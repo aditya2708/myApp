@@ -184,18 +184,6 @@ const RaportGenerateScreen = () => {
               </Text>
             </View>
             
-            <Text style={styles.materiHeader}>Materi:</Text>
-            {subject.materi_list.map((materi, mIndex) => (
-              <View key={mIndex} style={styles.materiItem}>
-                <View style={styles.materiRow}>
-                  <Text style={styles.materiName}>{materi.nama_materi}</Text>
-                  <Text style={styles.materiAverage}>{materi.rata_rata}</Text>
-                </View>
-                <Text style={styles.materiCount}>
-                  {materi.total_penilaian} penilaian
-                </Text>
-              </View>
-            ))}
           </View>
         ))}
       </View>
@@ -301,19 +289,6 @@ const RaportGenerateScreen = () => {
               <View style={styles.previewRow}>
                 <Text style={styles.previewLabel}>Rata-rata Keseluruhan:</Text>
                 <Text style={styles.previewValue}>{previewData.grades.overall_average}</Text>
-              </View>
-              <View style={styles.previewRow}>
-                <Text style={styles.previewLabel}>Total Penilaian:</Text>
-                <Text style={styles.previewValue}>{previewData.grades.total_assessments}</Text>
-              </View>
-              <View style={styles.previewRow}>
-                <Text style={styles.previewLabel}>Kelengkapan Data:</Text>
-                <Text style={[
-                  styles.previewValue,
-                  { color: previewData.grades.completeness === 100 ? '#2ecc71' : '#e74c3c' }
-                ]}>
-                  {previewData.grades.completeness}%
-                </Text>
               </View>
             </View>
 
@@ -526,35 +501,6 @@ const styles = StyleSheet.create({
   statText: {
     fontSize: 12,
     color: '#7f8c8d',
-  },
-  materiHeader: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#34495e',
-    marginBottom: 4,
-  },
-  materiItem: {
-    paddingLeft: 12,
-    marginBottom: 4,
-  },
-  materiRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  materiName: {
-    fontSize: 13,
-    color: '#2c3e50',
-    flex: 1,
-  },
-  materiAverage: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#27ae60',
-  },
-  materiCount: {
-    fontSize: 11,
-    color: '#95a5a6',
   },
   nilaiSikapDetail: {
     marginTop: 8,
