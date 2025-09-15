@@ -200,7 +200,8 @@ const ManagementStackNavigator = () => (
     <ManagementStack.Screen name="TutorManagement" component={TutorManagementScreen} options={{ headerTitle: 'Tutor Management' }} />
     <ManagementStack.Screen name="KeuanganList" component={KeuanganListScreen} options={{ headerTitle: 'Daftar Keuangan' }} />
     <ManagementStack.Screen name="LaporanKegiatanMain" component={LaporanKegiatanMainScreen} options={{ headerTitle: 'Laporan Kegiatan' }} />
-    
+    <ManagementStack.Screen name="RaportGenerate" component={RaportGenerateScreen} options={{ headerTitle: 'Generate Raport' }} />
+
     {/* Keluarga related screens */}
     <ManagementStack.Screen name="KeluargaDetail" component={KeluargaDetailScreen} options={{ headerTitle: 'Detail Keluarga' }} />
     <ManagementStack.Screen name="KeluargaForm" component={KeluargaFormScreen} options={{ headerTitle: 'Form Keluarga' }} />
@@ -208,30 +209,7 @@ const ManagementStackNavigator = () => (
     {/* Anak Management related screens */}
     <ManagementStack.Screen name="AnakDetail" component={AnakDetailScreen} options={{ headerTitle: 'Detail Anak' }} />
     <ManagementStack.Screen name="AnakForm" component={AnakFormScreen} options={{ headerTitle: 'Form Anak' }} />
-    
-    {/* AnakDetail module screens */}
-    <ManagementStack.Screen name="InformasiAnak" component={InformasiAnakScreen} options={{ headerTitle: 'Informasi Anak' }} />
-    <ManagementStack.Screen name="Raport" component={RaportScreen} options={{ headerTitle: 'Raport' }} />
-    <ManagementStack.Screen name="AddRaport" component={AddRaportScreen} options={{ headerTitle: 'Tambah Raport' }} />
-    <ManagementStack.Screen name="RaportDetail" component={RaportDetailScreen} options={{ headerTitle: 'Detail Raport' }} />
-    <ManagementStack.Screen name="Prestasi" component={PrestasiScreen} options={{ headerTitle: 'Prestasi' }} />
-    <ManagementStack.Screen name="PrestasiDetail" component={PrestasiDetailScreen} options={{ headerTitle: 'Detail Prestasi' }} />
-    <ManagementStack.Screen name="PrestasiForm" component={PrestasiFormScreen} options={{ headerTitle: 'Form Prestasi' }} />
-    <ManagementStack.Screen name="Surat" component={SuratScreen} options={{ headerTitle: 'Surat' }} />
-    <ManagementStack.Screen name="SuratList" component={SuratListScreen} options={{ headerTitle: 'Daftar Surat' }} />
-    <ManagementStack.Screen name="SuratDetail" component={SuratDetailScreen} options={{ headerTitle: 'Detail Surat' }} />
-    <ManagementStack.Screen name="SuratForm" component={SuratFormScreen} options={{ headerTitle: 'Form Surat' }} />
-    <ManagementStack.Screen name="Riwayat" component={RiwayatScreen} options={{ headerTitle: 'Riwayat' }} />
-    <ManagementStack.Screen name="RiwayatDetail" component={RiwayatDetailScreen} options={{ headerTitle: 'Detail Riwayat' }} />
-    <ManagementStack.Screen name="RiwayatForm" component={RiwayatFormScreen} options={{ headerTitle: 'Form Riwayat' }} />
-    <ManagementStack.Screen name="NilaiAnak" component={NilaiAnakScreen} options={{ headerTitle: 'Nilai Anak' }} />
-    <ManagementStack.Screen name="RaporShelter" component={RaporShelterScreen} options={{ headerTitle: 'Rapor Shelter' }} />
-    <ManagementStack.Screen name="RaportFormal" component={RaportFormalScreen} options={{ headerTitle: 'Raport Formal' }} />
-    <ManagementStack.Screen name="RaportFormalDetail" component={RaportFormalDetailScreen} options={{ headerTitle: 'Detail Raport Formal' }} />
-    <ManagementStack.Screen name="RaportFormalForm" component={RaportFormalFormScreen} options={{ headerTitle: 'Form Raport Formal' }} />
-    <ManagementStack.Screen name="PenilaianList" component={PenilaianListScreen} options={{ headerTitle: 'Daftar Penilaian' }} />
-    <ManagementStack.Screen name="PenilaianForm" component={PenilaianFormScreen} options={{ headerTitle: 'Form Penilaian' }} />
-    
+
     {/* Tutor related screens */}
     <ManagementStack.Screen name="TutorDetail" component={TutorDetailScreen} options={{ headerTitle: 'Detail Tutor' }} />
     <ManagementStack.Screen name="TutorForm" component={TutorFormScreen} options={{ headerTitle: 'Form Tutor' }} />
