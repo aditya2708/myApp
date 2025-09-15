@@ -43,14 +43,12 @@ const RaportGenerateScreen = () => {
     try {
       setLoadingData(true);
       const response = await semesterApi.getAllSemesters();
-      
+
       if (response.data.success) {
-        setSemesters(response.data.data.data || []);
-        
-        const activeSemester = response.data.data.data.find(s => s.is_active);
-        if (activeSemester) {
-          setSelectedSemester(activeSemester.id_semester);
-        }
+        const list = response.data.data || [];
+        setSemesters(list);
+        const activeSemester = list.find(s => s.aktif);
+        if (activeSemester) setSelectedSemester(activeSemester.id);
       }
     } catch (err) {
       console.error('Error fetching semesters:', err);
@@ -224,9 +222,9 @@ const RaportGenerateScreen = () => {
               <Picker.Item label="Pilih Semester" value="" />
               {semesters.map(semester => (
                 <Picker.Item
-                  key={semester.id_semester}
-                  label={`${semester.nama_semester} - ${semester.tahun_ajaran} ${semester.is_active ? '(Aktif)' : ''}`}
-                  value={semester.id_semester}
+                  key={semester.id}
+                  label={`${semester.nama_semester} - ${semester.tahun_ajaran} ${semester.aktif ? '(Aktif)' : ''}`}
+                  value={semester.id}
                 />
               ))}
             </Picker>
