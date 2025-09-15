@@ -4,6 +4,8 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Models\KurikulumMateri;
+use App\Models\Semester;
 
 class PenilaianRequest extends FormRequest
 {
@@ -33,7 +35,28 @@ class PenilaianRequest extends FormRequest
                 })
             ],
             'id_aktivitas' => 'required|exists:aktivitas,id_aktivitas',
-            'id_materi' => 'nullable|exists:materi,id_materi',
+            'id_materi' => [
+                'required',
+                'exists:materi,id_materi',
+                function ($attribute, $value, $fail) {
+                    $semesterId = $this->input('id_semester');
+                    if ($semesterId) {
+                        $semester = Semester::where('id_semester', $semesterId)
+                            ->where('is_active', true)
+                            ->first();
+                        if (!$semester) {
+                            $fail('Semester tidak aktif');
+                            return;
+                        }
+                        $valid = KurikulumMateri::where('id_kurikulum', $semester->kurikulum_id)
+                            ->where('id_materi', $value)
+                            ->exists();
+                        if (!$valid) {
+                            $fail('Materi tidak berada pada kurikulum & semester aktif');
+                        }
+                    }
+                }
+            ],
             'id_jenis_penilaian' => 'required|exists:jenis_penilaian,id_jenis_penilaian',
             'id_semester' => [
                 'required',
@@ -74,6 +97,7 @@ class PenilaianRequest extends FormRequest
             'id_anak.exists' => 'Anak tidak ditemukan atau tidak aktif',
             'id_aktivitas.required' => 'Aktivitas wajib dipilih',
             'id_aktivitas.exists' => 'Aktivitas tidak ditemukan',
+            'id_materi.required' => 'Materi wajib dipilih',
             'id_materi.exists' => 'Materi tidak ditemukan',
             'id_jenis_penilaian.required' => 'Jenis penilaian wajib dipilih',
             'id_jenis_penilaian.exists' => 'Jenis penilaian tidak ditemukan',
@@ -163,7 +187,31 @@ class BulkPenilaianRequest extends FormRequest
                 })
             ],
             'penilaian.*.id_aktivitas' => 'required|exists:aktivitas,id_aktivitas',
-            'penilaian.*.id_materi' => 'nullable|exists:materi,id_materi',
+            'penilaian.*.id_materi' => [
+                'required',
+                'exists:materi,id_materi',
+                function ($attribute, $value, $fail) {
+                    $segments = explode('.', $attribute);
+                    $index = $segments[1] ?? null;
+                    $penilaian = $this->penilaian[$index] ?? [];
+                    $semesterId = $penilaian['id_semester'] ?? null;
+                    if ($semesterId) {
+                        $semester = Semester::where('id_semester', $semesterId)
+                            ->where('is_active', true)
+                            ->first();
+                        if (!$semester) {
+                            $fail('Semester tidak aktif');
+                            return;
+                        }
+                        $valid = KurikulumMateri::where('id_kurikulum', $semester->kurikulum_id)
+                            ->where('id_materi', $value)
+                            ->exists();
+                        if (!$valid) {
+                            $fail('Materi tidak berada pada kurikulum & semester aktif');
+                        }
+                    }
+                }
+            ],
             'penilaian.*.id_jenis_penilaian' => 'required|exists:jenis_penilaian,id_jenis_penilaian',
             'penilaian.*.id_semester' => [
                 'required',
@@ -194,6 +242,8 @@ class BulkPenilaianRequest extends FormRequest
             'penilaian.*.id_anak.exists' => 'Anak tidak ditemukan atau tidak aktif',
             'penilaian.*.id_aktivitas.required' => 'Aktivitas wajib dipilih untuk setiap penilaian',
             'penilaian.*.id_aktivitas.exists' => 'Aktivitas tidak ditemukan',
+            'penilaian.*.id_materi.required' => 'Materi wajib dipilih',
+            'penilaian.*.id_materi.exists' => 'Materi tidak ditemukan',
             'penilaian.*.id_jenis_penilaian.required' => 'Jenis penilaian wajib dipilih',
             'penilaian.*.id_semester.required' => 'Semester wajib dipilih',
             'penilaian.*.nilai.required' => 'Nilai wajib diisi',
