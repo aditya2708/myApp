@@ -22,7 +22,7 @@ import ErrorMessage from '../../../common/components/ErrorMessage';
 // Import API
 import { penilaianApi } from '../api/penilaianApi';
 import { aktivitasApi } from '../api/aktivitasApi';
-import { materiApi } from '../api/materiApi';
+import { kurikulumShelterApi } from '../api/kurikulumShelterApi';
 
 const PenilaianFormScreen = () => {
   const navigation = useNavigation();
@@ -44,6 +44,7 @@ const PenilaianFormScreen = () => {
   });
 
   const [aktivitasList, setAktivitasList] = useState([]);
+  const [allMateriList, setAllMateriList] = useState([]);
   const [materiList, setMateriList] = useState([]);
   const [jenisPenilaianList, setJenisPenilaianList] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -65,21 +66,31 @@ const PenilaianFormScreen = () => {
     fetchInitialData();
   }, [anakId]);
 
-  // Auto-populate materi when aktivitas is selected
+  // Filter materi based on selected aktivitas
   useEffect(() => {
     if (formData.id_aktivitas && aktivitasList.length > 0) {
       const selectedAktivitas = aktivitasList.find(
         aktivitas => aktivitas.id_aktivitas.toString() === formData.id_aktivitas.toString()
       );
-      
       if (selectedAktivitas && selectedAktivitas.id_materi) {
-        updateFormData('id_materi', selectedAktivitas.id_materi);
+        const filtered = allMateriList.filter(
+          m => m.id_materi === selectedAktivitas.id_materi
+        );
+        setMateriList(filtered);
+        if (filtered.length === 1) {
+          updateFormData('id_materi', filtered[0].id_materi);
+        } else {
+          updateFormData('id_materi', '');
+        }
       } else {
-        // Clear materi if aktivitas doesn't have associated materi
+        setMateriList([]);
         updateFormData('id_materi', '');
       }
+    } else {
+      setMateriList([]);
+      updateFormData('id_materi', '');
     }
-  }, [formData.id_aktivitas, aktivitasList]);
+  }, [formData.id_aktivitas, aktivitasList, allMateriList]);
 
   const fetchInitialData = async () => {
     try {
@@ -90,9 +101,10 @@ const PenilaianFormScreen = () => {
       const promises = [];
 
       // Fetch aktivitas with kelompok filter
-      const aktivitasParams = { 
+      const aktivitasParams = {
         jenis_kegiatan: 'Bimbel',
-        limit: 100 
+        limit: 100,
+        semester_id: formData.id_semester
       };
       
       // Add nama_kelompok filter if anak has kelompok
@@ -106,7 +118,7 @@ const PenilaianFormScreen = () => {
       promises.push(penilaianApi.getJenisPenilaian());
 
       // Fetch materi from kurikulum
-      promises.push(materiApi.getAllMateri());
+      promises.push(kurikulumShelterApi.getAllMateri());
 
       const [aktivitasResponse, jenisPenilaianResponse, materiResponse] = await Promise.all(promises);
       
@@ -126,9 +138,12 @@ const PenilaianFormScreen = () => {
 
       // Handle materi response - extract from hierarchy structure
       if (materiResponse?.data?.success && materiResponse?.data?.data?.hierarchy?.materi_list) {
-        setMateriList(materiResponse.data.data.hierarchy.materi_list || []);
+        const materiData = materiResponse.data.data.hierarchy.materi_list || [];
+        setAllMateriList(materiData);
+        setMateriList(materiData);
       } else {
         console.warn('Failed to fetch materi:', materiResponse?.data?.message);
+        setAllMateriList([]);
         setMateriList([]);
       }
 
@@ -149,6 +164,8 @@ const PenilaianFormScreen = () => {
       
       const submitData = {
         ...formData,
+        id_materi: formData.id_materi,
+        id_semester: formData.id_semester,
         nilai: parseFloat(formData.nilai),
         tanggal_penilaian: formData.tanggal_penilaian.toISOString().split('T')[0]
       };
@@ -196,6 +213,10 @@ const PenilaianFormScreen = () => {
   const validateForm = () => {
     if (!formData.id_aktivitas) {
       Alert.alert('Error', 'Silakan pilih aktivitas');
+      return false;
+    }
+    if (!formData.id_materi) {
+      Alert.alert('Error', 'Silakan pilih materi');
       return false;
     }
     if (!formData.id_jenis_penilaian) {
@@ -264,26 +285,28 @@ const PenilaianFormScreen = () => {
           </View>
         </View>
 
-        {/* Materi Info - Auto-populated from Aktivitas */}
+        {/* Materi Picker */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Materi</Text>
-          <View style={styles.infoDisplay}>
-            {formData.id_materi ? (
-              <Text style={styles.infoDisplayText}>
-                {(() => {
-                  const selectedMateri = materiList.find(m => m.id_materi.toString() === formData.id_materi.toString());
-                  if (selectedMateri) {
-                    return `${selectedMateri.mata_pelajaran?.nama_mata_pelajaran || 'Mata Pelajaran'} - ${selectedMateri.nama_materi} (${selectedMateri.kelas?.nama_kelas || 'Kelas'})`;
-                  }
-                  return 'Materi dari aktivitas';
-                })()}
-              </Text>
-            ) : (
-              <Text style={styles.infoDisplayTextEmpty}>
-                Materi akan otomatis terisi dari aktivitas yang dipilih
-              </Text>
-            )}
-            <Ionicons name="information-circle-outline" size={20} color="#95a5a6" />
+          <Text style={styles.label}>Materi *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={formData.id_materi}
+              onValueChange={(value) => updateFormData('id_materi', value)}
+              style={styles.picker}
+              enabled={materiList.length > 0}
+            >
+              <Picker.Item
+                label={materiList.length > 0 ? 'Pilih Materi' : 'Pilih Aktivitas terlebih dahulu'}
+                value=""
+              />
+              {materiList.map(materi => (
+                <Picker.Item
+                  key={materi.id_materi}
+                  label={`${materi.mata_pelajaran?.nama_mata_pelajaran || 'Mata Pelajaran'} - ${materi.nama_materi} (${materi.kelas?.nama_kelas || 'Kelas'})`}
+                  value={materi.id_materi}
+                />
+              ))}
+            </Picker>
           </View>
         </View>
 
@@ -451,31 +474,6 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
-  },
-  infoDisplay: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 50,
-  },
-  infoDisplayText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#2c3e50',
-    lineHeight: 20,
-  },
-  infoDisplayTextEmpty: {
-    flex: 1,
-    fontSize: 16,
-    color: '#95a5a6',
-    fontStyle: 'italic',
-    lineHeight: 20,
   },
   dateInput: {
     backgroundColor: '#ffffff',
