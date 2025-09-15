@@ -104,10 +104,17 @@ class RaportController extends Controller
                 $penilaianData = $this->getValidPenilaian($request->id_anak, $semester);
             } catch (\InvalidArgumentException $e) {
                 DB::rollBack();
-                return response()->json([
+
+                $response = [
                     'success' => false,
                     'message' => $e->getMessage()
-                ], 422);
+                ];
+
+                if (str_contains($e->getMessage(), 'kurikulum_materi')) {
+                    $response['needs_curriculum_setup'] = true;
+                }
+
+                return response()->json($response, 422);
             }
 
             // Calculate attendance
@@ -514,10 +521,16 @@ class RaportController extends Controller
         try {
             $penilaianData = $this->getValidPenilaian($idAnak, $semester);
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
+            $response = [
                 'success' => false,
                 'message' => $e->getMessage()
-            ], 422);
+            ];
+
+            if (str_contains($e->getMessage(), 'kurikulum_materi')) {
+                $response['needs_curriculum_setup'] = true;
+            }
+
+            return response()->json($response, 422);
         }
 
         // Calculate attendance
