@@ -116,6 +116,12 @@ Route::middleware('role:admin_pusat')->prefix('admin-pusat')->group(function () 
         Route::get('/kurikulum/dropdown-data', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'getDropdownData']);
         Route::get('/kurikulum/mata-pelajaran', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'getMataPelajaran']);
 
+        // Kurikulum materi management
+        Route::get('/kurikulum/{kurikulum}/materi', [App\Http\Controllers\API\AdminCabang\KurikulumMateriController::class, 'index']);
+        Route::post('/kurikulum/{kurikulum}/materi', [App\Http\Controllers\API\AdminCabang\KurikulumMateriController::class, 'store']);
+        Route::delete('/kurikulum/{kurikulum}/materi/{materi}', [App\Http\Controllers\API\AdminCabang\KurikulumMateriController::class, 'destroy']);
+        Route::post('/kurikulum/{kurikulum}/materi/reorder', [App\Http\Controllers\API\AdminCabang\KurikulumMateriController::class, 'reorder']);
+
         // Hierarchy & Navigation
         Route::get('/kurikulum/struktur', [App\Http\Controllers\API\AdminCabang\HierarchyController::class, 'getStruktur']);
         Route::get('/kurikulum/kelas/{jenjang}', [App\Http\Controllers\API\AdminCabang\HierarchyController::class, 'getKelas']);
