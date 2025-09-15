@@ -50,13 +50,14 @@ const RaportGenerateScreen = () => {
         const activeSemester = list.find(s => s.aktif);
         if (activeSemester) setSelectedSemester(activeSemester.id);
       }
-    } catch (err) {
-      console.error('Error fetching semesters:', err);
-      setError('Gagal memuat data semester');
-    } finally {
-      setLoadingData(false);
-    }
-  };
+  } catch (err) {
+    console.error('Error fetching semesters:', err);
+    if (err.response) console.log('API response:', err.response.data);
+    setError('Gagal memuat data semester');
+  } finally {
+    setLoadingData(false);
+  }
+};
 
   const checkExistingRaport = async () => {
     try {
