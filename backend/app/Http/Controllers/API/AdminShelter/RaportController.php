@@ -10,6 +10,7 @@ use App\Models\Semester;
 use App\Models\Penilaian;
 use App\Models\NilaiSikap;
 use App\Models\Absen;
+use App\Models\KurikulumMateri;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -85,6 +86,7 @@ class RaportController extends Controller
                 ->first();
 
             if ($existingRaport) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Raport untuk anak dan semester ini sudah ada',
@@ -92,8 +94,23 @@ class RaportController extends Controller
                 ], 409);
             }
 
+            // Ensure semester is active
+            $semester = Semester::where('id_semester', $request->id_semester)
+                ->where('is_active', true)
+                ->firstOrFail();
+
+            // Validate penilaian data
+            try {
+                $penilaianData = $this->getValidPenilaian($request->id_anak, $semester);
+            } catch (\InvalidArgumentException $e) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 422);
+            }
+
             // Calculate attendance
-            $semester = Semester::findOrFail($request->id_semester);
             $totalActivities = Absen::whereHas('aktivitas', function($query) use ($semester) {
                     $query->whereBetween('tanggal', [$semester->tanggal_mulai, $semester->tanggal_selesai]);
                 })
@@ -125,7 +142,7 @@ class RaportController extends Controller
             ]);
 
             // Generate raport details from penilaian
-            $this->generateRaportDetails($raport);
+            $this->generateRaportDetails($raport, $penilaianData);
 
             // Calculate ranking
             $this->calculateRanking($request->id_semester);
@@ -137,7 +154,7 @@ class RaportController extends Controller
                 'message' => 'Raport berhasil dibuat',
                 'data' => $raport->load(['anak', 'semester', 'raportDetail'])
             ], 201);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
@@ -383,13 +400,8 @@ class RaportController extends Controller
     /**
      * Generate raport details from penilaian
      */
-    private function generateRaportDetails($raport)
+    private function generateRaportDetails($raport, $penilaianData)
     {
-        $penilaianData = Penilaian::where('id_anak', $raport->id_anak)
-            ->where('id_semester', $raport->id_semester)
-            ->with(['materi.mataPelajaran', 'jenisPenilaian'])
-            ->get();
-
         // Group by mata pelajaran using proper relationship
         $groupedByMapel = [];
         
@@ -458,6 +470,44 @@ class RaportController extends Controller
                 'keterangan' => $nilaiAkhir >= 70 ? 'Tuntas' : 'Belum Tuntas'
             ]);
         }
+    }
+
+    /**
+     * Get penilaian data and ensure materi belongs to active curriculum
+     */
+    private function getValidPenilaian($idAnak, $semester)
+    {
+        // Check for penilaian without materi
+        $missingMateri = Penilaian::where('id_anak', $idAnak)
+            ->where('id_semester', $semester->id_semester)
+            ->whereNull('id_materi')
+            ->exists();
+
+        if ($missingMateri) {
+            throw new \InvalidArgumentException('Terdapat penilaian tanpa materi yang valid');
+        }
+
+        // Get materi allowed for active kurikulum
+        $validMateriIds = KurikulumMateri::where('id_kurikulum', $semester->kurikulum_id)
+            ->pluck('id_materi')
+            ->toArray();
+
+        // Check for materi outside active curriculum
+        $invalidMateri = Penilaian::where('id_anak', $idAnak)
+            ->where('id_semester', $semester->id_semester)
+            ->whereNotNull('id_materi')
+            ->whereNotIn('id_materi', $validMateriIds)
+            ->exists();
+
+        if ($invalidMateri) {
+            throw new \InvalidArgumentException('Terdapat materi yang tidak berada pada kurikulum aktif');
+        }
+
+        return Penilaian::where('id_anak', $idAnak)
+            ->where('id_semester', $semester->id_semester)
+            ->whereIn('id_materi', $validMateriIds)
+            ->with(['materi.mataPelajaran', 'jenisPenilaian'])
+            ->get();
     }
 
     /**
@@ -530,8 +580,20 @@ class RaportController extends Controller
 {
     try {
         $anak = Anak::findOrFail($idAnak);
-        $semester = Semester::findOrFail($idSemester);
-        
+        $semester = Semester::where('id_semester', $idSemester)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        // Validate penilaian data
+        try {
+            $penilaianData = $this->getValidPenilaian($idAnak, $semester);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+
         // Calculate attendance
         $totalActivities = Absen::whereHas('aktivitas', function($query) use ($semester) {
                 $query->whereBetween('tanggal', [$semester->tanggal_mulai, $semester->tanggal_selesai]);
@@ -552,20 +614,14 @@ class RaportController extends Controller
 
         $attendancePercentage = $totalActivities > 0 ? ($presentCount / $totalActivities) * 100 : 0;
 
-        // Get detailed academic grades
-        $penilaianData = Penilaian::where('id_anak', $idAnak)
-            ->where('id_semester', $idSemester)
-            ->with(['materi', 'jenisPenilaian', 'aktivitas'])
-            ->get();
-
         // Group by mata_pelajaran using proper relationship
         $academicDetails = [];
         $overallAverage = 0;
         $totalSubjects = 0;
-        
+
         $groupedByMapel = $penilaianData->groupBy(function($penilaian) {
-            return $penilaian->materi && $penilaian->materi->mataPelajaran 
-                ? $penilaian->materi->mataPelajaran->nama_mata_pelajaran 
+            return $penilaian->materi && $penilaian->materi->mataPelajaran
+                ? $penilaian->materi->mataPelajaran->nama_mata_pelajaran
                 : 'Unknown';
         });
         
