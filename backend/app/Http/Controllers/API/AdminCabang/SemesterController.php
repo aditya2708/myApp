@@ -81,7 +81,7 @@ class SemesterController extends Controller
                 'periode' => 'required|in:ganjil,genap',
                 'tanggal_mulai' => 'required|date',
                 'tanggal_selesai' => 'required|date|after:tanggal_mulai',
-                'kurikulum_id' => 'nullable|exists:kurikulum,id_kurikulum',
+                'kurikulum_id' => 'required|exists:kurikulum,id_kurikulum',
                 'status' => 'nullable|in:draft,active,completed,archived',
                 'type' => 'nullable|in:cabang,shelter'
             ]);
@@ -213,7 +213,7 @@ class SemesterController extends Controller
                 'periode' => 'sometimes|in:ganjil,genap',
                 'tanggal_mulai' => 'sometimes|date',
                 'tanggal_selesai' => 'sometimes|date|after_or_equal:' . ($request->tanggal_mulai ?? $semester->tanggal_mulai),
-                'kurikulum_id' => 'nullable|exists:kurikulum,id_kurikulum',
+                'kurikulum_id' => 'sometimes|required|exists:kurikulum,id_kurikulum',
                 'status' => 'nullable|in:draft,active,completed,archived',
                 'type' => 'nullable|in:cabang,shelter'
             ]);
@@ -260,9 +260,17 @@ class SemesterController extends Controller
             }
 
             $data = $request->only([
-                'nama_semester', 'tahun_ajaran', 'periode', 'tanggal_mulai', 
+                'nama_semester', 'tahun_ajaran', 'periode', 'tanggal_mulai',
                 'tanggal_selesai', 'kurikulum_id', 'status', 'type'
             ]);
+
+            // Ensure kurikulum_id is present either in existing record or update data
+            if (!$semester->kurikulum_id && !isset($data['kurikulum_id'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kurikulum harus diisi'
+                ], 422);
+            }
 
             // Update tahun_mulai and tahun_selesai if dates changed
             if ($request->has('tanggal_mulai')) {
@@ -391,6 +399,13 @@ class SemesterController extends Controller
                       ->orWhere('status', 'aktif');
                 })
                 ->first();
+
+            if (!$semester->kurikulum_id && !$activeKurikulum) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Semester belum memiliki kurikulum'
+                ], 422);
+            }
 
             $updateData = ['is_active' => true, 'status' => 'active'];
             if ($activeKurikulum) {
