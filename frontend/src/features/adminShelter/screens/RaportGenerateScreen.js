@@ -104,15 +104,22 @@ const RaportGenerateScreen = () => {
       }
 
       const response = await raportApi.getPreviewData(anakId, selectedSemester);
-      
+
       if (response.data.success) {
         setPreviewData(response.data.data);
       } else {
-        setError(response.data.message || 'Gagal memuat preview raport');
+        setError(
+          response.data.message ||
+            'Kurikulum untuk semester ini belum tersedia.'
+        );
       }
     } catch (err) {
       console.error('Error getting preview:', err);
-      setError('Gagal memuat preview. Silakan coba lagi.');
+      const apiMessage = err.response?.data?.message;
+      setError(
+        apiMessage ||
+          'Kurikulum untuk semester ini belum tersedia. Silakan hubungi admin.'
+      );
     } finally {
       setLoading(false);
     }
