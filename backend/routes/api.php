@@ -184,12 +184,6 @@ Route::middleware('role:admin_pusat')->prefix('admin-pusat')->group(function () 
         Route::post('/anak/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'update']);
         Route::delete('/anak/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'destroy']);
         Route::post('/anak/{id}/toggle-status', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'toggleStatus']);
-    
-        Route::get('/anak/{childId}/raport', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportController::class, 'index']);
-        Route::post('/anak/{childId}/raport/create', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportController::class, 'store']);
-        Route::get('/anak/{childId}/raport/{raportId}', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportController::class, 'show']);
-        Route::post('/anak/{childId}/raport/{raportId}/update', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportController::class, 'update']);
-        Route::delete('/anak/{childId}/raport/{raportId}', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportController::class, 'destroy']);
 
         Route::get('/anak/{anakId}/prestasi', [App\Http\Controllers\API\AdminShelter\AdminShelterPrestasiController::class, 'index']);
         Route::post('/anak/{anakId}/prestasi', [App\Http\Controllers\API\AdminShelter\AdminShelterPrestasiController::class, 'store']);
