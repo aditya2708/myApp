@@ -89,6 +89,14 @@ const RaportViewScreen = () => {
     }
   };
 
+  // Combine statistics from preview API when available
+  const attendanceTotal =
+    previewData?.attendance?.total ?? raport?.total_kehadiran;
+  const attendancePercentage =
+    previewData?.attendance?.percentage ?? raport?.persentase_kehadiran;
+  const overallAverage =
+    previewData?.grades?.overall_average ?? raport?.average_grade;
+
   const handleExportPDF = async () => {
     Alert.alert(
       'Export PDF',
@@ -102,7 +110,7 @@ const RaportViewScreen = () => {
       const message = `Raport ${raport.anak.full_name}\n` +
                      `Semester: ${raport.semester.nama_semester} ${raport.semester.tahun_ajaran}\n` +
                      `Ranking: ${raport.ranking || '-'}\n` +
-                     `Kehadiran: ${raport.persentase_kehadiran}%`;
+                     `Kehadiran: ${attendancePercentage}%`;
       
       await Share.share({
         message,
@@ -258,14 +266,14 @@ const RaportViewScreen = () => {
             <Ionicons name="calendar-outline" size={24} color="#3498db" />
             <View style={styles.attendanceInfo}>
               <Text style={styles.attendanceLabel}>Total Kehadiran</Text>
-              <Text style={styles.attendanceValue}>{raport.total_kehadiran} hari</Text>
+              <Text style={styles.attendanceValue}>{attendanceTotal} hari</Text>
             </View>
           </View>
           <View style={styles.attendanceRow}>
             <Ionicons name="stats-chart-outline" size={24} color="#2ecc71" />
             <View style={styles.attendanceInfo}>
               <Text style={styles.attendanceLabel}>Persentase</Text>
-              <Text style={styles.attendanceValue}>{raport.persentase_kehadiran}%</Text>
+              <Text style={styles.attendanceValue}>{attendancePercentage}%</Text>
             </View>
           </View>
         </View>
@@ -276,10 +284,10 @@ const RaportViewScreen = () => {
         <Text style={styles.sectionTitle}>Nilai Akademik</Text>
         
         {/* Overall Summary */}
-        {previewData?.grades?.overall_average && (
+        {overallAverage !== undefined && overallAverage !== null && (
           <View style={styles.averageCard}>
             <Text style={styles.averageLabel}>Nilai Rata-rata Keseluruhan</Text>
-            <Text style={styles.averageValue}>{previewData.grades.overall_average.toFixed(2)}</Text>
+            <Text style={styles.averageValue}>{Number(overallAverage).toFixed(2)}</Text>
           </View>
         )}
         
