@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\AdminCabang;
 
 use App\Http\Controllers\Controller;
+use App\Models\KurikulumMateri;
 use App\Models\Materi;
 use App\Models\MataPelajaran;
 use App\Models\Kelas;
@@ -77,7 +78,8 @@ class MateriController extends Controller
                 'tingkat_kesulitan' => 'nullable|in:mudah,sedang,sulit',
                 'status' => 'nullable|in:draft,published,archived',
                 'file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240', // 10MB max
-                'urutan' => 'nullable|integer|min:1'
+                'urutan' => 'nullable|integer|min:1',
+                'kurikulum_id' => 'nullable|exists:kurikulum,id_kurikulum'
             ]);
 
             if ($validator->fails()) {
@@ -130,6 +132,21 @@ class MateriController extends Controller
             }
 
             $materi = Materi::create($data);
+
+            if ($request->filled('kurikulum_id')) {
+                $kurikulumUrutan = KurikulumMateri::getNextUrutan(
+                    $request->kurikulum_id,
+                    $request->id_mata_pelajaran
+                ) ?? 1;
+
+                KurikulumMateri::create([
+                    'id_kurikulum' => $request->kurikulum_id,
+                    'id_mata_pelajaran' => $request->id_mata_pelajaran,
+                    'id_materi' => $materi->id_materi,
+                    'urutan' => $kurikulumUrutan
+                ]);
+            }
+
             $materi->load(['mataPelajaran', 'kelas.jenjang']);
 
             return response()->json([
@@ -275,6 +292,8 @@ class MateriController extends Controller
             if ($materi->file_path) {
                 Storage::disk('public')->delete($materi->file_path);
             }
+
+            KurikulumMateri::where('id_materi', $materi->id_materi)->delete();
 
             $materi->delete();
 
