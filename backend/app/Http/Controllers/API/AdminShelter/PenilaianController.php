@@ -11,6 +11,7 @@ use App\Models\JenisPenilaian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
 
 class PenilaianController extends Controller
 {
@@ -73,9 +74,8 @@ class PenilaianController extends Controller
             $validator = Validator::make($request->all(), [
                 'id_anak' => 'required|exists:anak,id_anak',
                 'id_aktivitas' => 'required|exists:aktivitas,id_aktivitas',
-                'id_materi' => 'nullable|exists:materi,id_materi',
                 'id_jenis_penilaian' => 'required|exists:jenis_penilaian,id_jenis_penilaian',
-                'id_semester' => 'required|exists:semester,id_semester',
+                'id_semester' => 'nullable|exists:semester,id_semester',
                 'nilai' => 'required|numeric|min:0|max:100',
                 'deskripsi_tugas' => 'nullable|string',
                 'tanggal_penilaian' => 'required|date',
@@ -90,7 +90,39 @@ class PenilaianController extends Controller
                 ], 422);
             }
 
-            $penilaian = Penilaian::create($request->all());
+            $aktivitas = Aktivitas::find($request->id_aktivitas);
+            if (!$aktivitas || !$aktivitas->id_materi) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aktivitas tidak memiliki materi kurikulum'
+                ], 422);
+            }
+
+            $data = $request->all();
+            $data['id_materi'] = $aktivitas->id_materi;
+
+            if (!$request->filled('id_semester')) {
+                $kacabId = auth()->user()->adminShelter->id_kacab ?? null;
+                $query = Semester::query();
+                if ($kacabId) {
+                    $query->where('id_kacab', $kacabId);
+                }
+                if (Schema::hasColumn('semester', 'status')) {
+                    $query->where('status', 'active');
+                } else {
+                    $query->where('is_active', true);
+                }
+                $activeSemester = $query->first();
+                if (!$activeSemester) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Semester aktif tidak ditemukan'
+                    ], 422);
+                }
+                $data['id_semester'] = $activeSemester->id_semester;
+            }
+
+            $penilaian = Penilaian::create($data);
             
             return response()->json([
                 'success' => true,
@@ -142,9 +174,8 @@ class PenilaianController extends Controller
             $validator = Validator::make($request->all(), [
                 'id_anak' => 'sometimes|required|exists:anak,id_anak',
                 'id_aktivitas' => 'sometimes|required|exists:aktivitas,id_aktivitas',
-                'id_materi' => 'nullable|exists:materi,id_materi',
                 'id_jenis_penilaian' => 'sometimes|required|exists:jenis_penilaian,id_jenis_penilaian',
-                'id_semester' => 'sometimes|required|exists:semester,id_semester',
+                'id_semester' => 'sometimes|nullable|exists:semester,id_semester',
                 'nilai' => 'sometimes|required|numeric|min:0|max:100',
                 'deskripsi_tugas' => 'nullable|string',
                 'tanggal_penilaian' => 'sometimes|required|date',
@@ -159,7 +190,41 @@ class PenilaianController extends Controller
                 ], 422);
             }
 
-            $penilaian->update($request->all());
+            $aktivitasId = $request->id_aktivitas ?? $penilaian->id_aktivitas;
+            $aktivitas = Aktivitas::find($aktivitasId);
+            if (!$aktivitas || !$aktivitas->id_materi) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aktivitas tidak memiliki materi kurikulum'
+                ], 422);
+            }
+
+            $data = $request->all();
+            $data['id_aktivitas'] = $aktivitasId;
+            $data['id_materi'] = $aktivitas->id_materi;
+
+            if (!$request->has('id_semester')) {
+                $kacabId = auth()->user()->adminShelter->id_kacab ?? null;
+                $query = Semester::query();
+                if ($kacabId) {
+                    $query->where('id_kacab', $kacabId);
+                }
+                if (Schema::hasColumn('semester', 'status')) {
+                    $query->where('status', 'active');
+                } else {
+                    $query->where('is_active', true);
+                }
+                $activeSemester = $query->first();
+                if (!$activeSemester) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Semester aktif tidak ditemukan'
+                    ], 422);
+                }
+                $data['id_semester'] = $activeSemester->id_semester;
+            }
+
+            $penilaian->update($data);
             
             return response()->json([
                 'success' => true,
