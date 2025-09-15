@@ -275,6 +275,7 @@ Route::middleware('role:admin_pusat')->prefix('admin-pusat')->group(function () 
         Route::get('/kurikulum/dashboard', [App\Http\Controllers\API\AdminShelter\KurikulumDashboardController::class, 'getDashboard']);
         Route::get('/kurikulum/semester-info', [App\Http\Controllers\API\AdminShelter\KurikulumDashboardController::class, 'getSemesterInfo']);
         Route::get('/kurikulum/today-activities', [App\Http\Controllers\API\AdminShelter\KurikulumDashboardController::class, 'getTodayActivities']);
+        Route::post('/kurikulum/{id}/set-active', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'setActive']);
 
         // Semester Management for Admin Shelter (Read-only access to cabang semesters)
         Route::get('/semester', [App\Http\Controllers\API\AdminShelter\SemesterController::class, 'index']);
