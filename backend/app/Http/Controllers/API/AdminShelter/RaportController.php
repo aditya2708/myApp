@@ -402,6 +402,11 @@ class RaportController extends Controller
      */
     private function getValidPenilaian($idAnak, $semester)
     {
+        // Ensure semester has associated curriculum
+        if (!$semester->kurikulum_id) {
+            throw new \InvalidArgumentException('Semester belum memiliki kurikulum.');
+        }
+
         // Check for penilaian without materi
         $missingMateri = Penilaian::where('id_anak', $idAnak)
             ->where('id_semester', $semester->id_semester)
@@ -413,6 +418,10 @@ class RaportController extends Controller
         }
 
         // Get materi allowed for active kurikulum
+        if (!Schema::hasTable('kurikulum_materi')) {
+            throw new \InvalidArgumentException('Tabel kurikulum_materi tidak ditemukan');
+        }
+
         $validMateriIds = KurikulumMateri::where('id_kurikulum', $semester->kurikulum_id)
             ->pluck('id_materi')
             ->toArray();
