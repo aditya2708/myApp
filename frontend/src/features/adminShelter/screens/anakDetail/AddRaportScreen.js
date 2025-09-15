@@ -16,7 +16,7 @@ import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 
 // Import API
-import { adminShelterRaportApi } from '../../api/adminShelterRaportApi';
+import { raportApi } from '../../api/raportApi';
 
 const AddRaportScreen = () => {
   const route = useRoute();
@@ -45,7 +45,7 @@ const AddRaportScreen = () => {
       setSubmitting(true);
       setError(null);
       
-      const response = await adminShelterRaportApi.createRaport(anakId, formData);
+      const response = await raportApi.generateRaport(formData);
       
       if (response.data.success) {
         Alert.alert(

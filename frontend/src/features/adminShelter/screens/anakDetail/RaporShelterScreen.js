@@ -22,7 +22,7 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
 import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
 // Import API
-import { adminShelterRaportApi } from '../../api/adminShelterRaportApi';
+import { raportApi } from '../../api/raportApi';
 
 const RaportScreen = () => {
   const route = useRoute();
@@ -44,7 +44,7 @@ const RaportScreen = () => {
     
     try {
       setError(null);
-      const response = await adminShelterRaportApi.getRaports(anakId);
+      const response = await raportApi.getRaportByAnak(anakId);
       
       if (response.data.success) {
         setRaportList(response.data.data || []);
