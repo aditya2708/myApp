@@ -32,6 +32,7 @@ const PenilaianListScreen = () => {
   const [error, setError] = useState(null);
   const [activeSemester, setActiveSemester] = useState(null);
   const [selectedSemester, setSelectedSemester] = useState(null);
+  const [semesterId, setSemesterId] = useState(null);
 
   useEffect(() => {
     if (!anakId) {
@@ -45,9 +46,25 @@ const PenilaianListScreen = () => {
 
   useEffect(() => {
     if (selectedSemester) {
-      fetchPenilaian();
+      const id = selectedSemester.id_semester || selectedSemester.id;
+      setSemesterId(id);
     }
   }, [selectedSemester]);
+
+  useEffect(() => {
+    if (semesterId) {
+      fetchPenilaian();
+    }
+  }, [semesterId]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (semesterId) {
+        fetchPenilaian();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, semesterId]);
 
   const fetchActiveSemester = async () => {
     try {
@@ -59,6 +76,7 @@ const PenilaianListScreen = () => {
         console.log('✅ [PenilaianList] Active semester found:', response.data.data);
         setActiveSemester(response.data.data);
         setSelectedSemester(response.data.data);
+        setSemesterId(response.data.data.id_semester);
       } else {
         console.warn('⚠️ [PenilaianList] Semester API failed:', response.data.message);
         setError('Gagal memuat semester aktif');
@@ -73,20 +91,17 @@ const PenilaianListScreen = () => {
   const fetchPenilaian = async () => {
     try {
       setError(null);
-      
+
       console.log('📋 [PenilaianList] Selected semester:', selectedSemester);
       console.log('👤 [PenilaianList] Anak ID:', anakId);
-      
-      // Semester API returns 'id' field, not 'id_semester'
-      const semesterId = selectedSemester?.id_semester || selectedSemester?.id;
-      
+
       if (!semesterId) {
         console.warn('⚠️ [PenilaianList] No semester ID available');
         console.log('🔍 [PenilaianList] Selected semester object:', JSON.stringify(selectedSemester, null, 2));
         setError('Semester tidak tersedia');
         return;
       }
-      
+
       console.log('🔄 [PenilaianList] Fetching penilaian for anak:', anakId, 'semester:', semesterId);
       const response = await penilaianApi.getByAnakSemester(anakId, semesterId);
       console.log('📊 [PenilaianList] Penilaian API response:', JSON.stringify(response.data, null, 2));
@@ -114,14 +129,11 @@ const PenilaianListScreen = () => {
   };
 
   const navigateToForm = (penilaian = null) => {
-    // Semester API returns 'id' field, not 'id_semester'
-    const semesterId = selectedSemester?.id_semester || selectedSemester?.id;
-    
     navigation.navigate('PenilaianForm', {
       anakId,
       anakData,
       penilaian,
-      semesterId: semesterId
+      semesterId
     });
   };
 
