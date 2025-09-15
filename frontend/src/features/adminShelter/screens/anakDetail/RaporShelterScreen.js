@@ -3,12 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   Image,
   TouchableOpacity,
   FlatList,
-  RefreshControl,
-  Alert
+  RefreshControl
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,27 +75,13 @@ const RaportScreen = () => {
   };
 
   // Handle view raport detail
-  const handleViewRaport = (raport) => {
-    // Navigation to detail screen would go here
-    Alert.alert(
-      'Lihat Detail Raport',
-      `Raport ${raport.semester} - ${raport.tingkat}`,
-      [
-        { text: 'OK' }
-      ]
-    );
+  const handleViewRaport = (item) => {
+    navigation.navigate('RaportView', { raportId: item.id_raport });
   };
 
   // Handle create new raport
   const handleCreateRaport = () => {
-    // Navigation to create raport screen would go here
-    Alert.alert(
-      'Tambah Raport Baru',
-      'Fitur tambah raport baru akan segera tersedia',
-      [
-        { text: 'OK' }
-      ]
-    );
+    navigation.navigate('RaportGenerate', { anakId, anakData });
   };
 
   // Render raport item
