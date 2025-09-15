@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\AdminShelter;
 
 use App\Http\Controllers\Controller;
 use App\Models\Kurikulum;
+use App\Models\Semester;
 use Illuminate\Http\Request;
 
 class AdminShelterKurikulumController extends Controller
@@ -130,6 +131,51 @@ class AdminShelterKurikulumController extends Controller
                 'success' => false,
                 'message' => 'Gagal mengambil data dropdown kurikulum',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function setActive($id)
+    {
+        try {
+            $adminShelter = auth()->user()->adminShelter;
+            $kacabId = $adminShelter->shelter->wilbin->id_kacab;
+            $shelterId = $adminShelter->shelter->id_shelter;
+
+            // Ensure kurikulum exists for this cabang
+            $kurikulum = Kurikulum::where('id_kacab', $kacabId)->findOrFail($id);
+
+            // Find active semester for this shelter
+            $query = Semester::where('id_kacab', $kacabId)
+                ->where('id_shelter', $shelterId);
+
+            if (\Schema::hasColumn('semester', 'status')) {
+                $query->where('status', 'active');
+            } else {
+                $query->where('is_active', true);
+            }
+
+            $semester = $query->first();
+
+            if (!$semester) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Semester aktif tidak ditemukan'
+                ], 404);
+            }
+
+            $semester->kurikulum_id = $kurikulum->id_kurikulum;
+            $semester->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kurikulum aktif berhasil ditetapkan',
+                'data' => $semester
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menetapkan kurikulum aktif: ' . $e->getMessage()
             ], 500);
         }
     }

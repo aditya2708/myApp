@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\AdminCabang;
 
 use App\Http\Controllers\Controller;
 use App\Models\Semester;
+use App\Models\Kurikulum;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -383,8 +384,20 @@ class SemesterController extends Controller
                 ->where('id_semester', '!=', $id)
                 ->update(['is_active' => false, 'status' => 'draft']);
 
-            // Set this semester as active
-            $semester->update(['is_active' => true, 'status' => 'active']);
+            // Set this semester as active and assign active kurikulum
+            $activeKurikulum = Kurikulum::where('id_kacab', $kacabId)
+                ->where(function($q) {
+                    $q->where('is_active', true)
+                      ->orWhere('status', 'aktif');
+                })
+                ->first();
+
+            $updateData = ['is_active' => true, 'status' => 'active'];
+            if ($activeKurikulum) {
+                $updateData['kurikulum_id'] = $activeKurikulum->id_kurikulum;
+            }
+
+            $semester->update($updateData);
             $semester->load(['kurikulum']);
 
             return response()->json([
