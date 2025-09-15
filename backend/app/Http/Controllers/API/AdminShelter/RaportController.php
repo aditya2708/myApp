@@ -142,7 +142,7 @@ class RaportController extends Controller
             ]);
 
             // Generate raport details from penilaian
-            $this->generateRaportDetails($raport, $penilaianData);
+            $raport->generateFromPenilaian($penilaianData);
 
             // Calculate ranking
             $this->calculateRanking($request->id_semester);
@@ -398,81 +398,6 @@ class RaportController extends Controller
     }
 
     /**
-     * Generate raport details from penilaian
-     */
-    private function generateRaportDetails($raport, $penilaianData)
-    {
-        // Group by mata pelajaran using proper relationship
-        $groupedByMapel = [];
-        
-        foreach ($penilaianData as $penilaian) {
-            // Debug: Check if relationships are loaded
-            if (!$penilaian->materi) {
-                \Log::warning('Penilaian materi not loaded', ['penilaian_id' => $penilaian->id_penilaian]);
-                continue; // Skip if no materi relationship
-            }
-            
-            if (!$penilaian->materi->mataPelajaran) {
-                \Log::warning('MataPelajaran not loaded', ['materi_id' => $penilaian->materi->id_materi]);
-                // Try direct query as fallback
-                $mataPelajaran = \App\Models\MataPelajaran::find($penilaian->materi->id_mata_pelajaran);
-                if (!$mataPelajaran) {
-                    continue;
-                }
-                $mataPelajaranId = $mataPelajaran->id_mata_pelajaran;
-                $mataPelajaranName = $mataPelajaran->nama_mata_pelajaran;
-            } else {
-                $mataPelajaranId = $penilaian->materi->mataPelajaran->id_mata_pelajaran;
-                $mataPelajaranName = $penilaian->materi->mataPelajaran->nama_mata_pelajaran;
-            }
-            
-            if (!isset($groupedByMapel[$mataPelajaranId])) {
-                $groupedByMapel[$mataPelajaranId] = [
-                    'mata_pelajaran' => $penilaian->materi->mataPelajaran ?? $mataPelajaran,
-                    'penilaian' => []
-                ];
-            }
-            
-            $groupedByMapel[$mataPelajaranId]['penilaian'][] = $penilaian;
-        }
-
-        foreach ($groupedByMapel as $mataPelajaranId => $data) {
-            $mataPelajaran = $data['mata_pelajaran'];
-            $penilaianGroup = $data['penilaian'];
-            $nilaiAkhir = 0;
-            
-            // Use dynamic bobot from JenisPenilaian, fallback to hardcoded
-            $defaultBobotMapping = [
-                1 => 0.30, // Tugas (30%)
-                2 => 0.35, // UTS (35%)
-                3 => 0.35, // UAS (35%)
-            ];
-            
-            foreach ($penilaianGroup as $penilaian) {
-                $bobot = $penilaian->jenisPenilaian->bobot_persen > 0 
-                    ? ($penilaian->jenisPenilaian->bobot_persen / 100)
-                    : ($defaultBobotMapping[$penilaian->id_jenis_penilaian] ?? 0.30);
-                    
-                $nilaiAkhir += $penilaian->nilai * $bobot;
-            }
-            
-            // Get first materi for this mata_pelajaran (optional, could be null)
-            $firstMateri = $penilaianGroup[0]->materi ?? null;
-            
-            RaportDetail::create([
-                'id_raport' => $raport->id_raport,
-                'id_mata_pelajaran' => $mataPelajaranId,
-                'id_materi' => $firstMateri ? $firstMateri->id_materi : null, // Reference to first materi
-                'mata_pelajaran' => $mataPelajaran->nama_mata_pelajaran, // Backward compatibility
-                'nilai_akhir' => $nilaiAkhir,
-                'nilai_huruf' => $this->convertToHuruf($nilaiAkhir),
-                'kkm' => 70, // TODO: Make this dynamic based on mata pelajaran
-                'keterangan' => $nilaiAkhir >= 70 ? 'Tuntas' : 'Belum Tuntas'
-            ]);
-        }
-    }
-
-    /**
      * Get penilaian data and ensure materi belongs to active curriculum
      */
     private function getValidPenilaian($idAnak, $semester)
@@ -540,14 +465,6 @@ class RaportController extends Controller
         }
     }
 
-    private function convertToHuruf($nilai)
-    {
-        if ($nilai >= 90) return 'A';
-        if ($nilai >= 80) return 'B';
-        if ($nilai >= 70) return 'C';
-        if ($nilai >= 60) return 'D';
-        return 'E';
-    }
     /**
      * Check if raport exists for anak and semester
      */

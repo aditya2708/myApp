@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class Raport extends Model
 {
@@ -78,38 +79,35 @@ class Raport extends Model
         return $this->raportDetail()->avg('nilai_akhir');
     }
 
-    public function generateFromPenilaian()
+    public function generateFromPenilaian(Collection $penilaianData)
     {
-        $penilaianData = Penilaian::where('id_anak', $this->id_anak)
-            ->where('id_semester', $this->id_semester)
-            ->with(['materi.mataPelajaran', 'jenisPenilaian'])
-            ->get()
-            ->groupBy(function($penilaian) {
-                return $penilaian->materi && $penilaian->materi->mataPelajaran 
-                    ? $penilaian->materi->mataPelajaran->id_mata_pelajaran 
-                    : 'unknown';
-            });
+        $grouped = $penilaianData->groupBy(function($penilaian) {
+            return optional(optional($penilaian->materi)->mataPelajaran)->id_mata_pelajaran;
+        });
 
-        foreach ($penilaianData as $mataPelajaranId => $penilaianGroup) {
-            if ($mataPelajaranId === 'unknown') continue;
-            
+        foreach ($grouped as $mataPelajaranId => $penilaianGroup) {
+            if (!$mataPelajaranId) {
+                continue;
+            }
+
             $nilaiAkhir = 0;
             $mataPelajaran = $penilaianGroup->first()->materi->mataPelajaran;
-            
+
             foreach ($penilaianGroup as $penilaian) {
                 $bobot = $penilaian->jenisPenilaian->bobot_persen > 0
                     ? ($penilaian->jenisPenilaian->bobot_persen / 100)
                     : $penilaian->jenisPenilaian->bobot_decimal;
-                    
+
                 $nilaiAkhir += $penilaian->nilai * $bobot;
             }
-            
+
+            $firstMateri = $penilaianGroup->first()->materi;
+
             $this->raportDetail()->updateOrCreate(
+                ['id_mata_pelajaran' => $mataPelajaranId],
                 [
-                    'id_mata_pelajaran' => $mataPelajaranId,
-                    'mata_pelajaran' => $mataPelajaran->nama_mata_pelajaran
-                ],
-                [
+                    'id_materi' => $firstMateri ? $firstMateri->id_materi : null,
+                    'mata_pelajaran' => $mataPelajaran->nama_mata_pelajaran,
                     'nilai_akhir' => $nilaiAkhir,
                     'nilai_huruf' => $this->convertToHuruf($nilaiAkhir),
                     'kkm' => 70,
