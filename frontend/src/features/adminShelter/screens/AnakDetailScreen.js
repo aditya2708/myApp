@@ -63,7 +63,7 @@ const AnakDetailScreen = () => {
     },
     {
       title: 'Raport Shelter',
-      screen: 'Raport',
+      screen: 'RaporShelter',
       icon: 'library-outline'
     },
     {
