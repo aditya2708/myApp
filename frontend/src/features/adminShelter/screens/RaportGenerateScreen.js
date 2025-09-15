@@ -224,7 +224,7 @@ const RaportGenerateScreen = () => {
               {semesters.map(semester => (
                 <Picker.Item
                   key={semester.id}
-                  label={`${semester.nama_semester} - ${semester.tahun_ajaran} ${semester.aktif ? '(Aktif)' : ''}`}
+                  label={`${semester.nama || semester.nama_semester} - ${semester.tahun_ajaran} ${semester.aktif ? '(Aktif)' : ''}`}
                   value={semester.id}
                 />
               ))}
