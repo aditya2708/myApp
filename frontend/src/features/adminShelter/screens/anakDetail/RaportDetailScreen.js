@@ -22,7 +22,7 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
 import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
 // Import API
-import { adminShelterRaportApi } from '../../api/adminShelterRaportApi';
+import { raportApi } from '../../api/raportApi';
 
 const { width } = Dimensions.get('window');
 
@@ -74,7 +74,7 @@ const RaportDetailScreen = () => {
       setLoading(true);
       setError(null);
       
-      const response = await adminShelterRaportApi.getRaportDetail(anakId, raportId);
+      const response = await raportApi.getRaportDetail(raportId);
       
       if (response.data.success) {
         setRaport(response.data.data);
@@ -125,7 +125,7 @@ const RaportDetailScreen = () => {
     try {
       setSubmitting(true);
       
-      const response = await adminShelterRaportApi.deleteRaport(anakId, raportId);
+      const response = await raportApi.deleteRaport(raportId);
       
       if (response.data.success) {
         Alert.alert(
