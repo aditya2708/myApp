@@ -141,10 +141,46 @@ export const kurikulumApi = createApi({
       providesTags: (result, error, id) => [{ type: 'Materi', id }],
     }),
 
+    getKurikulumMateri: builder.query({
+      query: ({ kurikulumId, mataPelajaranId }) => ({
+        url: `/kurikulum/${kurikulumId}/materi`,
+        params: mataPelajaranId ? { mata_pelajaran: mataPelajaranId } : undefined,
+      }),
+      providesTags: ['Kurikulum'],
+    }),
+
+    addKurikulumMateri: builder.mutation({
+      query: ({ kurikulumId, mataPelajaranId, materiId, urutan }) => {
+        const body = {
+          id_mata_pelajaran: mataPelajaranId,
+          id_materi: materiId,
+        };
+
+        if (urutan !== undefined && urutan !== null) {
+          body.urutan = urutan;
+        }
+
+        return {
+          url: `/kurikulum/${kurikulumId}/materi`,
+          method: 'POST',
+          body,
+        };
+      },
+      invalidatesTags: ['Kurikulum'],
+    }),
+
+    deleteKurikulumMateri: builder.mutation({
+      query: ({ kurikulumId, materiId }) => ({
+        url: `/kurikulum/${kurikulumId}/materi/${materiId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Kurikulum'],
+    }),
+
     createMateri: builder.mutation({
       query: (data) => {
         const formData = new FormData();
-        
+
         // Append all form fields
         Object.keys(data).forEach(key => {
           if (data[key] !== null && data[key] !== undefined && data[key] !== '') {
@@ -603,6 +639,9 @@ export const {
   // Materi hooks
   useGetMateriListQuery,
   useGetMateriQuery,
+  useGetKurikulumMateriQuery,
+  useAddKurikulumMateriMutation,
+  useDeleteKurikulumMateriMutation,
   useCreateMateriMutation,
   useUpdateMateriMutation,
   useDeleteMateriMutation,
