@@ -15,6 +15,7 @@ class Kurikulum extends Model
     protected $fillable = [
         'nama_kurikulum',
         'kode_kurikulum',
+        'jenis',
         'tahun_berlaku',
         'id_jenjang',
         'deskripsi',
@@ -29,6 +30,7 @@ class Kurikulum extends Model
     protected $casts = [
         'id_kurikulum' => 'integer',
         'tahun_berlaku' => 'integer',
+        'jenis' => 'string',
         'id_jenjang' => 'integer',
         'tanggal_mulai' => 'date',
         'tanggal_selesai' => 'date',
