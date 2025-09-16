@@ -16,6 +16,114 @@ use Illuminate\Support\Str;
 class KurikulumController extends Controller
 {
     /**
+     * Display all kurikulum that belong to the authenticated cabang
+     */
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user || !$user->adminCabang) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak memiliki akses untuk melihat kurikulum'
+                ], 403);
+            }
+
+            $kacabId = $user->adminCabang->id_kacab;
+            $search = trim((string) $request->query('search', ''));
+            $status = $request->query('status');
+            $tahun = $request->query('tahun') ?? $request->query('tahun_berlaku');
+            $limit = $request->query('limit');
+
+            $query = Kurikulum::byKacab($kacabId)
+                ->withCounts()
+                ->with(['jenjang']);
+
+            if ($search !== '') {
+                $query->where(function($q) use ($search) {
+                    $q->where('nama_kurikulum', 'like', "%{$search}%")
+                      ->orWhere('kode_kurikulum', 'like', "%{$search}%")
+                      ->orWhere('tahun_berlaku', 'like', "%{$search}%");
+                });
+            }
+
+            if ($status && $status !== 'all') {
+                $normalizedStatus = strtolower($status);
+
+                if (in_array($normalizedStatus, ['aktif', 'active'], true)) {
+                    $query->where(function($q) {
+                        $q->where('status', 'aktif')
+                          ->orWhere('is_active', true);
+                    });
+                } elseif (in_array($normalizedStatus, ['nonaktif', 'inactive', 'non-active'], true)) {
+                    $query->where(function($q) {
+                        $q->whereIn('status', ['nonaktif', 'inactive'])
+                          ->orWhere('is_active', false);
+                    });
+                } else {
+                    $query->where(function($q) use ($status, $normalizedStatus) {
+                        $q->where('status', $status);
+                        if ($status !== $normalizedStatus) {
+                            $q->orWhere('status', $normalizedStatus);
+                        }
+                    });
+                }
+            }
+
+            if (!empty($tahun)) {
+                $query->where('tahun_berlaku', $tahun);
+            }
+
+            $query->orderByDesc('is_active')
+                ->orderByRaw("CASE WHEN status = 'aktif' THEN 0 WHEN status = 'draft' THEN 1 ELSE 2 END")
+                ->orderBy('tahun_berlaku', 'desc')
+                ->orderBy('nama_kurikulum');
+
+            if ($limit && is_numeric($limit) && (int) $limit > 0) {
+                $query->limit((int) $limit);
+            }
+
+            $kurikulum = $query->get()->map(function($kurikulum) {
+                $mataPelajaranCount = (int) ($kurikulum->mata_pelajaran_count ?? $kurikulum->getTotalMataPelajaran());
+                $materiCount = (int) ($kurikulum->kurikulum_materi_count ?? $kurikulum->materi_count ?? $kurikulum->getTotalMateri());
+                $semesterCount = (int) ($kurikulum->semester_count ?? $kurikulum->semester()->count());
+
+                return [
+                    'id_kurikulum' => $kurikulum->id_kurikulum,
+                    'nama_kurikulum' => $kurikulum->nama_kurikulum,
+                    'kode_kurikulum' => $kurikulum->kode_kurikulum,
+                    'tahun_berlaku' => $kurikulum->tahun_berlaku,
+                    'jenis' => $kurikulum->jenis,
+                    'deskripsi' => $kurikulum->deskripsi,
+                    'status' => $kurikulum->status,
+                    'status_text' => $kurikulum->status_text,
+                    'status_color' => $kurikulum->status_color,
+                    'is_active' => (bool) $kurikulum->is_active,
+                    'mata_pelajaran_count' => $mataPelajaranCount,
+                    'total_mata_pelajaran' => $mataPelajaranCount,
+                    'kurikulum_materi_count' => $materiCount,
+                    'total_materi' => $materiCount,
+                    'semester_count' => $semesterCount,
+                    'created_at' => $kurikulum->created_at ? $kurikulum->created_at->toIso8601String() : null,
+                    'updated_at' => $kurikulum->updated_at ? $kurikulum->updated_at->toIso8601String() : null,
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'data' => $kurikulum,
+                'message' => 'Daftar kurikulum berhasil diambil'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil kurikulum: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Store a new kurikulum for current cabang
      */
     public function store(Request $request): JsonResponse
