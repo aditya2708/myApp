@@ -17,7 +17,6 @@ class Kurikulum extends Model
         'kode_kurikulum',
         'tahun_berlaku',
         'id_jenjang',
-        'id_mata_pelajaran',
         'deskripsi',
         'tujuan',
         'tanggal_mulai',
@@ -31,7 +30,6 @@ class Kurikulum extends Model
         'id_kurikulum' => 'integer',
         'tahun_berlaku' => 'integer',
         'id_jenjang' => 'integer',
-        'id_mata_pelajaran' => 'integer',
         'tanggal_mulai' => 'date',
         'tanggal_selesai' => 'date',
         'is_active' => 'boolean',
@@ -51,7 +49,12 @@ class Kurikulum extends Model
 
     public function mataPelajaran()
     {
-        return $this->belongsTo(MataPelajaran::class, 'id_mata_pelajaran', 'id_mata_pelajaran');
+        return $this->belongsToMany(
+            MataPelajaran::class,
+            'kurikulum_materi',
+            'id_kurikulum',
+            'id_mata_pelajaran'
+        )->distinct();
     }
 
     public function kurikulumMateri()
@@ -117,7 +120,12 @@ class Kurikulum extends Model
 
     public function scopeWithCounts($query)
     {
-        return $query->withCount(['kurikulumMateri', 'semester', 'materi', 'mataPelajaran']);
+        return $query
+            ->withCount(['kurikulumMateri', 'semester', 'materi'])
+            ->addSelect([
+                'mata_pelajaran_count' => KurikulumMateri::selectRaw('COUNT(DISTINCT id_mata_pelajaran)')
+                    ->whereColumn('kurikulum_materi.id_kurikulum', 'kurikulum.id_kurikulum'),
+            ]);
     }
 
     // Accessors
@@ -168,7 +176,9 @@ class Kurikulum extends Model
 
     public function getTotalMataPelajaran()
     {
-        return $this->mataPelajaran()->distinct()->count();
+        return $this->kurikulumMateri()
+            ->distinct('id_mata_pelajaran')
+            ->count('id_mata_pelajaran');
     }
 
     public function getKurikulumStats()
