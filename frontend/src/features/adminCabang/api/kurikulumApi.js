@@ -71,6 +71,15 @@ export const kurikulumApi = createApi({
       },
     }),
 
+    createKurikulum: builder.mutation({
+      query: (data) => ({
+        url: '/kurikulum',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: [{ type: 'Kurikulum', id: 'LIST' }, 'Statistics'],
+    }),
+
     getMataPelajaran: builder.query({
       query: (params) => ({
         url: '/kurikulum/mata-pelajaran',
@@ -527,6 +536,7 @@ export const {
   // Kurikulum hooks
   useGetKurikulumStrukturQuery,
   useGetKurikulumListQuery,
+  useCreateKurikulumMutation,
   useGetMataPelajaranQuery,
   useGetKurikulumDropdownDataQuery,
   useGetKelasByJenjangQuery,

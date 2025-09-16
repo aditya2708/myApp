@@ -5,13 +5,92 @@ namespace App\Http\Controllers\API\AdminCabang;
 use App\Http\Controllers\Controller;
 use App\Models\Jenjang;
 use App\Models\Kelas;
+use App\Models\Kurikulum;
 use App\Models\MataPelajaran;
 use App\Models\Materi;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class KurikulumController extends Controller
 {
+    /**
+     * Store a new kurikulum for current cabang
+     */
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user || !$user->adminCabang) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak memiliki akses untuk membuat kurikulum'
+                ], 403);
+            }
+
+            $kacabId = $user->adminCabang->id_kacab;
+
+            $validator = Validator::make($request->all(), [
+                'nama' => 'required|string|max:255',
+                'tahun' => 'required|integer|min:2000|max:2100',
+                'jenis' => 'nullable|string|max:100',
+                'deskripsi' => 'nullable|string',
+                'status' => 'nullable|in:draft,aktif,nonaktif'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $nama = trim($request->input('nama'));
+            $tahun = (int) $request->input('tahun');
+
+            $duplicateExists = Kurikulum::where('id_kacab', $kacabId)
+                ->where('nama_kurikulum', $nama)
+                ->where('tahun_berlaku', $tahun)
+                ->exists();
+
+            if ($duplicateExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kurikulum dengan nama dan tahun tersebut sudah ada'
+                ], 422);
+            }
+
+            $status = $request->input('status', 'draft');
+
+            $kurikulum = Kurikulum::create([
+                'nama_kurikulum' => $nama,
+                'kode_kurikulum' => $this->generateKurikulumCode($kacabId, $request->input('jenis') ?? $nama, $tahun),
+                'tahun_berlaku' => $tahun,
+                'jenis' => $request->input('jenis'),
+                'deskripsi' => $request->input('deskripsi'),
+                'status' => $status,
+                'is_active' => $status === 'aktif',
+                'id_kacab' => $kacabId,
+            ]);
+
+            $kurikulum->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kurikulum berhasil dibuat',
+                'data' => $kurikulum
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat kurikulum: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Get kurikulum hierarchy structure (jenjang -> kelas -> mata pelajaran)
      */
@@ -233,5 +312,27 @@ class KurikulumController extends Controller
                 'message' => 'Gagal mengambil statistik: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Generate unique kurikulum code for branch
+     */
+    private function generateKurikulumCode(int $kacabId, string $baseName, int $tahun): string
+    {
+        $slug = Str::slug($baseName, '_');
+        $slug = $slug ?: 'kurikulum';
+        $slug = substr($slug, 0, 40);
+        $baseCode = strtoupper($slug) . '_' . $tahun;
+        $code = $baseCode;
+        $counter = 1;
+
+        while (Kurikulum::where('id_kacab', $kacabId)
+            ->where('kode_kurikulum', $code)
+            ->exists()) {
+            $code = $baseCode . '_' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+            $counter++;
+        }
+
+        return $code;
     }
 }

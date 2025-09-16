@@ -26,6 +26,7 @@ import MataPelajaranListScreen from '../features/adminCabang/screens/kurikulum/M
 import MateriManagementScreen from '../features/adminCabang/screens/kurikulum/MateriManagementScreen';
 import MateriFormScreen from '../features/adminCabang/screens/kurikulum/MateriFormScreen';
 import SelectKurikulumScreen from '../features/adminCabang/screens/kurikulum/SelectKurikulumScreen';
+import CreateKurikulumScreen from '../features/adminCabang/screens/kurikulum/CreateKurikulumScreen';
 import SemesterManagementScreen from '../features/adminCabang/screens/kurikulum/SemesterManagementScreen';
 import TemplateAdoptionScreen from '../features/adminCabang/screens/kurikulum/TemplateAdoptionScreen';
 import MasterDataScreen from '../features/adminCabang/screens/kurikulum/MasterDataScreen';
@@ -114,6 +115,11 @@ const KurikulumStackNavigator = () => (
       name="SelectKurikulum"
       component={SelectKurikulumScreen}
       options={{ headerTitle: 'Pilih Kurikulum' }}
+    />
+    <KurikulumStack.Screen
+      name="CreateKurikulum"
+      component={CreateKurikulumScreen}
+      options={{ headerTitle: 'Buat Kurikulum' }}
     />
     <KurikulumStack.Screen
       name="JenjangSelection"

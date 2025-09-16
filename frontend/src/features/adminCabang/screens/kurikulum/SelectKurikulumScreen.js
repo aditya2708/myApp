@@ -102,7 +102,7 @@ const SelectKurikulumScreen = ({ navigation }) => {
   };
 
   const handleCreateNew = () => {
-    navigation.navigate('TemplateAdoption');
+    navigation.navigate('CreateKurikulum');
   };
 
   const renderHeader = () => (
