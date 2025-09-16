@@ -489,6 +489,7 @@ export const {
   
   // Materi hooks
   useGetMateriListQuery,
+  useLazyGetMateriListQuery,
   useGetMateriQuery,
   useGetKurikulumMateriQuery,
   useAddKurikulumMateriMutation,
