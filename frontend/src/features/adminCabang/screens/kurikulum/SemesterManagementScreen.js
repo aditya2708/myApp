@@ -31,6 +31,14 @@ import {
  * CRUD interface for semester management
  */
 const SemesterManagementScreen = ({ navigation }) => {
+  const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
+  const activeKurikulumId = selectedKurikulumId
+    ?? selectedKurikulum?.id_kurikulum
+    ?? selectedKurikulum?.kurikulum_id
+    ?? selectedKurikulum?.id
+    ?? null;
+  const activeKurikulumName = selectedKurikulum?.nama_kurikulum || '';
+
   const [selectedTab, setSelectedTab] = useState('active');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -40,7 +48,8 @@ const SemesterManagementScreen = ({ navigation }) => {
     tahun_ajaran: '',
     periode: 'ganjil',
     tanggal_mulai: '',
-    tanggal_selesai: ''
+    tanggal_selesai: '',
+    kurikulum_id: activeKurikulumId ?? ''
   });
   
   // Date picker states
@@ -70,15 +79,24 @@ const SemesterManagementScreen = ({ navigation }) => {
   );
 
   const handleAddSemester = () => {
+    if (!activeKurikulumId) {
+      Alert.alert(
+        'Kurikulum Belum Dipilih',
+        'Pilih kurikulum terlebih dahulu sebelum menambah semester baru.'
+      );
+      return;
+    }
+
     const today = new Date();
     const nextYear = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
-    
+
     setFormData({
       nama_semester: '',
       tahun_ajaran: new Date().getFullYear().toString(),
       periode: 'ganjil',
       tanggal_mulai: '',
-      tanggal_selesai: ''
+      tanggal_selesai: '',
+      kurikulum_id: activeKurikulumId
     });
     setStartDate(today);
     setEndDate(nextYear);
@@ -87,21 +105,39 @@ const SemesterManagementScreen = ({ navigation }) => {
 
   const handleEditSemester = (semester) => {
     setEditingSemester(semester);
+    const semesterKurikulumId = semester.kurikulum_id
+      ?? semester.id_kurikulum
+      ?? activeKurikulumId
+      ?? '';
     setFormData({
       nama_semester: semester.nama_semester || '',
       tahun_ajaran: semester.tahun_ajaran || '',
       periode: semester.periode || 'ganjil',
       tanggal_mulai: semester.tanggal_mulai || '',
-      tanggal_selesai: semester.tanggal_selesai || ''
+      tanggal_selesai: semester.tanggal_selesai || '',
+      kurikulum_id: semesterKurikulumId
     });
-    
+
     // Set date picker values
     const startDateValue = semester.tanggal_mulai ? new Date(semester.tanggal_mulai) : new Date();
     const endDateValue = semester.tanggal_selesai ? new Date(semester.tanggal_selesai) : new Date();
     setStartDate(startDateValue);
     setEndDate(endDateValue);
-    
+
     setShowEditModal(true);
+  };
+
+  const resolveKurikulumIdValue = (value) => {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      return value;
+    }
+
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
   };
 
   const handleCreateSubmit = async () => {
@@ -111,8 +147,19 @@ const SemesterManagementScreen = ({ navigation }) => {
       return;
     }
 
+    const normalizedKurikulumId = resolveKurikulumIdValue(formData.kurikulum_id ?? activeKurikulumId);
+    if (!normalizedKurikulumId) {
+      Alert.alert('Error', 'Kurikulum belum dipilih atau tidak valid');
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      kurikulum_id: normalizedKurikulumId
+    };
+
     try {
-      await createSemester(formData).unwrap();
+      await createSemester(payload).unwrap();
       Alert.alert('Berhasil', 'Semester berhasil ditambahkan');
       setShowCreateModal(false);
       refetch();
@@ -128,10 +175,21 @@ const SemesterManagementScreen = ({ navigation }) => {
       return;
     }
 
+    const normalizedKurikulumId = resolveKurikulumIdValue(formData.kurikulum_id ?? activeKurikulumId);
+    if (!normalizedKurikulumId) {
+      Alert.alert('Error', 'Kurikulum belum dipilih atau tidak valid');
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      kurikulum_id: normalizedKurikulumId
+    };
+
     try {
-      await updateSemester({ 
-        id: editingSemester.id_semester, 
-        ...formData 
+      await updateSemester({
+        id: editingSemester.id_semester,
+        ...payload
       }).unwrap();
       Alert.alert('Berhasil', 'Semester berhasil diupdate');
       setShowEditModal(false);
@@ -153,7 +211,8 @@ const SemesterManagementScreen = ({ navigation }) => {
       tahun_ajaran: '',
       periode: 'ganjil',
       tanggal_mulai: '',
-      tanggal_selesai: ''
+      tanggal_selesai: '',
+      kurikulum_id: activeKurikulumId ?? ''
     });
   };
 
@@ -494,11 +553,27 @@ const SemesterManagementScreen = ({ navigation }) => {
                   placeholder="Contoh: 2024/2025"
                 />
               </View>
-              
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ID Kurikulum</Text>
+                <TextInput
+                  style={[styles.formInput, styles.readOnlyInput]}
+                  value={formData.kurikulum_id ? String(formData.kurikulum_id) : ''}
+                  editable={false}
+                  selectTextOnFocus={false}
+                  placeholder="ID kurikulum terpilih"
+                />
+                {(editingSemester?.kurikulum?.nama_kurikulum || activeKurikulumName) ? (
+                  <Text style={styles.helperText} numberOfLines={2}>
+                    Kurikulum: {editingSemester?.kurikulum?.nama_kurikulum || activeKurikulumName}
+                  </Text>
+                ) : null}
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Periode</Text>
                 <View style={styles.radioGroup}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.radioOption, formData.periode === 'ganjil' && styles.radioSelected]}
                     onPress={() => setFormData({...formData, periode: 'ganjil'})}
                   >
@@ -595,11 +670,27 @@ const SemesterManagementScreen = ({ navigation }) => {
                   placeholder="Contoh: 2024/2025"
                 />
               </View>
-              
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ID Kurikulum</Text>
+                <TextInput
+                  style={[styles.formInput, styles.readOnlyInput]}
+                  value={formData.kurikulum_id ? String(formData.kurikulum_id) : ''}
+                  editable={false}
+                  selectTextOnFocus={false}
+                  placeholder="ID kurikulum terpilih"
+                />
+                {(editingSemester?.kurikulum?.nama_kurikulum || activeKurikulumName) ? (
+                  <Text style={styles.helperText} numberOfLines={2}>
+                    Kurikulum: {editingSemester?.kurikulum?.nama_kurikulum || activeKurikulumName}
+                  </Text>
+                ) : null}
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Periode</Text>
                 <View style={styles.radioGroup}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.radioOption, formData.periode === 'ganjil' && styles.radioSelected]}
                     onPress={() => setFormData({...formData, periode: 'ganjil'})}
                   >
@@ -888,6 +979,15 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 14,
     backgroundColor: '#fff',
+  },
+  readOnlyInput: {
+    backgroundColor: '#f1f3f5',
+    color: '#495057',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 6,
   },
   datePickerButton: {
     borderWidth: 1,
