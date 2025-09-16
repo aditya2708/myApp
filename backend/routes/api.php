@@ -112,6 +112,7 @@ Route::middleware('role:admin_pusat')->prefix('admin-pusat')->group(function () 
         Route::get('/donatur-dropdown', [App\Http\Controllers\API\AdminCabang\AdminCabangDonaturController::class, 'getDropdownData']);
 
         // Kurikulum main endpoints
+        Route::get('/kurikulum', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'index']);
         Route::post('/kurikulum', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'store']);
         Route::get('/kurikulum/statistics', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'getStatistics']);
         Route::get('/kurikulum/dropdown-data', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'getDropdownData']);
