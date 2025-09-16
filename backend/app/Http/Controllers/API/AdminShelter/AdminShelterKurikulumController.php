@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\AdminShelter;
 
 use App\Http\Controllers\Controller;
 use App\Models\Kurikulum;
+use App\Models\KurikulumMateri;
 use App\Models\Semester;
 use Illuminate\Http\Request;
 
@@ -25,7 +26,12 @@ class AdminShelterKurikulumController extends Controller
                 $query->where('nama_kurikulum', 'like', '%' . $request->search . '%');
             }
             
-            $kurikulum = $query->withCount(['kurikulumMateri', 'mataPelajaran'])
+            $kurikulum = $query
+                ->withCount(['kurikulumMateri'])
+                ->addSelect([
+                    'mata_pelajaran_count' => KurikulumMateri::selectRaw('COUNT(DISTINCT id_mata_pelajaran)')
+                        ->whereColumn('kurikulum_materi.id_kurikulum', 'kurikulum.id_kurikulum'),
+                ])
                 ->orderBy('tahun_berlaku', 'desc')
                 ->orderBy('nama_kurikulum')
                 ->get();
@@ -82,10 +88,13 @@ class AdminShelterKurikulumController extends Controller
                 'kurikulum' => $kurikulum->only(['id_kurikulum', 'nama_kurikulum', 'deskripsi', 'tahun_berlaku']),
                 'total_mata_pelajaran' => $kurikulum->getTotalMataPelajaran(),
                 'total_materi' => $kurikulum->getTotalMateri(),
-                'mata_pelajaran' => $kurikulum->allMataPelajaran->map(function ($mp) use ($kurikulum) {
-                    return [
-                        'id_mata_pelajaran' => $mp->id_mata_pelajaran,
-                        'nama' => $mp->nama_mata_pelajaran,
+                'mata_pelajaran' => $kurikulum->mataPelajaran
+                    ->unique('id_mata_pelajaran')
+                    ->values()
+                    ->map(function ($mp) use ($kurikulum) {
+                        return [
+                            'id_mata_pelajaran' => $mp->id_mata_pelajaran,
+                            'nama' => $mp->nama_mata_pelajaran,
                         'kategori' => $mp->kategori,
                         'total_materi' => $kurikulum->kurikulumMateri()
                             ->where('id_mata_pelajaran', $mp->id_mata_pelajaran)

@@ -164,7 +164,6 @@ class BaseCRUDRequest extends FormRequest
             'kode_kurikulum' => ['required', 'string', 'max:50'],
             'tahun_berlaku' => ['required', 'integer', 'min:2020', 'max:2030'],
             'id_jenjang' => ['required', 'integer', 'exists:jenjang,id_jenjang'],
-            'id_mata_pelajaran' => ['required', 'integer', 'exists:mata_pelajaran,id_mata_pelajaran'],
             'deskripsi' => ['nullable', 'string', 'max:1000'],
             'tujuan' => ['nullable', 'string', 'max:1000'],
             'tanggal_mulai' => ['required', 'date'],
