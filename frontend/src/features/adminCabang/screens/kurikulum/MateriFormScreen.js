@@ -1,26 +1,53 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Alert 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import { useSelector } from 'react-redux';
 import TextInput from '../../../../common/components/TextInput';
 import PickerInput from '../../../../common/components/PickerInput';
 import Button from '../../../../common/components/Button';
-import { useCreateMateriMutation, useUpdateMateriMutation } from '../../api/kurikulumApi';
+import {
+  useCreateMateriMutation,
+  useUpdateMateriMutation,
+  useAddKurikulumMateriMutation
+} from '../../api/kurikulumApi';
+
+const getFirstDefined = (...values) => values.find((value) => value !== undefined && value !== null);
 
 /**
  * Materi Form Screen - API Integrated
  * Form for adding/editing learning materials
  */
 const MateriFormScreen = ({ navigation, route }) => {
-  const { jenjang, kelas, mataPelajaran, isEdit, materi } = route.params;
-  
+  const { jenjang, kelas, mataPelajaran, isEdit, materi, kurikulumId: routeKurikulumId } = route.params || {};
+
+  const kurikulumState = useSelector(state => state?.kurikulum);
+  const kurikulumId = getFirstDefined(
+    routeKurikulumId,
+    materi?.kurikulum_id,
+    materi?.id_kurikulum,
+    materi?.pivot?.id_kurikulum,
+    kurikulumState?.currentMataPelajaran?.id_kurikulum,
+    kurikulumState?.currentMataPelajaran?.kurikulum_id,
+    kurikulumState?.currentKelas?.id_kurikulum,
+    kurikulumState?.currentKelas?.kurikulum_id,
+    kurikulumState?.currentJenjang?.id_kurikulum,
+    kurikulumState?.currentJenjang?.kurikulum_id,
+    kelas?.id_kurikulum,
+    kelas?.kurikulum_id,
+    mataPelajaran?.id_kurikulum,
+    mataPelajaran?.kurikulum_id,
+    jenjang?.id_kurikulum,
+    jenjang?.kurikulum_id
+  );
+
   const [formData, setFormData] = useState({
     nama_materi: isEdit ? materi?.nama_materi || '' : '',
     deskripsi: isEdit ? materi?.deskripsi || '' : '',
@@ -33,8 +60,9 @@ const MateriFormScreen = ({ navigation, route }) => {
   // API mutations
   const [createMateri, { isLoading: isCreating }] = useCreateMateriMutation();
   const [updateMateri, { isLoading: isUpdating }] = useUpdateMateriMutation();
-  
-  const loading = isCreating || isUpdating;
+  const [addKurikulumMateri, { isLoading: isLinkingKurikulum }] = useAddKurikulumMateriMutation();
+
+  const loading = isCreating || isUpdating || isLinkingKurikulum;
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -70,14 +98,23 @@ const MateriFormScreen = ({ navigation, route }) => {
       return;
     }
 
+    if (!isEdit && !kurikulumId) {
+      Alert.alert('Error', 'Kurikulum tidak ditemukan. Mohon kembali dan pilih kurikulum terlebih dahulu.');
+      return;
+    }
+
     try {
+      const parsedUrutan = parseInt(formData.urutan, 10);
+      const sanitizedUrutan = Number.isNaN(parsedUrutan) ? 1 : parsedUrutan;
+
       const submitData = {
         nama_materi: formData.nama_materi,
         deskripsi: formData.deskripsi,
         kategori: formData.kategori,
-        urutan: parseInt(formData.urutan) || 1,
+        urutan: sanitizedUrutan,
         id_mata_pelajaran: mataPelajaran.id_mata_pelajaran,
         id_kelas: kelas.id_kelas,
+        kurikulum_id: kurikulumId
       };
 
       // Add file if selected
@@ -89,18 +126,39 @@ const MateriFormScreen = ({ navigation, route }) => {
         };
       }
 
-      let result;
       if (isEdit) {
-        result = await updateMateri({ 
-          id: materi.id_materi, 
-          ...submitData 
+        await updateMateri({
+          id: materi.id_materi,
+          ...submitData
         }).unwrap();
       } else {
-        result = await createMateri(submitData).unwrap();
+        const createdMateri = await createMateri(submitData).unwrap();
+
+        if (kurikulumId) {
+          const materiId = getFirstDefined(
+            createdMateri?.data?.id_materi,
+            createdMateri?.data?.id,
+            createdMateri?.id_materi,
+            createdMateri?.id,
+            createdMateri?.materi?.id_materi,
+            createdMateri?.materi?.id
+          );
+
+          if (materiId) {
+            await addKurikulumMateri({
+              kurikulumId,
+              mataPelajaranId: mataPelajaran.id_mata_pelajaran,
+              materiId,
+              urutan: sanitizedUrutan
+            }).unwrap();
+          } else {
+            console.warn('Materi ID tidak ditemukan pada respons createMateri, melewati sinkronisasi kurikulum.');
+          }
+        }
       }
 
       Alert.alert(
-        'Sukses', 
+        'Sukses',
         `Materi berhasil ${isEdit ? 'diupdate' : 'ditambahkan'}!`,
         [
           { text: 'OK', onPress: () => navigation.goBack() }
