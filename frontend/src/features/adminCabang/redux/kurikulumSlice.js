@@ -8,6 +8,8 @@ const kurikulumSlice = createSlice({
   name: 'kurikulum',
   initialState: {
     // Navigation state
+    selectedKurikulumId: null,
+    selectedKurikulum: null,
     currentJenjang: null,
     currentKelas: null,
     currentMataPelajaran: null,
@@ -45,6 +47,16 @@ const kurikulumSlice = createSlice({
   },
   reducers: {
     // Navigation actions
+    setSelectedKurikulum: (state, action) => {
+      state.selectedKurikulum = action.payload || null;
+      state.selectedKurikulumId = action.payload?.id_kurikulum ?? action.payload?.id ?? null;
+    },
+
+    clearSelectedKurikulum: (state) => {
+      state.selectedKurikulum = null;
+      state.selectedKurikulumId = null;
+    },
+
     setCurrentJenjang: (state, action) => {
       state.currentJenjang = action.payload;
       // Reset dependent states
@@ -151,6 +163,8 @@ const kurikulumSlice = createSlice({
     
     // Clear all data
     clearKurikulumData: (state) => {
+      state.selectedKurikulum = null;
+      state.selectedKurikulumId = null;
       state.struktur = [];
       state.kelasList = [];
       state.mataPelajaranList = [];
@@ -179,6 +193,8 @@ const kurikulumSlice = createSlice({
 });
 
 export const {
+  setSelectedKurikulum,
+  clearSelectedKurikulum,
   setCurrentJenjang,
   setCurrentKelas,
   setCurrentMataPelajaran,

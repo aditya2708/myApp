@@ -26,11 +26,16 @@ const getFirstDefined = (...values) => values.find((value) => value !== undefine
  * Form for adding/editing learning materials
  */
 const MateriFormScreen = ({ navigation, route }) => {
-  const { jenjang, kelas, mataPelajaran, isEdit, materi, kurikulumId: routeKurikulumId } = route.params || {};
+  const { jenjang, kelas, mataPelajaran, isEdit, materi, kurikulumId: routeKurikulumId, kurikulum } = route.params || {};
 
   const kurikulumState = useSelector(state => state?.kurikulum);
   const kurikulumId = getFirstDefined(
     routeKurikulumId,
+    kurikulum?.id_kurikulum,
+    kurikulum?.id,
+    kurikulumState?.selectedKurikulumId,
+    kurikulumState?.selectedKurikulum?.id_kurikulum,
+    kurikulumState?.selectedKurikulum?.kurikulum_id,
     materi?.kurikulum_id,
     materi?.id_kurikulum,
     materi?.pivot?.id_kurikulum,

@@ -22,6 +22,7 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
  */
 const KurikulumHomeScreen = ({ navigation }) => {
   const dispatch = useDispatch();
+  const { selectedKurikulum } = useSelector(state => state?.kurikulum || {});
   
   // Get statistics from API
   const {
@@ -55,7 +56,7 @@ const KurikulumHomeScreen = ({ navigation }) => {
   const handleMenuPress = (menuType) => {
     switch (menuType) {
       case 'kelola_kurikulum':
-        navigation.navigate('JenjangSelection');
+        navigation.navigate('SelectKurikulum');
         break;
       case 'semester':
         navigation.navigate('SemesterManagement');
@@ -103,6 +104,23 @@ const KurikulumHomeScreen = ({ navigation }) => {
         <Text style={styles.headerSubtitle}>
           Sistem manajemen kurikulum untuk Admin Cabang
         </Text>
+        {selectedKurikulum && (
+          <View style={styles.selectedKurikulumBanner}>
+            <Ionicons name="ribbon" size={22} color="#0d6efd" style={{ marginRight: 12 }} />
+            <View style={styles.selectedKurikulumTextContainer}>
+              <Text style={styles.selectedKurikulumLabel}>Kurikulum aktif</Text>
+              <Text style={styles.selectedKurikulumName} numberOfLines={1}>
+                {selectedKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.changeKurikulumButton}
+              onPress={() => navigation.navigate('SelectKurikulum')}
+            >
+              <Text style={styles.changeKurikulumButtonText}>Ganti</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Statistics Cards */}
@@ -250,6 +268,42 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#6c757d',
+  },
+  selectedKurikulumBanner: {
+    marginTop: 18,
+    backgroundColor: '#eef4ff',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedKurikulumTextContainer: {
+    flex: 1,
+  },
+  selectedKurikulumLabel: {
+    fontSize: 12,
+    color: '#4c6ef5',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  selectedKurikulumName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1c3d8f',
+    marginTop: 4,
+  },
+  changeKurikulumButton: {
+    backgroundColor: '#0d6efd',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginLeft: 12,
+  },
+  changeKurikulumButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 13,
   },
   statsContainer: {
     padding: 20,

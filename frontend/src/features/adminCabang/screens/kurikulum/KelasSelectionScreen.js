@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import { useGetKelasByJenjangQuery } from '../../api/kurikulumApi';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -11,25 +12,60 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
  * Allows user to select class within a jenjang
  */
 const KelasSelectionScreen = ({ navigation, route }) => {
-  const { jenjang } = route.params;
-  
+  const { jenjang, kurikulumId: routeKurikulumId, kurikulum: routeKurikulum } = route.params || {};
+
+  const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
+
+  const activeKurikulum = routeKurikulum || selectedKurikulum;
+  const activeKurikulumId = routeKurikulumId ?? selectedKurikulumId ?? activeKurikulum?.id_kurikulum;
+  const shouldSkipQuery = !jenjang?.id_jenjang || !activeKurikulumId;
+
   const {
     data: kelasList,
     isLoading,
+    isFetching,
     error,
     refetch
-  } = useGetKelasByJenjangQuery(jenjang.id_jenjang);
+  } = useGetKelasByJenjangQuery(jenjang?.id_jenjang, {
+    skip: shouldSkipQuery
+  });
 
   // Refetch data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      refetch();
-    }, [refetch])
+      if (!shouldSkipQuery) {
+        refetch();
+      }
+    }, [refetch, shouldSkipQuery])
   );
 
   const handleKelasSelect = (kelas) => {
-    navigation.navigate('MataPelajaranList', { jenjang, kelas });
+    navigation.navigate('MataPelajaranList', {
+      jenjang,
+      kelas,
+      kurikulumId: activeKurikulumId,
+      kurikulum: activeKurikulum
+    });
   };
+
+  if (!activeKurikulumId) {
+    return (
+      <View style={styles.emptyWrapper}>
+        <Ionicons name="library-outline" size={56} color="#adb5bd" style={styles.emptyIcon} />
+        <Text style={styles.emptyTitle}>Kurikulum Belum Dipilih</Text>
+        <Text style={styles.emptySubtitle}>
+          Pilih kurikulum terlebih dahulu untuk melihat daftar kelas.
+        </Text>
+        <TouchableOpacity
+          style={styles.emptyButton}
+          onPress={() => navigation.navigate('SelectKurikulum')}
+        >
+          <Ionicons name="search-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={styles.emptyButtonText}>Pilih Kurikulum</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (isLoading) {
     return <LoadingSpinner message="Memuat data kelas..." />;
@@ -47,11 +83,11 @@ const KelasSelectionScreen = ({ navigation, route }) => {
   const kelas = kelasList?.data || [];
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl
-          refreshing={isLoading}
+          refreshing={isFetching}
           onRefresh={refetch}
           colors={['#28a745']}
         />
@@ -62,6 +98,14 @@ const KelasSelectionScreen = ({ navigation, route }) => {
         <Text style={styles.subtitle}>
           Pilih kelas untuk mengelola mata pelajaran dan materi
         </Text>
+        {activeKurikulum && (
+          <View style={styles.kurikulumBadge}>
+            <Ionicons name="ribbon-outline" size={18} color="#28a745" style={{ marginRight: 6 }} />
+            <Text style={styles.kurikulumBadgeText} numberOfLines={1}>
+              {activeKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -128,6 +172,21 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#6c757d',
+  },
+  kurikulumBadge: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  kurikulumBadgeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#28a745',
+    fontWeight: '600',
   },
   content: {
     padding: 20,
@@ -200,6 +259,31 @@ const styles = StyleSheet.create({
     color: '#adb5bd',
     textAlign: 'center',
     marginTop: 5,
+  },
+  emptyWrapper: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 40,
+  },
+  emptyIcon: {
+    marginBottom: 16,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#28a745',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 12,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
   },
 });
 
