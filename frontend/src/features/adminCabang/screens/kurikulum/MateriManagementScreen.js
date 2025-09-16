@@ -44,12 +44,21 @@ const MateriManagementScreen = ({ navigation, route }) => {
     kurikulumState?.currentJenjang?.kurikulum_id,
     kurikulumState?.currentJenjang?.id_kurikulum
   );
-  
+
+  const mataPelajaranId = getFirstDefined(
+    mataPelajaran?.id_mata_pelajaran,
+    mataPelajaran?.id,
+    mataPelajaran?.mata_pelajaran_id,
+    kurikulumState?.currentMataPelajaran?.id_mata_pelajaran,
+    kurikulumState?.currentMataPelajaran?.id,
+    kurikulumState?.currentMataPelajaran?.mata_pelajaran_id
+  );
+
   // Get auth state for debugging
   const auth = useSelector(state => state.auth);
 
   // API hooks
-  const shouldSkipQuery = !kurikulumId || !mataPelajaran?.id_mata_pelajaran;
+  const shouldSkipQuery = !kurikulumId || !mataPelajaranId;
 
   const {
     data: materiResponse,
@@ -60,7 +69,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
   } = useGetKurikulumMateriQuery(
     {
       kurikulumId,
-      mataPelajaranId: mataPelajaran?.id_mata_pelajaran
+      mataPelajaranId
     },
     {
       skip: shouldSkipQuery
@@ -156,15 +165,17 @@ const MateriManagementScreen = ({ navigation, route }) => {
   };
 
   const fetchMateriLibrary = React.useCallback(() => {
-    if (!mataPelajaran?.id_mata_pelajaran || !kelas?.id_kelas) {
+    if (!kurikulumId || !mataPelajaranId || !kelas?.id_kelas) {
       return;
     }
 
     triggerMateriLibrary({
-      mata_pelajaran: mataPelajaran.id_mata_pelajaran,
+      kurikulumId,
+      mataPelajaranId,
+      mata_pelajaran: mataPelajaranId,
       kelas: kelas.id_kelas
     });
-  }, [triggerMateriLibrary, mataPelajaran?.id_mata_pelajaran, kelas?.id_kelas]);
+  }, [triggerMateriLibrary, kurikulumId, mataPelajaranId, kelas?.id_kelas]);
 
   const handleOpenAddExisting = () => {
     if (!kurikulumId) {
@@ -172,7 +183,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (!mataPelajaran?.id_mata_pelajaran || !kelas?.id_kelas) {
+    if (!mataPelajaranId || !kelas?.id_kelas) {
       Alert.alert('Informasi', 'Data mata pelajaran atau kelas tidak valid untuk menampilkan daftar materi.');
       return;
     }
@@ -187,7 +198,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
   };
 
   const handleAttachExistingMateri = async (materi) => {
-    if (!kurikulumId || !mataPelajaran?.id_mata_pelajaran || !materi?.id_materi) {
+    if (!kurikulumId || !mataPelajaranId || !materi?.id_materi) {
       Alert.alert('Error', 'Data materi tidak lengkap untuk ditambahkan ke kurikulum.');
       return;
     }
@@ -196,7 +207,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
       setAttachingMateriId(materi.id_materi);
       await addKurikulumMateri({
         kurikulumId,
-        mataPelajaranId: mataPelajaran.id_mata_pelajaran,
+        mataPelajaranId,
         materiId: materi.id_materi
       }).unwrap();
       Alert.alert('Sukses', 'Materi berhasil ditambahkan ke kurikulum');
@@ -260,7 +271,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
 
   const isLibraryLoading = isLoadingMateriLibrary || isFetchingMateriLibrary;
   const isRefreshing = isFetching && !isLoading;
-  const canManageMateri = !!kurikulumId && !!mataPelajaran?.id_mata_pelajaran && !!kelas?.id_kelas;
+  const canManageMateri = !!kurikulumId && !!mataPelajaranId && !!kelas?.id_kelas;
 
   // DEBUG LOGGING FOR PHYSICAL DEVICE
   console.log('=== MATERI MANAGEMENT SCREEN DEBUG ===');
@@ -277,7 +288,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
   console.log('- query skipped:', shouldSkipQuery);
   console.log('Query params:', {
     kurikulumId,
-    mataPelajaranId: mataPelajaran?.id_mata_pelajaran
+    mataPelajaranId
   });
 
   console.log('RTK Query State:');
@@ -292,11 +303,30 @@ const MateriManagementScreen = ({ navigation, route }) => {
   console.log('- availableMateriList length:', availableMateriList.length);
   console.log('=== END DEBUG ===');
 
-  if (shouldSkipQuery) {
+  if (!kurikulumId) {
+    return (
+      <View style={[styles.container, styles.missingKurikulumContainer]}>
+        <Ionicons name="library-outline" size={56} color="#adb5bd" style={styles.missingKurikulumIcon} />
+        <Text style={styles.missingKurikulumTitle}>Kurikulum Belum Dipilih</Text>
+        <Text style={styles.missingKurikulumSubtitle}>
+          Pilih kurikulum terlebih dahulu untuk mulai mengelola materi pembelajaran.
+        </Text>
+        <TouchableOpacity
+          style={styles.missingKurikulumButton}
+          onPress={() => navigation.navigate('SelectKurikulum')}
+        >
+          <Ionicons name="search-outline" size={18} color="#fff" style={styles.missingKurikulumButtonIcon} />
+          <Text style={styles.missingKurikulumButtonText}>Pilih Kurikulum</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!mataPelajaranId) {
     return (
       <View style={styles.container}>
         <ErrorMessage
-          message="Kurikulum tidak ditemukan. Mohon kembali dan pilih kurikulum terlebih dahulu."
+          message="Data mata pelajaran tidak ditemukan. Mohon kembali dan pilih mata pelajaran terlebih dahulu."
           onRetry={() => navigation.goBack()}
         />
       </View>
@@ -395,7 +425,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
             const urutan = mapping?.urutan ?? materi?.pivot?.urutan ?? materi?.urutan;
 
             const kurikulumKey = mapping?.id_kurikulum ?? kurikulumId ?? 'kurikulum';
-            const mataPelajaranKey = mapping?.id_mata_pelajaran ?? mataPelajaran?.id_mata_pelajaran ?? 'mapel';
+            const mataPelajaranKey = mapping?.id_mata_pelajaran ?? mataPelajaranId ?? 'mapel';
             const key = materiId
               ? `${kurikulumKey}-${mataPelajaranKey}-${materiId}`
               : `materi-index-${index}`;
@@ -569,6 +599,44 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  missingKurikulumContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  missingKurikulumIcon: {
+    marginBottom: 16,
+  },
+  missingKurikulumTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  missingKurikulumSubtitle: {
+    fontSize: 14,
+    color: '#6c757d',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  missingKurikulumButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007bff',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  missingKurikulumButtonIcon: {
+    marginRight: 8,
+  },
+  missingKurikulumButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   header: {
     backgroundColor: '#fff',
