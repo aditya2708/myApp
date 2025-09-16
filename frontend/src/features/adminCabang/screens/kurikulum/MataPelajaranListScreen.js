@@ -7,6 +7,8 @@ import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import { useGetMataPelajaranQuery } from '../../api/kurikulumApi';
 
+const getFirstDefined = (...values) => values.find((value) => value !== undefined && value !== null);
+
 /**
  * Mata Pelajaran List Screen - API Integrated
  * Shows list of subjects for selected jenjang and kelas
@@ -17,7 +19,13 @@ const MataPelajaranListScreen = ({ navigation, route }) => {
   const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
 
   const activeKurikulum = routeKurikulum || selectedKurikulum;
-  const activeKurikulumId = routeKurikulumId ?? selectedKurikulumId ?? activeKurikulum?.id_kurikulum;
+  const activeKurikulumId = getFirstDefined(
+    routeKurikulumId,
+    selectedKurikulumId,
+    activeKurikulum?.id_kurikulum,
+    activeKurikulum?.kurikulum_id,
+    activeKurikulum?.id
+  );
   const shouldSkipQuery = !jenjang?.id_jenjang || !kelas?.id_kelas || !activeKurikulumId;
 
   // API hooks
