@@ -23,8 +23,52 @@ export const kurikulumApi = createApi({
   endpoints: (builder) => ({
     // Kurikulum endpoints
     getKurikulumStruktur: builder.query({
-      query: () => '/kurikulum/struktur',
+      query: (kurikulumId) => ({
+        url: '/kurikulum/struktur',
+        params: kurikulumId ? { kurikulum_id: kurikulumId } : undefined,
+      }),
       providesTags: ['Kurikulum'],
+    }),
+
+    getKurikulumList: builder.query({
+      query: (params) => ({
+        url: '/kurikulum',
+        params,
+      }),
+      transformResponse: (response) => {
+        if (Array.isArray(response)) {
+          return { data: response };
+        }
+
+        if (Array.isArray(response?.data)) {
+          return { ...response, data: response.data };
+        }
+
+        if (Array.isArray(response?.data?.data)) {
+          return { ...response, data: response.data.data };
+        }
+
+        return response;
+      },
+      providesTags: (result) => {
+        const list = Array.isArray(result)
+          ? result
+          : Array.isArray(result?.data)
+            ? result.data
+            : [];
+
+        if (list.length > 0) {
+          return [
+            ...list.map((item) => ({
+              type: 'Kurikulum',
+              id: item?.id_kurikulum ?? item?.id,
+            })),
+            { type: 'Kurikulum', id: 'LIST' },
+          ];
+        }
+
+        return [{ type: 'Kurikulum', id: 'LIST' }];
+      },
     }),
 
     getMataPelajaran: builder.query({
@@ -482,6 +526,7 @@ export const kurikulumApi = createApi({
 export const {
   // Kurikulum hooks
   useGetKurikulumStrukturQuery,
+  useGetKurikulumListQuery,
   useGetMataPelajaranQuery,
   useGetKurikulumDropdownDataQuery,
   useGetKelasByJenjangQuery,

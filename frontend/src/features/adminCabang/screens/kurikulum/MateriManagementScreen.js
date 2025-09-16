@@ -20,11 +20,17 @@ const getFirstDefined = (...values) => values.find((value) => value !== undefine
  * CRUD interface for learning materials
  */
 const MateriManagementScreen = ({ navigation, route }) => {
-  const { jenjang, kelas, mataPelajaran, kurikulumId: routeKurikulumId } = route.params || {};
+  const { jenjang, kelas, mataPelajaran, kurikulumId: routeKurikulumId, kurikulum } = route.params || {};
 
   const kurikulumState = useSelector(state => state?.kurikulum);
+  const activeKurikulum = kurikulum || kurikulumState?.selectedKurikulum || null;
   const kurikulumId = getFirstDefined(
     routeKurikulumId,
+    kurikulum?.id_kurikulum,
+    kurikulum?.id,
+    kurikulumState?.selectedKurikulumId,
+    kurikulumState?.selectedKurikulum?.id_kurikulum,
+    kurikulumState?.selectedKurikulum?.kurikulum_id,
     mataPelajaran?.kurikulum_id,
     mataPelajaran?.id_kurikulum,
     kelas?.kurikulum_id,
@@ -94,6 +100,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
       kelas,
       mataPelajaran,
       kurikulumId,
+      kurikulum: activeKurikulum,
       isEdit: false
     });
   };
@@ -109,6 +116,7 @@ const MateriManagementScreen = ({ navigation, route }) => {
       kelas,
       mataPelajaran,
       kurikulumId,
+      kurikulum: activeKurikulum,
       isEdit: true,
       materi: materiData
     });
