@@ -106,7 +106,7 @@ const MateriFormScreen = ({ navigation, route }) => {
     nama_materi: isEdit ? materi?.nama_materi || '' : '',
     deskripsi: isEdit ? materi?.deskripsi || '' : '',
     kategori: isEdit ? materi?.kategori || 'pembelajaran' : 'pembelajaran',
-    urutan: isEdit ? materi?.urutan?.toString() || '' : '',
+    urutan: isEdit && materi?.urutan !== undefined && materi?.urutan !== null ? String(materi.urutan) : '',
   });
 
   const [selectedFile, setSelectedFile] = useState(null);
@@ -169,17 +169,20 @@ const MateriFormScreen = ({ navigation, route }) => {
 
     try {
       const parsedUrutan = parseInt(formData.urutan, 10);
-      const sanitizedUrutan = Number.isNaN(parsedUrutan) ? 1 : parsedUrutan;
+      const hasValidUrutan = !Number.isNaN(parsedUrutan);
 
       const submitData = {
         nama_materi: formData.nama_materi,
         deskripsi: formData.deskripsi,
         kategori: formData.kategori,
-        urutan: sanitizedUrutan,
         id_mata_pelajaran: mataPelajaran.id_mata_pelajaran,
         id_kelas: kelas.id_kelas,
         kurikulum_id: kurikulumId
       };
+
+      if (isEdit && hasValidUrutan) {
+        submitData.urutan = parsedUrutan;
+      }
 
       if (selectedFile) {
         submitData.file = {
@@ -228,7 +231,7 @@ const MateriFormScreen = ({ navigation, route }) => {
         kurikulumId,
         mataPelajaranId: mataPelajaran.id_mata_pelajaran,
         materiId,
-        urutan: sanitizedUrutan
+        ...(hasValidUrutan ? { urutan: parsedUrutan } : {})
       }).unwrap();
 
       showSuccessAlert();
@@ -306,13 +309,16 @@ const MateriFormScreen = ({ navigation, route }) => {
           numberOfLines={3}
         />
 
-        <TextInput
-          label="Urutan"
-          value={formData.urutan}
-          onChangeText={(value) => handleInputChange('urutan', value)}
-          placeholder="Masukkan urutan materi (angka)"
-          keyboardType="numeric"
-        />
+        <View style={styles.readOnlyField}>
+          <Text style={styles.readOnlyLabel}>Urutan</Text>
+          {isEdit ? (
+            <Text style={styles.readOnlyValue}>
+              {formData.urutan || '-'}
+            </Text>
+          ) : (
+            <Text style={styles.readOnlyInfo}>Urutan akan diisi otomatis</Text>
+          )}
+        </View>
 
         <PickerInput
           label="Kategori"
@@ -389,6 +395,23 @@ const styles = StyleSheet.create({
   },
   form: {
     padding: 20,
+  },
+  readOnlyField: {
+    marginBottom: 20,
+  },
+  readOnlyLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#343a40',
+    marginBottom: 4,
+  },
+  readOnlyValue: {
+    fontSize: 16,
+    color: '#212529',
+  },
+  readOnlyInfo: {
+    fontSize: 14,
+    color: '#6c757d',
   },
   fileSection: {
     marginBottom: 20,
