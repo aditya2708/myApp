@@ -86,7 +86,15 @@ class KurikulumController extends Controller
 
             $kurikulum = $query->get()->map(function($kurikulum) {
                 $mataPelajaranCount = (int) ($kurikulum->mata_pelajaran_count ?? $kurikulum->getTotalMataPelajaran());
-                $materiCount = (int) ($kurikulum->kurikulum_materi_count ?? $kurikulum->materi_count ?? $kurikulum->getTotalMateri());
+
+                $materiCount = $kurikulum->materi_count;
+                if ($materiCount === null) {
+                    $materiCount = $kurikulum->kurikulum_materi_count;
+                }
+                if ($materiCount === null) {
+                    $materiCount = $kurikulum->getTotalMateri();
+                }
+                $materiCount = (int) $materiCount;
                 $semesterCount = (int) ($kurikulum->semester_count ?? $kurikulum->semester()->count());
 
                 return [
