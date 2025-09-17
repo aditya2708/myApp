@@ -153,6 +153,32 @@ const RaportScreen = () => {
         ? item.kelas
         : item.kelas?.nama ??
           (typeof item.kelas?.label === 'string' ? item.kelas.label : '-');
+    const kelompokLabel =
+      typeof item.kelompok === 'string'
+        ? item.kelompok
+        : item.kelompok?.nama_kelompok ?? '-';
+    const kurikulumLabel =
+      typeof item.kurikulum === 'string'
+        ? item.kurikulum
+        : item.kurikulum?.nama_kurikulum ?? '-';
+    const safeDisplay = (value) => {
+      if (value === null || value === undefined) {
+        return '-';
+      }
+
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : '-';
+      }
+
+      return value;
+    };
+    const metadataItems = [
+      { label: 'Kelas', value: safeDisplay(kelasLabel) },
+      { label: 'Kelompok', value: safeDisplay(kelompokLabel) },
+      { label: 'Semester', value: safeDisplay(semesterLabel) },
+      { label: 'Kurikulum', value: safeDisplay(kurikulumLabel) },
+    ];
     const rawStatus = (item.status ?? item.keterangan ?? '').toString();
     const normalizedStatus = rawStatus.toLowerCase();
     const statusInfo = getStatusInfo(normalizedStatus, rawStatus);
@@ -186,34 +212,45 @@ const RaportScreen = () => {
         </View>
 
         <View style={styles.raportDetails}>
-          <View style={styles.raportScores}>
-            <View style={styles.scoreItem}>
-              <Text style={styles.scoreLabel}>Min:</Text>
-              <Text style={styles.scoreValue}>{item.nilai_min || '-'}</Text>
-            </View>
-
-            <View style={styles.scoreItem}>
-              <Text style={styles.scoreLabel}>Rata-rata:</Text>
-              <Text style={styles.scoreValue}>{item.nilai_rata_rata || '-'}</Text>
-            </View>
-
-            <View style={styles.scoreItem}>
-              <Text style={styles.scoreLabel}>Max:</Text>
-              <Text style={styles.scoreValue}>{item.nilai_max || '-'}</Text>
-            </View>
+          <View style={styles.metadataRow}>
+            {metadataItems.map((meta) => (
+              <View key={meta.label} style={styles.metadataItem}>
+                <Text style={styles.metadataLabel}>{meta.label}</Text>
+                <Text style={styles.metadataValue}>{meta.value}</Text>
+              </View>
+            ))}
           </View>
 
-          <View style={styles.raportMeta}>
-            <Text style={styles.raportDate}>
-              {item.tanggal ? formatDateToIndonesian(item.tanggal) : ''}
-            </Text>
-
-            {item.foto_raport && item.foto_raport.length > 0 && (
-              <View style={styles.photoIndicator}>
-                <Ionicons name="image" size={16} color="#666" />
-                <Text style={styles.photoCount}>{item.foto_raport.length} foto</Text>
+          <View style={styles.scoreAndMetaRow}>
+            <View style={styles.raportScores}>
+              <View style={styles.scoreItem}>
+                <Text style={styles.scoreLabel}>Min:</Text>
+                <Text style={styles.scoreValue}>{item.nilai_min || '-'}</Text>
               </View>
-            )}
+
+              <View style={styles.scoreItem}>
+                <Text style={styles.scoreLabel}>Rata-rata:</Text>
+                <Text style={styles.scoreValue}>{item.nilai_rata_rata || '-'}</Text>
+              </View>
+
+              <View style={styles.scoreItem}>
+                <Text style={styles.scoreLabel}>Max:</Text>
+                <Text style={styles.scoreValue}>{item.nilai_max || '-'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.raportMeta}>
+              <Text style={styles.raportDate}>
+                {item.tanggal ? formatDateToIndonesian(item.tanggal) : ''}
+              </Text>
+
+              {item.foto_raport && item.foto_raport.length > 0 && (
+                <View style={styles.photoIndicator}>
+                  <Ionicons name="image" size={16} color="#666" />
+                  <Text style={styles.photoCount}>{item.foto_raport.length} foto</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
@@ -453,11 +490,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   raportDetails: {
+    flexDirection: 'column',
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  metadataItem: {
+    width: '48%',
+    marginBottom: 8,
+    paddingRight: 12,
+  },
+  metadataLabel: {
+    fontSize: 12,
+    color: '#999999',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  metadataValue: {
+    fontSize: 14,
+    color: '#333333',
+    fontWeight: '600',
+  },
+  scoreAndMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   raportScores: {
     flex: 1,
+    paddingRight: 12,
   },
   scoreItem: {
     flexDirection: 'row',
@@ -475,6 +537,7 @@ const styles = StyleSheet.create({
   },
   raportMeta: {
     alignItems: 'flex-end',
+    minWidth: 110,
   },
   raportDate: {
     fontSize: 12,
