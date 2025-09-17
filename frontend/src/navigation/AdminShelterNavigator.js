@@ -180,6 +180,7 @@ const ManagementStackNavigator = () => (
     <ManagementStack.Screen name="KeuanganList" component={KeuanganListScreen} options={{ headerTitle: 'Daftar Keuangan' }} />
     <ManagementStack.Screen name="LaporanKegiatanMain" component={LaporanKegiatanMainScreen} options={{ headerTitle: 'Laporan Kegiatan' }} />
     <ManagementStack.Screen name="RaportGenerate" component={RaportGenerateScreen} options={{ headerTitle: 'Generate Raport' }} />
+    <ManagementStack.Screen name="RaportView" component={RaportViewScreen} options={{ headerTitle: 'View Raport' }} />
 
     {/* Keluarga related screens */}
     <ManagementStack.Screen name="KeluargaDetail" component={KeluargaDetailScreen} options={{ headerTitle: 'Detail Keluarga' }} />
