@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   Image,
   TouchableOpacity,
   FlatList,
-  RefreshControl
+  RefreshControl,
+  Alert
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import components
@@ -37,16 +38,16 @@ const RaportScreen = () => {
   });
 
   // Fetch raport data
-  const fetchRaportData = async () => {
+  const fetchRaportData = useCallback(async () => {
     if (!anakId) return;
-    
+
     try {
       setError(null);
       const response = await raportApi.getRaportByAnak(anakId);
-      
+
       if (response.data.success) {
         setRaportList(response.data.data || []);
-        
+
         // Set summary data if available
         if (response.data.summary) {
           setSummary(response.data.summary);
@@ -61,17 +62,36 @@ const RaportScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchRaportData();
   }, [anakId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchRaportData();
+    }, [fetchRaportData])
+  );
 
   // Handle refresh
   const handleRefresh = () => {
     setRefreshing(true);
     fetchRaportData();
+  };
+
+  const getStatusInfo = (statusValue, rawStatus) => {
+    switch (statusValue) {
+      case 'draft':
+        return { label: 'Draft', color: '#f39c12' };
+      case 'published':
+        return { label: 'Published', color: '#2ecc71' };
+      default:
+        if (!statusValue) return null;
+        return {
+          label:
+            rawStatus && typeof rawStatus === 'string'
+              ? rawStatus
+              : statusValue.charAt(0).toUpperCase() + statusValue.slice(1),
+          color: '#3498db'
+        };
+    }
   };
 
   // Handle view raport detail
@@ -82,6 +102,38 @@ const RaportScreen = () => {
   // Handle create new raport
   const handleCreateRaport = () => {
     navigation.navigate('RaportGenerate', { anakId, anakData });
+  };
+
+  const handleDeleteRaport = (item) => {
+    Alert.alert(
+      'Hapus Raport',
+      'Apakah Anda yakin ingin menghapus raport ini?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Hapus',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await raportApi.deleteRaport(item.id_raport);
+              fetchRaportData();
+            } catch (err) {
+              console.error('Error deleting raport:', err);
+              Alert.alert('Gagal', 'Gagal menghapus raport. Silakan coba lagi.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleRegenerateRaport = (item) => {
+    navigation.navigate('RaportGenerate', {
+      anakId,
+      anakData,
+      raportId: item.id_raport,
+      onGenerateComplete: fetchRaportData
+    });
   };
 
   // Render raport item
@@ -101,6 +153,10 @@ const RaportScreen = () => {
         ? item.kelas
         : item.kelas?.nama ??
           (typeof item.kelas?.label === 'string' ? item.kelas.label : '-');
+    const rawStatus = (item.status ?? item.keterangan ?? '').toString();
+    const normalizedStatus = rawStatus.toLowerCase();
+    const statusInfo = getStatusInfo(normalizedStatus, rawStatus);
+    const isDraft = normalizedStatus === 'draft';
 
     return (
       <TouchableOpacity
@@ -108,13 +164,25 @@ const RaportScreen = () => {
         onPress={() => handleViewRaport(item)}
       >
         <View style={styles.raportHeader}>
-          <Text style={styles.raportTitle}>
-            {semesterLabel}
-            {tahunAjaranLabel ? ` - Tahun Ajaran ${tahunAjaranLabel}` : ''}
-          </Text>
-          <Text style={styles.raportSchoolLevel}>
-            {tingkatLabel} - Kelas {kelasLabel}
-          </Text>
+          <View style={styles.raportHeaderContent}>
+            <Text style={styles.raportTitle}>
+              {semesterLabel}
+              {tahunAjaranLabel ? ` - Tahun Ajaran ${tahunAjaranLabel}` : ''}
+            </Text>
+            <Text style={styles.raportSchoolLevel}>
+              {tingkatLabel} - Kelas {kelasLabel}
+            </Text>
+          </View>
+          {statusInfo && (
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusInfo.color }
+              ]}
+            >
+              <Text style={styles.statusBadgeText}>{statusInfo.label}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.raportDetails}>
@@ -148,6 +216,31 @@ const RaportScreen = () => {
             )}
           </View>
         </View>
+
+        {isDraft && (
+          <View style={styles.raportActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.regenerateButton]}
+              onPress={(event) => {
+                event.stopPropagation();
+                handleRegenerateRaport(item);
+              }}
+            >
+              <Ionicons name="refresh" size={16} color="#ffffff" />
+              <Text style={styles.actionButtonText}>Regenerate</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={(event) => {
+                event.stopPropagation();
+                handleDeleteRaport(item);
+              }}
+            >
+              <Ionicons name="trash-outline" size={16} color="#ffffff" />
+              <Text style={styles.actionButtonText}>Hapus</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -327,10 +420,17 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   raportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     paddingBottom: 8,
+  },
+  raportHeaderContent: {
+    flex: 1,
+    paddingRight: 12,
   },
   raportTitle: {
     fontSize: 16,
@@ -341,6 +441,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     marginTop: 4,
+  },
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   raportDetails: {
     flexDirection: 'row',
@@ -379,6 +489,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
     marginLeft: 4,
+  },
+  raportActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  regenerateButton: {
+    backgroundColor: '#2980b9',
+  },
+  deleteButton: {
+    backgroundColor: '#e74c3c',
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   emptyContainer: {
     flex: 1,
