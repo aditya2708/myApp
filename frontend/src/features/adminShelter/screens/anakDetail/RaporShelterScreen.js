@@ -104,6 +104,32 @@ const RaportScreen = () => {
     navigation.navigate('RaportGenerate', { anakId, anakData });
   };
 
+  const handlePublishRaport = (item) => {
+    Alert.alert(
+      'Publish Raport',
+      'Apakah Anda yakin ingin mempublikasikan raport ini?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Publish',
+          onPress: async () => {
+            try {
+              await raportApi.publishRaport(item.id_raport);
+              Alert.alert('Berhasil', 'Raport berhasil dipublikasikan.');
+              fetchRaportData();
+            } catch (err) {
+              console.error('Error publishing raport:', err);
+              Alert.alert(
+                'Gagal',
+                'Gagal mempublikasikan raport. Silakan coba lagi.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteRaport = (item) => {
     Alert.alert(
       'Hapus Raport',
@@ -271,6 +297,16 @@ const RaportScreen = () => {
 
         {isDraft && (
           <View style={styles.raportActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.publishButton]}
+              onPress={(event) => {
+                event.stopPropagation();
+                handlePublishRaport(item);
+              }}
+            >
+              <Ionicons name="cloud-upload-outline" size={16} color="#ffffff" />
+              <Text style={styles.actionButtonText}>Publish</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.regenerateButton]}
               onPress={(event) => {
@@ -580,6 +616,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     marginLeft: 8,
+  },
+  publishButton: {
+    backgroundColor: '#2ecc71',
   },
   regenerateButton: {
     backgroundColor: '#2980b9',
