@@ -17,9 +17,6 @@ import Button from '../../../../common/components/Button';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 
-// Import utils
-import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
-
 // Import API
 import { raportApi } from '../../api/raportApi';
 
@@ -153,15 +150,6 @@ const RaportScreen = () => {
     );
   };
 
-  const handleRegenerateRaport = (item) => {
-    navigation.navigate('RaportGenerate', {
-      anakId,
-      anakData,
-      raportId: item.id_raport,
-      onGenerateComplete: fetchRaportData
-    });
-  };
-
   // Render raport item
   const renderRaportItem = ({ item }) => {
     const semesterLabel =
@@ -184,42 +172,6 @@ const RaportScreen = () => {
       item.anak?.anakPendidikan?.kelas ??
       item.anak?.anak_pendidikan?.kelas ??
       '-';
-    const kelompokValue =
-      typeof item.kelompok === 'string'
-        ? item.kelompok
-        : item.kelompok?.nama_kelompok;
-    const kelompokLabel =
-      kelompokValue ??
-      item.anak?.kelompok?.nama_kelompok ??
-      item.anak?.kelompok?.namaKelompok ??
-      '-';
-    const kurikulumValue =
-      typeof item.kurikulum === 'string'
-        ? item.kurikulum
-        : item.kurikulum?.nama_kurikulum;
-    const kurikulumLabel =
-      kurikulumValue ??
-      item.semester?.kurikulum?.nama_kurikulum ??
-      item.semester?.kurikulum?.namaKurikulum ??
-      '-';
-    const safeDisplay = (value) => {
-      if (value === null || value === undefined) {
-        return '-';
-      }
-
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        return trimmed.length > 0 ? trimmed : '-';
-      }
-
-      return value;
-    };
-    const metadataItems = [
-      { label: 'Kelas', value: safeDisplay(kelasLabel) },
-      { label: 'Kelompok', value: safeDisplay(kelompokLabel) },
-      { label: 'Semester', value: safeDisplay(semesterLabel) },
-      { label: 'Kurikulum', value: safeDisplay(kurikulumLabel) },
-    ];
     const rawStatus = (item.status ?? item.keterangan ?? '').toString();
     const normalizedStatus = rawStatus.toLowerCase();
     const statusInfo = getStatusInfo(normalizedStatus, rawStatus);
@@ -252,49 +204,6 @@ const RaportScreen = () => {
           )}
         </View>
 
-        <View style={styles.raportDetails}>
-          <View style={styles.metadataRow}>
-            {metadataItems.map((meta) => (
-              <View key={meta.label} style={styles.metadataItem}>
-                <Text style={styles.metadataLabel}>{meta.label}</Text>
-                <Text style={styles.metadataValue}>{meta.value}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.scoreAndMetaRow}>
-            <View style={styles.raportScores}>
-              <View style={styles.scoreItem}>
-                <Text style={styles.scoreLabel}>Min:</Text>
-                <Text style={styles.scoreValue}>{item.nilai_min || '-'}</Text>
-              </View>
-
-              <View style={styles.scoreItem}>
-                <Text style={styles.scoreLabel}>Rata-rata:</Text>
-                <Text style={styles.scoreValue}>{item.nilai_rata_rata || '-'}</Text>
-              </View>
-
-              <View style={styles.scoreItem}>
-                <Text style={styles.scoreLabel}>Max:</Text>
-                <Text style={styles.scoreValue}>{item.nilai_max || '-'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.raportMeta}>
-              <Text style={styles.raportDate}>
-                {item.tanggal ? formatDateToIndonesian(item.tanggal) : ''}
-              </Text>
-
-              {item.foto_raport && item.foto_raport.length > 0 && (
-                <View style={styles.photoIndicator}>
-                  <Ionicons name="image" size={16} color="#666" />
-                  <Text style={styles.photoCount}>{item.foto_raport.length} foto</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
         {isDraft && (
           <View style={styles.raportActions}>
             <TouchableOpacity
@@ -306,16 +215,6 @@ const RaportScreen = () => {
             >
               <Ionicons name="cloud-upload-outline" size={16} color="#ffffff" />
               <Text style={styles.actionButtonText}>Publish</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.regenerateButton]}
-              onPress={(event) => {
-                event.stopPropagation();
-                handleRegenerateRaport(item);
-              }}
-            >
-              <Ionicons name="refresh" size={16} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Regenerate</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.deleteButton]}
@@ -511,10 +410,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    paddingBottom: 8,
   },
   raportHeaderContent: {
     flex: 1,
@@ -540,70 +435,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  raportDetails: {
-    flexDirection: 'column',
-  },
-  metadataRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  metadataItem: {
-    width: '48%',
-    marginBottom: 8,
-    paddingRight: 12,
-  },
-  metadataLabel: {
-    fontSize: 12,
-    color: '#999999',
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  metadataValue: {
-    fontSize: 14,
-    color: '#333333',
-    fontWeight: '600',
-  },
-  scoreAndMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  raportScores: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  scoreItem: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  scoreLabel: {
-    width: 80,
-    fontSize: 14,
-    color: '#666666',
-  },
-  scoreValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  raportMeta: {
-    alignItems: 'flex-end',
-    minWidth: 110,
-  },
-  raportDate: {
-    fontSize: 12,
-    color: '#999999',
-    marginBottom: 4,
-  },
-  photoIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  photoCount: {
-    fontSize: 12,
-    color: '#666666',
-    marginLeft: 4,
-  },
   raportActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -619,9 +450,6 @@ const styles = StyleSheet.create({
   },
   publishButton: {
     backgroundColor: '#2ecc71',
-  },
-  regenerateButton: {
-    backgroundColor: '#2980b9',
   },
   deleteButton: {
     backgroundColor: '#e74c3c',
