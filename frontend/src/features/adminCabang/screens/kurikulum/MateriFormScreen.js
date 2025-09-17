@@ -233,7 +233,38 @@ const MateriFormScreen = ({ navigation, route }) => {
 
       showSuccessAlert();
     } catch (error) {
-      const errorMessage = error?.data?.message || error?.message || 'Gagal menyimpan materi';
+      let errorMessage = 'Gagal menyimpan materi';
+
+      if (error?.status === 422) {
+        const backendErrors = error?.data?.errors;
+        let firstBackendError;
+
+        if (backendErrors && typeof backendErrors === 'object') {
+          Object.values(backendErrors).some((messages) => {
+            if (!messages) {
+              return false;
+            }
+
+            if (Array.isArray(messages)) {
+              const firstMessage = messages.find((message) => typeof message === 'string' && message.trim().length > 0);
+              if (firstMessage) {
+                firstBackendError = firstMessage;
+                return true;
+              }
+            } else if (typeof messages === 'string' && messages.trim().length > 0) {
+              firstBackendError = messages;
+              return true;
+            }
+
+            return false;
+          });
+        }
+
+        errorMessage = firstBackendError || error?.data?.message || errorMessage;
+      } else {
+        errorMessage = error?.data?.message || error?.message || errorMessage;
+      }
+
       if (errorMessage) {
         Alert.alert('Error', errorMessage);
       }
