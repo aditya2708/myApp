@@ -433,9 +433,10 @@ class RaportController extends Controller
 
             if (!$nilaiSikap) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Nilai sikap tidak ditemukan'
-                ], 404);
+                    'success' => true,
+                    'message' => 'Nilai sikap tidak ditemukan',
+                    'data' => null
+                ]);
             }
 
             $nilaiSikap->append(['rata_rata', 'predikat', 'nilai_huruf']);
