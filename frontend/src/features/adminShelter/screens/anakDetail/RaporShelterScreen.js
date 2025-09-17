@@ -148,19 +148,34 @@ const RaportScreen = () => {
         ? item.tingkat
         : item.tingkat?.nama ??
           (typeof item.tingkat?.level === 'string' ? item.tingkat.level : '-');
-    const kelasLabel =
+    const kelasValue =
       typeof item.kelas === 'string'
         ? item.kelas
         : item.kelas?.nama ??
-          (typeof item.kelas?.label === 'string' ? item.kelas.label : '-');
-    const kelompokLabel =
+          (typeof item.kelas?.label === 'string' ? item.kelas.label : undefined);
+    const kelasLabel =
+      kelasValue ??
+      item.anak?.anakPendidikan?.kelas ??
+      item.anak?.anak_pendidikan?.kelas ??
+      '-';
+    const kelompokValue =
       typeof item.kelompok === 'string'
         ? item.kelompok
-        : item.kelompok?.nama_kelompok ?? '-';
-    const kurikulumLabel =
+        : item.kelompok?.nama_kelompok;
+    const kelompokLabel =
+      kelompokValue ??
+      item.anak?.kelompok?.nama_kelompok ??
+      item.anak?.kelompok?.namaKelompok ??
+      '-';
+    const kurikulumValue =
       typeof item.kurikulum === 'string'
         ? item.kurikulum
-        : item.kurikulum?.nama_kurikulum ?? '-';
+        : item.kurikulum?.nama_kurikulum;
+    const kurikulumLabel =
+      kurikulumValue ??
+      item.semester?.kurikulum?.nama_kurikulum ??
+      item.semester?.kurikulum?.namaKurikulum ??
+      '-';
     const safeDisplay = (value) => {
       if (value === null || value === undefined) {
         return '-';
