@@ -136,8 +136,6 @@ const HomeStackNavigator = () => (
     <HomeStack.Screen name="AddChildrenToKelompok" component={AddChildrenToKelompokScreen} options={{ headerTitle: 'Tambah Anak ke Kelompok' }} />
     <HomeStack.Screen name="KelompokReporting" component={KelompokReportingScreen} options={{ headerTitle: 'Laporan Kelompok' }} />
     <HomeStack.Screen name="LaporanAktivitas" component={LaporanAktivitasScreen} options={{ headerTitle: 'Laporan Aktivitas' }} />
-    <HomeStack.Screen name="PenilaianList" component={PenilaianListScreen} options={{ headerTitle: 'Daftar Penilaian' }} />
-    <HomeStack.Screen name="PenilaianForm" component={PenilaianFormScreen} options={{ headerTitle: 'Form Penilaian' }} />
     <HomeStack.Screen name="SemesterManagement" component={SemesterManagementScreen} options={{ headerTitle: 'Kelola Semester' }} />
     
     {/* Management & Utility screens */}
@@ -204,6 +202,8 @@ const ManagementStackNavigator = () => (
   <ManagementStack.Screen name="RaportFormal" component={RaportFormalScreen} options={{ headerTitle: 'Raport Formal' }} />
   <ManagementStack.Screen name="RaportFormalDetail" component={RaportFormalDetailScreen} options={{ headerTitle: 'Detail Raport Formal' }} />
   <ManagementStack.Screen name="RaportFormalForm" component={RaportFormalFormScreen} options={{ headerTitle: 'Form Raport Formal' }} />
+  <ManagementStack.Screen name="PenilaianList" component={PenilaianListScreen} options={{ headerTitle: 'Daftar Penilaian' }} />
+  <ManagementStack.Screen name="PenilaianForm" component={PenilaianFormScreen} options={{ headerTitle: 'Form Penilaian' }} />
 
     {/* Tutor related screens */}
     <ManagementStack.Screen name="TutorDetail" component={TutorDetailScreen} options={{ headerTitle: 'Detail Tutor' }} />
