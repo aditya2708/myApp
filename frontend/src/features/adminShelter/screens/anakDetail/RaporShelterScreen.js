@@ -85,49 +85,72 @@ const RaportScreen = () => {
   };
 
   // Render raport item
-  const renderRaportItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.raportCard}
-      onPress={() => handleViewRaport(item)}
-    >
-      <View style={styles.raportHeader}>
-        <Text style={styles.raportTitle}>{item.semester}</Text>
-        <Text style={styles.raportSchoolLevel}>{item.tingkat} - Kelas {item.kelas}</Text>
-      </View>
-      
-      <View style={styles.raportDetails}>
-        <View style={styles.raportScores}>
-          <View style={styles.scoreItem}>
-            <Text style={styles.scoreLabel}>Min:</Text>
-            <Text style={styles.scoreValue}>{item.nilai_min || '-'}</Text>
-          </View>
-          
-          <View style={styles.scoreItem}>
-            <Text style={styles.scoreLabel}>Rata-rata:</Text>
-            <Text style={styles.scoreValue}>{item.nilai_rata_rata || '-'}</Text>
-          </View>
-          
-          <View style={styles.scoreItem}>
-            <Text style={styles.scoreLabel}>Max:</Text>
-            <Text style={styles.scoreValue}>{item.nilai_max || '-'}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.raportMeta}>
-          <Text style={styles.raportDate}>
-            {item.tanggal ? formatDateToIndonesian(item.tanggal) : ''}
+  const renderRaportItem = ({ item }) => {
+    const semesterLabel =
+      item.semester?.nama_semester ??
+      item.semester?.nama ??
+      (typeof item.semester === 'string' ? item.semester : '-');
+    const tahunAjaranLabel = item.semester?.tahun_ajaran ?? item.tahun_ajaran ?? '';
+    const tingkatLabel =
+      typeof item.tingkat === 'string'
+        ? item.tingkat
+        : item.tingkat?.nama ??
+          (typeof item.tingkat?.level === 'string' ? item.tingkat.level : '-');
+    const kelasLabel =
+      typeof item.kelas === 'string'
+        ? item.kelas
+        : item.kelas?.nama ??
+          (typeof item.kelas?.label === 'string' ? item.kelas.label : '-');
+
+    return (
+      <TouchableOpacity
+        style={styles.raportCard}
+        onPress={() => handleViewRaport(item)}
+      >
+        <View style={styles.raportHeader}>
+          <Text style={styles.raportTitle}>
+            {semesterLabel}
+            {tahunAjaranLabel ? ` - Tahun Ajaran ${tahunAjaranLabel}` : ''}
           </Text>
-          
-          {item.foto_raport && item.foto_raport.length > 0 && (
-            <View style={styles.photoIndicator}>
-              <Ionicons name="image" size={16} color="#666" />
-              <Text style={styles.photoCount}>{item.foto_raport.length} foto</Text>
-            </View>
-          )}
+          <Text style={styles.raportSchoolLevel}>
+            {tingkatLabel} - Kelas {kelasLabel}
+          </Text>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+
+        <View style={styles.raportDetails}>
+          <View style={styles.raportScores}>
+            <View style={styles.scoreItem}>
+              <Text style={styles.scoreLabel}>Min:</Text>
+              <Text style={styles.scoreValue}>{item.nilai_min || '-'}</Text>
+            </View>
+
+            <View style={styles.scoreItem}>
+              <Text style={styles.scoreLabel}>Rata-rata:</Text>
+              <Text style={styles.scoreValue}>{item.nilai_rata_rata || '-'}</Text>
+            </View>
+
+            <View style={styles.scoreItem}>
+              <Text style={styles.scoreLabel}>Max:</Text>
+              <Text style={styles.scoreValue}>{item.nilai_max || '-'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.raportMeta}>
+            <Text style={styles.raportDate}>
+              {item.tanggal ? formatDateToIndonesian(item.tanggal) : ''}
+            </Text>
+
+            {item.foto_raport && item.foto_raport.length > 0 && (
+              <View style={styles.photoIndicator}>
+                <Ionicons name="image" size={16} color="#666" />
+                <Text style={styles.photoCount}>{item.foto_raport.length} foto</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // Loading state
   if (loading && !refreshing) {
