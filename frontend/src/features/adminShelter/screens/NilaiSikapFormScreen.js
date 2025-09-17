@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  Alert,
-  Slider
+  Alert
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
