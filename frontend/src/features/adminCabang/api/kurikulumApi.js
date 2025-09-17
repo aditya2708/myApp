@@ -128,10 +128,22 @@ export const kurikulumApi = createApi({
     }),
 
     getKurikulumMateri: builder.query({
-      query: ({ kurikulumId, mataPelajaranId }) => ({
-        url: `/kurikulum/${kurikulumId}/materi`,
-        params: mataPelajaranId ? { mata_pelajaran: mataPelajaranId } : undefined,
-      }),
+      query: ({ kurikulumId, mataPelajaranId, kelasId }) => {
+        const params = {};
+
+        if (mataPelajaranId) {
+          params.mata_pelajaran = mataPelajaranId;
+        }
+
+        if (kelasId) {
+          params.kelas = kelasId;
+        }
+
+        return {
+          url: `/kurikulum/${kurikulumId}/materi`,
+          params: Object.keys(params).length > 0 ? params : undefined,
+        };
+      },
       providesTags: ['Kurikulum'],
     }),
 
