@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\AdminShelter;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\NilaiSikapRequest;
 use App\Models\Raport;
 use App\Models\RaportDetail;
 use App\Models\Anak;
@@ -12,6 +13,8 @@ use App\Models\NilaiSikap;
 use App\Models\Absen;
 use App\Models\KurikulumMateri;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
@@ -384,7 +387,7 @@ class RaportController extends Controller
             $detail = RaportDetail::where('id_raport', $idRaport)
                 ->where('id_raport_detail', $idDetail)
                 ->firstOrFail();
-            
+
             $validator = Validator::make($request->all(), [
                 'nilai_akhir' => 'sometimes|numeric|min:0|max:100',
                 'nilai_huruf' => 'sometimes|in:A,B,C,D,E',
@@ -399,19 +402,124 @@ class RaportController extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
-            
+
             $detail->update($request->all());
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Detail raport berhasil diperbarui',
                 'data' => $detail
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memperbarui detail raport',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get nilai sikap for anak and semester
+     */
+    public function getNilaiSikap($idAnak, $idSemester)
+    {
+        try {
+            $nilaiSikap = NilaiSikap::with(['semester'])
+                ->where('id_anak', $idAnak)
+                ->where('id_semester', $idSemester)
+                ->first();
+
+            if (!$nilaiSikap) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nilai sikap tidak ditemukan'
+                ], 404);
+            }
+
+            $nilaiSikap->append(['rata_rata', 'predikat', 'nilai_huruf']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Nilai sikap berhasil diambil',
+                'data' => $nilaiSikap
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil nilai sikap',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Store nilai sikap
+     */
+    public function storeNilaiSikap(NilaiSikapRequest $request)
+    {
+        try {
+            $validated = $request->validated();
+
+            $nilaiSikap = NilaiSikap::create($validated);
+            $nilaiSikap->load(['semester']);
+            $nilaiSikap->append(['rata_rata', 'predikat', 'nilai_huruf']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Nilai sikap berhasil disimpan',
+                'data' => $nilaiSikap
+            ], 201);
+        } catch (QueryException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nilai sikap untuk anak dan semester ini sudah ada',
+                'error' => $e->getMessage()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan nilai sikap',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update nilai sikap
+     */
+    public function updateNilaiSikap(NilaiSikapRequest $request, $id)
+    {
+        try {
+            $nilaiSikap = NilaiSikap::findOrFail($id);
+
+            $validated = $request->validated();
+            $nilaiSikap->update($validated);
+
+            $nilaiSikap->refresh()->load(['semester']);
+            $nilaiSikap->append(['rata_rata', 'predikat', 'nilai_huruf']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Nilai sikap berhasil diperbarui',
+                'data' => $nilaiSikap
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nilai sikap tidak ditemukan'
+            ], 404);
+        } catch (QueryException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nilai sikap untuk anak dan semester ini sudah ada',
+                'error' => $e->getMessage()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperbarui nilai sikap',
                 'error' => $e->getMessage()
             ], 500);
         }
