@@ -37,9 +37,6 @@ import AttendanceManagementScreen from '../features/adminShelter/screens/attenda
 
 // AnakDetail module screens
 import InformasiAnakScreen from '../features/adminShelter/screens/anakDetail/InformasiAnakScreen';
-import RaportScreen from '../features/adminShelter/screens/anakDetail/RaportScreen';
-import AddRaportScreen from '../features/adminShelter/screens/anakDetail/AddRaportScreen';
-import RaportDetailScreen from '../features/adminShelter/screens/anakDetail/RaportDetailScreen';
 import PrestasiScreen from '../features/adminShelter/screens/anakDetail/PrestasiScreen';
 import PrestasiDetailScreen from '../features/adminShelter/screens/anakDetail/PrestasiDetailScreen';
 import PrestasiFormScreen from '../features/adminShelter/screens/anakDetail/PrestasiFormScreen';
@@ -192,9 +189,6 @@ const ManagementStackNavigator = () => (
 
   {/* AnakDetail module */}
   <ManagementStack.Screen name="InformasiAnak" component={InformasiAnakScreen} options={{ headerTitle: 'Informasi Anak' }} />
-  <ManagementStack.Screen name="Raport" component={RaportScreen} options={{ headerTitle: 'Raport' }} />
-  <ManagementStack.Screen name="AddRaport" component={AddRaportScreen} options={{ headerTitle: 'Tambah Raport' }} />
-  <ManagementStack.Screen name="RaportDetail" component={RaportDetailScreen} options={{ headerTitle: 'Detail Raport' }} />
   <ManagementStack.Screen name="Prestasi" component={PrestasiScreen} options={{ headerTitle: 'Prestasi' }} />
   <ManagementStack.Screen name="PrestasiDetail" component={PrestasiDetailScreen} options={{ headerTitle: 'Detail Prestasi' }} />
   <ManagementStack.Screen name="PrestasiForm" component={PrestasiFormScreen} options={{ headerTitle: 'Form Prestasi' }} />
