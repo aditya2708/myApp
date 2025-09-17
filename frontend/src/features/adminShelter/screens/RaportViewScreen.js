@@ -3,24 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Share
+  ScrollView
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import components
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
-import Button from '../../../common/components/Button';
 
 // Import API
 import { raportApi } from '../api/raportApi';
 
 const RaportViewScreen = () => {
-  const navigation = useNavigation();
   const route = useRoute();
   const { raportId } = route.params || {};
   
@@ -96,30 +91,6 @@ const RaportViewScreen = () => {
     previewData?.attendance?.percentage ?? raport?.persentase_kehadiran;
   const overallAverage =
     previewData?.grades?.overall_average ?? raport?.average_grade;
-
-  const handleExportPDF = async () => {
-    Alert.alert(
-      'Export PDF',
-      'Fitur export PDF akan segera tersedia',
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleShare = async () => {
-    try {
-      const message = `Raport ${raport.anak.full_name}\n` +
-                     `Semester: ${raport.semester.nama_semester} ${raport.semester.tahun_ajaran}\n` +
-                     `Ranking: ${raport.ranking || '-'}\n` +
-                     `Kehadiran: ${attendancePercentage}%`;
-      
-      await Share.share({
-        message,
-        title: 'Raport Anak Binaan'
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
 
   const renderDetailedAcademicGrades = () => {
     if (!previewData?.grades?.academic_details) {
@@ -366,24 +337,6 @@ const RaportViewScreen = () => {
           </View>
         </View>
       )}
-
-      {/* Actions */}
-      <View style={styles.actions}>
-        <Button
-          title="Export PDF"
-          onPress={handleExportPDF}
-          leftIcon={<Ionicons name="document-text" size={20} color="#ffffff" />}
-          style={styles.actionButton}
-        />
-        
-        <Button
-          title="Bagikan"
-          onPress={handleShare}
-          type="outline"
-          leftIcon={<Ionicons name="share-social" size={20} color="#3498db" />}
-          style={styles.actionButton}
-        />
-      </View>
 
       {/* Footer */}
       <View style={styles.footer}>
@@ -720,16 +673,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2c3e50',
     lineHeight: 20,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 16,
-    marginTop: 20,
-  },
-  actionButton: {
-    flex: 1,
-    marginHorizontal: 8,
   },
   footer: {
     padding: 20,
