@@ -69,7 +69,8 @@ const MateriManagementScreen = ({ navigation, route }) => {
   } = useGetKurikulumMateriQuery(
     {
       kurikulumId,
-      mataPelajaranId
+      mataPelajaranId,
+      kelasId: kelas?.id_kelas
     },
     {
       skip: shouldSkipQuery

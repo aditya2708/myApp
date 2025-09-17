@@ -43,6 +43,11 @@ class KurikulumMateriController extends Controller
                 $query->where('id_mata_pelajaran', $request->query('mata_pelajaran'));
             }
 
+            if ($request->filled('kelas')) {
+                $kelasId = $request->query('kelas');
+                $query->whereHas('materi', fn ($q) => $q->where('id_kelas', $kelasId));
+            }
+
             $materi = $query->get();
 
             return response()->json([
