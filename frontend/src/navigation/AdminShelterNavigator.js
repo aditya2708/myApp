@@ -76,6 +76,8 @@ import LaporanAktivitasScreen from '../features/adminShelter/screens/reports/Lap
 import PenilaianListScreen from '../features/adminShelter/screens/PenilaianListScreen';
 import PenilaianFormScreen from '../features/adminShelter/screens/PenilaianFormScreen';
 import SemesterManagementScreen from '../features/adminShelter/screens/SemesterManagementScreen';
+import NilaiSikapScreen from '../features/adminShelter/screens/NilaiSikapScreen';
+import NilaiSikapFormScreen from '../features/adminShelter/screens/NilaiSikapFormScreen';
 
 // Management & Utility screens
 import PengajuanAnakSearchScreen from '../features/adminShelter/screens/PengajuanAnakSearchScreen';
@@ -198,6 +200,8 @@ const ManagementStackNavigator = () => (
   <ManagementStack.Screen name="RiwayatDetail" component={RiwayatDetailScreen} options={{ headerTitle: 'Detail Riwayat' }} />
   <ManagementStack.Screen name="RiwayatForm" component={RiwayatFormScreen} options={{ headerTitle: 'Form Riwayat' }} />
   <ManagementStack.Screen name="NilaiAnak" component={NilaiAnakScreen} options={{ headerTitle: 'Nilai Anak' }} />
+  <ManagementStack.Screen name="NilaiSikap" component={NilaiSikapScreen} options={{ headerTitle: 'Nilai Sikap' }} />
+  <ManagementStack.Screen name="NilaiSikapForm" component={NilaiSikapFormScreen} options={{ headerTitle: 'Form Nilai Sikap' }} />
   <ManagementStack.Screen name="RaporShelter" component={RaporShelterScreen} options={{ headerTitle: 'Rapor Shelter' }} />
   <ManagementStack.Screen name="RaportFormal" component={RaportFormalScreen} options={{ headerTitle: 'Raport Formal' }} />
   <ManagementStack.Screen name="RaportFormalDetail" component={RaportFormalDetailScreen} options={{ headerTitle: 'Detail Raport Formal' }} />

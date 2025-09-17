@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,28 @@ const RaportGenerateScreen = () => {
   const [error, setError] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [existingRaport, setExistingRaport] = useState(null);
+
+  const refreshPreviewData = useCallback(async () => {
+    if (!selectedSemester) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await raportApi.getPreviewData(anakId, selectedSemester);
+
+      if (response.data.success) {
+        setPreviewData(response.data.data);
+        setError(null);
+      } else {
+        setError(response.data.message || 'Gagal memuat preview raport');
+      }
+    } catch (err) {
+      console.error('Error refreshing preview data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [anakId, selectedSemester]);
 
   useEffect(() => {
     fetchSemesters();
@@ -123,6 +145,24 @@ const RaportGenerateScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleManageNilaiSikap = () => {
+    if (!selectedSemester) {
+      return;
+    }
+
+    const selectedOption = semesters.find(
+      semester => String(semester.id ?? semester.id_semester) === String(selectedSemester)
+    );
+
+    navigation.navigate('NilaiSikap', {
+      anakId,
+      anakData,
+      semesterId: selectedSemester,
+      semesterName: selectedOption?.nama || selectedOption?.nama_semester,
+      onNilaiSikapUpdated: refreshPreviewData
+    });
   };
 
   const handleGenerate = async () => {
@@ -320,6 +360,14 @@ const RaportGenerateScreen = () => {
                       Rata-rata: {previewData.nilaiSikap.data.rata_rata.toFixed(1)}
                     </Text>
                   </View>
+                )}
+                {!previewData.nilaiSikap.exists && (
+                  <Button
+                    title="Kelola Nilai Sikap"
+                    onPress={handleManageNilaiSikap}
+                    type="outline"
+                    style={styles.manageNilaiSikapButton}
+                  />
                 )}
               </View>
             )}
@@ -546,6 +594,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#2ecc71',
   },
   cancelButton: {
+    marginTop: 12,
+  },
+  manageNilaiSikapButton: {
     marginTop: 12,
   },
 });
