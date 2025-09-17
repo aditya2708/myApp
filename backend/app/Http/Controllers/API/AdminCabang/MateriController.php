@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class MateriController extends Controller
 {
@@ -71,7 +72,17 @@ class MateriController extends Controller
             $validator = Validator::make($request->all(), [
                 'id_mata_pelajaran' => 'required|exists:mata_pelajaran,id_mata_pelajaran',
                 'id_kelas' => 'required|exists:kelas,id_kelas',
-                'nama_materi' => 'required|string|max:255',
+                'nama_materi' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('materi', 'nama_materi')->where(function ($query) use ($kacabId, $request) {
+                        return $query
+                            ->where('id_kacab', $kacabId)
+                            ->where('id_mata_pelajaran', $request->id_mata_pelajaran)
+                            ->where('id_kelas', $request->id_kelas);
+                    }),
+                ],
                 'deskripsi' => 'nullable|string',
                 'tujuan_pembelajaran' => 'nullable|string',
                 'durasi_menit' => 'nullable|integer|min:1',
@@ -80,13 +91,16 @@ class MateriController extends Controller
                 'file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240', // 10MB max
                 'urutan' => 'nullable|integer|min:1',
                 'kurikulum_id' => 'nullable|exists:kurikulum,id_kurikulum'
+            ], [
+                'nama_materi.unique' => 'Materi dengan nama tersebut sudah ada untuk mata pelajaran dan kelas ini.'
             ]);
 
             if ($validator->fails()) {
+                $errors = $validator->errors();
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $errors->first() ?? 'Validasi gagal',
+                    'errors' => $errors
                 ], 422);
             }
 
