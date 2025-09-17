@@ -21,6 +21,55 @@ import {
 
 const getFirstDefined = (...values) => values.find((value) => value !== undefined && value !== null);
 
+const getKurikulumIdFromResponse = (response) => {
+  const sources = [
+    response,
+    response?.data,
+    response?.data?.data,
+    response?.data?.materi,
+    response?.data?.data?.materi,
+    response?.materi,
+    response?.materi?.data,
+  ];
+
+  const candidates = [];
+
+  sources.forEach((source) => {
+    if (!source) {
+      return;
+    }
+
+    if (Array.isArray(source)) {
+      source.forEach((item) => {
+        candidates.push(
+          item?.kurikulum_id,
+          item?.id_kurikulum,
+          item?.pivot?.kurikulum_id,
+          item?.pivot?.id_kurikulum,
+          item?.materi?.kurikulum_id,
+          item?.materi?.id_kurikulum,
+          item?.materi?.pivot?.kurikulum_id,
+          item?.materi?.pivot?.id_kurikulum
+        );
+      });
+      return;
+    }
+
+    candidates.push(
+      source?.kurikulum_id,
+      source?.id_kurikulum,
+      source?.pivot?.kurikulum_id,
+      source?.pivot?.id_kurikulum,
+      source?.materi?.kurikulum_id,
+      source?.materi?.id_kurikulum,
+      source?.materi?.pivot?.kurikulum_id,
+      source?.materi?.pivot?.id_kurikulum
+    );
+  });
+
+  return getFirstDefined(...candidates);
+};
+
 /**
  * Materi Form Screen - API Integrated
  * Form for adding/editing learning materials
@@ -108,6 +157,16 @@ const MateriFormScreen = ({ navigation, route }) => {
       return;
     }
 
+    const showSuccessAlert = () => {
+      Alert.alert(
+        'Sukses',
+        `Materi berhasil ${isEdit ? 'diupdate' : 'ditambahkan'}!`,
+        [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]
+      );
+    };
+
     try {
       const parsedUrutan = parseInt(formData.urutan, 10);
       const sanitizedUrutan = Number.isNaN(parsedUrutan) ? 1 : parsedUrutan;
@@ -122,7 +181,6 @@ const MateriFormScreen = ({ navigation, route }) => {
         kurikulum_id: kurikulumId
       };
 
-      // Add file if selected
       if (selectedFile) {
         submitData.file = {
           uri: selectedFile.uri,
@@ -136,41 +194,49 @@ const MateriFormScreen = ({ navigation, route }) => {
           id: materi.id_materi,
           ...submitData
         }).unwrap();
-      } else {
-        const createdMateri = await createMateri(submitData).unwrap();
-
-        if (kurikulumId) {
-          const materiId = getFirstDefined(
-            createdMateri?.data?.id_materi,
-            createdMateri?.data?.id,
-            createdMateri?.id_materi,
-            createdMateri?.id,
-            createdMateri?.materi?.id_materi,
-            createdMateri?.materi?.id
-          );
-
-          if (materiId) {
-            await addKurikulumMateri({
-              kurikulumId,
-              mataPelajaranId: mataPelajaran.id_mata_pelajaran,
-              materiId,
-              urutan: sanitizedUrutan
-            }).unwrap();
-          } else {
-            console.warn('Materi ID tidak ditemukan pada respons createMateri, melewati sinkronisasi kurikulum.');
-          }
-        }
+        showSuccessAlert();
+        return;
       }
 
-      Alert.alert(
-        'Sukses',
-        `Materi berhasil ${isEdit ? 'diupdate' : 'ditambahkan'}!`,
-        [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]
+      const createdMateri = await createMateri(submitData).unwrap();
+      const materiId = getFirstDefined(
+        createdMateri?.data?.id_materi,
+        createdMateri?.data?.id,
+        createdMateri?.id_materi,
+        createdMateri?.id,
+        createdMateri?.materi?.id_materi,
+        createdMateri?.materi?.id
       );
+
+      const normalizeId = (value) => (value !== undefined && value !== null ? String(value) : undefined);
+      const normalizedKurikulumId = normalizeId(kurikulumId);
+      const normalizedResponseKurikulumId = normalizeId(getKurikulumIdFromResponse(createdMateri));
+      const needsManualLinking = Boolean(normalizedKurikulumId) && normalizedKurikulumId !== normalizedResponseKurikulumId;
+
+      if (!needsManualLinking) {
+        showSuccessAlert();
+        return;
+      }
+
+      if (!materiId) {
+        console.warn('Materi ID tidak ditemukan pada respons createMateri, melewati sinkronisasi kurikulum.');
+        showSuccessAlert();
+        return;
+      }
+
+      await addKurikulumMateri({
+        kurikulumId,
+        mataPelajaranId: mataPelajaran.id_mata_pelajaran,
+        materiId,
+        urutan: sanitizedUrutan
+      }).unwrap();
+
+      showSuccessAlert();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Gagal menyimpan materi');
+      const errorMessage = error?.data?.message || error?.message || 'Gagal menyimpan materi';
+      if (errorMessage) {
+        Alert.alert('Error', errorMessage);
+      }
     }
   };
 
