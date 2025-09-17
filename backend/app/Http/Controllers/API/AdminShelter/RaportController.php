@@ -342,10 +342,23 @@ class RaportController extends Controller
     public function getByAnak($idAnak)
     {
         try {
-            $raport = Raport::with(['semester', 'raportDetail'])
+            $raport = Raport::with(['semester.kurikulum', 'anak.kelompok', 'anak.anakPendidikan', 'raportDetail'])
                 ->where('id_anak', $idAnak)
                 ->orderBy('tanggal_terbit', 'desc')
-                ->get();
+                ->get()
+                ->map(function ($raport) {
+                    $anak = $raport->anak;
+                    $anakPendidikan = $anak ? $anak->anakPendidikan : null;
+                    $kelompok = $anak ? $anak->kelompok : null;
+                    $semester = $raport->semester;
+                    $kurikulum = $semester ? $semester->kurikulum : null;
+
+                    return array_merge($raport->toArray(), [
+                        'kelas' => $anakPendidikan ? $anakPendidikan->kelas : null,
+                        'kelompok' => $kelompok ? $kelompok->toArray() : null,
+                        'kurikulum' => $kurikulum ? $kurikulum->toArray() : null,
+                    ]);
+                });
             
             return response()->json([
                 'success' => true,
