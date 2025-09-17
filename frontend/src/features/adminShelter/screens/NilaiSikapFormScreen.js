@@ -23,7 +23,7 @@ import { semesterApi } from '../api/semesterApi';
 const NilaiSikapFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { anakId, anakData, nilaiSikap, semesterId } = route.params || {};
+  const { anakId, anakData, nilaiSikap, semesterId, onSuccess } = route.params || {};
   
   const isEdit = !!nilaiSikap;
 
@@ -85,6 +85,13 @@ const NilaiSikapFormScreen = () => {
       }
 
       if (response.data.success) {
+        if (typeof onSuccess === 'function') {
+          try {
+            onSuccess();
+          } catch (callbackError) {
+            console.error('Error executing onSuccess callback:', callbackError);
+          }
+        }
         Alert.alert(
           'Sukses',
           isEdit ? 'Nilai sikap berhasil diperbarui' : 'Nilai sikap berhasil disimpan',
