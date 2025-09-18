@@ -23,8 +23,7 @@ const NilaiSikapScreen = () => {
     anakId,
     anakData,
     semesterId: semesterIdParam,
-    semesterName: semesterNameParam,
-    onNilaiSikapUpdated
+    semesterName: semesterNameParam
   } = route.params || {};
 
   const [activeSemester, setActiveSemester] = useState(null);
@@ -148,13 +147,7 @@ const NilaiSikapScreen = () => {
       anakId,
       anakData,
       semesterId: semesterInfo.id,
-      nilaiSikap,
-      onSuccess: async () => {
-        await loadData({ showLoading: false });
-        if (typeof onNilaiSikapUpdated === 'function') {
-          onNilaiSikapUpdated();
-        }
-      }
+      nilaiSikap
     });
   };
 
