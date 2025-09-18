@@ -49,6 +49,7 @@ const AdminCabangDashboardScreen = () => {
   const navigateToKurikulum = () => navigation.navigate('Kurikulum', { screen: 'KurikulumHome' });
   const navigateToGpsApproval = () => navigation.navigate('GpsApprovalScreen');
   const navigateToProfile = () => navigation.navigate('Profile');
+  const navigateToUserManagement = () => navigation.navigate('AdminCabangUserManagement');
 
   if (loading && !refreshing) return <LoadingSpinner fullScreen message="Memuat dashboard..." />;
 
@@ -61,18 +62,26 @@ const AdminCabangDashboardScreen = () => {
       onPress: navigateToSurveyManagement, 
       badge: surveyStats.pending 
     },
-    { 
-      title: 'Manajemen Donatur', 
-      description: 'Kelola data donatur cabang', 
-      icon: 'people', 
-      color: '#3498db', 
-      onPress: navigateToDonaturManagement, 
-      badge: donaturStats.total_donatur 
+    {
+      title: 'Manajemen Donatur',
+      description: 'Kelola data donatur cabang',
+      icon: 'people',
+      color: '#3498db',
+      onPress: navigateToDonaturManagement,
+      badge: donaturStats.total_donatur
     },
-    { 
-      title: 'Kurikulum', 
-      description: 'Kelola materi pembelajaran cabang', 
-      icon: 'library', 
+    {
+      title: 'Manajemen Pengguna',
+      description: 'Kelola akses admin cabang & shelter',
+      icon: 'people-circle',
+      color: '#2980b9',
+      onPress: navigateToUserManagement,
+      badge: null
+    },
+    {
+      title: 'Kurikulum',
+      description: 'Kelola materi pembelajaran cabang',
+      icon: 'library',
       color: '#9b59b6', 
       onPress: navigateToKurikulum, 
       badge: null 

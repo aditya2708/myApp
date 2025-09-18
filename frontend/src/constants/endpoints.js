@@ -119,6 +119,16 @@ export const ADMIN_CABANG_ENDPOINTS = {
     ASSIGN_DONATUR: '/admin-cabang/pengajuan-donatur/assign-donatur',
     CHILD_DETAIL: (id) => `/admin-cabang/pengajuan-donatur/child-detail/${id}`
   },
+  USERS: {
+    LIST: '/admin-cabang/users',
+    CREATE: '/admin-cabang/users',
+    DETAIL: (id) => `/admin-cabang/users/${id}`,
+    UPDATE: (id) => `/admin-cabang/users/${id}`,
+    DROPDOWN: {
+      WILBIN: '/admin-cabang/users/wilbin-dropdown',
+      SHELTER_BY_WILBIN: (wilbinId) => `/admin-cabang/users/wilbin/${wilbinId}/shelter-dropdown`
+    }
+  },
   DONATUR: {
     LIST: '/admin-cabang/donatur',
     CREATE: '/admin-cabang/donatur',
