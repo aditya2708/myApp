@@ -137,27 +137,54 @@ class AdminPusatUserController extends Controller
     /**
      * List all Kacab (for dropdown).
      */
-    public function listKacab()
+    public function listKacab(): JsonResponse
     {
-        $kacabs = Kacab::all();
-        return response()->json($kacabs);
+        $kacabs = Kacab::query()
+            ->select(['id_kacab', 'nama_kacab'])
+            ->orderBy('nama_kacab')
+            ->get()
+            ->map(function ($kacab) {
+                $kacab->nama_cabang = $kacab->nama_kacab;
+                return $kacab;
+            });
+
+        return response()->json([
+            'status' => true,
+            'data' => $kacabs,
+        ]);
     }
 
     /**
      * List Wilbin by Kacab ID.
      */
-    public function listWilbinByKacab($id)
+    public function listWilbinByKacab($id): JsonResponse
     {
-        $wilbins = Wilbin::where('id_kacab', $id)->get();
-        return response()->json($wilbins);
+        $wilbins = Wilbin::query()
+            ->where('id_kacab', $id)
+            ->select(['id_wilbin', 'id_kacab', 'nama_wilbin'])
+            ->orderBy('nama_wilbin')
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data' => $wilbins,
+        ]);
     }
 
     /**
      * List Shelter by Wilbin ID.
      */
-    public function listShelterByWilbin($id)
+    public function listShelterByWilbin($id): JsonResponse
     {
-        $shelters = Shelter::where('id_wilbin', $id)->get();
-        return response()->json($shelters);
+        $shelters = Shelter::query()
+            ->where('id_wilbin', $id)
+            ->select(['id_shelter', 'id_wilbin', 'nama_shelter'])
+            ->orderBy('nama_shelter')
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data' => $shelters,
+        ]);
     }
 }
