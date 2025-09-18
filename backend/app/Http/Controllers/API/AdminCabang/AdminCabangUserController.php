@@ -59,6 +59,11 @@ class AdminCabangUserController extends Controller
     public function show($id)
     {
         $user = User::with(['adminCabang', 'adminShelter'])->findOrFail($id);
+
+        if (!in_array($user->level, ['admin_cabang', 'admin_shelter'], true)) {
+            abort(404);
+        }
+
         return new UserResource($user);
     }
 
