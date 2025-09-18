@@ -17,6 +17,9 @@ import AdminCabangDonaturDetailScreen from '../features/adminCabang/screens/Admi
 import DonaturFilterScreen from '../features/adminCabang/screens/DonaturFilterScreen';
 import GpsApprovalScreen from '../features/adminCabang/screens/GpsApprovalScreen';
 import GpsApprovalDetailScreen from '../features/adminCabang/screens/GpsApprovalDetailScreen';
+import AdminCabangUserManagementScreen from '../features/adminCabang/screens/user/UserManagementScreen';
+import AdminCabangUserFormScreen from '../features/adminCabang/screens/user/UserFormScreen';
+import AdminCabangUserDetailScreen from '../features/adminCabang/screens/user/UserDetailScreen';
 
 // Kurikulum screens
 import KurikulumHomeScreen from '../features/adminCabang/screens/kurikulum/KurikulumHomeScreen';
@@ -99,6 +102,21 @@ const DashboardStackNavigator = () => (
       name="GpsApprovalDetailScreen"
       component={GpsApprovalDetailScreen}
       options={{ headerTitle: 'Detail Persetujuan GPS' }}
+    />
+    <DashboardStack.Screen
+      name="AdminCabangUserManagement"
+      component={AdminCabangUserManagementScreen}
+      options={{ headerTitle: 'Manajemen User Cabang' }}
+    />
+    <DashboardStack.Screen
+      name="AdminCabangUserForm"
+      component={AdminCabangUserFormScreen}
+      options={{ headerTitle: 'Form User Cabang' }}
+    />
+    <DashboardStack.Screen
+      name="AdminCabangUserDetail"
+      component={AdminCabangUserDetailScreen}
+      options={{ headerTitle: 'Detail User Cabang' }}
     />
   </DashboardStack.Navigator>
 );
