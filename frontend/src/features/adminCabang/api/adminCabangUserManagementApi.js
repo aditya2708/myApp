@@ -45,8 +45,13 @@ export const adminCabangUserManagementApi = {
   },
 
   /** Dropdown wilbin untuk cabang */
-  getWilbinDropdown: async () => {
-    return await api.get(USER_ENDPOINTS.DROPDOWN.WILBIN);
+  getWilbinDropdown: async (kacabId) => {
+    if (!kacabId && kacabId !== 0) {
+      const error = new Error('Parameter id kacab wajib diisi');
+      error.code = 'KACAB_ID_REQUIRED';
+      throw error;
+    }
+    return await api.get(USER_ENDPOINTS.DROPDOWN.WILBIN(kacabId));
   },
 
   /** Dropdown shelter berdasarkan wilbin */

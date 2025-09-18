@@ -125,8 +125,9 @@ export const ADMIN_CABANG_ENDPOINTS = {
     DETAIL: (id) => `/admin-cabang/users/${id}`,
     UPDATE: (id) => `/admin-cabang/users/${id}`,
     DROPDOWN: {
-      WILBIN: '/admin-cabang/users/wilbin-dropdown',
-      SHELTER_BY_WILBIN: (wilbinId) => `/admin-cabang/users/wilbin/${wilbinId}/shelter-dropdown`
+      KACAB: '/admin-cabang/kacab',
+      WILBIN: (kacabId) => `/admin-cabang/kacab/${kacabId}/wilbin`,
+      SHELTER_BY_WILBIN: (wilbinId) => `/admin-cabang/wilbin/${wilbinId}/shelter`
     }
   },
   DONATUR: {

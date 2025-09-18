@@ -118,10 +118,14 @@ const UserFormScreen = () => {
     setKacabName(profile?.kacab?.nama_cabang || profile?.nama_cabang || 'Cabang Anda');
   }, [profile]);
 
-  const fetchWilbinDropdown = useCallback(async () => {
+  const fetchWilbinDropdown = useCallback(async (kacabId) => {
+    if (!kacabId) {
+      setWilbinList([]);
+      return;
+    }
     try {
       setLoadingDropdown(true);
-      const res = await adminCabangUserManagementApi.getWilbinDropdown();
+      const res = await adminCabangUserManagementApi.getWilbinDropdown(kacabId);
       const list = res?.data?.data || res?.data || [];
       setWilbinList(Array.isArray(list) ? list : []);
     } catch (e) {
@@ -199,14 +203,21 @@ const UserFormScreen = () => {
   }, [defaultLevel, editingId, fetchShelterOptions]);
 
   useEffect(() => {
-    const init = async () => {
-      await fetchWilbinDropdown();
-      if (mode === 'edit' && editingId) {
-        await fetchDetail();
-      }
-    };
-    init();
-  }, [mode, editingId, fetchWilbinDropdown, fetchDetail]);
+    if (!id_kacab) {
+      setWilbinList([]);
+      setIdWilbin('');
+      setShelterList([]);
+      setIdShelter('');
+      return;
+    }
+    fetchWilbinDropdown(id_kacab);
+  }, [id_kacab, fetchWilbinDropdown]);
+
+  useEffect(() => {
+    if (mode === 'edit' && editingId) {
+      fetchDetail();
+    }
+  }, [mode, editingId, fetchDetail]);
 
   const handleWilbinChange = useCallback(
     (value) => {
