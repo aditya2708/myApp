@@ -10,6 +10,8 @@ use App\Http\Resources\UserCollection;
 use App\Models\Kacab;
 use App\Models\Wilbin;
 use App\Models\Shelter;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
 
 class AdminPusatUserController extends Controller
 {
@@ -31,27 +33,48 @@ class AdminPusatUserController extends Controller
     /**
      * Store a newly created user.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'username' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'level' => 'required|string|in:admin_pusat,admin_cabang,admin_shelter',
         ]);
 
-        $validated['password'] = bcrypt($validated['password']);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
 
-        $user = User::create($validated);
+        try {
+            $validated = $validator->validated();
+            $validated['password'] = bcrypt($validated['password']);
 
-        $user->load(match ($user->level) {
-            'admin_pusat' => 'adminPusat',
-            'admin_cabang' => 'adminCabang',
-            'admin_shelter' => 'adminShelter',
-            default => []
-        });
+            $user = User::create($validated);
 
-        return new UserResource($user);
+            $user->load(match ($user->level) {
+                'admin_pusat' => 'adminPusat',
+                'admin_cabang' => 'adminCabang',
+                'admin_shelter' => 'adminShelter',
+                default => []
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User berhasil dibuat',
+                'data' => (new UserResource($user))->resolve(),
+            ], 201);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal membuat user',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -66,27 +89,49 @@ class AdminPusatUserController extends Controller
     /**
      * Update the specified user.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id): JsonResponse
     {
         $user = User::findOrFail($id);
 
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'username' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|email|unique:users,email,' . $user->id_users . ',id_users',
             'password' => 'nullable|string|min:6',
             'level' => 'sometimes|required|string|in:admin_pusat,admin_cabang,admin_shelter',
         ]);
 
-        if (!empty($validated['password'])) {
-            $validated['password'] = bcrypt($validated['password']);
-        } else {
-            unset($validated['password']);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $user->update($validated);
-        $user->load(['adminPusat', 'adminCabang', 'adminShelter']);
+        try {
+            $validated = $validator->validated();
 
-        return new UserResource($user);
+            if (!empty($validated['password'])) {
+                $validated['password'] = bcrypt($validated['password']);
+            } else {
+                unset($validated['password']);
+            }
+
+            $user->update($validated);
+            $user->load(['adminPusat', 'adminCabang', 'adminShelter']);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User berhasil diupdate',
+                'data' => (new UserResource($user))->resolve(),
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal mengupdate user',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
     }
 
     /**
