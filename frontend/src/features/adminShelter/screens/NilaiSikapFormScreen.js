@@ -59,7 +59,7 @@ const NilaiSikapFormScreen = () => {
         setActiveSemester(activeSemesterData);
         setFormData(prev => ({
           ...prev,
-          id_semester: activeSemesterData?.id ?? activeSemesterData?.id_semester || ''
+          id_semester: (activeSemesterData?.id ?? activeSemesterData?.id_semester) ?? ''
         }));
       }
     } catch (err) {
