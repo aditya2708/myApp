@@ -121,7 +121,7 @@ export const ADMIN_CABANG_ENDPOINTS = {
   },
   USERS: {
     LIST: '/admin-cabang/users',
-    CREATE: '/admin-cabang/users',
+    CREATE: '/admin-cabang/create-user',
     DETAIL: (id) => `/admin-cabang/users/${id}`,
     UPDATE: (id) => `/admin-cabang/users/${id}`,
     DROPDOWN: {
