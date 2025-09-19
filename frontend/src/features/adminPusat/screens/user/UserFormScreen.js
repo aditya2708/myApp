@@ -197,29 +197,29 @@ const UserFormScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safe}> 
+    <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.select({ ios: 'padding', android: undefined })}
         keyboardVerticalOffset={Platform.select({ ios: 64, android: 0 })}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.container}>
-            <View style={styles.headerCard}>
-              <View style={styles.headerIconWrap}>
-                <Ionicons name="people" size={22} color="#fff" />
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.mainContent}>
+              <View style={styles.headerCard}>
+                <View style={styles.headerIconWrap}>
+                  <Ionicons name="people" size={22} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>{mode === 'create' ? 'Tambah User' : 'Edit User'}</Text>
+                  <Text style={styles.subtitle}>Isi data pengguna untuk akses admin pusat/cabang/shelter</Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>{mode === 'create' ? 'Tambah User' : 'Edit User'}</Text>
-                <Text style={styles.subtitle}>Isi data pengguna untuk akses admin pusat/cabang/shelter</Text>
-              </View>
-            </View>
 
-            <ScrollView
-              style={styles.scroll}
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
               {/* Card: Level */}
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Level</Text>
@@ -304,9 +304,7 @@ const UserFormScreen = () => {
                   <Text style={styles.errorText}>{apiError}</Text>
                 </View>
               )}
-
-              <View style={{ height: 16 }} />
-            </ScrollView>
+            </View>
 
             <View style={styles.footerBar}>
               <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.7 }]} disabled={submitting} onPress={onSubmit}>
@@ -314,7 +312,7 @@ const UserFormScreen = () => {
                 <Text style={styles.submitText}>{submitting ? 'Menyimpan...' : 'Simpan'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -324,14 +322,13 @@ const UserFormScreen = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: THEME.bg },
   flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: THEME.bg },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24 },
-  headerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.card, margin: 16, marginBottom: 8, padding: 16, borderRadius: 12, elevation: 2 },
+  scrollContent: { flexGrow: 1, padding: 20, paddingBottom: 48, backgroundColor: THEME.bg },
+  mainContent: { flexGrow: 1, gap: 16, width: '100%' },
+  headerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 2 },
   headerIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2ecc71', alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 18, fontWeight: 'bold', color: THEME.text },
   subtitle: { color: THEME.textMuted, marginTop: 2 },
-  card: { backgroundColor: THEME.card, borderRadius: 12, padding: 16, marginHorizontal: 16, marginTop: 12, elevation: 2 },
+  card: { backgroundColor: THEME.card, borderRadius: 16, padding: 20, elevation: 2 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: THEME.text, marginBottom: 10 },
   formRow: { marginBottom: 12 },
   label: { marginBottom: 6, color: THEME.text, fontWeight: '600' },
@@ -342,9 +339,9 @@ const styles = StyleSheet.create({
   levelPillActive: { backgroundColor: THEME.primaryAlt },
   levelPillText: { color: '#444', fontWeight: '600' },
   levelPillTextActive: { color: THEME.primary },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: THEME.danger, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: THEME.danger, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 },
   errorText: { color: '#fff', flex: 1 },
-  footerBar: { backgroundColor: THEME.card, padding: 12, borderTopWidth: 1, borderTopColor: THEME.border },
+  footerBar: { marginTop: 24, backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 3, width: '100%' },
   submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: THEME.primary, paddingVertical: 14, borderRadius: 10, gap: 8 },
   submitText: { color: '#fff', fontWeight: '700' },
 });
