@@ -217,7 +217,14 @@ const KeluargaManagementScreen = () => {
             <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('KeluargaForm', { keluarga: item })}>
               <Ionicons name="create-outline" size={18} color="#3498db" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => handleDeleteKeluarga(item)}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.hiddenActionButton]}
+              onPress={() => handleDeleteKeluarga(item)}
+              disabled
+              pointerEvents="none"
+              accessible={false}
+              testID="keluarga-delete-action"
+            >
               <Ionicons name="trash-outline" size={18} color="#e74c3c" />
             </TouchableOpacity>
           </View>
@@ -292,6 +299,7 @@ const styles = StyleSheet.create({
   keluargaName: { fontSize: 18, fontWeight: 'bold', color: '#333', flex: 1 },
   keluargaActions: { flexDirection: 'row' },
   actionButton: { padding: 6, marginLeft: 8 },
+  hiddenActionButton: { display: 'none' },
   keluargaDetails: { marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', paddingBottom: 12 },
   detailRow: { flexDirection: 'row', marginBottom: 4 },
   detailLabel: { width: 70, fontSize: 14, color: '#777' },
