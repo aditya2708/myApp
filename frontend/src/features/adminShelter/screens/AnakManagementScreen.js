@@ -239,10 +239,11 @@ const AnakManagementScreen = () => {
         <FlatList
           data={anakList}
           renderItem={({ item }) => (
-            <AnakListItem 
+            <AnakListItem
               item={item}
               onPress={() => handleViewAnak(item.id_anak)}
               onDelete={handleDeleteAnak}
+              showDeleteAction={false}
             />
           )}
           keyExtractor={(item) => item.id_anak?.toString()}

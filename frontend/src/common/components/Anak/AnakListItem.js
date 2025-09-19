@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { calculateAge, getStatusLabel } from '../../../common/utils/ageCalculator';
 import { formatEducationDisplay } from '../../../common/utils/educationFormatter';
 
-const AnakListItem = ({ item, onPress, onToggleStatus, onDelete }) => {
+const AnakListItem = ({ item, onPress, onToggleStatus, onDelete, showDeleteAction = true }) => {
   if (!item) return null;
 
   const getInitials = (name) => {
@@ -96,10 +96,17 @@ const AnakListItem = ({ item, onPress, onToggleStatus, onDelete }) => {
           </View>
           
           {onDelete && (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.deleteButton]}
+            <TouchableOpacity
+              testID="anak-delete-action"
+              style={[
+                styles.actionButton,
+                styles.deleteButton,
+                !showDeleteAction && styles.hiddenActionButton,
+              ]}
               onPress={() => onDelete(item)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              disabled={!showDeleteAction}
+              pointerEvents={showDeleteAction ? 'auto' : 'none'}
             >
               <Ionicons name="trash-outline" size={20} color="#EF4444" />
             </TouchableOpacity>
@@ -208,6 +215,11 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#FEF2F2',
+  },
+  hiddenActionButton: {
+    opacity: 0,
+    width: 0,
+    height: 0,
   },
 });
 
