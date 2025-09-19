@@ -200,7 +200,7 @@ const UserFormScreen = () => {
     <SafeAreaView style={styles.safe}> 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.select({ ios: 'padding', android: undefined })}
+        behavior={Platform.select({ ios: 'padding', android: 'height' })}
         keyboardVerticalOffset={Platform.select({ ios: 64, android: 0 })}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
