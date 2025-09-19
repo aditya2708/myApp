@@ -1,0 +1,58 @@
+# Dependencies (reinstalled on EAS workers)
+node_modules/
+
+# Expo / Metro caches
+.expo/
+.expo-shared/
+.cache/
+
+# Locally generated native/platform folders
+android/
+ios/
+web-build/
+
+# Build outputs and temporary directories
+build/
+dist/
+out/
+tmp/
+temp/
+
+# Logs and editor swap files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+expo-debug.log*
+*.log
+*.tmp
+*.swp
+*.swo
+
+# IDE and system artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tests, mocks, and storybook artifacts not needed in production bundles
+__tests__/
+__mocks__/
+.storybook/
+storybook/
+coverage/
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.tsx
+
+# Packaged binaries and signing material
+*.apk
+*.aab
+*.ipa
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
