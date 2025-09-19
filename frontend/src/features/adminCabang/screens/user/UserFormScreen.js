@@ -300,113 +300,113 @@ const UserFormScreen = () => {
         keyboardVerticalOffset={Platform.select({ ios: 64, android: 90 })}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.container}>
-            <View style={styles.headerCard}>
-              <View style={styles.headerIconWrap}>
-                <Ionicons name="people" size={22} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>{mode === 'create' ? 'Tambah User Cabang' : 'Edit User Cabang'}</Text>
-                <Text style={styles.subtitle}>Kelola akses admin cabang & shelter di cabang Anda</Text>
-              </View>
-            </View>
-
-            <ScrollView
-              style={styles.scroll}
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              {loadingDetail && (
-                <View style={styles.loadingOverlay}>
-                  <ActivityIndicator size="large" color={THEME.primary} />
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.contentWrap}>
+              <View style={styles.headerCard}>
+                <View style={styles.headerIconWrap}>
+                  <Ionicons name="people" size={22} color="#fff" />
                 </View>
-              )}
-
-              {/* Card: Level */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Level</Text>
-                <LevelPicker value={level} onChange={setLevel} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>{mode === 'create' ? 'Tambah User Cabang' : 'Edit User Cabang'}</Text>
+                  <Text style={styles.subtitle}>Kelola akses admin cabang & shelter di cabang Anda</Text>
+                </View>
               </View>
 
-              {/* Card: Data Akun */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Data Akun</Text>
-                <FormRow label="Username">
-                  <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="username" />
-                </FormRow>
-                <FormRow label="Email">
-                  <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="email@example.com" autoCapitalize="none" />
-                </FormRow>
-                <FormRow label="Password">
-                  <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="min 6 karakter" secureTextEntry />
-                </FormRow>
-              </View>
-
-              {/* Card: Profil */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Profil (Opsional)</Text>
-                <FormRow label="Nama Lengkap">
-                  <TextInput style={styles.input} value={nama_lengkap} onChangeText={setNamaLengkap} placeholder="Nama lengkap" />
-                </FormRow>
-                <FormRow label="Alamat">
-                  <TextInput style={[styles.input, styles.multiline]} value={alamat} onChangeText={setAlamat} placeholder="Alamat" multiline />
-                </FormRow>
-                <FormRow label="No HP">
-                  <TextInput style={styles.input} value={no_hp} onChangeText={setNoHp} placeholder="08xxxxxxxxxx" keyboardType="phone-pad" />
-                </FormRow>
-              </View>
-
-              {/* Card: Relasi Cabang */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Relasi Cabang</Text>
-                <FormRow label="Cabang">
-                  <View style={styles.readonlyBox}>
-                    <Ionicons name="business" size={16} color={THEME.textMuted} style={{ marginRight: 6 }} />
-                    <Text style={styles.readonlyText}>{cabangInfo}</Text>
+              <View style={styles.body}>
+                {loadingDetail && (
+                  <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color={THEME.primary} />
                   </View>
-                  <Text style={styles.helperText}>User otomatis terhubung ke cabang Anda.</Text>
-                </FormRow>
+                )}
 
-                {level === 'admin_shelter' && (
-                  <>
-                    <FormRow label="Wilbin">
-                      {loadingDropdown ? (
-                        <ActivityIndicator />
-                      ) : (
-                        <Picker selectedValue={id_wilbin} onValueChange={handleWilbinChange}>
-                          <Picker.Item label="-- Pilih Wilbin --" value="" />
-                          {wilbinList.map((w) => (
-                            <Picker.Item key={w.id_wilbin || w.id} label={w.nama_wilbin} value={String(w.id_wilbin || w.id)} />
-                          ))}
-                        </Picker>
-                      )}
-                    </FormRow>
+                {/* Card: Level */}
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Level</Text>
+                  <LevelPicker value={level} onChange={setLevel} />
+                </View>
 
-                    <FormRow label="Shelter">
-                      {loadingDropdown ? (
-                        <ActivityIndicator />
-                      ) : (
-                        <Picker selectedValue={id_shelter} onValueChange={setIdShelter} enabled={!!id_wilbin}>
-                          <Picker.Item label="-- Pilih Shelter --" value="" />
-                          {shelterList.map((s) => (
-                            <Picker.Item key={s.id_shelter || s.id} label={s.nama_shelter} value={String(s.id_shelter || s.id)} />
-                          ))}
-                        </Picker>
-                      )}
-                    </FormRow>
-                  </>
+                {/* Card: Data Akun */}
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Data Akun</Text>
+                  <FormRow label="Username">
+                    <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="username" />
+                  </FormRow>
+                  <FormRow label="Email">
+                    <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="email@example.com" autoCapitalize="none" />
+                  </FormRow>
+                  <FormRow label="Password">
+                    <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="min 6 karakter" secureTextEntry />
+                  </FormRow>
+                </View>
+
+                {/* Card: Profil */}
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Profil (Opsional)</Text>
+                  <FormRow label="Nama Lengkap">
+                    <TextInput style={styles.input} value={nama_lengkap} onChangeText={setNamaLengkap} placeholder="Nama lengkap" />
+                  </FormRow>
+                  <FormRow label="Alamat">
+                    <TextInput style={[styles.input, styles.multiline]} value={alamat} onChangeText={setAlamat} placeholder="Alamat" multiline />
+                  </FormRow>
+                  <FormRow label="No HP">
+                    <TextInput style={styles.input} value={no_hp} onChangeText={setNoHp} placeholder="08xxxxxxxxxx" keyboardType="phone-pad" />
+                  </FormRow>
+                </View>
+
+                {/* Card: Relasi Cabang */}
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Relasi Cabang</Text>
+                  <FormRow label="Cabang">
+                    <View style={styles.readonlyBox}>
+                      <Ionicons name="business" size={16} color={THEME.textMuted} style={{ marginRight: 6 }} />
+                      <Text style={styles.readonlyText}>{cabangInfo}</Text>
+                    </View>
+                    <Text style={styles.helperText}>User otomatis terhubung ke cabang Anda.</Text>
+                  </FormRow>
+
+                  {level === 'admin_shelter' && (
+                    <>
+                      <FormRow label="Wilbin">
+                        {loadingDropdown ? (
+                          <ActivityIndicator />
+                        ) : (
+                          <Picker selectedValue={id_wilbin} onValueChange={handleWilbinChange}>
+                            <Picker.Item label="-- Pilih Wilbin --" value="" />
+                            {wilbinList.map((w) => (
+                              <Picker.Item key={w.id_wilbin || w.id} label={w.nama_wilbin} value={String(w.id_wilbin || w.id)} />
+                            ))}
+                          </Picker>
+                        )}
+                      </FormRow>
+
+                      <FormRow label="Shelter">
+                        {loadingDropdown ? (
+                          <ActivityIndicator />
+                        ) : (
+                          <Picker selectedValue={id_shelter} onValueChange={setIdShelter} enabled={!!id_wilbin}>
+                            <Picker.Item label="-- Pilih Shelter --" value="" />
+                            {shelterList.map((s) => (
+                              <Picker.Item key={s.id_shelter || s.id} label={s.nama_shelter} value={String(s.id_shelter || s.id)} />
+                            ))}
+                          </Picker>
+                        )}
+                      </FormRow>
+                    </>
+                  )}
+                </View>
+
+                {!!apiError && (
+                  <View style={styles.errorBanner}>
+                    <Ionicons name="alert-circle" size={18} color="#fff" />
+                    <Text style={styles.errorText}>{apiError}</Text>
+                  </View>
                 )}
               </View>
-
-              {!!apiError && (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle" size={18} color="#fff" />
-                  <Text style={styles.errorText}>{apiError}</Text>
-                </View>
-              )}
-
-              <View style={{ height: 16 }} />
-            </ScrollView>
+            </View>
 
             <View style={styles.footerBar}>
               <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.7 }]} disabled={submitting} onPress={onSubmit}>
@@ -414,7 +414,7 @@ const UserFormScreen = () => {
                 <Text style={styles.submitText}>{submitting ? 'Menyimpan...' : 'Simpan'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -424,14 +424,15 @@ const UserFormScreen = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: THEME.bg },
   flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: THEME.bg },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24 },
-  headerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.card, margin: 16, marginBottom: 8, padding: 16, borderRadius: 12, elevation: 2 },
+  scroll: { flex: 1, backgroundColor: THEME.bg },
+  scrollContent: { flexGrow: 1, padding: 20, paddingBottom: 40 },
+  contentWrap: { flexGrow: 1, width: '100%', gap: 20 },
+  body: { flexGrow: 1, gap: 16, position: 'relative' },
+  headerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 2 },
   headerIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2ecc71', alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 18, fontWeight: 'bold', color: THEME.text },
   subtitle: { color: THEME.textMuted, marginTop: 2 },
-  card: { backgroundColor: THEME.card, borderRadius: 12, padding: 16, marginHorizontal: 16, marginTop: 12, elevation: 2 },
+  card: { backgroundColor: THEME.card, borderRadius: 16, padding: 20, elevation: 2 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: THEME.text, marginBottom: 10 },
   formRow: { marginBottom: 12 },
   label: { marginBottom: 6, color: THEME.text, fontWeight: '600' },
@@ -442,15 +443,15 @@ const styles = StyleSheet.create({
   levelPillActive: { backgroundColor: THEME.primaryAlt },
   levelPillText: { color: '#444', fontWeight: '600' },
   levelPillTextActive: { color: THEME.primary },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: THEME.danger, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: THEME.danger, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12 },
   errorText: { color: '#fff', flex: 1 },
-  footerBar: { backgroundColor: THEME.card, padding: 12, borderTopWidth: 1, borderTopColor: THEME.border },
-  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: THEME.primary, paddingVertical: 14, borderRadius: 10, gap: 8 },
+  footerBar: { marginTop: 24, width: '100%', backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 2 },
+  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: THEME.primary, paddingVertical: 16, borderRadius: 12, gap: 8, width: '100%' },
   submitText: { color: '#fff', fontWeight: '700' },
   readonlyBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: THEME.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fafafa' },
   readonlyText: { color: THEME.text, fontWeight: '600', flex: 1 },
   helperText: { color: THEME.textMuted, fontSize: 12, marginTop: 6 },
-  loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
 });
 
 export default UserFormScreen;
