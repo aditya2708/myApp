@@ -60,7 +60,15 @@ class AdminCabangSurveyController extends Controller
         $admin = $this->getAdminCabang();
         
         $survey = Survey::byKacab($admin->id_kacab)->with([
-            'keluarga' => fn($q) => $q->with(['shelter.wilbin', 'kacab', 'bank', 'anak', 'ayah', 'ibu', 'wali']),
+            'keluarga' => fn($q) => $q->with([
+                'shelter.wilbin',
+                'kacab',
+                'bank',
+                'anak' => fn($anak) => $anak->with(['anakPendidikan']),
+                'ayah',
+                'ibu',
+                'wali'
+            ]),
             'approvedBy'
         ])->find($id);
 
