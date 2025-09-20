@@ -24,6 +24,12 @@ class StoreKacabRequest extends FormRequest
                 'no_telp' => $this->input('no_telpon'),
             ]);
         }
+
+        if ($this->filled('no_telp') && !$this->filled('no_telpon')) {
+            $this->merge([
+                'no_telpon' => $this->input('no_telp'),
+            ]);
+        }
     }
 
     /**

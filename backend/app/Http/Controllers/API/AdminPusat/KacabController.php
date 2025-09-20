@@ -33,9 +33,9 @@ class KacabController extends Controller
 
         if (!empty($data['no_telpon']) && empty($data['no_telp'])) {
             $data['no_telp'] = $data['no_telpon'];
+        } elseif (!empty($data['no_telp']) && empty($data['no_telpon'])) {
+            $data['no_telpon'] = $data['no_telp'];
         }
-
-        unset($data['no_telpon']);
 
         $kacab = Kacab::create($data);
 
@@ -61,9 +61,9 @@ class KacabController extends Controller
 
         if (!empty($data['no_telpon']) && empty($data['no_telp'])) {
             $data['no_telp'] = $data['no_telpon'];
+        } elseif (!empty($data['no_telp']) && empty($data['no_telpon'])) {
+            $data['no_telpon'] = $data['no_telp'];
         }
-
-        unset($data['no_telpon']);
 
         $kacab->fill($data);
         $kacab->save();
