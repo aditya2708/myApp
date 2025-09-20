@@ -21,9 +21,13 @@ Route::middleware('role:admin_pusat')->prefix('admin-pusat')->group(function () 
         Route::put('users/{id}', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'update']);
 
         // Dropdown berjenjang
-        Route::get('kacab', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listKacab']);
-        Route::get('kacab/{id}/wilbin', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listWilbinByKacab']);
-        Route::get('wilbin/{id}/shelter', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listShelterByWilbin']);
+        Route::prefix('dropdowns')->group(function () {
+            Route::get('kacab', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listKacab']);
+            Route::get('kacab/{id}/wilbin', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listWilbinByKacab']);
+            Route::get('wilbin/{id}/shelter', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listShelterByWilbin']);
+        });
+
+        Route::apiResource('kacab', App\Http\Controllers\API\AdminPusat\KacabController::class);
  Route::get('/tutor-honor-settings', [App\Http\Controllers\API\AdminPusat\AdminPusatTutorHonorSettingsController::class, 'index']);
     Route::get('/tutor-honor-settings/active', [App\Http\Controllers\API\AdminPusat\AdminPusatTutorHonorSettingsController::class, 'getActiveSetting']);
     Route::post('/tutor-honor-settings', [App\Http\Controllers\API\AdminPusat\AdminPusatTutorHonorSettingsController::class, 'store']);
