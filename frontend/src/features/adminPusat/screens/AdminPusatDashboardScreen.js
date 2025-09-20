@@ -60,6 +60,7 @@ const AdminPusatDashboardScreen = () => {
   const navigateToProfile = () => navigation.navigate('ProfileTab');
   const navigateToTutorHonorSettings = () => navigation.navigate('TutorHonorSettings');
   const navigateToUserManagement = () => navigation.navigate('UserManagement');
+  const navigateToDataWilayah = () => navigation.navigate('DataWilayah');
 
   // Show loading indicator
   if (loading && !refreshing) {
@@ -159,8 +160,8 @@ const AdminPusatDashboardScreen = () => {
             <Text style={styles.quickAccessSubtext}>Kelola template dan distribusi</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.quickAccessItem} 
+          <TouchableOpacity
+            style={styles.quickAccessItem}
             onPress={navigateToTutorHonorSettings}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#e74c3c' }]}>
@@ -171,7 +172,7 @@ const AdminPusatDashboardScreen = () => {
           </TouchableOpacity>
 
           {/* NEW: Manajemen User */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.quickAccessItem}
             onPress={navigateToUserManagement}
           >
@@ -180,6 +181,17 @@ const AdminPusatDashboardScreen = () => {
             </View>
             <Text style={styles.quickAccessText}>Manajemen User</Text>
             <Text style={styles.quickAccessSubtext}>Kelola user pusat/cabang/shelter</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickAccessItem}
+            onPress={navigateToDataWilayah}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: '#9b59b6' }]}>
+              <Ionicons name="map" size={24} color="#fff" />
+            </View>
+            <Text style={styles.quickAccessText}>Data Wilayah</Text>
+            <Text style={styles.quickAccessSubtext}>Lihat kantor cabang & shelter</Text>
           </TouchableOpacity>
         </View>
       </View>
