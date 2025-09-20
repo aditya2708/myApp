@@ -30,10 +30,10 @@ class Kacab extends Model
 
     protected $casts = [
         'id_kacab' => 'integer',
-        'id_prov' => 'integer',
-        'id_kab' => 'integer',
-        'id_kec' => 'integer',
-        'id_kel' => 'integer'
+        'id_prov' => 'string',
+        'id_kab' => 'string',
+        'id_kec' => 'string',
+        'id_kel' => 'string'
     ];
 
     // Geographic relationships
