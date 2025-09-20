@@ -46,10 +46,10 @@ class UpdateKacabRequest extends FormRequest
             'alamat' => ['required', 'string'],
             'email' => ['nullable', 'email', 'max:255'],
             'status' => ['required', 'string', 'max:50'],
-            'id_prov' => ['nullable', 'integer'],
-            'id_kab' => ['nullable', 'integer'],
-            'id_kec' => ['nullable', 'integer'],
-            'id_kel' => ['nullable', 'integer'],
+            'id_prov' => ['nullable', 'string', 'max:10'],
+            'id_kab' => ['nullable', 'string', 'max:10'],
+            'id_kec' => ['nullable', 'string', 'max:10'],
+            'id_kel' => ['nullable', 'string', 'max:10'],
         ];
     }
 }
