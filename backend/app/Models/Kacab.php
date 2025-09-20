@@ -17,13 +17,14 @@ class Kacab extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'nama_kacab', 
-        'no_telp', 
-        'alamat', 
+        'nama_kacab',
+        'no_telp',
+        'alamat',
         'email',
-        'id_prov', 
-        'id_kab', 
-        'id_kec', 
+        'status',
+        'id_prov',
+        'id_kab',
+        'id_kec',
         'id_kel'
     ];
 
