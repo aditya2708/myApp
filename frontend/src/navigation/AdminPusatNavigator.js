@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AdminPusatDashboardScreen from '../features/adminPusat/screens/AdminPusatDashboardScreen';
 import AdminPusatProfileScreen from '../features/adminPusat/screens/AdminPusatProfileScreen';
 import TutorHonorSettingsScreen from '../features/adminPusat/screens/TutorHonorSettingsScreen';
+import DataWilayahScreen from '../features/adminPusat/screens/DataWilayahScreen';
 
 // User Management Screens
 import UserManagementScreen from '../features/adminPusat/screens/user/UserManagementScreen';
@@ -35,14 +36,19 @@ const Stack = createStackNavigator();
 const HomeStackNavigator = () => {
   return (
     <Stack.Navigator>
-      <Stack.Screen 
-        name="Dashboard" 
-        component={AdminPusatDashboardScreen} 
+      <Stack.Screen
+        name="Dashboard"
+        component={AdminPusatDashboardScreen}
         options={{ headerTitle: 'Admin Pusat Dashboard' }}
       />
-      <Stack.Screen 
-        name="TutorHonorSettings" 
-        component={TutorHonorSettingsScreen} 
+      <Stack.Screen
+        name="DataWilayah"
+        component={DataWilayahScreen}
+        options={{ headerTitle: 'Data Wilayah' }}
+      />
+      <Stack.Screen
+        name="TutorHonorSettings"
+        component={TutorHonorSettingsScreen}
         options={{ headerTitle: 'Setting Honor Tutor' }}
       />
 
