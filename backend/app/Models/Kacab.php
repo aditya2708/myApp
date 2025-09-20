@@ -19,6 +19,7 @@ class Kacab extends Model
     protected $fillable = [
         'nama_kacab',
         'no_telp',
+        'no_telpon',
         'alamat',
         'email',
         'status',
