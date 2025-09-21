@@ -159,14 +159,10 @@ const KacabDetailScreen = () => {
         <View style={styles.detailCard}>
           <Text style={styles.sectionTitle}>Informasi Kontak</Text>
           <DetailRow icon="call-outline" label="Nomor Telepon" value={detail?.no_telp || detail?.no_telpon || '-'} />
-          <DetailRow icon="call" label="No. Telpon (Legacy)" value={detail?.no_telpon || detail?.no_telp || '-'} />
           <DetailRow icon="mail-outline" label="Email" value={detail?.email || '-'} />
 
           <Text style={styles.sectionTitle}>Informasi Wilayah</Text>
-          <DetailRow icon="flag-outline" label="Kode Provinsi" value={detail?.id_prov || '-'} />
-          <DetailRow icon="business-outline" label="Kode Kabupaten" value={detail?.id_kab || '-'} />
-          <DetailRow icon="map-outline" label="Kode Kecamatan" value={detail?.id_kec || '-'} />
-          <DetailRow icon="location-outline" label="Kode Kelurahan" value={detail?.id_kel || '-'} />
+          <DetailRow icon="home-outline" label="Alamat" value={detail?.alamat || '-'} />
 
           <Text style={styles.sectionTitle}>Status & Audit</Text>
           <DetailRow icon="time-outline" label="Dibuat" value={formatDateTime(detail?.created_at)} />
