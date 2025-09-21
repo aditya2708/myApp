@@ -23,14 +23,9 @@ const statusOptions = [
 const initialForm = {
   nama_kacab: '',
   no_telp: '',
-  no_telpon: '',
   alamat: '',
   email: '',
   status: 'aktif',
-  id_prov: '',
-  id_kab: '',
-  id_kec: '',
-  id_kel: '',
 };
 
 const KacabFormScreen = () => {
@@ -63,14 +58,9 @@ const KacabFormScreen = () => {
       setForm({
         nama_kacab: data?.nama_kacab ?? '',
         no_telp: data?.no_telp ?? data?.no_telpon ?? '',
-        no_telpon: data?.no_telpon ?? data?.no_telp ?? '',
         alamat: data?.alamat ?? '',
         email: data?.email ?? '',
         status: data?.status ?? 'aktif',
-        id_prov: data?.id_prov ?? '',
-        id_kab: data?.id_kab ?? '',
-        id_kec: data?.id_kec ?? '',
-        id_kel: data?.id_kel ?? '',
       });
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Gagal memuat data kantor cabang';
@@ -86,37 +76,19 @@ const KacabFormScreen = () => {
   }, [fetchDetail]);
 
   const handleSubmit = async () => {
-    const nama = form.nama_kacab.trim();
-    const alamat = form.alamat.trim();
     const phonePrimary = form.no_telp.trim();
-    const phoneLegacy = form.no_telpon.trim();
 
-    if (!nama) {
-      Alert.alert('Validasi', 'Nama kantor cabang wajib diisi.');
-      return;
-    }
-
-    if (!alamat) {
-      Alert.alert('Validasi', 'Alamat kantor cabang wajib diisi.');
-      return;
-    }
-
-    if (!phonePrimary && !phoneLegacy) {
-      Alert.alert('Validasi', 'Minimal salah satu nomor telepon harus diisi.');
+    if (!phonePrimary) {
+      Alert.alert('Validasi', 'No. telepon wajib diisi.');
       return;
     }
 
     const payload = {
-      nama_kacab: nama,
-      alamat,
+      nama_kacab: form.nama_kacab.trim(),
+      alamat: form.alamat.trim(),
       email: form.email.trim() || null,
       status: form.status || 'aktif',
-      no_telp: phonePrimary || phoneLegacy,
-      no_telpon: phoneLegacy || phonePrimary,
-      id_prov: form.id_prov.trim() || null,
-      id_kab: form.id_kab.trim() || null,
-      id_kec: form.id_kec.trim() || null,
-      id_kel: form.id_kel.trim() || null,
+      no_telp: phonePrimary,
     };
 
     try {
@@ -195,27 +167,15 @@ const KacabFormScreen = () => {
               />
             </View>
 
-            <View style={styles.row}>
-              <View style={[styles.formGroup, styles.flexHalf]}>
-                <Text style={styles.label}>No. Telepon Utama *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={form.no_telp}
-                  onChangeText={(text) => updateField('no_telp', text)}
-                  placeholder="Contoh: 021123456"
-                  keyboardType="phone-pad"
-                />
-              </View>
-              <View style={[styles.formGroup, styles.flexHalf]}>
-                <Text style={styles.label}>No. Telpon (Legacy)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={form.no_telpon}
-                  onChangeText={(text) => updateField('no_telpon', text)}
-                  placeholder="Opsional"
-                  keyboardType="phone-pad"
-                />
-              </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>No. Telepon *</Text>
+              <TextInput
+                style={styles.input}
+                value={form.no_telp}
+                onChangeText={(text) => updateField('no_telp', text)}
+                placeholder="Contoh: 021123456"
+                keyboardType="phone-pad"
+              />
             </View>
 
             <View style={styles.formGroup}>
@@ -248,51 +208,6 @@ const KacabFormScreen = () => {
               })}
             </View>
 
-            <Text style={styles.sectionTitle}>Kode Wilayah (Opsional)</Text>
-            <View style={styles.row}>
-              <View style={[styles.formGroup, styles.flexHalf]}>
-                <Text style={styles.label}>ID Provinsi</Text>
-                <TextInput
-                  style={styles.input}
-                  value={form.id_prov}
-                  onChangeText={(text) => updateField('id_prov', text)}
-                  placeholder="Contoh: 32"
-                  autoCapitalize="none"
-                />
-              </View>
-              <View style={[styles.formGroup, styles.flexHalf]}>
-                <Text style={styles.label}>ID Kabupaten</Text>
-                <TextInput
-                  style={styles.input}
-                  value={form.id_kab}
-                  onChangeText={(text) => updateField('id_kab', text)}
-                  placeholder="Contoh: 3201"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-            <View style={styles.row}>
-              <View style={[styles.formGroup, styles.flexHalf]}>
-                <Text style={styles.label}>ID Kecamatan</Text>
-                <TextInput
-                  style={styles.input}
-                  value={form.id_kec}
-                  onChangeText={(text) => updateField('id_kec', text)}
-                  placeholder="Contoh: 320101"
-                  autoCapitalize="none"
-                />
-              </View>
-              <View style={[styles.formGroup, styles.flexHalf]}>
-                <Text style={styles.label}>ID Kelurahan</Text>
-                <TextInput
-                  style={styles.input}
-                  value={form.id_kel}
-                  onChangeText={(text) => updateField('id_kel', text)}
-                  placeholder="Contoh: 3201011001"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
 
             <TouchableOpacity
               style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
@@ -383,13 +298,6 @@ const styles = StyleSheet.create({
   multilineInput: {
     height: 90,
     textAlignVertical: 'top',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  flexHalf: {
-    flex: 1,
   },
   statusRow: {
     flexDirection: 'row',
