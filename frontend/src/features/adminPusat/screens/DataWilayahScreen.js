@@ -41,6 +41,11 @@ const DataWilayahScreen = () => {
       return;
     }
 
+    if (itemId === 'shelter') {
+      navigation.navigate('ShelterList');
+      return;
+    }
+
     Alert.alert('Segera Hadir', 'Fitur ini akan tersedia pada pembaruan berikutnya.');
   };
 
