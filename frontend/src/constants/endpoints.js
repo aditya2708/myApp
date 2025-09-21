@@ -7,6 +7,8 @@ export const AUTH_ENDPOINTS = {
 export const ADMIN_PUSAT_ENDPOINTS = {
   DASHBOARD: '/admin-pusat/dashboard',
   PROFILE: '/admin-pusat/profile',
+  WILBIN: '/admin-pusat/wilbin',
+  WILBIN_DETAIL: (id) => `/admin-pusat/wilbin/${id}`,
   ANAK: {
     LIST: '/admin-pusat/anak',
     DETAIL: (id) => `/admin-pusat/anak/${id}`,
