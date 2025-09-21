@@ -30,6 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
             });
 
             Route::apiResource('kacab', App\Http\Controllers\API\AdminPusat\KacabController::class);
+            Route::apiResource('wilbin', App\Http\Controllers\API\AdminPusat\WilbinController::class);
 
             Route::get('/tutor-honor-settings', [App\Http\Controllers\API\AdminPusat\AdminPusatTutorHonorSettingsController::class, 'index']);
             Route::get('/tutor-honor-settings/active', [App\Http\Controllers\API\AdminPusat\AdminPusatTutorHonorSettingsController::class, 'getActiveSetting']);
