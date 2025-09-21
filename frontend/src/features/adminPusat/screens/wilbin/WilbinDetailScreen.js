@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { adminPusatApi } from '../../api/adminPusatApi';
 
@@ -82,9 +82,13 @@ const WilbinDetailScreen = () => {
     [idWilbin]
   );
 
-  useEffect(() => {
-    fetchDetail();
-  }, [fetchDetail]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+
+      return () => {};
+    }, [fetchDetail])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
