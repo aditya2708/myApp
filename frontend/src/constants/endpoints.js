@@ -374,8 +374,8 @@ export const MANAGEMENT_ENDPOINTS = {
   USERS: '/users',
   USER_DETAIL: (id) => `/users/${id}`,
   
-  KACAB: '/kacab',
-  KACAB_DETAIL: (id) => `/kacab/${id}`,
+  KACAB: '/admin-pusat/kacab',
+  KACAB_DETAIL: (id) => `/admin-pusat/kacab/${id}`,
   
   WILBIN: '/wilbin',
   WILBIN_DETAIL: (id) => `/wilbin/${id}`,

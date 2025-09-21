@@ -105,11 +105,7 @@ export const adminPusatApi = {
    * @returns {Promise} - API response
    */
   createKacab: async (kacabData) => {
-    return await api.post(MANAGEMENT_ENDPOINTS.KACAB, kacabData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    return await api.post(MANAGEMENT_ENDPOINTS.KACAB, kacabData);
   },
 
   /**
@@ -119,11 +115,7 @@ export const adminPusatApi = {
    * @returns {Promise} - API response
    */
   updateKacab: async (kacabId, kacabData) => {
-    return await api.post(MANAGEMENT_ENDPOINTS.KACAB_DETAIL(kacabId), kacabData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    return await api.put(MANAGEMENT_ENDPOINTS.KACAB_DETAIL(kacabId), kacabData);
   },
 
   /**
