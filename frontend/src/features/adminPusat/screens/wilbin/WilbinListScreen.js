@@ -37,43 +37,128 @@ const WilbinListScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const resetPagination = useCallback((options = {}) => {
+    const { clearData = false } = options;
+
+    setPage(1);
+    setLastPage(1);
+    setLoadingMore(false);
+
+    if (clearData) {
+      setWilbinList([]);
+      setMeta(null);
+    }
+  }, []);
 
   const fetchWilbin = useCallback(async (options = {}) => {
-    const { silent = false } = options;
+    const { silent = false, page: requestedPage = 1 } = options;
 
     try {
-      setError('');
-      if (!silent) {
+      if (requestedPage === 1) {
+        setError('');
+      }
+
+      if (requestedPage > 1) {
+        setLoadingMore(true);
+      } else if (!silent) {
         setLoading(true);
       }
 
-      const response = await adminPusatApi.getWilbin();
+      const response = await adminPusatApi.getWilbin({ page: requestedPage });
       const payload = response?.data ?? null;
       const { items, meta: pagination } = normalizeListResponse(payload);
+      const normalizedItems = Array.isArray(items) ? items : [];
 
-      setWilbinList(Array.isArray(items) ? items : []);
-      setMeta(pagination);
+      setMeta((prevMeta) =>
+        pagination ?? (requestedPage > 1 ? prevMeta : null)
+      );
+
+      const derivedLastPageRaw =
+        pagination?.last_page ??
+        pagination?.lastPage ??
+        pagination?.total_pages ??
+        pagination?.totalPages ??
+        pagination?.pages ??
+        pagination?.pageCount ??
+        pagination?.page_count ??
+        pagination?.max_page ??
+        pagination?.maxPage ??
+        pagination?.last ??
+        null;
+      const derivedLastPage =
+        typeof derivedLastPageRaw === 'number'
+          ? derivedLastPageRaw
+          : Number(derivedLastPageRaw) || requestedPage;
+      setLastPage((prevLastPage) =>
+        derivedLastPage || (requestedPage > 1 ? prevLastPage : 1)
+      );
+
+      setWilbinList((prev) =>
+        requestedPage > 1 ? [...prev, ...normalizedItems] : normalizedItems
+      );
+      setPage(requestedPage);
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Gagal memuat wilayah binaan';
-      setError(String(message));
-    } finally {
-      if (!silent) {
-        setLoading(false);
+      if (requestedPage > 1) {
+        Alert.alert('Error', String(message));
+      } else {
+        setError(String(message));
       }
-      setRefreshing(false);
+    } finally {
+      if (requestedPage > 1) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      fetchWilbin();
-    }, [fetchWilbin])
+      resetPagination({ clearData: true });
+      fetchWilbin({ page: 1 });
+    }, [fetchWilbin, resetPagination])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchWilbin({ silent: true });
+    resetPagination();
+    fetchWilbin({ page: 1, silent: true });
   };
+
+  const handleLoadMore = useCallback(() => {
+    if (loadingMore || loading || refreshing || page >= lastPage) {
+      return;
+    }
+
+    const nextPage = page + 1;
+    fetchWilbin({ page: nextPage, silent: true });
+  }, [fetchWilbin, lastPage, loading, loadingMore, page, refreshing]);
+
+  const renderFooter = useCallback(() => {
+    if (loadingMore) {
+      return (
+        <View style={styles.footerLoading}>
+          <ActivityIndicator size="small" color="#3498db" />
+        </View>
+      );
+    }
+
+    if (!loading && page < lastPage) {
+      return (
+        <TouchableOpacity style={styles.loadMoreButton} onPress={handleLoadMore}>
+          <Text style={styles.loadMoreText}>Muat Lebih</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return null;
+  }, [handleLoadMore, lastPage, loading, loadingMore, page]);
 
   const goToCreate = () => {
     navigation.navigate('WilbinForm', { mode: 'create' });
@@ -108,7 +193,8 @@ const WilbinListScreen = () => {
       setDeletingId(id);
       await adminPusatApi.deleteWilbin(id);
       Alert.alert('Berhasil', 'Wilayah binaan berhasil dihapus.');
-      await fetchWilbin();
+      resetPagination({ clearData: true });
+      await fetchWilbin({ page: 1 });
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Gagal menghapus wilayah binaan';
       Alert.alert('Error', String(message));
@@ -240,6 +326,9 @@ const WilbinListScreen = () => {
           contentContainerStyle={{ paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={listEmptyComponent}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.2}
+          ListFooterComponent={renderFooter}
         />
       )}
     </View>
@@ -382,6 +471,22 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#95a5a6',
+  },
+  footerLoading: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    marginTop: 16,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#3498db',
+  },
+  loadMoreText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 
