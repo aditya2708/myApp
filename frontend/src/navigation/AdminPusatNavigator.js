@@ -11,6 +11,9 @@ import DataWilayahScreen from '../features/adminPusat/screens/DataWilayahScreen'
 import KacabListScreen from '../features/adminPusat/screens/kacab/KacabListScreen';
 import KacabDetailScreen from '../features/adminPusat/screens/kacab/KacabDetailScreen';
 import KacabFormScreen from '../features/adminPusat/screens/kacab/KacabFormScreen';
+import WilbinListScreen from '../features/adminPusat/screens/wilbin/WilbinListScreen';
+import WilbinDetailScreen from '../features/adminPusat/screens/wilbin/WilbinDetailScreen';
+import WilbinFormScreen from '../features/adminPusat/screens/wilbin/WilbinFormScreen';
 
 // User Management Screens
 import UserManagementScreen from '../features/adminPusat/screens/user/UserManagementScreen';
@@ -64,6 +67,23 @@ const HomeStackNavigator = () => {
         component={KacabFormScreen}
         options={({ route }) => ({
           headerTitle: route?.params?.mode === 'edit' ? 'Edit Kantor Cabang' : 'Tambah Kantor Cabang',
+        })}
+      />
+      <Stack.Screen
+        name="WilbinList"
+        component={WilbinListScreen}
+        options={{ headerTitle: 'Wilayah Binaan' }}
+      />
+      <Stack.Screen
+        name="WilbinDetail"
+        component={WilbinDetailScreen}
+        options={{ headerTitle: 'Detail Wilayah Binaan' }}
+      />
+      <Stack.Screen
+        name="WilbinForm"
+        component={WilbinFormScreen}
+        options={({ route }) => ({
+          headerTitle: route?.params?.mode === 'edit' ? 'Edit Wilayah Binaan' : 'Tambah Wilayah Binaan',
         })}
       />
       <Stack.Screen

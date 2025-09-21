@@ -36,6 +36,11 @@ const DataWilayahScreen = () => {
       return;
     }
 
+    if (itemId === 'wilayah-binaan') {
+      navigation.navigate('WilbinList');
+      return;
+    }
+
     Alert.alert('Segera Hadir', 'Fitur ini akan tersedia pada pembaruan berikutnya.');
   };
 
