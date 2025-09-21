@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Kacab;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateKacabRequest extends FormRequest
 {
@@ -45,7 +46,7 @@ class UpdateKacabRequest extends FormRequest
             'no_telpon' => ['required_without:no_telp', 'nullable', 'string', 'max:25'],
             'alamat' => ['required', 'string'],
             'email' => ['nullable', 'email', 'max:255'],
-            'status' => ['required', 'string', 'max:50'],
+            'status' => ['required', 'string', Rule::in(['aktif', 'nonaktif'])],
             'id_prov' => ['nullable', 'string', 'max:10'],
             'id_kab' => ['nullable', 'string', 'max:10'],
             'id_kec' => ['nullable', 'string', 'max:10'],
