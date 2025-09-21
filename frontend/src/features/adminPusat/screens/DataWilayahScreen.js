@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const menuItems = [
   {
@@ -27,6 +28,17 @@ const menuItems = [
 ];
 
 const DataWilayahScreen = () => {
+  const navigation = useNavigation();
+
+  const handlePress = (itemId) => {
+    if (itemId === 'kantor-cabang') {
+      navigation.navigate('KacabList');
+      return;
+    }
+
+    Alert.alert('Segera Hadir', 'Fitur ini akan tersedia pada pembaruan berikutnya.');
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.title}>Data Wilayah</Text>
@@ -36,7 +48,12 @@ const DataWilayahScreen = () => {
 
       <View style={styles.menuList}>
         {menuItems.map((item) => (
-          <TouchableOpacity key={item.id} style={styles.menuCard} activeOpacity={0.8}>
+          <TouchableOpacity
+            key={item.id}
+            style={styles.menuCard}
+            activeOpacity={0.8}
+            onPress={() => handlePress(item.id)}
+          >
             <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
               <Ionicons name={item.icon} size={28} color="#fff" />
             </View>
