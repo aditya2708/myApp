@@ -14,6 +14,9 @@ import KacabFormScreen from '../features/adminPusat/screens/kacab/KacabFormScree
 import WilbinListScreen from '../features/adminPusat/screens/wilbin/WilbinListScreen';
 import WilbinDetailScreen from '../features/adminPusat/screens/wilbin/WilbinDetailScreen';
 import WilbinFormScreen from '../features/adminPusat/screens/wilbin/WilbinFormScreen';
+import ShelterListScreen from '../features/adminPusat/screens/shelter/ShelterListScreen';
+import ShelterDetailScreen from '../features/adminPusat/screens/shelter/ShelterDetailScreen';
+import ShelterFormScreen from '../features/adminPusat/screens/shelter/ShelterFormScreen';
 
 // User Management Screens
 import UserManagementScreen from '../features/adminPusat/screens/user/UserManagementScreen';
@@ -84,6 +87,23 @@ const HomeStackNavigator = () => {
         component={WilbinFormScreen}
         options={({ route }) => ({
           headerTitle: route?.params?.mode === 'edit' ? 'Edit Wilayah Binaan' : 'Tambah Wilayah Binaan',
+        })}
+      />
+      <Stack.Screen
+        name="ShelterList"
+        component={ShelterListScreen}
+        options={{ headerTitle: 'Shelter' }}
+      />
+      <Stack.Screen
+        name="ShelterDetail"
+        component={ShelterDetailScreen}
+        options={{ headerTitle: 'Detail Shelter' }}
+      />
+      <Stack.Screen
+        name="ShelterForm"
+        component={ShelterFormScreen}
+        options={({ route }) => ({
+          headerTitle: route?.params?.mode === 'edit' ? 'Edit Shelter' : 'Tambah Shelter',
         })}
       />
       <Stack.Screen
