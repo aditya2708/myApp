@@ -26,7 +26,7 @@ class StoreKacabRequest extends FormRequest
             ]);
         }
 
-        if ($this->filled('no_telp') && !$this->filled('no_telpon')) {
+        if ($this->filled('no_telp') && !$this->has('no_telpon')) {
             $this->merge([
                 'no_telpon' => $this->input('no_telp'),
             ]);
@@ -48,8 +48,8 @@ class StoreKacabRequest extends FormRequest
     {
         return [
             'nama_kacab' => ['required', 'string', 'max:255'],
-            'no_telp' => ['required_without:no_telpon', 'nullable', 'string', 'max:25'],
-            'no_telpon' => ['required_without:no_telp', 'nullable', 'string', 'max:25'],
+            'no_telp' => ['nullable', 'string', 'max:25'],
+            'no_telpon' => ['nullable', 'string', 'max:25'],
             'alamat' => ['required', 'string'],
             'email' => ['nullable', 'email', 'max:255'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],

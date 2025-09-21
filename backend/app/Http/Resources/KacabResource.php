@@ -31,7 +31,6 @@ class KacabResource extends JsonResource
                 ?? $this->nama_kacab
                 ?? null,
             'no_telp' => $this->no_telp,
-            'no_telpon' => $this->no_telpon ?? $this->no_telp,
             'alamat' => $this->alamat,
             'email' => $this->email,
             'status' => $this->status,
