@@ -9,6 +9,13 @@ export const ADMIN_PUSAT_ENDPOINTS = {
   PROFILE: '/admin-pusat/profile',
   WILBIN: '/admin-pusat/wilbin',
   WILBIN_DETAIL: (id) => `/admin-pusat/wilbin/${id}`,
+  SHELTER: {
+    LIST: '/admin-pusat/shelter',
+    DETAIL: (id) => `/admin-pusat/shelter/${id}`,
+    DROPDOWN: {
+      BY_WILBIN: (wilbinId) => `/dropdowns/wilbin/${wilbinId}/shelter`
+    }
+  },
   ANAK: {
     LIST: '/admin-pusat/anak',
     DETAIL: (id) => `/admin-pusat/anak/${id}`,

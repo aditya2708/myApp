@@ -175,5 +175,60 @@ export const adminPusatApi = {
    */
   deleteWilbin: async (wilbinId) => {
     return await api.delete(ADMIN_PUSAT_ENDPOINTS.WILBIN_DETAIL(wilbinId));
+  },
+
+  /**
+   * Get list of shelters
+   * @param {Object} params - Query parameters
+   * @returns {Promise} - API response with shelter data
+   */
+  getShelter: async (params = {}) => {
+    return await api.get(ADMIN_PUSAT_ENDPOINTS.SHELTER.LIST, { params });
+  },
+
+  /**
+   * Get shelter details
+   * @param {number|string} shelterId - Shelter ID
+   * @returns {Promise} - API response with shelter details
+   */
+  getShelterDetail: async (shelterId) => {
+    return await api.get(ADMIN_PUSAT_ENDPOINTS.SHELTER.DETAIL(shelterId));
+  },
+
+  /**
+   * Create new shelter
+   * @param {Object} shelterData - Shelter data
+   * @returns {Promise} - API response
+   */
+  createShelter: async (shelterData) => {
+    return await api.post(ADMIN_PUSAT_ENDPOINTS.SHELTER.LIST, shelterData);
+  },
+
+  /**
+   * Update shelter
+   * @param {number|string} shelterId - Shelter ID
+   * @param {Object} shelterData - Shelter data
+   * @returns {Promise} - API response
+   */
+  updateShelter: async (shelterId, shelterData) => {
+    return await api.put(ADMIN_PUSAT_ENDPOINTS.SHELTER.DETAIL(shelterId), shelterData);
+  },
+
+  /**
+   * Delete shelter
+   * @param {number|string} shelterId - Shelter ID
+   * @returns {Promise} - API response
+   */
+  deleteShelter: async (shelterId) => {
+    return await api.delete(ADMIN_PUSAT_ENDPOINTS.SHELTER.DETAIL(shelterId));
+  },
+
+  /**
+   * Get shelter dropdown data by wilbin
+   * @param {number|string} wilbinId - Wilbin ID
+   * @returns {Promise} - API response with shelter dropdown data
+   */
+  getShelterDropdownByWilbin: async (wilbinId) => {
+    return await api.get(ADMIN_PUSAT_ENDPOINTS.SHELTER.DROPDOWN.BY_WILBIN(wilbinId));
   }
 };
