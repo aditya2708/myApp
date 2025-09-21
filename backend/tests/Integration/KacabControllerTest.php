@@ -83,12 +83,44 @@ class KacabControllerTest extends TestCase
         $this->assertSame('0102', $stored->id_kab);
         $this->assertSame('010203', $stored->id_kec);
         $this->assertSame('01020304', $stored->id_kel);
+        $this->assertSame('0800123456', $stored->no_telpon);
 
         $raw = $this->database->table('kacab')->first();
         $this->assertSame('01', $raw->id_prov);
         $this->assertSame('0102', $raw->id_kab);
         $this->assertSame('010203', $raw->id_kec);
         $this->assertSame('01020304', $raw->id_kel);
+        $this->assertSame('0800123456', $raw->no_telpon);
+    }
+
+    public function test_store_accepts_legacy_no_telpon_field(): void
+    {
+        $controller = new KacabController();
+
+        $request = Request::create('/api/kacab', 'POST', [
+            'nama_kacab' => 'Cabang 02',
+            'no_telpon' => '0811223344',
+            'alamat' => 'Alamat Cabang 02',
+            'email' => 'cabang02@example.com',
+        ]);
+
+        $response = $controller->store($request);
+
+        $this->assertInstanceOf(JsonResponse::class, $response);
+        $this->assertSame(201, $response->getStatusCode());
+
+        $payload = $response->getData(true);
+        $this->assertTrue($payload['status']);
+        $this->assertSame('0811223344', $payload['data']['no_telp']);
+
+        $stored = Kacab::query()->where('nama_kacab', 'Cabang 02')->first();
+        $this->assertNotNull($stored);
+        $this->assertSame('0811223344', $stored->no_telp);
+        $this->assertSame('0811223344', $stored->no_telpon);
+
+        $raw = $this->database->table('kacab')->where('nama_kacab', 'Cabang 02')->first();
+        $this->assertSame('0811223344', $raw->no_telp);
+        $this->assertSame('0811223344', $raw->no_telpon);
     }
 
     public function test_update_keeps_leading_zeroes_on_location_identifiers(): void
@@ -128,18 +160,54 @@ class KacabControllerTest extends TestCase
         $this->assertSame('2103', $payload['data']['id_kab']);
         $this->assertSame('210304', $payload['data']['id_kec']);
         $this->assertSame('21030405', $payload['data']['id_kel']);
+        $this->assertSame('0800987654', $payload['data']['no_telp']);
 
         $existing->refresh();
         $this->assertSame('21', $existing->id_prov);
         $this->assertSame('2103', $existing->id_kab);
         $this->assertSame('210304', $existing->id_kec);
         $this->assertSame('21030405', $existing->id_kel);
+        $this->assertSame('0800987654', $existing->no_telpon);
 
         $raw = $this->database->table('kacab')->where('id_kacab', $existing->id_kacab)->first();
         $this->assertSame('21', $raw->id_prov);
         $this->assertSame('2103', $raw->id_kab);
         $this->assertSame('210304', $raw->id_kec);
         $this->assertSame('21030405', $raw->id_kel);
+        $this->assertSame('0800987654', $raw->no_telpon);
+    }
+
+    public function test_update_accepts_legacy_no_telpon_field(): void
+    {
+        $existing = Kacab::create([
+            'nama_kacab' => 'Cabang Lama',
+            'no_telpon' => '0899001122',
+            'alamat' => 'Alamat Lama',
+        ]);
+
+        $controller = new KacabController();
+
+        $request = Request::create('/api/kacab/' . $existing->id_kacab, 'PUT', [
+            'nama_kacab' => 'Cabang Lama',
+            'no_telpon' => '0811333444',
+        ]);
+
+        $response = $controller->update($request, $existing);
+
+        $this->assertInstanceOf(JsonResponse::class, $response);
+        $this->assertSame(200, $response->getStatusCode());
+
+        $payload = $response->getData(true);
+        $this->assertTrue($payload['status']);
+        $this->assertSame('0811333444', $payload['data']['no_telp']);
+
+        $existing->refresh();
+        $this->assertSame('0811333444', $existing->no_telp);
+        $this->assertSame('0811333444', $existing->no_telpon);
+
+        $raw = $this->database->table('kacab')->where('id_kacab', $existing->id_kacab)->first();
+        $this->assertSame('0811333444', $raw->no_telp);
+        $this->assertSame('0811333444', $raw->no_telpon);
     }
 
     private function setUpContainer(): void

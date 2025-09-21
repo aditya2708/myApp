@@ -66,7 +66,13 @@ class KacabController extends Controller
     {
         $validated = $this->validateKacab($request);
 
-        $kacab = Kacab::create($validated);
+        $kacab = new Kacab($validated);
+
+        if (array_key_exists('no_telp', $validated)) {
+            $kacab->no_telpon = $validated['no_telp'];
+        }
+
+        $kacab->save();
         $kacab->load(['provinsi', 'kabupaten', 'kecamatan', 'kelurahan']);
 
         return (new KacabResource($kacab))
@@ -101,6 +107,9 @@ class KacabController extends Controller
         $validated = $this->validateKacab($request, $kacab);
 
         $kacab->fill($validated);
+        if (array_key_exists('no_telp', $validated)) {
+            $kacab->no_telpon = $validated['no_telp'];
+        }
         $kacab->save();
         $kacab->load(['provinsi', 'kabupaten', 'kecamatan', 'kelurahan']);
 
@@ -141,6 +150,12 @@ class KacabController extends Controller
     private function validateKacab(Request $request, ?Kacab $kacab = null): array
     {
         $id = $kacab?->id_kacab;
+
+        if ($request->filled('no_telpon') && !$request->filled('no_telp')) {
+            $request->merge([
+                'no_telp' => $request->input('no_telpon'),
+            ]);
+        }
 
         $validated = $request->validate([
             'nama_kacab' => 'required|string|max:255',
