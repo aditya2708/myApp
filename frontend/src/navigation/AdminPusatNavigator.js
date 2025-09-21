@@ -8,6 +8,9 @@ import AdminPusatDashboardScreen from '../features/adminPusat/screens/AdminPusat
 import AdminPusatProfileScreen from '../features/adminPusat/screens/AdminPusatProfileScreen';
 import TutorHonorSettingsScreen from '../features/adminPusat/screens/TutorHonorSettingsScreen';
 import DataWilayahScreen from '../features/adminPusat/screens/DataWilayahScreen';
+import KacabListScreen from '../features/adminPusat/screens/kacab/KacabListScreen';
+import KacabDetailScreen from '../features/adminPusat/screens/kacab/KacabDetailScreen';
+import KacabFormScreen from '../features/adminPusat/screens/kacab/KacabFormScreen';
 
 // User Management Screens
 import UserManagementScreen from '../features/adminPusat/screens/user/UserManagementScreen';
@@ -45,6 +48,23 @@ const HomeStackNavigator = () => {
         name="DataWilayah"
         component={DataWilayahScreen}
         options={{ headerTitle: 'Data Wilayah' }}
+      />
+      <Stack.Screen
+        name="KacabList"
+        component={KacabListScreen}
+        options={{ headerTitle: 'Kantor Cabang' }}
+      />
+      <Stack.Screen
+        name="KacabDetail"
+        component={KacabDetailScreen}
+        options={{ headerTitle: 'Detail Kantor Cabang' }}
+      />
+      <Stack.Screen
+        name="KacabForm"
+        component={KacabFormScreen}
+        options={({ route }) => ({
+          headerTitle: route?.params?.mode === 'edit' ? 'Edit Kantor Cabang' : 'Tambah Kantor Cabang',
+        })}
       />
       <Stack.Screen
         name="TutorHonorSettings"
