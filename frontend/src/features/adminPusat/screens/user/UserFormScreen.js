@@ -105,6 +105,18 @@ const UserFormScreen = () => {
 
   const extractFieldErrors = (errors, fallbackMessage) => {
     const fieldErrors = {};
+    const allowedFields = [
+      'username',
+      'email',
+      'password',
+      'nama_lengkap',
+      'alamat',
+      'no_hp',
+      'id_kacab',
+      'id_wilbin',
+      'id_shelter',
+    ];
+
     const assignError = (field, value) => {
       if (!value) return;
       if (Array.isArray(value)) {
@@ -116,7 +128,7 @@ const UserFormScreen = () => {
 
     if (errors && typeof errors === 'object') {
       Object.entries(errors).forEach(([field, value]) => {
-        if (['username', 'email', 'password'].includes(field)) {
+        if (allowedFields.includes(field)) {
           assignError(field, value);
         }
       });
@@ -129,6 +141,9 @@ const UserFormScreen = () => {
       }
       if (!fieldErrors.username && lower.includes('username')) {
         fieldErrors.username = fallbackMessage;
+      }
+      if (!fieldErrors.nama_lengkap && lower.includes('nama lengkap')) {
+        fieldErrors.nama_lengkap = fallbackMessage;
       }
     }
 
@@ -189,8 +204,10 @@ const UserFormScreen = () => {
   const onSubmit = async () => {
     const trimmedUsername = username.trim();
     const trimmedEmail = email.trim();
+    const trimmedNamaLengkap = nama_lengkap.trim();
     if (trimmedUsername !== username) setUsername(trimmedUsername);
     if (trimmedEmail !== email) setEmail(trimmedEmail);
+    if (trimmedNamaLengkap !== nama_lengkap) setNamaLengkap(trimmedNamaLengkap);
 
     const localErrors = {};
     if (!trimmedUsername) {
@@ -198,6 +215,9 @@ const UserFormScreen = () => {
     }
     if (!trimmedEmail) {
       localErrors.email = 'Email wajib diisi';
+    }
+    if (!trimmedNamaLengkap) {
+      localErrors.nama_lengkap = 'Nama lengkap wajib diisi';
     }
     if (!editingId && !password) {
       localErrors.password = 'Password wajib diisi saat membuat user baru';
@@ -226,7 +246,14 @@ const UserFormScreen = () => {
       setApiError('');
       setFormErrors({});
 
-      const payload = { username: trimmedUsername, email: trimmedEmail, level, nama_lengkap, alamat, no_hp };
+      const payload = {
+        username: trimmedUsername,
+        email: trimmedEmail,
+        level,
+        nama_lengkap: trimmedNamaLengkap,
+        alamat,
+        no_hp,
+      };
       if (password) payload.password = password;
       if (level === 'admin_cabang') payload.id_kacab = id_kacab;
       if (level === 'admin_shelter') {
@@ -348,7 +375,18 @@ const UserFormScreen = () => {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Profil (Opsional)</Text>
                 <FormRow label="Nama Lengkap">
-                  <TextInput style={styles.input} value={nama_lengkap} onChangeText={setNamaLengkap} placeholder="Nama lengkap" />
+                  <TextInput
+                    style={[styles.input, formErrors.nama_lengkap && styles.inputError]}
+                    value={nama_lengkap}
+                    onChangeText={(text) => {
+                      setNamaLengkap(text);
+                      clearFieldError('nama_lengkap');
+                    }}
+                    placeholder="Nama lengkap"
+                  />
+                  {formErrors.nama_lengkap ? (
+                    <Text style={styles.fieldError}>{formErrors.nama_lengkap}</Text>
+                  ) : null}
                 </FormRow>
                 <FormRow label="Alamat">
                   <TextInput style={[styles.input, styles.multiline]} value={alamat} onChangeText={setAlamat} placeholder="Alamat" multiline />
