@@ -156,17 +156,23 @@ const UserFormScreen = () => {
           }
           break;
         case 'nama_lengkap':
-          if (value && String(value).length < 3) {
+          if (!value) {
+            errorMessage = 'Nama lengkap wajib diisi';
+          } else if (String(value).length < 3) {
             errorMessage = 'Nama lengkap minimal 3 karakter';
           }
           break;
         case 'alamat':
-          if (value && String(value).length < 5) {
+          if (!value) {
+            errorMessage = 'Alamat wajib diisi';
+          } else if (String(value).length < 5) {
             errorMessage = 'Alamat minimal 5 karakter';
           }
           break;
         case 'no_hp':
-          if (value) {
+          if (!value) {
+            errorMessage = 'No HP wajib diisi';
+          } else {
             const phone = String(value).replace(/[^0-9+]/g, '');
             if (!/^\+?\d{8,15}$/.test(phone)) {
               errorMessage = 'No HP harus berupa 8-15 digit angka';
@@ -186,6 +192,62 @@ const UserFormScreen = () => {
   const clearFieldError = useCallback((field) => {
     setFieldError(field, null);
   }, [setFieldError]);
+
+  const extractFieldErrors = useCallback((errors, fallbackMessage) => {
+    const fieldErrors = {};
+    const allowedFields = [
+      'username',
+      'email',
+      'password',
+      'nama_lengkap',
+      'alamat',
+      'no_hp',
+      'id_kacab',
+      'id_wilbin',
+      'id_shelter',
+    ];
+
+    const assignError = (field, value) => {
+      if (!value) return;
+      if (Array.isArray(value)) {
+        fieldErrors[field] = String(value[0]);
+      } else {
+        fieldErrors[field] = String(value);
+      }
+    };
+
+    if (errors && typeof errors === 'object') {
+      Object.entries(errors).forEach(([field, value]) => {
+        if (allowedFields.includes(field)) {
+          assignError(field, value);
+        }
+      });
+    }
+
+    if (fallbackMessage && typeof fallbackMessage === 'string') {
+      const lower = fallbackMessage.toLowerCase();
+      if (!fieldErrors.email && lower.includes('email')) {
+        fieldErrors.email = fallbackMessage;
+      }
+      if (!fieldErrors.username && lower.includes('username')) {
+        fieldErrors.username = fallbackMessage;
+      }
+      if (!fieldErrors.nama_lengkap && lower.includes('nama lengkap')) {
+        fieldErrors.nama_lengkap = fallbackMessage;
+      }
+      if (!fieldErrors.alamat && lower.includes('alamat')) {
+        fieldErrors.alamat = fallbackMessage;
+      }
+      if (
+        !fieldErrors.no_hp &&
+        (lower.includes('no hp') || lower.includes('nomor hp') || lower.includes('telepon'))
+      ) {
+        fieldErrors.no_hp = fallbackMessage;
+      }
+    }
+
+    return fieldErrors;
+  }, []);
 
   useEffect(() => {
     const cabangId = pickProfileCabangId(profile);
@@ -375,11 +437,19 @@ const UserFormScreen = () => {
         ]);
       } else {
         const msg = res?.data?.message || `Gagal ${mode === 'edit' ? 'mengupdate' : 'membuat'} user`;
+        const fieldErr = extractFieldErrors(res?.data?.errors, msg);
+        if (Object.keys(fieldErr).length) {
+          setFormErrors(fieldErr);
+        }
         setApiError(String(msg));
         Alert.alert('Gagal', msg);
       }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || `Gagal ${mode === 'edit' ? 'mengupdate' : 'membuat'} user`;
+      const fieldErr = extractFieldErrors(err?.response?.data?.errors, msg);
+      if (Object.keys(fieldErr).length) {
+        setFormErrors(fieldErr);
+      }
       setApiError(String(msg));
       Alert.alert('Error', String(msg));
     } finally {
@@ -491,7 +561,7 @@ const UserFormScreen = () => {
 
                 {/* Card: Profil */}
                 <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Profil (Opsional)</Text>
+                  <Text style={styles.cardTitle}>Profil</Text>
                   <FormRow label="Nama Lengkap">
                     <TextInput
                       style={[styles.input, formErrors.nama_lengkap && styles.inputError]}

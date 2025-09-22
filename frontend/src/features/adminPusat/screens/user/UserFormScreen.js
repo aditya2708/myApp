@@ -151,12 +151,16 @@ const UserFormScreen = () => {
           }
           break;
         case 'alamat':
-          if (value && String(value).length < 5) {
+          if (!value) {
+            errorMessage = 'Alamat wajib diisi';
+          } else if (String(value).length < 5) {
             errorMessage = 'Alamat minimal 5 karakter';
           }
           break;
         case 'no_hp':
-          if (value) {
+          if (!value) {
+            errorMessage = 'No HP wajib diisi';
+          } else {
             const phone = String(value).replace(/[^0-9+]/g, '');
             if (!/^\+?\d{8,15}$/.test(phone)) {
               errorMessage = 'No HP harus berupa 8-15 digit angka';
@@ -214,6 +218,15 @@ const UserFormScreen = () => {
       }
       if (!fieldErrors.nama_lengkap && lower.includes('nama lengkap')) {
         fieldErrors.nama_lengkap = fallbackMessage;
+      }
+      if (!fieldErrors.alamat && lower.includes('alamat')) {
+        fieldErrors.alamat = fallbackMessage;
+      }
+      if (
+        !fieldErrors.no_hp &&
+        (lower.includes('no hp') || lower.includes('nomor hp') || lower.includes('telepon'))
+      ) {
+        fieldErrors.no_hp = fallbackMessage;
       }
     }
 
@@ -460,7 +473,7 @@ const UserFormScreen = () => {
 
               {/* Card: Profil */}
               <View style={styles.card}>
-                <Text style={styles.cardTitle}>Profil (Opsional)</Text>
+                <Text style={styles.cardTitle}>Profil</Text>
                 <FormRow label="Nama Lengkap">
                   <TextInput
                     style={[styles.input, formErrors.nama_lengkap && styles.inputError]}
