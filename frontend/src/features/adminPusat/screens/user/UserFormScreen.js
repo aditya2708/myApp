@@ -92,6 +92,48 @@ const UserFormScreen = () => {
   const [loadingDropdown, setLoadingDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+
+  const clearFieldError = (field) => {
+    setFormErrors((prev) => {
+      if (!prev?.[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const extractFieldErrors = (errors, fallbackMessage) => {
+    const fieldErrors = {};
+    const assignError = (field, value) => {
+      if (!value) return;
+      if (Array.isArray(value)) {
+        fieldErrors[field] = String(value[0]);
+      } else {
+        fieldErrors[field] = String(value);
+      }
+    };
+
+    if (errors && typeof errors === 'object') {
+      Object.entries(errors).forEach(([field, value]) => {
+        if (['username', 'email', 'password'].includes(field)) {
+          assignError(field, value);
+        }
+      });
+    }
+
+    if (fallbackMessage && typeof fallbackMessage === 'string') {
+      const lower = fallbackMessage.toLowerCase();
+      if (!fieldErrors.email && lower.includes('email')) {
+        fieldErrors.email = fallbackMessage;
+      }
+      if (!fieldErrors.username && lower.includes('username')) {
+        fieldErrors.username = fallbackMessage;
+      }
+    }
+
+    return fieldErrors;
+  };
 
   useEffect(() => {
     const fetchKacab = async () => {
@@ -145,8 +187,28 @@ const UserFormScreen = () => {
   }, [id_wilbin]);
 
   const onSubmit = async () => {
-    if (!username || !email || (!editingId && !password) || !level) {
-      Alert.alert('Validasi', 'Username, email, password (untuk create), dan level wajib diisi');
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email.trim();
+    if (trimmedUsername !== username) setUsername(trimmedUsername);
+    if (trimmedEmail !== email) setEmail(trimmedEmail);
+
+    const localErrors = {};
+    if (!trimmedUsername) {
+      localErrors.username = 'Username wajib diisi';
+    }
+    if (!trimmedEmail) {
+      localErrors.email = 'Email wajib diisi';
+    }
+    if (!editingId && !password) {
+      localErrors.password = 'Password wajib diisi saat membuat user baru';
+    }
+    if (!level) {
+      localErrors.level = 'Level wajib dipilih';
+    }
+
+    if (Object.keys(localErrors).length) {
+      setFormErrors(localErrors);
+      Alert.alert('Validasi', 'Periksa kembali isian wajib yang masih kosong.');
       return;
     }
 
@@ -162,7 +224,9 @@ const UserFormScreen = () => {
     try {
       setSubmitting(true);
       setApiError('');
-      const payload = { username, email, level, nama_lengkap, alamat, no_hp };
+      setFormErrors({});
+
+      const payload = { username: trimmedUsername, email: trimmedEmail, level, nama_lengkap, alamat, no_hp };
       if (password) payload.password = password;
       if (level === 'admin_cabang') payload.id_kacab = id_kacab;
       if (level === 'admin_shelter') {
@@ -182,13 +246,22 @@ const UserFormScreen = () => {
         Alert.alert('Sukses', `User berhasil ${mode === 'edit' ? 'diupdate' : 'dibuat'}`, [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
+        setFormErrors({});
       } else {
         const msg = res?.data?.message || `Gagal ${mode === 'edit' ? 'mengupdate' : 'membuat'} user`;
+        const fieldErr = extractFieldErrors(res?.data?.errors, msg);
+        if (Object.keys(fieldErr).length) {
+          setFormErrors(fieldErr);
+        }
         setApiError(String(msg));
         Alert.alert('Gagal', msg);
       }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || `Gagal ${mode === 'edit' ? 'mengupdate' : 'membuat'} user`;
+      const fieldErr = extractFieldErrors(err?.response?.data?.errors, msg);
+      if (Object.keys(fieldErr).length) {
+        setFormErrors(fieldErr);
+      }
       setApiError(String(msg));
       Alert.alert('Error', String(msg));
     } finally {
@@ -230,13 +303,44 @@ const UserFormScreen = () => {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Data Akun</Text>
                 <FormRow label="Username">
-                  <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="username" />
+                  <TextInput
+                    style={[styles.input, formErrors.username && styles.inputError]}
+                    value={username}
+                    onChangeText={(text) => {
+                      setUsername(text);
+                      clearFieldError('username');
+                    }}
+                    placeholder="username"
+                    autoCapitalize="none"
+                  />
+                  {formErrors.username ? <Text style={styles.fieldError}>{formErrors.username}</Text> : null}
                 </FormRow>
                 <FormRow label="Email">
-                  <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="email@example.com" />
+                  <TextInput
+                    style={[styles.input, formErrors.email && styles.inputError]}
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      clearFieldError('email');
+                    }}
+                    placeholder="email@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  {formErrors.email ? <Text style={styles.fieldError}>{formErrors.email}</Text> : null}
                 </FormRow>
                 <FormRow label="Password">
-                  <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="min 6 karakter" secureTextEntry />
+                  <TextInput
+                    style={[styles.input, formErrors.password && styles.inputError]}
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      clearFieldError('password');
+                    }}
+                    placeholder="min 6 karakter"
+                    secureTextEntry
+                  />
+                  {formErrors.password ? <Text style={styles.fieldError}>{formErrors.password}</Text> : null}
                 </FormRow>
               </View>
 
@@ -334,6 +438,8 @@ const styles = StyleSheet.create({
   label: { marginBottom: 6, color: THEME.text, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: THEME.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: THEME.inputBg, color: THEME.text },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
+  inputError: { borderColor: THEME.danger },
+  fieldError: { color: THEME.danger, marginTop: 6, fontSize: 12 },
   levelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   levelPill: { backgroundColor: '#f0f0f0', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 999 },
   levelPillActive: { backgroundColor: THEME.primaryAlt },
