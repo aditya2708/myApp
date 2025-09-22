@@ -5,7 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert
+  Alert,
+  ToastAndroid,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -157,14 +159,20 @@ const MateriFormScreen = ({ navigation, route }) => {
       return;
     }
 
-    const showSuccessAlert = () => {
-      Alert.alert(
-        'Sukses',
-        `Materi berhasil ${isEdit ? 'diupdate' : 'ditambahkan'}!`,
-        [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]
-      );
+    const handleSuccess = () => {
+      const successMessage = `Materi berhasil ${isEdit ? 'diupdate' : 'ditambahkan'}!`;
+
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(successMessage, ToastAndroid.SHORT);
+      }
+
+      navigation.navigate('MateriManagement', {
+        jenjang,
+        kelas,
+        mataPelajaran,
+        kurikulumId,
+        kurikulum
+      });
     };
 
     try {
@@ -197,7 +205,7 @@ const MateriFormScreen = ({ navigation, route }) => {
           id: materi.id_materi,
           ...submitData
         }).unwrap();
-        showSuccessAlert();
+        handleSuccess();
         return;
       }
 
@@ -218,13 +226,13 @@ const MateriFormScreen = ({ navigation, route }) => {
       const needsManualLinking = Boolean(normalizedKurikulumId) && hasResponseKurikulumId && normalizedKurikulumId !== normalizedResponseKurikulumId;
 
       if (!needsManualLinking) {
-        showSuccessAlert();
+        handleSuccess();
         return;
       }
 
       if (!materiId) {
         console.warn('Materi ID tidak ditemukan pada respons createMateri, melewati sinkronisasi kurikulum.');
-        showSuccessAlert();
+        handleSuccess();
         return;
       }
 
@@ -247,7 +255,7 @@ const MateriFormScreen = ({ navigation, route }) => {
         }
       }
 
-      showSuccessAlert();
+      handleSuccess();
     } catch (error) {
       let errorMessage = 'Gagal menyimpan materi';
 
