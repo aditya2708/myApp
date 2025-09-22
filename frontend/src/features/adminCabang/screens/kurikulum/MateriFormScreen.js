@@ -214,7 +214,8 @@ const MateriFormScreen = ({ navigation, route }) => {
       const normalizeId = (value) => (value !== undefined && value !== null ? String(value) : undefined);
       const normalizedKurikulumId = normalizeId(kurikulumId);
       const normalizedResponseKurikulumId = normalizeId(getKurikulumIdFromResponse(createdMateri));
-      const needsManualLinking = Boolean(normalizedKurikulumId) && normalizedKurikulumId !== normalizedResponseKurikulumId;
+      const hasResponseKurikulumId = normalizedResponseKurikulumId !== undefined;
+      const needsManualLinking = Boolean(normalizedKurikulumId) && hasResponseKurikulumId && normalizedKurikulumId !== normalizedResponseKurikulumId;
 
       if (!needsManualLinking) {
         showSuccessAlert();
@@ -227,12 +228,24 @@ const MateriFormScreen = ({ navigation, route }) => {
         return;
       }
 
-      await addKurikulumMateri({
-        kurikulumId,
-        mataPelajaranId: mataPelajaran.id_mata_pelajaran,
-        materiId,
-        ...(hasValidUrutan ? { urutan: parsedUrutan } : {})
-      }).unwrap();
+      try {
+        await addKurikulumMateri({
+          kurikulumId,
+          mataPelajaranId: mataPelajaran.id_mata_pelajaran,
+          materiId,
+          ...(hasValidUrutan ? { urutan: parsedUrutan } : {})
+        }).unwrap();
+      } catch (linkError) {
+        const duplicateMateriMessage = linkError?.data?.message;
+        const isDuplicateMateriError =
+          linkError?.status === 422 &&
+          typeof duplicateMateriMessage === 'string' &&
+          duplicateMateriMessage.toLowerCase().includes('materi sudah terdaftar');
+
+        if (!isDuplicateMateriError) {
+          throw linkError;
+        }
+      }
 
       showSuccessAlert();
     } catch (error) {
