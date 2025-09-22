@@ -99,6 +99,7 @@ const UserFormScreen = () => {
   const [nama_lengkap, setNamaLengkap] = useState('');
   const [alamat, setAlamat] = useState('');
   const [no_hp, setNoHp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [kacabName, setKacabName] = useState('');
   const [id_kacab, setIdKacab] = useState('');
@@ -339,7 +340,22 @@ const UserFormScreen = () => {
                     <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="email@example.com" autoCapitalize="none" />
                   </FormRow>
                   <FormRow label="Password">
-                    <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="min 6 karakter" secureTextEntry />
+                    <View style={[styles.input, styles.passwordInputWrapper]}>
+                      <TextInput
+                        style={styles.passwordInput}
+                        value={password}
+                        onChangeText={setPassword}
+                        placeholder="min 6 karakter"
+                        secureTextEntry={!showPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword((prev) => !prev)}
+                        style={styles.passwordToggle}
+                        accessibilityLabel={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                      >
+                        <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={THEME.textMuted} />
+                      </TouchableOpacity>
+                    </View>
                   </FormRow>
                 </View>
 
@@ -437,6 +453,9 @@ const styles = StyleSheet.create({
   formRow: { marginBottom: 12 },
   label: { marginBottom: 6, color: THEME.text, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: THEME.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: THEME.inputBg, color: THEME.text },
+  passwordInputWrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 },
+  passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, color: THEME.text },
+  passwordToggle: { paddingHorizontal: 12, height: '100%', alignItems: 'center', justifyContent: 'center' },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   levelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   levelPill: { backgroundColor: '#f0f0f0', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 999 },
