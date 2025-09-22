@@ -13,7 +13,7 @@ export const ADMIN_PUSAT_ENDPOINTS = {
     LIST: '/admin-pusat/shelter',
     DETAIL: (id) => `/admin-pusat/shelter/${id}`,
     DROPDOWN: {
-      BY_WILBIN: (wilbinId) => `/dropdowns/wilbin/${wilbinId}/shelter`
+      BY_WILBIN: (wilbinId) => `/admin-pusat/dropdowns/wilbin/${wilbinId}/shelter`
     }
   },
   ANAK: {
