@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Dimensions, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Image,
+  Dimensions,
+  Platform,
+  Alert
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
@@ -49,7 +60,8 @@ const AdminCabangDashboardScreen = () => {
   const navigateToKurikulum = () => navigation.navigate('Kurikulum', { screen: 'KurikulumHome' });
   const navigateToGpsApproval = () => navigation.navigate('GpsApprovalScreen');
   const navigateToProfile = () => navigation.navigate('Profile');
-  const navigateToUserManagement = () => navigation.navigate('AdminCabangUserManagement');
+  const navigateToUserManagement = () =>
+    Alert.alert('Segera Hadir', 'Fitur Manajemen Pengguna sedang dalam pengembangan.');
 
   if (loading && !refreshing) return <LoadingSpinner fullScreen message="Memuat dashboard..." />;
 
