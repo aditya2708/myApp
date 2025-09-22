@@ -5,9 +5,9 @@
 //  - GET  /api/admin-pusat/users/{id}   (detail user)
 //  - POST /api/admin-pusat/create-user  (payload sesuai contoh dari user)
 //  - PUT  /api/admin-pusat/users/{id}   (update user)
-//  - GET  /api/kacab
-//  - GET  /api/kacab/{id}/wilbin
-//  - GET  /api/wilbin/{id}/shelter
+//  - GET  /api/admin-pusat/dropdowns/kacab
+//  - GET  /api/admin-pusat/dropdowns/kacab/{id}/wilbin
+//  - GET  /api/admin-pusat/dropdowns/wilbin/{id}/shelter
 
 import api from '../../../api/axiosConfig';
 
@@ -54,7 +54,7 @@ export const userManagementApi = {
 
   /** Ambil semua kacab */
   getKacab: async () => {
-    return await api.get('/admin-pusat/kacab');
+    return await api.get('/admin-pusat/dropdowns/kacab');
   },
 
   /** Ambil wilbin berdasarkan kacab */
@@ -64,7 +64,7 @@ export const userManagementApi = {
       err.code = 'KACAB_ID_REQUIRED';
       throw err;
     }
-    return await api.get(`/admin-pusat/kacab/${idKacab}/wilbin`);
+    return await api.get(`/admin-pusat/dropdowns/kacab/${idKacab}/wilbin`);
   },
 
   /** Ambil shelter berdasarkan wilbin */
@@ -74,7 +74,7 @@ export const userManagementApi = {
       err.code = 'WILBIN_ID_REQUIRED';
       throw err;
     }
-    return await api.get(`/admin-pusat/wilbin/${idWilbin}/shelter`);
+    return await api.get(`/admin-pusat/dropdowns/wilbin/${idWilbin}/shelter`);
   },
 
   // Placeholder: delete belum tersedia
