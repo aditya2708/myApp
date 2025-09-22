@@ -55,7 +55,7 @@ class MasterDataController extends Controller
         }));
 
         if (empty($value)) {
-            return [];
+            return null;
         }
 
         return array_map('intval', $value);

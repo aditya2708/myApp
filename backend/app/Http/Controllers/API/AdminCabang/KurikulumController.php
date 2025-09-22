@@ -289,6 +289,7 @@ class KurikulumController extends Controller
                 $query->where(function($q) use ($jenjangId) {
                     $q->where('id_jenjang', $jenjangId)
                       ->orWhereNull('id_jenjang')
+                      ->orWhereJsonLength('target_jenjang', 0)
                       ->orWhereJsonContains('target_jenjang', $jenjangId);
                 });
             }
@@ -296,7 +297,8 @@ class KurikulumController extends Controller
             if ($kelasId !== null) {
                 $query->where(function($q) use ($kelasId) {
                     $q->whereJsonContains('target_kelas', $kelasId)
-                      ->orWhereNull('target_kelas'); // Not specific to any class
+                      ->orWhereNull('target_kelas') // Not specific to any class
+                      ->orWhereJsonLength('target_kelas', 0);
                 });
             }
 
