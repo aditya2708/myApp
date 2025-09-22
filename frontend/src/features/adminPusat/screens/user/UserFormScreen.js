@@ -80,6 +80,7 @@ const UserFormScreen = () => {
   const [nama_lengkap, setNamaLengkap] = useState('');
   const [alamat, setAlamat] = useState('');
   const [no_hp, setNoHp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [kacabList, setKacabList] = useState([]);
   const [wilbinList, setWilbinList] = useState([]);
@@ -357,16 +358,31 @@ const UserFormScreen = () => {
                   {formErrors.email ? <Text style={styles.fieldError}>{formErrors.email}</Text> : null}
                 </FormRow>
                 <FormRow label="Password">
-                  <TextInput
-                    style={[styles.input, formErrors.password && styles.inputError]}
-                    value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      clearFieldError('password');
-                    }}
-                    placeholder="min 6 karakter"
-                    secureTextEntry
-                  />
+                  <View
+                    style={[
+                      styles.input,
+                      styles.passwordInputWrapper,
+                      formErrors.password && styles.inputError,
+                    ]}
+                  >
+                    <TextInput
+                      style={styles.passwordInput}
+                      value={password}
+                      onChangeText={(text) => {
+                        setPassword(text);
+                        clearFieldError('password');
+                      }}
+                      placeholder="min 6 karakter"
+                      secureTextEntry={!showPassword}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword((prev) => !prev)}
+                      style={styles.passwordToggle}
+                      accessibilityLabel={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                    >
+                      <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={THEME.textMuted} />
+                    </TouchableOpacity>
+                  </View>
                   {formErrors.password ? <Text style={styles.fieldError}>{formErrors.password}</Text> : null}
                 </FormRow>
               </View>
@@ -475,6 +491,9 @@ const styles = StyleSheet.create({
   formRow: { marginBottom: 12 },
   label: { marginBottom: 6, color: THEME.text, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: THEME.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: THEME.inputBg, color: THEME.text },
+  passwordInputWrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 },
+  passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, color: THEME.text },
+  passwordToggle: { paddingHorizontal: 12, height: '100%', alignItems: 'center', justifyContent: 'center' },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   inputError: { borderColor: THEME.danger },
   fieldError: { color: THEME.danger, marginTop: 6, fontSize: 12 },
