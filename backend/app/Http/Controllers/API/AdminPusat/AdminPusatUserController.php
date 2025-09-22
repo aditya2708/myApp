@@ -38,7 +38,7 @@ class AdminPusatUserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'level' => 'required|string|in:admin_pusat,admin_cabang,admin_shelter',
@@ -48,7 +48,7 @@ class AdminPusatUserController extends Controller
             'id_kacab' => 'required_if:level,admin_cabang,admin_shelter|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'required_if:level,admin_shelter|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'required_if:level,admin_shelter|integer|exists:shelter,id_shelter',
-        ]);
+        ], $this->validationMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -119,7 +119,7 @@ class AdminPusatUserController extends Controller
         $user = User::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
-            'username' => 'sometimes|required|string|max:255',
+            'username' => 'sometimes|required|string|max:255|unique:users,username,' . $user->id_users . ',id_users',
             'email' => 'sometimes|required|email|unique:users,email,' . $user->id_users . ',id_users',
             'password' => 'nullable|string|min:6',
             'level' => 'sometimes|required|string|in:admin_pusat,admin_cabang,admin_shelter',
@@ -129,7 +129,7 @@ class AdminPusatUserController extends Controller
             'id_kacab' => 'sometimes|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'sometimes|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'sometimes|integer|exists:shelter,id_shelter',
-        ]);
+        ], $this->validationMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -262,7 +262,7 @@ class AdminPusatUserController extends Controller
 
             if ($namaLengkap === null) {
                 throw ValidationException::withMessages([
-                    'nama_lengkap' => 'The nama_lengkap field is required.',
+                    'nama_lengkap' => __('Nama lengkap wajib diisi.'),
                 ]);
             }
         } elseif ($targetLevel === 'admin_cabang') {
@@ -272,7 +272,7 @@ class AdminPusatUserController extends Controller
 
             if ($idKacab === null) {
                 throw ValidationException::withMessages([
-                    'id_kacab' => 'The id_kacab field is required.',
+                    'id_kacab' => __('Cabang wajib dipilih.'),
                 ]);
             }
         } elseif ($targetLevel === 'admin_shelter') {
@@ -291,15 +291,15 @@ class AdminPusatUserController extends Controller
             $messages = [];
 
             if ($idKacab === null) {
-                $messages['id_kacab'] = 'The id_kacab field is required.';
+                $messages['id_kacab'] = __('Cabang wajib dipilih.');
             }
 
             if ($idWilbin === null) {
-                $messages['id_wilbin'] = 'The id_wilbin field is required.';
+                $messages['id_wilbin'] = __('Wilayah binaan wajib dipilih.');
             }
 
             if ($idShelter === null) {
-                $messages['id_shelter'] = 'The id_shelter field is required.';
+                $messages['id_shelter'] = __('Shelter wajib dipilih.');
             }
 
             if (!empty($messages)) {
@@ -319,6 +319,41 @@ class AdminPusatUserController extends Controller
         }
 
         return $payload;
+    }
+
+    private function validationMessages(): array
+    {
+        return [
+            'username.required' => __('Username wajib diisi.'),
+            'username.string' => __('Username harus berupa teks.'),
+            'username.max' => __('Username maksimal 255 karakter.'),
+            'username.unique' => __('Username sudah digunakan.'),
+            'email.required' => __('Email wajib diisi.'),
+            'email.email' => __('Format email tidak valid.'),
+            'email.unique' => __('Email sudah digunakan.'),
+            'password.required' => __('Password wajib diisi.'),
+            'password.string' => __('Password harus berupa teks.'),
+            'password.min' => __('Password minimal 6 karakter.'),
+            'level.required' => __('Level pengguna wajib dipilih.'),
+            'level.string' => __('Level pengguna harus berupa teks.'),
+            'level.in' => __('Level pengguna tidak valid.'),
+            'nama_lengkap.required' => __('Nama lengkap wajib diisi.'),
+            'nama_lengkap.string' => __('Nama lengkap harus berupa teks.'),
+            'nama_lengkap.max' => __('Nama lengkap maksimal 255 karakter.'),
+            'alamat.string' => __('Alamat harus berupa teks.'),
+            'alamat.max' => __('Alamat maksimal 500 karakter.'),
+            'no_hp.string' => __('Nomor HP harus berupa teks.'),
+            'no_hp.max' => __('Nomor HP maksimal 20 karakter.'),
+            'id_kacab.required_if' => __('Cabang wajib dipilih ketika level admin cabang atau admin shelter.'),
+            'id_kacab.integer' => __('Cabang harus berupa angka.'),
+            'id_kacab.exists' => __('Cabang tidak ditemukan.'),
+            'id_wilbin.required_if' => __('Wilayah binaan wajib dipilih ketika level admin shelter.'),
+            'id_wilbin.integer' => __('Wilayah binaan harus berupa angka.'),
+            'id_wilbin.exists' => __('Wilayah binaan tidak ditemukan.'),
+            'id_shelter.required_if' => __('Shelter wajib dipilih ketika level admin shelter.'),
+            'id_shelter.integer' => __('Shelter harus berupa angka.'),
+            'id_shelter.exists' => __('Shelter tidak ditemukan.'),
+        ];
     }
 
     /**
