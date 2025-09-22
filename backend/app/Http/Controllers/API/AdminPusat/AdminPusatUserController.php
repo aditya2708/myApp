@@ -43,8 +43,8 @@ class AdminPusatUserController extends Controller
             'password' => 'required|string|min:6',
             'level' => 'required|string|in:admin_pusat,admin_cabang,admin_shelter',
             'nama_lengkap' => 'required|string|max:255',
-            'alamat' => 'nullable|string|max:500',
-            'no_hp' => 'nullable|string|max:20',
+            'alamat' => 'required|string|max:500',
+            'no_hp' => 'required|string|max:20',
             'id_kacab' => 'required_if:level,admin_cabang,admin_shelter|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'required_if:level,admin_shelter|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'required_if:level,admin_shelter|integer|exists:shelter,id_shelter',
@@ -124,8 +124,8 @@ class AdminPusatUserController extends Controller
             'password' => 'nullable|string|min:6',
             'level' => 'sometimes|required|string|in:admin_pusat,admin_cabang,admin_shelter',
             'nama_lengkap' => 'sometimes|required|string|max:255',
-            'alamat' => 'sometimes|nullable|string|max:500',
-            'no_hp' => 'sometimes|nullable|string|max:20',
+            'alamat' => 'sometimes|required|string|max:500',
+            'no_hp' => 'sometimes|required|string|max:20',
             'id_kacab' => 'sometimes|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'sometimes|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'sometimes|integer|exists:shelter,id_shelter',
@@ -256,24 +256,71 @@ class AdminPusatUserController extends Controller
     private function ensureRequiredProfileData(User $user, string $targetLevel, array $profileData): void
     {
         if ($targetLevel === 'admin_pusat') {
+            $existing = $user->adminPusat;
+
             $namaLengkap = array_key_exists('nama_lengkap', $profileData)
                 ? $profileData['nama_lengkap']
-                : $user->adminPusat?->nama_lengkap;
+                : $existing?->nama_lengkap;
+            $alamat = array_key_exists('alamat', $profileData)
+                ? $profileData['alamat']
+                : $existing?->alamat;
+            $noHp = array_key_exists('no_hp', $profileData)
+                ? $profileData['no_hp']
+                : $existing?->no_hp;
 
-            if ($namaLengkap === null) {
-                throw ValidationException::withMessages([
-                    'nama_lengkap' => __('Nama lengkap wajib diisi.'),
-                ]);
+            $messages = [];
+
+            if ($this->isBlank($namaLengkap)) {
+                $messages['nama_lengkap'] = __('Nama lengkap wajib diisi.');
+            }
+
+            if ($this->isBlank($alamat)) {
+                $messages['alamat'] = __('Alamat wajib diisi.');
+            }
+
+            if ($this->isBlank($noHp)) {
+                $messages['no_hp'] = __('Nomor HP wajib diisi.');
+            }
+
+            if (!empty($messages)) {
+                throw ValidationException::withMessages($messages);
             }
         } elseif ($targetLevel === 'admin_cabang') {
+            $existing = $user->adminCabang;
+
             $idKacab = array_key_exists('id_kacab', $profileData)
                 ? $profileData['id_kacab']
-                : $user->adminCabang?->id_kacab;
+                : $existing?->id_kacab;
+            $namaLengkap = array_key_exists('nama_lengkap', $profileData)
+                ? $profileData['nama_lengkap']
+                : $existing?->nama_lengkap;
+            $alamat = array_key_exists('alamat', $profileData)
+                ? $profileData['alamat']
+                : $existing?->alamat;
+            $noHp = array_key_exists('no_hp', $profileData)
+                ? $profileData['no_hp']
+                : $existing?->no_hp;
+
+            $messages = [];
 
             if ($idKacab === null) {
-                throw ValidationException::withMessages([
-                    'id_kacab' => __('Cabang wajib dipilih.'),
-                ]);
+                $messages['id_kacab'] = __('Cabang wajib dipilih.');
+            }
+
+            if ($this->isBlank($namaLengkap)) {
+                $messages['nama_lengkap'] = __('Nama lengkap wajib diisi.');
+            }
+
+            if ($this->isBlank($alamat)) {
+                $messages['alamat'] = __('Alamat wajib diisi.');
+            }
+
+            if ($this->isBlank($noHp)) {
+                $messages['no_hp'] = __('Nomor HP wajib diisi.');
+            }
+
+            if (!empty($messages)) {
+                throw ValidationException::withMessages($messages);
             }
         } elseif ($targetLevel === 'admin_shelter') {
             $existing = $user->adminShelter;
@@ -287,6 +334,15 @@ class AdminPusatUserController extends Controller
             $idShelter = array_key_exists('id_shelter', $profileData)
                 ? $profileData['id_shelter']
                 : $existing?->id_shelter;
+            $namaLengkap = array_key_exists('nama_lengkap', $profileData)
+                ? $profileData['nama_lengkap']
+                : $existing?->nama_lengkap;
+            $alamat = array_key_exists('alamat', $profileData)
+                ? $profileData['alamat']
+                : $existing?->alamat_adm;
+            $noHp = array_key_exists('no_hp', $profileData)
+                ? $profileData['no_hp']
+                : $existing?->no_hp;
 
             $messages = [];
 
@@ -302,10 +358,35 @@ class AdminPusatUserController extends Controller
                 $messages['id_shelter'] = __('Shelter wajib dipilih.');
             }
 
+            if ($this->isBlank($namaLengkap)) {
+                $messages['nama_lengkap'] = __('Nama lengkap wajib diisi.');
+            }
+
+            if ($this->isBlank($alamat)) {
+                $messages['alamat'] = __('Alamat wajib diisi.');
+            }
+
+            if ($this->isBlank($noHp)) {
+                $messages['no_hp'] = __('Nomor HP wajib diisi.');
+            }
+
             if (!empty($messages)) {
                 throw ValidationException::withMessages($messages);
             }
         }
+    }
+
+    private function isBlank($value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+
+        if (is_string($value) && trim($value) === '') {
+            return true;
+        }
+
+        return false;
     }
 
     private function extractProfilePayload(array $data, array $allowedKeys): array
@@ -340,8 +421,12 @@ class AdminPusatUserController extends Controller
             'nama_lengkap.required' => __('Nama lengkap wajib diisi.'),
             'nama_lengkap.string' => __('Nama lengkap harus berupa teks.'),
             'nama_lengkap.max' => __('Nama lengkap maksimal 255 karakter.'),
+            'alamat.required' => __('Alamat wajib diisi.'),
+            'alamat.required_if' => __('Alamat wajib diisi sesuai level pengguna.'),
             'alamat.string' => __('Alamat harus berupa teks.'),
             'alamat.max' => __('Alamat maksimal 500 karakter.'),
+            'no_hp.required' => __('Nomor HP wajib diisi.'),
+            'no_hp.required_if' => __('Nomor HP wajib diisi sesuai level pengguna.'),
             'no_hp.string' => __('Nomor HP harus berupa teks.'),
             'no_hp.max' => __('Nomor HP maksimal 20 karakter.'),
             'id_kacab.required_if' => __('Cabang wajib dipilih ketika level admin cabang atau admin shelter.'),
