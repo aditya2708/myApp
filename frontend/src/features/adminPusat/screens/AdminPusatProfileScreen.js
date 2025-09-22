@@ -61,7 +61,7 @@ const AdminPusatProfileScreen = () => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Permission to access camera roll is required');
+        Alert.alert('Izin Ditolak', 'Izin untuk mengakses galeri diperlukan');
         return;
       }
 
@@ -78,7 +78,7 @@ const AdminPusatProfileScreen = () => {
       }
     } catch (error) {
       console.error('Error selecting image:', error);
-      Alert.alert('Error', 'Failed to select image');
+      Alert.alert('Kesalahan', 'Gagal memilih gambar');
     }
   };
 
@@ -117,10 +117,10 @@ const AdminPusatProfileScreen = () => {
       
       // Exit edit mode
       setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully');
+      Alert.alert('Berhasil', 'Profil berhasil diperbarui');
     } catch (err) {
       console.error('Error updating profile:', err);
-      setError('Failed to update profile. Please try again.');
+      setError('Gagal memperbarui profil. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -134,15 +134,15 @@ const AdminPusatProfileScreen = () => {
   // Handle logout
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      'Keluar',
+      'Apakah Anda yakin ingin keluar?',
       [
         {
-          text: 'Cancel',
+          text: 'Batal',
           style: 'cancel',
         },
         {
-          text: 'Logout',
+          text: 'Keluar',
           style: 'destructive',
           onPress: () => {
             // Call logout from useAuth hook
@@ -229,12 +229,12 @@ const AdminPusatProfileScreen = () => {
         <View style={styles.profileFields}>
           {/* Name */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Full Name</Text>
+            <Text style={styles.fieldLabel}>Nama Lengkap</Text>
             {isEditing ? (
               <TextInput
                 value={profileData.nama_lengkap}
                 onChangeText={(value) => handleChange('nama_lengkap', value)}
-                placeholder="Enter your full name"
+                placeholder="Masukkan nama lengkap Anda"
               />
             ) : (
               <Text style={styles.fieldValue}>
@@ -253,12 +253,12 @@ const AdminPusatProfileScreen = () => {
 
           {/* Phone */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Phone Number</Text>
+            <Text style={styles.fieldLabel}>Nomor Telepon</Text>
             {isEditing ? (
               <TextInput
                 value={profileData.no_hp}
                 onChangeText={(value) => handleChange('no_hp', value)}
-                placeholder="Enter your phone number"
+                placeholder="Masukkan nomor telepon Anda"
                 inputProps={{
                   keyboardType: 'phone-pad',
                 }}
@@ -272,12 +272,12 @@ const AdminPusatProfileScreen = () => {
 
           {/* Address */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Address</Text>
+            <Text style={styles.fieldLabel}>Alamat</Text>
             {isEditing ? (
               <TextInput
                 value={profileData.alamat}
                 onChangeText={(value) => handleChange('alamat', value)}
-                placeholder="Enter your address"
+                placeholder="Masukkan alamat Anda"
                 multiline
                 inputProps={{
                   numberOfLines: 3,
@@ -298,7 +298,7 @@ const AdminPusatProfileScreen = () => {
             onPress={() => navigation.navigate('Settings')}
           >
             <Ionicons name="settings-outline" size={24} color="#3498db" />
-            <Text style={styles.settingsText}>Settings</Text>
+            <Text style={styles.settingsText}>Pengaturan</Text>
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
@@ -307,7 +307,7 @@ const AdminPusatProfileScreen = () => {
             onPress={handleLogout}
           >
             <Ionicons name="log-out-outline" size={24} color="#e74c3c" />
-            <Text style={[styles.settingsText, { color: '#e74c3c' }]}>Logout</Text>
+            <Text style={[styles.settingsText, { color: '#e74c3c' }]}>Keluar</Text>
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
         </View>
@@ -316,7 +316,7 @@ const AdminPusatProfileScreen = () => {
       {/* Loading Overlay */}
       {loading && (
         <View style={styles.loadingOverlay}>
-          <LoadingSpinner message="Updating profile..." />
+          <LoadingSpinner message="Memperbarui profil..." />
         </View>
       )}
     </ScrollView>
