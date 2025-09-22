@@ -261,6 +261,18 @@ class KurikulumController extends Controller
             $jenjangId = $request->query('jenjang');
             $kelasId = $request->query('kelas');
 
+            if ($jenjangId !== null && $jenjangId !== '') {
+                $jenjangId = (int) $jenjangId;
+            } else {
+                $jenjangId = null;
+            }
+
+            if ($kelasId !== null && $kelasId !== '') {
+                $kelasId = (int) $kelasId;
+            } else {
+                $kelasId = null;
+            }
+
             $query = MataPelajaran::where(function($q) use ($kacabId) {
                 $q->where('is_global', true)
                   ->orWhere('id_kacab', $kacabId);
@@ -273,16 +285,17 @@ class KurikulumController extends Controller
             }])
             ->with(['jenjang', 'kacab']);
 
-            if ($jenjangId) {
+            if ($jenjangId !== null) {
                 $query->where(function($q) use ($jenjangId) {
                     $q->where('id_jenjang', $jenjangId)
-                      ->orWhereNull('id_jenjang'); // Global subjects
+                      ->orWhereNull('id_jenjang')
+                      ->orWhereJsonContains('target_jenjang', $jenjangId);
                 });
             }
 
-            if ($kelasId) {
+            if ($kelasId !== null) {
                 $query->where(function($q) use ($kelasId) {
-                    $q->where('target_kelas', $kelasId)
+                    $q->whereJsonContains('target_kelas', $kelasId)
                       ->orWhereNull('target_kelas'); // Not specific to any class
                 });
             }
