@@ -112,6 +112,80 @@ const UserFormScreen = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+
+  const setFieldError = useCallback((field, message) => {
+    setFormErrors((prev) => {
+      if (message) {
+        if (prev[field] === message) return prev;
+        return { ...prev, [field]: message };
+      }
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const validateField = useCallback(
+    (field, rawValue) => {
+      let errorMessage = '';
+      const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+
+      switch (field) {
+        case 'username':
+          if (!value) {
+            errorMessage = 'Username wajib diisi';
+          }
+          break;
+        case 'email':
+          if (!value) {
+            errorMessage = 'Email wajib diisi';
+          } else {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(String(value).toLowerCase())) {
+              errorMessage = 'Format email tidak valid';
+            }
+          }
+          break;
+        case 'password':
+          if (mode !== 'edit' && !value) {
+            errorMessage = 'Password wajib diisi saat membuat user baru';
+          } else if (value && String(value).length < 6) {
+            errorMessage = 'Password minimal 6 karakter';
+          }
+          break;
+        case 'nama_lengkap':
+          if (value && String(value).length < 3) {
+            errorMessage = 'Nama lengkap minimal 3 karakter';
+          }
+          break;
+        case 'alamat':
+          if (value && String(value).length < 5) {
+            errorMessage = 'Alamat minimal 5 karakter';
+          }
+          break;
+        case 'no_hp':
+          if (value) {
+            const phone = String(value).replace(/[^0-9+]/g, '');
+            if (!/^\+?\d{8,15}$/.test(phone)) {
+              errorMessage = 'No HP harus berupa 8-15 digit angka';
+            }
+          }
+          break;
+        default:
+          break;
+      }
+
+      setFieldError(field, errorMessage);
+      return !errorMessage;
+    },
+    [mode, setFieldError]
+  );
+
+  const clearFieldError = useCallback((field) => {
+    setFieldError(field, null);
+  }, [setFieldError]);
 
   useEffect(() => {
     const cabangId = pickProfileCabangId(profile);
@@ -241,8 +315,21 @@ const UserFormScreen = () => {
   }, [level]);
 
   const onSubmit = async () => {
-    if (!username || !email || (!editingId && !password) || !level) {
-      Alert.alert('Validasi', 'Username, email, password (untuk create), dan level wajib diisi');
+    const fieldsToValidate = {
+      username,
+      email,
+      password,
+      nama_lengkap,
+      alamat,
+      no_hp,
+    };
+
+    const validationResults = Object.entries(fieldsToValidate).map(([field, value]) =>
+      validateField(field, value)
+    );
+
+    if (validationResults.includes(false) || !level) {
+      Alert.alert('Validasi', 'Periksa kembali data wajib yang masih kosong atau tidak valid.');
       return;
     }
 
@@ -259,7 +346,16 @@ const UserFormScreen = () => {
     try {
       setSubmitting(true);
       setApiError('');
-      const payload = { username, email, level, nama_lengkap, alamat, no_hp, id_kacab };
+      setFormErrors({});
+      const payload = {
+        username: username.trim(),
+        email: email.trim(),
+        level,
+        nama_lengkap: nama_lengkap.trim(),
+        alamat: alamat.trim(),
+        no_hp: no_hp.trim(),
+        id_kacab,
+      };
       if (password) payload.password = password;
       if (level === 'admin_shelter') {
         payload.id_wilbin = id_wilbin;
@@ -334,17 +430,50 @@ const UserFormScreen = () => {
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>Data Akun</Text>
                   <FormRow label="Username">
-                    <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="username" />
+                    <TextInput
+                      style={[styles.input, formErrors.username && styles.inputError]}
+                      value={username}
+                      onChangeText={(text) => {
+                        setUsername(text);
+                        clearFieldError('username');
+                      }}
+                      onBlur={() => validateField('username', username)}
+                      placeholder="username"
+                      autoCapitalize="none"
+                    />
+                    {formErrors.username ? <Text style={styles.fieldError}>{formErrors.username}</Text> : null}
                   </FormRow>
                   <FormRow label="Email">
-                    <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="email@example.com" autoCapitalize="none" />
+                    <TextInput
+                      style={[styles.input, formErrors.email && styles.inputError]}
+                      value={email}
+                      onChangeText={(text) => {
+                        setEmail(text);
+                        clearFieldError('email');
+                      }}
+                      onBlur={() => validateField('email', email)}
+                      placeholder="email@example.com"
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                    />
+                    {formErrors.email ? <Text style={styles.fieldError}>{formErrors.email}</Text> : null}
                   </FormRow>
                   <FormRow label="Password">
-                    <View style={[styles.input, styles.passwordInputWrapper]}>
+                    <View
+                      style={[
+                        styles.input,
+                        styles.passwordInputWrapper,
+                        formErrors.password && styles.inputError,
+                      ]}
+                    >
                       <TextInput
                         style={styles.passwordInput}
                         value={password}
-                        onChangeText={setPassword}
+                        onChangeText={(text) => {
+                          setPassword(text);
+                          clearFieldError('password');
+                        }}
+                        onBlur={() => validateField('password', password)}
                         placeholder="min 6 karakter"
                         secureTextEntry={!showPassword}
                       />
@@ -356,6 +485,7 @@ const UserFormScreen = () => {
                         <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={THEME.textMuted} />
                       </TouchableOpacity>
                     </View>
+                    {formErrors.password ? <Text style={styles.fieldError}>{formErrors.password}</Text> : null}
                   </FormRow>
                 </View>
 
@@ -363,13 +493,45 @@ const UserFormScreen = () => {
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>Profil (Opsional)</Text>
                   <FormRow label="Nama Lengkap">
-                    <TextInput style={styles.input} value={nama_lengkap} onChangeText={setNamaLengkap} placeholder="Nama lengkap" />
+                    <TextInput
+                      style={[styles.input, formErrors.nama_lengkap && styles.inputError]}
+                      value={nama_lengkap}
+                      onChangeText={(text) => {
+                        setNamaLengkap(text);
+                        clearFieldError('nama_lengkap');
+                      }}
+                      onBlur={() => validateField('nama_lengkap', nama_lengkap)}
+                      placeholder="Nama lengkap"
+                    />
+                    {formErrors.nama_lengkap ? <Text style={styles.fieldError}>{formErrors.nama_lengkap}</Text> : null}
                   </FormRow>
                   <FormRow label="Alamat">
-                    <TextInput style={[styles.input, styles.multiline]} value={alamat} onChangeText={setAlamat} placeholder="Alamat" multiline />
+                    <TextInput
+                      style={[styles.input, styles.multiline, formErrors.alamat && styles.inputError]}
+                      value={alamat}
+                      onChangeText={(text) => {
+                        setAlamat(text);
+                        clearFieldError('alamat');
+                      }}
+                      onBlur={() => validateField('alamat', alamat)}
+                      placeholder="Alamat"
+                      multiline
+                    />
+                    {formErrors.alamat ? <Text style={styles.fieldError}>{formErrors.alamat}</Text> : null}
                   </FormRow>
                   <FormRow label="No HP">
-                    <TextInput style={styles.input} value={no_hp} onChangeText={setNoHp} placeholder="08xxxxxxxxxx" keyboardType="phone-pad" />
+                    <TextInput
+                      style={[styles.input, formErrors.no_hp && styles.inputError]}
+                      value={no_hp}
+                      onChangeText={(text) => {
+                        setNoHp(text);
+                        clearFieldError('no_hp');
+                      }}
+                      onBlur={() => validateField('no_hp', no_hp)}
+                      placeholder="08xxxxxxxxxx"
+                      keyboardType="phone-pad"
+                    />
+                    {formErrors.no_hp ? <Text style={styles.fieldError}>{formErrors.no_hp}</Text> : null}
                   </FormRow>
                 </View>
 
@@ -457,6 +619,8 @@ const styles = StyleSheet.create({
   passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, color: THEME.text },
   passwordToggle: { paddingHorizontal: 12, height: '100%', alignItems: 'center', justifyContent: 'center' },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
+  inputError: { borderColor: THEME.danger },
+  fieldError: { color: THEME.danger, marginTop: 6, fontSize: 12 },
   levelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   levelPill: { backgroundColor: '#f0f0f0', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 999 },
   levelPillActive: { backgroundColor: THEME.primaryAlt },

@@ -1,7 +1,7 @@
 // FEATURES PATH: features/adminPusat/screens/user/UserFormScreen.js
 // DESC: Screen form untuk create / update user baru (dengan dropdown berjenjang kacab → wilbin → shelter)
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -95,14 +95,83 @@ const UserFormScreen = () => {
   const [apiError, setApiError] = useState('');
   const [formErrors, setFormErrors] = useState({});
 
-  const clearFieldError = (field) => {
+  const setFieldError = useCallback((field, message) => {
     setFormErrors((prev) => {
+      if (message) {
+        if (prev[field] === message) return prev;
+        return { ...prev, [field]: message };
+      }
       if (!prev?.[field]) return prev;
       const next = { ...prev };
       delete next[field];
       return next;
     });
-  };
+  }, []);
+
+  const clearFieldError = useCallback(
+    (field) => {
+      setFieldError(field, null);
+    },
+    [setFieldError]
+  );
+
+  const validateField = useCallback(
+    (field, rawValue) => {
+      let errorMessage = '';
+      const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+
+      switch (field) {
+        case 'username':
+          if (!value) {
+            errorMessage = 'Username wajib diisi';
+          }
+          break;
+        case 'email':
+          if (!value) {
+            errorMessage = 'Email wajib diisi';
+          } else {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(String(value).toLowerCase())) {
+              errorMessage = 'Format email tidak valid';
+            }
+          }
+          break;
+        case 'password':
+          if (mode !== 'edit' && !value) {
+            errorMessage = 'Password wajib diisi saat membuat user baru';
+          } else if (value && String(value).length < 6) {
+            errorMessage = 'Password minimal 6 karakter';
+          }
+          break;
+        case 'nama_lengkap':
+          if (!value) {
+            errorMessage = 'Nama lengkap wajib diisi';
+          } else if (String(value).length < 3) {
+            errorMessage = 'Nama lengkap minimal 3 karakter';
+          }
+          break;
+        case 'alamat':
+          if (value && String(value).length < 5) {
+            errorMessage = 'Alamat minimal 5 karakter';
+          }
+          break;
+        case 'no_hp':
+          if (value) {
+            const phone = String(value).replace(/[^0-9+]/g, '');
+            if (!/^\+?\d{8,15}$/.test(phone)) {
+              errorMessage = 'No HP harus berupa 8-15 digit angka';
+            }
+          }
+          break;
+        default:
+          break;
+      }
+
+      setFieldError(field, errorMessage);
+      return !errorMessage;
+    },
+    [mode, setFieldError]
+  );
 
   const extractFieldErrors = (errors, fallbackMessage) => {
     const fieldErrors = {};
@@ -206,30 +275,29 @@ const UserFormScreen = () => {
     const trimmedUsername = username.trim();
     const trimmedEmail = email.trim();
     const trimmedNamaLengkap = nama_lengkap.trim();
+    const trimmedAlamat = alamat.trim();
+    const trimmedNoHp = no_hp.trim();
     if (trimmedUsername !== username) setUsername(trimmedUsername);
     if (trimmedEmail !== email) setEmail(trimmedEmail);
     if (trimmedNamaLengkap !== nama_lengkap) setNamaLengkap(trimmedNamaLengkap);
+    if (trimmedAlamat !== alamat) setAlamat(trimmedAlamat);
+    if (trimmedNoHp !== no_hp) setNoHp(trimmedNoHp);
 
-    const localErrors = {};
-    if (!trimmedUsername) {
-      localErrors.username = 'Username wajib diisi';
-    }
-    if (!trimmedEmail) {
-      localErrors.email = 'Email wajib diisi';
-    }
-    if (!trimmedNamaLengkap) {
-      localErrors.nama_lengkap = 'Nama lengkap wajib diisi';
-    }
-    if (!editingId && !password) {
-      localErrors.password = 'Password wajib diisi saat membuat user baru';
-    }
-    if (!level) {
-      localErrors.level = 'Level wajib dipilih';
-    }
+    const fieldsToValidate = {
+      username: trimmedUsername,
+      email: trimmedEmail,
+      password,
+      nama_lengkap: trimmedNamaLengkap,
+      alamat: trimmedAlamat,
+      no_hp: trimmedNoHp,
+    };
 
-    if (Object.keys(localErrors).length) {
-      setFormErrors(localErrors);
-      Alert.alert('Validasi', 'Periksa kembali isian wajib yang masih kosong.');
+    const validationResults = Object.entries(fieldsToValidate).map(([field, value]) =>
+      validateField(field, value)
+    );
+
+    if (validationResults.includes(false) || !level) {
+      Alert.alert('Validasi', 'Periksa kembali isian wajib yang masih kosong atau tidak valid.');
       return;
     }
 
@@ -252,8 +320,8 @@ const UserFormScreen = () => {
         email: trimmedEmail,
         level,
         nama_lengkap: trimmedNamaLengkap,
-        alamat,
-        no_hp,
+        alamat: trimmedAlamat,
+        no_hp: trimmedNoHp,
       };
       if (password) payload.password = password;
       if (level === 'admin_cabang') payload.id_kacab = id_kacab;
@@ -338,6 +406,7 @@ const UserFormScreen = () => {
                       setUsername(text);
                       clearFieldError('username');
                     }}
+                    onBlur={() => validateField('username', username)}
                     placeholder="username"
                     autoCapitalize="none"
                   />
@@ -351,6 +420,7 @@ const UserFormScreen = () => {
                       setEmail(text);
                       clearFieldError('email');
                     }}
+                    onBlur={() => validateField('email', email)}
                     placeholder="email@example.com"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -372,6 +442,7 @@ const UserFormScreen = () => {
                         setPassword(text);
                         clearFieldError('password');
                       }}
+                      onBlur={() => validateField('password', password)}
                       placeholder="min 6 karakter"
                       secureTextEntry={!showPassword}
                     />
@@ -398,6 +469,7 @@ const UserFormScreen = () => {
                       setNamaLengkap(text);
                       clearFieldError('nama_lengkap');
                     }}
+                    onBlur={() => validateField('nama_lengkap', nama_lengkap)}
                     placeholder="Nama lengkap"
                   />
                   {formErrors.nama_lengkap ? (
@@ -405,10 +477,32 @@ const UserFormScreen = () => {
                   ) : null}
                 </FormRow>
                 <FormRow label="Alamat">
-                  <TextInput style={[styles.input, styles.multiline]} value={alamat} onChangeText={setAlamat} placeholder="Alamat" multiline />
+                  <TextInput
+                    style={[styles.input, styles.multiline, formErrors.alamat && styles.inputError]}
+                    value={alamat}
+                    onChangeText={(text) => {
+                      setAlamat(text);
+                      clearFieldError('alamat');
+                    }}
+                    onBlur={() => validateField('alamat', alamat)}
+                    placeholder="Alamat"
+                    multiline
+                  />
+                  {formErrors.alamat ? <Text style={styles.fieldError}>{formErrors.alamat}</Text> : null}
                 </FormRow>
                 <FormRow label="No HP">
-                  <TextInput style={styles.input} value={no_hp} onChangeText={setNoHp} placeholder="08xxxxxxxxxx" />
+                  <TextInput
+                    style={[styles.input, formErrors.no_hp && styles.inputError]}
+                    value={no_hp}
+                    onChangeText={(text) => {
+                      setNoHp(text);
+                      clearFieldError('no_hp');
+                    }}
+                    onBlur={() => validateField('no_hp', no_hp)}
+                    placeholder="08xxxxxxxxxx"
+                    keyboardType="phone-pad"
+                  />
+                  {formErrors.no_hp ? <Text style={styles.fieldError}>{formErrors.no_hp}</Text> : null}
                 </FormRow>
               </View>
 
