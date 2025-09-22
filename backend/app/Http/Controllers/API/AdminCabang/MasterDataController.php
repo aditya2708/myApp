@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Collection;
 
 class MasterDataController extends Controller
 {
@@ -21,6 +22,43 @@ class MasterDataController extends Controller
     {
         $user = Auth::user();
         return AdminCabang::where('user_id', $user->id_users)->first();
+    }
+
+    private function normalizeTargetArray($value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof Collection) {
+            $value = $value->toArray();
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $value = $decoded;
+            }
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_array($value)) {
+            $value = [$value];
+        }
+
+        $value = array_values(array_filter($value, function ($item) {
+            return $item !== null && $item !== '';
+        }));
+
+        if (empty($value)) {
+            return [];
+        }
+
+        return array_map('intval', $value);
     }
 
     /**
@@ -361,6 +399,9 @@ class MasterDataController extends Controller
                 ], 404);
             }
             
+            $targetJenjang = $this->normalizeTargetArray($request->input('target_jenjang'));
+            $targetKelas = $this->normalizeTargetArray($request->input('target_kelas'));
+
             $mataPelajaranCustom = MataPelajaran::create([
                 'nama_mata_pelajaran' => $request->nama_mata_pelajaran,
                 'kode_mata_pelajaran' => $request->kode_mata_pelajaran,
@@ -370,8 +411,8 @@ class MasterDataController extends Controller
                 'id_kacab' => $adminCabang->id_kacab,
                 'id_jenjang' => $request->id_jenjang,
                 'is_global' => $request->is_global ?? false,
-                'target_jenjang' => $request->target_jenjang,
-                'target_kelas' => $request->target_kelas
+                'target_jenjang' => $targetJenjang,
+                'target_kelas' => $targetKelas
             ]);
 
             $mataPelajaranCustom->load(['jenjang', 'kacab']);
@@ -429,6 +470,9 @@ class MasterDataController extends Controller
                 ], 422);
             }
 
+            $targetJenjang = $this->normalizeTargetArray($request->input('target_jenjang'));
+            $targetKelas = $this->normalizeTargetArray($request->input('target_kelas'));
+
             $mataPelajaranCustom->update([
                 'nama_mata_pelajaran' => $request->nama_mata_pelajaran,
                 'kode_mata_pelajaran' => $request->kode_mata_pelajaran,
@@ -436,8 +480,8 @@ class MasterDataController extends Controller
                 'deskripsi' => $request->deskripsi,
                 'id_jenjang' => $request->id_jenjang,
                 'is_global' => $request->is_global ?? $mataPelajaranCustom->is_global,
-                'target_jenjang' => $request->target_jenjang,
-                'target_kelas' => $request->target_kelas,
+                'target_jenjang' => $targetJenjang,
+                'target_kelas' => $targetKelas,
                 'status' => $request->status ?? $mataPelajaranCustom->status
             ]);
 
