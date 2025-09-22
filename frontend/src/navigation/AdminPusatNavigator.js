@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -232,10 +233,19 @@ const AdminPusatNavigator = () => {
         component={HomeStackNavigator} 
         options={{ tabBarLabel: 'Home' }}
       />
-      <Tab.Screen 
-        name="Template" 
-        component={TemplateStackNavigator} 
+      <Tab.Screen
+        name="Template"
+        component={TemplateStackNavigator}
         options={{ tabBarLabel: 'Template' }}
+        listeners={() => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            Alert.alert(
+              'Maintenance',
+              'Fitur ini sedang dalam perbaikan / maintenance.'
+            );
+          },
+        })}
       />
       <Tab.Screen 
         name="ProfileTab" 
