@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -56,7 +57,11 @@ const AdminPusatDashboardScreen = () => {
   };
 
   // Navigation handlers
-  const navigateToTemplates = () => navigation.navigate('Template');
+  const navigateToTemplates = () =>
+    Alert.alert(
+      'Maintenance',
+      'Fitur ini sedang dalam perbaikan / maintenance.'
+    );
   const navigateToProfile = () => navigation.navigate('ProfileTab');
   const navigateToTutorHonorSettings = () => navigation.navigate('TutorHonorSettings');
   const navigateToUserManagement = () => navigation.navigate('UserManagement');
@@ -157,7 +162,7 @@ const AdminPusatDashboardScreen = () => {
               <Ionicons name="library" size={24} color="#fff" />
             </View>
             <Text style={styles.quickAccessText}>Template Kurikulum</Text>
-            <Text style={styles.quickAccessSubtext}>Kelola template dan distribusi</Text>
+            <Text style={styles.quickAccessSubtext}>Fitur ini sedang dalam perbaikan / maintenance</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
