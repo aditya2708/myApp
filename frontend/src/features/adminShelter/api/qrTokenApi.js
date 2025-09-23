@@ -11,11 +11,28 @@ export const qrTokenApi = {
    * @param {number} validDays - Number of days token should be valid
    * @returns {Promise} - API response with generated token
    */
-  generateToken: async (id_anak, validDays = 30) => {
-    return await api.post('/admin-shelter/qr-tokens/generate', {
-      id_anak,
-      valid_days: validDays
-    });
+  generateToken: async (id_anak, options = {}) => {
+    const { validDays, expiryStrategy } = options || {};
+
+    const payload = {
+      id_anak
+    };
+
+    const shouldIncludeValidDays =
+      (expiryStrategy === undefined || expiryStrategy === 'days') &&
+      typeof validDays === 'number';
+
+    if (shouldIncludeValidDays) {
+      payload.valid_days = validDays;
+    } else if (expiryStrategy === undefined && validDays === undefined) {
+      payload.valid_days = 30;
+    }
+
+    if (expiryStrategy) {
+      payload.expiry_strategy = expiryStrategy;
+    }
+
+    return await api.post('/admin-shelter/qr-tokens/generate', payload);
   },
 
   /**
@@ -24,11 +41,28 @@ export const qrTokenApi = {
    * @param {number} validDays - Number of days tokens should be valid
    * @returns {Promise} - API response with generated tokens
    */
-  generateBatchTokens: async (studentIds, validDays = 30) => {
-    return await api.post('/admin-shelter/qr-tokens/generate-batch', {
-      student_ids: studentIds,
-      valid_days: validDays
-    });
+  generateBatchTokens: async (studentIds, options = {}) => {
+    const { validDays, expiryStrategy } = options || {};
+
+    const payload = {
+      student_ids: studentIds
+    };
+
+    const shouldIncludeValidDays =
+      (expiryStrategy === undefined || expiryStrategy === 'days') &&
+      typeof validDays === 'number';
+
+    if (shouldIncludeValidDays) {
+      payload.valid_days = validDays;
+    } else if (expiryStrategy === undefined && validDays === undefined) {
+      payload.valid_days = 30;
+    }
+
+    if (expiryStrategy) {
+      payload.expiry_strategy = expiryStrategy;
+    }
+
+    return await api.post('/admin-shelter/qr-tokens/generate-batch', payload);
   },
 
   /**

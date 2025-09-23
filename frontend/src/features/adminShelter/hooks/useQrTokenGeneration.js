@@ -46,6 +46,7 @@ export const useQrTokenGeneration = (routeParams = {}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [validDays, setValidDays] = useState(30);
+  const [expiryStrategy, setExpiryStrategy] = useState('days');
   const [exportLoading, setExportLoading] = useState(false);
   const [activityTutor, setActivityTutor] = useState(null);
   const [kelompokList, setKelompokList] = useState([]);
@@ -213,7 +214,7 @@ export const useQrTokenGeneration = (routeParams = {}) => {
     setSelectedKelompokId(kelompokId);
   };
   
-  const filteredStudents = students.filter(student => 
+  const filteredStudents = students.filter(student =>
     (student.full_name || student.nick_name || '')
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
@@ -249,12 +250,12 @@ export const useQrTokenGeneration = (routeParams = {}) => {
     setTargets(newTargets);
   }, [
     filteredStudents.length, 
-    activityTutor?.id_tutor, 
-    tutorToken?.token, 
+    activityTutor?.id_tutor,
+    tutorToken,
     studentTokens, // Changed from Object.keys(studentTokens).length to full object
     selectedStudents.length
   ]);
-  
+
   const toggleStudentSelection = (studentId) => {
     if (selectedStudents.includes(studentId)) {
       setSelectedStudents(selectedStudents.filter(id => id !== studentId));
@@ -271,37 +272,85 @@ export const useQrTokenGeneration = (routeParams = {}) => {
     }
   };
   
-  const handleGenerateToken = async (target) => {
-    try {
+  const resolveTarget = (target) => {
+    if (typeof target === 'object' && target !== null) {
       if (target.type === 'student') {
-        await dispatch(generateToken({ id_anak: target.id, validDays })).unwrap();
-      } else if (target.type === 'tutor') {
-        await dispatch(generateTutorToken({ id_tutor: target.id, validDays })).unwrap();
-        Alert.alert('Berhasil', `Token berhasil dibuat untuk tutor: ${target.name}`);
+        const studentData = target.data || students.find(s => s.id_anak === target.id);
+        const studentName = studentData?.full_name || studentData?.nick_name || `Siswa-${target.id}`;
+        return {
+          type: 'student',
+          id: target.id,
+          name: target.name || studentName,
+          data: studentData,
+          token: target.token || studentTokens[target.id]
+        };
+      }
+
+      if (target.type === 'tutor') {
+        const tutorName = target.name || activityTutor?.nama || `Tutor-${target.id}`;
+        return {
+          type: 'tutor',
+          id: target.id,
+          name: tutorName,
+          data: target.data || activityTutor,
+          token: target.token || tutorToken
+        };
+      }
+
+      return target;
+    }
+
+    const studentId = target;
+    const studentData = students.find(s => s.id_anak === studentId);
+    const studentName = studentData?.full_name || studentData?.nick_name || `Siswa-${studentId}`;
+
+    return {
+      type: 'student',
+      id: studentId,
+      name: studentName,
+      data: studentData,
+      token: studentTokens[studentId]
+    };
+  };
+
+  const handleGenerateToken = async (target) => {
+    const normalizedTarget = resolveTarget(target);
+
+    try {
+      if (normalizedTarget.type === 'student') {
+        await dispatch(generateToken({
+          id_anak: normalizedTarget.id,
+          validDays: expiryStrategy === 'days' ? validDays : undefined,
+          expiryStrategy
+        })).unwrap();
+      } else if (normalizedTarget.type === 'tutor') {
+        await dispatch(generateTutorToken({ id_tutor: normalizedTarget.id, validDays })).unwrap();
+        Alert.alert('Berhasil', `Token berhasil dibuat untuk tutor: ${normalizedTarget.name}`);
       }
     } catch (error) {
       Alert.alert('Error', error.message || 'Gagal membuat token');
     }
   };
-  
+
   const handleGenerateBatchTokens = async () => {
     if (selectedStudents.length === 0) {
       Alert.alert('Tidak Ada Siswa Dipilih', 'Silakan pilih minimal satu siswa.');
       return;
     }
-    
+
     try {
-      await dispatch(generateBatchTokens({ 
-        studentIds: selectedStudents, 
-        validDays 
+      await dispatch(generateBatchTokens({
+        studentIds: selectedStudents,
+        validDays: expiryStrategy === 'days' ? validDays : undefined,
+        expiryStrategy
       })).unwrap();
-      
+
       Alert.alert('Berhasil', `Token berhasil dibuat untuk ${selectedStudents.length} siswa.`);
     } catch (error) {
       Alert.alert('Error', error.message || 'Gagal membuat token batch');
     }
   };
-  
+
 
   const getQrDataUrl = async (targetId) => {
     return new Promise((resolve, reject) => {
@@ -317,6 +366,8 @@ export const useQrTokenGeneration = (routeParams = {}) => {
   };
 
   const handleExportQr = async (target) => {
+    const normalizedTarget = resolveTarget(target);
+
     try {
       const isSharingAvailable = await qrExportHelper.isSharingAvailable();
       if (!isSharingAvailable) {
@@ -325,20 +376,20 @@ export const useQrTokenGeneration = (routeParams = {}) => {
       }
 
       setExportLoading(true);
-      
-      if (!target.token) {
-        Alert.alert('Error', `Tidak ada token ditemukan untuk ${target.type} ini`);
+
+      if (!normalizedTarget.token) {
+        Alert.alert('Error', `Tidak ada token ditemukan untuk ${normalizedTarget.type} ini`);
         return;
       }
-      
-      const base64Data = await getQrDataUrl(target.id);
+
+      const base64Data = await getQrDataUrl(normalizedTarget.id);
       if (!base64Data) {
         throw new Error('Gagal membuat gambar kode QR');
       }
-      
-      const fileUri = await qrExportHelper.saveQrCodeToFile(base64Data, target.data);
+
+      const fileUri = await qrExportHelper.saveQrCodeToFile(base64Data, normalizedTarget.data);
       await qrExportHelper.shareQrCode(fileUri, {
-        title: `Kode QR - ${target.name} (${target.type})`
+        title: `Kode QR - ${normalizedTarget.name} (${normalizedTarget.type})`
       });
     } catch (error) {
       console.error('Error mengekspor kode QR:', error);
@@ -418,6 +469,8 @@ export const useQrTokenGeneration = (routeParams = {}) => {
     error,
     validDays,
     setValidDays,
+    expiryStrategy,
+    setExpiryStrategy,
     exportLoading,
     activityTutor,
     kelompokList,

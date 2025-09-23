@@ -22,6 +22,40 @@ const TutorTokenSection = ({
   exportLoading,
   handleExportTutorQr
 }) => {
+  const getExpiryInfo = () => {
+    if (!tutorToken) {
+      return null;
+    }
+
+    const rawDate = tutorToken?.expiry_date || tutorToken?.expires_at || tutorToken?.expired_at || tutorToken?.valid_until;
+    const strategy = tutorToken?.expiry_strategy || tutorToken?.expiryStrategy;
+
+    if (rawDate) {
+      const parsedDate = new Date(rawDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        try {
+          return `Berlaku hingga: ${parsedDate.toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })}`;
+        } catch (error) {
+          return `Berlaku hingga: ${parsedDate.toDateString()}`;
+        }
+      }
+
+      return `Berlaku hingga: ${rawDate}`;
+    }
+
+    if (strategy === 'semester') {
+      return 'Berlaku hingga akhir semester aktif';
+    }
+
+    return null;
+  };
+
+  const expiryInfo = getExpiryInfo();
+
   return (
     <ScrollView style={styles.tutorContainer}>
       {activityTutor ? (
@@ -44,11 +78,11 @@ const TutorTokenSection = ({
             <TextInput
               style={styles.validDaysInput}
               value={validDays.toString()}
-              onChangeText={(value) => setValidDays(parseInt(value) || 30)}
+              onChangeText={(value) => setValidDays(parseInt(value, 10) || 30)}
               keyboardType="number-pad"
             />
           </View>
-          
+
           <TouchableOpacity
             style={[styles.tutorGenerateButton, tutorLoading && styles.disabledButton]}
             onPress={handleGenerateTutorToken}
@@ -74,7 +108,11 @@ const TutorTokenSection = ({
                 showExportButtons={false}
                 ref={tutorQrRef}
               />
-              
+
+              {expiryInfo && (
+                <Text style={styles.expiryText}>{expiryInfo}</Text>
+              )}
+
               <TouchableOpacity
                 style={[styles.tutorExportButton, exportLoading && styles.disabledButton]}
                 onPress={handleExportTutorQr}
@@ -193,6 +231,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
     marginLeft: 8,
+  },
+  expiryText: {
+    marginTop: 12,
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontStyle: 'italic'
   },
   noTutorContainer: {
     alignItems: 'center',

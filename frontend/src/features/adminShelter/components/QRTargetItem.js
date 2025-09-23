@@ -21,14 +21,48 @@ const QRTargetItem = ({
   const { type, id, name, token, selected, data } = target;
   
   // Debug target token
-  console.log('TARGET ITEM:', { 
-    type, 
-    id, 
-    name, 
+  console.log('TARGET ITEM:', {
+    type,
+    id,
+    name,
     hasToken: !!token,
     tokenValue: token?.token ? `${token.token.substring(0, 8)}...${token.token.substring(token.token.length - 8)}` : 'NO TOKEN',
     tokenFull: token?.token
   });
+
+  const getExpiryInfo = () => {
+    if (!token) {
+      return null;
+    }
+
+    const rawDate = token.expiry_date || token.expires_at || token.expired_at || token.valid_until;
+    const strategy = token.expiry_strategy || token.expiryStrategy;
+
+    if (rawDate) {
+      const parsedDate = new Date(rawDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        try {
+          return `Berlaku hingga: ${parsedDate.toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })}`;
+        } catch (error) {
+          return `Berlaku hingga: ${parsedDate.toDateString()}`;
+        }
+      }
+
+      return `Berlaku hingga: ${rawDate}`;
+    }
+
+    if (strategy === 'semester') {
+      return 'Berlaku hingga akhir semester aktif';
+    }
+
+    return null;
+  };
+
+  const expiryInfo = getExpiryInfo();
   
   const getBadgeColor = () => {
     switch (type) {
@@ -112,6 +146,10 @@ const QRTargetItem = ({
             ref={(ref) => setQrRef(id, ref)}
           />
         </View>
+      )}
+
+      {token && expiryInfo && (
+        <Text style={styles.expiryText}>{expiryInfo}</Text>
       )}
     </View>
   );
@@ -205,6 +243,12 @@ const styles = StyleSheet.create({
   qrContainer: {
     alignItems: 'center',
     marginTop: 8,
+  },
+  expiryText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontStyle: 'italic'
   },
 });
 
