@@ -16,12 +16,16 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { userManagementApi } from '../../api/userManagementApi';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { width: screenWidth } = Dimensions.get('window');
+const isTablet = screenWidth >= 768;
 
 const THEME = {
   bg: '#f5f5f5',
@@ -91,7 +95,9 @@ const UserFormScreen = () => {
   const [id_wilbin, setIdWilbin] = useState('');
   const [id_shelter, setIdShelter] = useState('');
 
-  const [loadingDropdown, setLoadingDropdown] = useState(false);
+  const [loadingKacab, setLoadingKacab] = useState(false);
+  const [loadingWilbin, setLoadingWilbin] = useState(false);
+  const [loadingShelter, setLoadingShelter] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [formErrors, setFormErrors] = useState({});
@@ -242,13 +248,13 @@ const UserFormScreen = () => {
   useEffect(() => {
     const fetchKacab = async () => {
       try {
-        setLoadingDropdown(true);
+        setLoadingKacab(true);
         const res = await userManagementApi.getKacab();
         setKacabList(res?.data?.data || []);
       } catch (e) {
         console.error(e);
       } finally {
-        setLoadingDropdown(false);
+        setLoadingKacab(false);
       }
     };
     fetchKacab();
@@ -258,7 +264,7 @@ const UserFormScreen = () => {
     if (!id_kacab) return;
     const fetchWilbin = async () => {
       try {
-        setLoadingDropdown(true);
+        setLoadingWilbin(true);
         const res = await userManagementApi.getWilbinByKacab(id_kacab);
         setWilbinList(res?.data?.data || []);
         setIdWilbin('');
@@ -267,7 +273,7 @@ const UserFormScreen = () => {
       } catch (e) {
         console.error(e);
       } finally {
-        setLoadingDropdown(false);
+        setLoadingWilbin(false);
       }
     };
     fetchWilbin();
@@ -277,14 +283,14 @@ const UserFormScreen = () => {
     if (!id_wilbin) return;
     const fetchShelter = async () => {
       try {
-        setLoadingDropdown(true);
+        setLoadingShelter(true);
         const res = await userManagementApi.getShelterByWilbin(id_wilbin);
         setShelterList(res?.data?.data || []);
         setIdShelter('');
       } catch (e) {
         console.error(e);
       } finally {
-        setLoadingDropdown(false);
+        setLoadingShelter(false);
       }
     };
     fetchShelter();
@@ -397,13 +403,14 @@ const UserFormScreen = () => {
               style={styles.flex}
               contentContainerStyle={[styles.scrollContent, { paddingBottom: contentPaddingBottom }]}
               keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <View style={styles.mainContent}>
+              <View style={[styles.mainContent, isTablet && styles.mainContentTablet]}>
                 <View style={styles.headerCard}>
                   <View style={styles.headerIconWrap}>
                     <Ionicons name="people" size={22} color="#fff" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.title}>{mode === 'create' ? 'Tambah User' : 'Edit User'}</Text>
                     <Text style={styles.subtitle}>Isi data pengguna untuk akses admin pusat/cabang/shelter</Text>
                   </View>
@@ -532,8 +539,10 @@ const UserFormScreen = () => {
                     <Text style={styles.cardTitle}>Relasi</Text>
 
                     <FormRow label="Cabang">
-                      {loadingDropdown ? (
-                        <ActivityIndicator />
+                      {loadingKacab ? (
+                        <View style={styles.loadingContainer}>
+                          <ActivityIndicator size="small" color={THEME.primary} />
+                        </View>
                       ) : (
                         <View style={styles.pickerWrapper}>
                           <Picker
@@ -560,8 +569,10 @@ const UserFormScreen = () => {
                     {level === 'admin_shelter' && (
                       <>
                         <FormRow label="Wilbin">
-                          {loadingDropdown ? (
-                            <ActivityIndicator />
+                          {loadingWilbin ? (
+                            <View style={styles.loadingContainer}>
+                              <ActivityIndicator size="small" color={THEME.primary} />
+                            </View>
                           ) : (
                             <View
                               style={[
@@ -592,8 +603,10 @@ const UserFormScreen = () => {
                         </FormRow>
 
                         <FormRow label="Shelter">
-                          {loadingDropdown ? (
-                            <ActivityIndicator />
+                          {loadingShelter ? (
+                            <View style={styles.loadingContainer}>
+                              <ActivityIndicator size="small" color={THEME.primary} />
+                            </View>
                           ) : (
                             <View
                               style={[
@@ -637,7 +650,7 @@ const UserFormScreen = () => {
             </ScrollView>
 
             <View
-              style={styles.footerBar}
+              style={[styles.footerBar, { paddingBottom: Math.max(16, bottomInset) }]}
               onLayout={({ nativeEvent }) => {
                 const { height } = nativeEvent.layout;
                 setFooterHeight((prev) => (Math.abs(prev - height) > 1 ? height : prev));
@@ -648,7 +661,11 @@ const UserFormScreen = () => {
                 disabled={submitting}
                 onPress={onSubmit}
               >
-                <Ionicons name="save" size={18} color="#fff" />
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="save" size={18} color="#fff" />
+                )}
                 <Text style={styles.submitText}>{submitting ? 'Menyimpan...' : 'Simpan'}</Text>
               </TouchableOpacity>
             </View>
@@ -660,54 +677,219 @@ const UserFormScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: THEME.bg },
-  flex: { flex: 1 },
-  scrollContent: { flexGrow: 1, padding: 20, backgroundColor: THEME.bg },
-  mainContent: { flexGrow: 1, gap: 16, width: '100%' },
-  headerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 2 },
-  headerIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2ecc71', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: 'bold', color: THEME.text },
-  subtitle: { color: THEME.textMuted, marginTop: 2 },
-  card: { backgroundColor: THEME.card, borderRadius: 16, padding: 20, elevation: 2 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: THEME.text, marginBottom: 10 },
-  formRow: { marginBottom: 12 },
-  label: { marginBottom: 6, color: THEME.text, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: THEME.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: THEME.inputBg, color: THEME.text },
-  passwordInputWrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 },
-  passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, color: THEME.text },
-  passwordToggle: { paddingHorizontal: 12, height: '100%', alignItems: 'center', justifyContent: 'center' },
-  multiline: { minHeight: 80, textAlignVertical: 'top' },
-  inputError: { borderColor: THEME.danger },
-  fieldError: { color: THEME.danger, marginTop: 6, fontSize: 12 },
-  levelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  levelPill: { backgroundColor: '#f0f0f0', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 999 },
-  levelPillActive: { backgroundColor: THEME.primaryAlt },
-  levelPillText: { color: '#444', fontWeight: '600' },
-  levelPillTextActive: { color: THEME.primary },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: THEME.danger, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 },
-  errorText: { color: '#fff', flex: 1 },
+  safe: { 
+    flex: 1, 
+    backgroundColor: THEME.bg 
+  },
+  flex: { 
+    flex: 1 
+  },
+  scrollContent: { 
+    flexGrow: 1, 
+    padding: isTablet ? 32 : 20, 
+    backgroundColor: THEME.bg 
+  },
+  mainContent: { 
+    flexGrow: 1, 
+    width: '100%' 
+  },
+  mainContentTablet: {
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  headerCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 16,
+    backgroundColor: THEME.card, 
+    padding: isTablet ? 24 : 20, 
+    borderRadius: 16, 
+    elevation: 2,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 }
+    } : {})
+  },
+  headerIconWrap: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#2ecc71', 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  title: { 
+    fontSize: isTablet ? 20 : 18, 
+    fontWeight: 'bold', 
+    color: THEME.text 
+  },
+  subtitle: { 
+    color: THEME.textMuted, 
+    marginTop: 2,
+    fontSize: isTablet ? 14 : 13
+  },
+  card: { 
+    backgroundColor: THEME.card, 
+    borderRadius: 16, 
+    padding: isTablet ? 24 : 20, 
+    elevation: 2, 
+    marginBottom: 16,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 }
+    } : {})
+  },
+  cardTitle: { 
+    fontSize: isTablet ? 17 : 16, 
+    fontWeight: '700', 
+    color: THEME.text, 
+    marginBottom: 12 
+  },
+  formRow: { 
+    marginBottom: 16 
+  },
+  label: { 
+    marginBottom: 6, 
+    color: THEME.text, 
+    fontWeight: '600',
+    fontSize: isTablet ? 14 : 13
+  },
+  input: { 
+    borderWidth: 1, 
+    borderColor: THEME.border, 
+    borderRadius: 10, 
+    paddingHorizontal: 14, 
+    paddingVertical: Platform.OS === 'ios' ? 14 : 12, 
+    backgroundColor: THEME.inputBg, 
+    color: THEME.text,
+    fontSize: isTablet ? 15 : 14
+  },
+  passwordInputWrapper: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 0, 
+    paddingVertical: 0 
+  },
+  passwordInput: { 
+    flex: 1, 
+    paddingHorizontal: 14, 
+    paddingVertical: Platform.OS === 'ios' ? 14 : 12, 
+    color: THEME.text,
+    fontSize: isTablet ? 15 : 14
+  },
+  passwordToggle: { 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  multiline: { 
+    minHeight: 80, 
+    textAlignVertical: 'top',
+    paddingTop: 12
+  },
+  inputError: { 
+    borderColor: THEME.danger 
+  },
+  fieldError: { 
+    color: THEME.danger, 
+    marginTop: 6, 
+    fontSize: 12 
+  },
+  levelRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap',
+    marginTop: 4
+  },
+  levelPill: { 
+    backgroundColor: '#f0f0f0', 
+    paddingVertical: 10, 
+    paddingHorizontal: isTablet ? 16 : 12, 
+    borderRadius: 999, 
+    marginRight: 8, 
+    marginBottom: 8 
+  },
+  levelPillActive: { 
+    backgroundColor: THEME.primaryAlt 
+  },
+  levelPillText: { 
+    color: '#444', 
+    fontWeight: '600',
+    fontSize: isTablet ? 14 : 13
+  },
+  levelPillTextActive: { 
+    color: THEME.primary 
+  },
+  errorBanner: { 
+    flexDirection: 'row', 
+    alignItems: 'center',  
+    backgroundColor: THEME.danger, 
+    paddingVertical: 12, 
+    paddingHorizontal: 16, 
+    borderRadius: 12,
+    marginTop: 8
+  },
+  errorText: { 
+    color: '#fff', 
+    flex: 1, 
+    marginLeft: 8,
+    fontSize: isTablet ? 14 : 13
+  },
   footerBar: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: isTablet ? 32 : 20,
+    paddingTop: 16,
     backgroundColor: THEME.bg,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: THEME.border,
   },
-  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: THEME.primary, paddingVertical: 14, borderRadius: 10, gap: 8 },
-  submitText: { color: '#fff', fontWeight: '700' },
+  submitBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: THEME.primary, 
+    paddingVertical: isTablet ? 16 : 14, 
+    borderRadius: 10,
+    gap: 8
+  },
+  submitText: { 
+    color: '#fff', 
+    fontWeight: '700', 
+    marginLeft: 4,
+    fontSize: isTablet ? 16 : 15
+  },
   pickerWrapper: {
     borderWidth: 1,
     borderColor: THEME.border,
     borderRadius: 10,
     backgroundColor: THEME.inputBg,
-    overflow: 'hidden',
+    overflow: 'hidden'
   },
-  pickerWrapperDisabled: { backgroundColor: '#f0f0f0', borderColor: '#d0d0d0' },
+  pickerWrapperDisabled: { 
+    backgroundColor: '#f0f0f0', 
+    borderColor: '#d0d0d0' 
+  },
   picker: {
     width: '100%',
     color: THEME.text,
-    ...(Platform.OS === 'android' ? { height: 48 } : {}),
+    ...(Platform.OS === 'android' ? { 
+      height: 48 
+    } : {
+      height: 44
+    }),
   },
+  loadingContainer: {
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: THEME.border,
+    borderRadius: 10,
+    backgroundColor: THEME.inputBg,
+  }
 });
 
 export default UserFormScreen;
