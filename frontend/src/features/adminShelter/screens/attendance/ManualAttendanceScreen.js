@@ -104,15 +104,24 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   
   useEffect(() => {
     updateExpectedStatus();
-  }, [arrivalTime, activityDetails]);
+  }, [arrivalTime, activityDetails, dateStatus]);
   
   const validateDate = () => {
     if (!activityDate) { setDateStatus('unknown'); return; }
     
-    const today = startOfDay(new Date());
     const actDate = startOfDay(new Date(activityDate));
-    
-    setDateStatus(isFuture(actDate) ? 'future' : isPast(actDate) ? 'past' : 'valid');
+
+    if (isFuture(actDate)) {
+      setDateStatus('future');
+      return;
+    }
+
+    if (isToday(actDate)) {
+      setDateStatus('valid');
+      return;
+    }
+
+    setDateStatus(isPast(actDate) ? 'past' : 'valid');
   };
   
   const fetchActivityDetails = async () => {
