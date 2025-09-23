@@ -192,18 +192,19 @@ const attendanceSlice = createSlice({
           // Update activity records to include the new attendance
           if (attendance.aktivitas?.id_aktivitas) {
             const activityId = attendance.aktivitas.id_aktivitas;
-            if (state.activityRecords[activityId]) {
-              // Check if this attendance record already exists in the activity records
-              const existingIndex = state.activityRecords[activityId].findIndex(
-                record => record.id_absen === attendance.id_absen
-              );
-              if (existingIndex === -1) {
-                // Add new record if it doesn't exist
-                state.activityRecords[activityId].push(attendance);
-              } else {
-                // Update existing record
-                state.activityRecords[activityId][existingIndex] = attendance;
-              }
+            if (!state.activityRecords[activityId]) {
+              state.activityRecords[activityId] = [];
+            }
+            // Check if this attendance record already exists in the activity records
+            const existingIndex = state.activityRecords[activityId].findIndex(
+              record => record.id_absen === attendance.id_absen
+            );
+            if (existingIndex === -1) {
+              // Add new record if it doesn't exist
+              state.activityRecords[activityId].push(attendance);
+            } else {
+              // Update existing record
+              state.activityRecords[activityId][existingIndex] = attendance;
             }
           }
         }
@@ -249,18 +250,19 @@ const attendanceSlice = createSlice({
           // Update activity records to include the new attendance
           if (attendance.aktivitas?.id_aktivitas) {
             const activityId = attendance.aktivitas.id_aktivitas;
-            if (state.activityRecords[activityId]) {
-              // Check if this attendance record already exists in the activity records
-              const existingIndex = state.activityRecords[activityId].findIndex(
-                record => record.id_absen === attendance.id_absen
-              );
-              if (existingIndex === -1) {
-                // Add new record if it doesn't exist
-                state.activityRecords[activityId].push(attendance);
-              } else {
-                // Update existing record
-                state.activityRecords[activityId][existingIndex] = attendance;
-              }
+            if (!state.activityRecords[activityId]) {
+              state.activityRecords[activityId] = [];
+            }
+            // Check if this attendance record already exists in the activity records
+            const existingIndex = state.activityRecords[activityId].findIndex(
+              record => record.id_absen === attendance.id_absen
+            );
+            if (existingIndex === -1) {
+              // Add new record if it doesn't exist
+              state.activityRecords[activityId].push(attendance);
+            } else {
+              // Update existing record
+              state.activityRecords[activityId][existingIndex] = attendance;
             }
           }
         }
