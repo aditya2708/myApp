@@ -386,198 +386,261 @@ const UserFormScreen = () => {
         keyboardVerticalOffset={Platform.select({ ios: 64, android: 0 })}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <ScrollView
-            style={styles.flex}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.mainContent}>
-              <View style={styles.headerCard}>
-                <View style={styles.headerIconWrap}>
-                  <Ionicons name="people" size={22} color="#fff" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.title}>{mode === 'create' ? 'Tambah User' : 'Edit User'}</Text>
-                  <Text style={styles.subtitle}>Isi data pengguna untuk akses admin pusat/cabang/shelter</Text>
-                </View>
-              </View>
-
-              {/* Card: Level */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Level</Text>
-                <LevelPicker value={level} onChange={setLevel} />
-              </View>
-
-              {/* Card: Data Akun */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Data Akun</Text>
-                <FormRow label="Username">
-                  <TextInput
-                    style={[styles.input, formErrors.username && styles.inputError]}
-                    value={username}
-                    onChangeText={(text) => {
-                      setUsername(text);
-                      clearFieldError('username');
-                    }}
-                    onBlur={() => validateField('username', username)}
-                    placeholder="username"
-                    autoCapitalize="none"
-                  />
-                  {formErrors.username ? <Text style={styles.fieldError}>{formErrors.username}</Text> : null}
-                </FormRow>
-                <FormRow label="Email">
-                  <TextInput
-                    style={[styles.input, formErrors.email && styles.inputError]}
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      clearFieldError('email');
-                    }}
-                    onBlur={() => validateField('email', email)}
-                    placeholder="email@example.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                  {formErrors.email ? <Text style={styles.fieldError}>{formErrors.email}</Text> : null}
-                </FormRow>
-                <FormRow label="Password">
-                  <View
-                    style={[
-                      styles.input,
-                      styles.passwordInputWrapper,
-                      formErrors.password && styles.inputError,
-                    ]}
-                  >
-                    <TextInput
-                      style={styles.passwordInput}
-                      value={password}
-                      onChangeText={(text) => {
-                        setPassword(text);
-                        clearFieldError('password');
-                      }}
-                      onBlur={() => validateField('password', password)}
-                      placeholder="min 6 karakter"
-                      secureTextEntry={!showPassword}
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowPassword((prev) => !prev)}
-                      style={styles.passwordToggle}
-                      accessibilityLabel={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                    >
-                      <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={THEME.textMuted} />
-                    </TouchableOpacity>
+          <View style={styles.flex}>
+            <ScrollView
+              style={styles.flex}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.mainContent}>
+                <View style={styles.headerCard}>
+                  <View style={styles.headerIconWrap}>
+                    <Ionicons name="people" size={22} color="#fff" />
                   </View>
-                  {formErrors.password ? <Text style={styles.fieldError}>{formErrors.password}</Text> : null}
-                </FormRow>
-              </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.title}>{mode === 'create' ? 'Tambah User' : 'Edit User'}</Text>
+                    <Text style={styles.subtitle}>Isi data pengguna untuk akses admin pusat/cabang/shelter</Text>
+                  </View>
+                </View>
 
-              {/* Card: Profil */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Profil</Text>
-                <FormRow label="Nama Lengkap">
-                  <TextInput
-                    style={[styles.input, formErrors.nama_lengkap && styles.inputError]}
-                    value={nama_lengkap}
-                    onChangeText={(text) => {
-                      setNamaLengkap(text);
-                      clearFieldError('nama_lengkap');
-                    }}
-                    onBlur={() => validateField('nama_lengkap', nama_lengkap)}
-                    placeholder="Nama lengkap"
-                  />
-                  {formErrors.nama_lengkap ? (
-                    <Text style={styles.fieldError}>{formErrors.nama_lengkap}</Text>
-                  ) : null}
-                </FormRow>
-                <FormRow label="Alamat">
-                  <TextInput
-                    style={[styles.input, styles.multiline, formErrors.alamat && styles.inputError]}
-                    value={alamat}
-                    onChangeText={(text) => {
-                      setAlamat(text);
-                      clearFieldError('alamat');
-                    }}
-                    onBlur={() => validateField('alamat', alamat)}
-                    placeholder="Alamat"
-                    multiline
-                  />
-                  {formErrors.alamat ? <Text style={styles.fieldError}>{formErrors.alamat}</Text> : null}
-                </FormRow>
-                <FormRow label="No HP">
-                  <TextInput
-                    style={[styles.input, formErrors.no_hp && styles.inputError]}
-                    value={no_hp}
-                    onChangeText={(text) => {
-                      setNoHp(text);
-                      clearFieldError('no_hp');
-                    }}
-                    onBlur={() => validateField('no_hp', no_hp)}
-                    placeholder="08xxxxxxxxxx"
-                    keyboardType="phone-pad"
-                  />
-                  {formErrors.no_hp ? <Text style={styles.fieldError}>{formErrors.no_hp}</Text> : null}
-                </FormRow>
-              </View>
-
-              {/* Card: Dropdown untuk cabang/shelter */}
-              {level === 'admin_cabang' || level === 'admin_shelter' ? (
+                {/* Card: Level */}
                 <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Relasi</Text>
+                  <Text style={styles.cardTitle}>Level</Text>
+                  <LevelPicker value={level} onChange={setLevel} />
+                </View>
 
-                  <FormRow label="Cabang">
-                    {loadingDropdown ? <ActivityIndicator /> : (
-                      <Picker selectedValue={id_kacab} onValueChange={setIdKacab}>
-                        <Picker.Item label="-- Pilih Cabang --" value="" />
-                        {kacabList.map((k) => (
-                          <Picker.Item key={k.id_kacab} label={k.nama_cabang} value={k.id_kacab} />
-                        ))}
-                      </Picker>
-                    )}
+                {/* Card: Data Akun */}
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Data Akun</Text>
+                  <FormRow label="Username">
+                    <TextInput
+                      style={[styles.input, formErrors.username && styles.inputError]}
+                      value={username}
+                      onChangeText={(text) => {
+                        setUsername(text);
+                        clearFieldError('username');
+                      }}
+                      onBlur={() => validateField('username', username)}
+                      placeholder="username"
+                      autoCapitalize="none"
+                    />
+                    {formErrors.username ? <Text style={styles.fieldError}>{formErrors.username}</Text> : null}
                   </FormRow>
+                  <FormRow label="Email">
+                    <TextInput
+                      style={[styles.input, formErrors.email && styles.inputError]}
+                      value={email}
+                      onChangeText={(text) => {
+                        setEmail(text);
+                        clearFieldError('email');
+                      }}
+                      onBlur={() => validateField('email', email)}
+                      placeholder="email@example.com"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                    {formErrors.email ? <Text style={styles.fieldError}>{formErrors.email}</Text> : null}
+                  </FormRow>
+                  <FormRow label="Password">
+                    <View
+                      style={[
+                        styles.input,
+                        styles.passwordInputWrapper,
+                        formErrors.password && styles.inputError,
+                      ]}
+                    >
+                      <TextInput
+                        style={styles.passwordInput}
+                        value={password}
+                        onChangeText={(text) => {
+                          setPassword(text);
+                          clearFieldError('password');
+                        }}
+                        onBlur={() => validateField('password', password)}
+                        placeholder="min 6 karakter"
+                        secureTextEntry={!showPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword((prev) => !prev)}
+                        style={styles.passwordToggle}
+                        accessibilityLabel={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                      >
+                        <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={THEME.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                    {formErrors.password ? <Text style={styles.fieldError}>{formErrors.password}</Text> : null}
+                  </FormRow>
+                </View>
 
-                  {level === 'admin_shelter' && (
-                    <>
-                      <FormRow label="Wilbin">
-                        {loadingDropdown ? <ActivityIndicator /> : (
-                          <Picker selectedValue={id_wilbin} onValueChange={setIdWilbin} enabled={!!id_kacab}>
-                            <Picker.Item label="-- Pilih Wilbin --" value="" />
-                            {wilbinList.map((w) => (
-                              <Picker.Item key={w.id_wilbin} label={w.nama_wilbin} value={w.id_wilbin} />
+                {/* Card: Profil */}
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Profil</Text>
+                  <FormRow label="Nama Lengkap">
+                    <TextInput
+                      style={[styles.input, formErrors.nama_lengkap && styles.inputError]}
+                      value={nama_lengkap}
+                      onChangeText={(text) => {
+                        setNamaLengkap(text);
+                        clearFieldError('nama_lengkap');
+                      }}
+                      onBlur={() => validateField('nama_lengkap', nama_lengkap)}
+                      placeholder="Nama lengkap"
+                    />
+                    {formErrors.nama_lengkap ? (
+                      <Text style={styles.fieldError}>{formErrors.nama_lengkap}</Text>
+                    ) : null}
+                  </FormRow>
+                  <FormRow label="Alamat">
+                    <TextInput
+                      style={[styles.input, styles.multiline, formErrors.alamat && styles.inputError]}
+                      value={alamat}
+                      onChangeText={(text) => {
+                        setAlamat(text);
+                        clearFieldError('alamat');
+                      }}
+                      onBlur={() => validateField('alamat', alamat)}
+                      placeholder="Alamat"
+                      multiline
+                    />
+                    {formErrors.alamat ? <Text style={styles.fieldError}>{formErrors.alamat}</Text> : null}
+                  </FormRow>
+                  <FormRow label="No HP">
+                    <TextInput
+                      style={[styles.input, formErrors.no_hp && styles.inputError]}
+                      value={no_hp}
+                      onChangeText={(text) => {
+                        setNoHp(text);
+                        clearFieldError('no_hp');
+                      }}
+                      onBlur={() => validateField('no_hp', no_hp)}
+                      placeholder="08xxxxxxxxxx"
+                      keyboardType="phone-pad"
+                    />
+                    {formErrors.no_hp ? <Text style={styles.fieldError}>{formErrors.no_hp}</Text> : null}
+                  </FormRow>
+                </View>
+
+                {/* Card: Dropdown untuk cabang/shelter */}
+                {level === 'admin_cabang' || level === 'admin_shelter' ? (
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Relasi</Text>
+
+                    <FormRow label="Cabang">
+                      {loadingDropdown ? (
+                        <ActivityIndicator />
+                      ) : (
+                        <View style={styles.pickerWrapper}>
+                          <Picker
+                            selectedValue={id_kacab}
+                            onValueChange={(value) => {
+                              setIdKacab(value);
+                              clearFieldError('id_kacab');
+                            }}
+                            style={styles.picker}
+                            dropdownIconColor={THEME.textMuted}
+                          >
+                            <Picker.Item label="-- Pilih Cabang --" value="" />
+                            {kacabList.map((k) => (
+                              <Picker.Item key={k.id_kacab} label={k.nama_cabang} value={k.id_kacab} />
                             ))}
                           </Picker>
-                        )}
-                      </FormRow>
+                        </View>
+                      )}
+                      {formErrors.id_kacab ? (
+                        <Text style={styles.fieldError}>{formErrors.id_kacab}</Text>
+                      ) : null}
+                    </FormRow>
 
-                      <FormRow label="Shelter">
-                        {loadingDropdown ? <ActivityIndicator /> : (
-                          <Picker selectedValue={id_shelter} onValueChange={setIdShelter} enabled={!!id_wilbin}>
-                            <Picker.Item label="-- Pilih Shelter --" value="" />
-                            {shelterList.map((s) => (
-                              <Picker.Item key={s.id_shelter} label={s.nama_shelter} value={s.id_shelter} />
-                            ))}
-                          </Picker>
-                        )}
-                      </FormRow>
-                    </>
-                  )}
-                </View>
-              ) : null}
+                    {level === 'admin_shelter' && (
+                      <>
+                        <FormRow label="Wilbin">
+                          {loadingDropdown ? (
+                            <ActivityIndicator />
+                          ) : (
+                            <View
+                              style={[
+                                styles.pickerWrapper,
+                                !id_kacab && styles.pickerWrapperDisabled,
+                              ]}
+                            >
+                              <Picker
+                                selectedValue={id_wilbin}
+                                onValueChange={(value) => {
+                                  setIdWilbin(value);
+                                  clearFieldError('id_wilbin');
+                                }}
+                                enabled={!!id_kacab}
+                                style={styles.picker}
+                                dropdownIconColor={THEME.textMuted}
+                              >
+                                <Picker.Item label="-- Pilih Wilbin --" value="" />
+                                {wilbinList.map((w) => (
+                                  <Picker.Item key={w.id_wilbin} label={w.nama_wilbin} value={w.id_wilbin} />
+                                ))}
+                              </Picker>
+                            </View>
+                          )}
+                          {formErrors.id_wilbin ? (
+                            <Text style={styles.fieldError}>{formErrors.id_wilbin}</Text>
+                          ) : null}
+                        </FormRow>
 
-              {!!apiError && (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle" size={18} color="#fff" />
-                  <Text style={styles.errorText}>{apiError}</Text>
-                </View>
-              )}
-            </View>
+                        <FormRow label="Shelter">
+                          {loadingDropdown ? (
+                            <ActivityIndicator />
+                          ) : (
+                            <View
+                              style={[
+                                styles.pickerWrapper,
+                                !id_wilbin && styles.pickerWrapperDisabled,
+                              ]}
+                            >
+                              <Picker
+                                selectedValue={id_shelter}
+                                onValueChange={(value) => {
+                                  setIdShelter(value);
+                                  clearFieldError('id_shelter');
+                                }}
+                                enabled={!!id_wilbin}
+                                style={styles.picker}
+                                dropdownIconColor={THEME.textMuted}
+                              >
+                                <Picker.Item label="-- Pilih Shelter --" value="" />
+                                {shelterList.map((s) => (
+                                  <Picker.Item key={s.id_shelter} label={s.nama_shelter} value={s.id_shelter} />
+                                ))}
+                              </Picker>
+                            </View>
+                          )}
+                          {formErrors.id_shelter ? (
+                            <Text style={styles.fieldError}>{formErrors.id_shelter}</Text>
+                          ) : null}
+                        </FormRow>
+                      </>
+                    )}
+                  </View>
+                ) : null}
+
+                {!!apiError && (
+                  <View style={styles.errorBanner}>
+                    <Ionicons name="alert-circle" size={18} color="#fff" />
+                    <Text style={styles.errorText}>{apiError}</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
 
             <View style={styles.footerBar}>
-              <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.7 }]} disabled={submitting} onPress={onSubmit}>
+              <TouchableOpacity
+                style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
+                disabled={submitting}
+                onPress={onSubmit}
+              >
                 <Ionicons name="save" size={18} color="#fff" />
                 <Text style={styles.submitText}>{submitting ? 'Menyimpan...' : 'Simpan'}</Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
+          </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -587,7 +650,7 @@ const UserFormScreen = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: THEME.bg },
   flex: { flex: 1 },
-  scrollContent: { flexGrow: 1, padding: 20, paddingBottom: 48, backgroundColor: THEME.bg },
+  scrollContent: { flexGrow: 1, padding: 20, paddingBottom: 140, backgroundColor: THEME.bg },
   mainContent: { flexGrow: 1, gap: 16, width: '100%' },
   headerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 2 },
   headerIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2ecc71', alignItems: 'center', justifyContent: 'center' },
@@ -611,9 +674,28 @@ const styles = StyleSheet.create({
   levelPillTextActive: { color: THEME.primary },
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: THEME.danger, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 },
   errorText: { color: '#fff', flex: 1 },
-  footerBar: { marginTop: 24, backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 3, width: '100%' },
+  footerBar: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: THEME.bg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: THEME.border,
+  },
   submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: THEME.primary, paddingVertical: 14, borderRadius: 10, gap: 8 },
   submitText: { color: '#fff', fontWeight: '700' },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: THEME.border,
+    borderRadius: 10,
+    backgroundColor: THEME.inputBg,
+    overflow: 'hidden',
+  },
+  pickerWrapperDisabled: { backgroundColor: '#f0f0f0', borderColor: '#d0d0d0' },
+  picker: {
+    width: '100%',
+    color: THEME.text,
+    ...(Platform.OS === 'android' ? { height: 48 } : {}),
+  },
 });
 
 export default UserFormScreen;
