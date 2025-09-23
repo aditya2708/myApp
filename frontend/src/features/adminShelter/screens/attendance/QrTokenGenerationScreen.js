@@ -27,10 +27,43 @@ const QrTokenGenerationScreen = ({ navigation, route }) => {
     setQrRef, toggleStudentSelection, handleGenerateToken, handleExportQr
   } = hookData;
 
+  const getExpiryInfo = (token) => {
+    if (!token) {
+      return null;
+    }
+
+    const rawDate = token.expiry_date || token.expires_at || token.expired_at || token.valid_until;
+    const strategy = token.expiry_strategy || token.expiryStrategy;
+
+    if (rawDate) {
+      const parsedDate = new Date(rawDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        try {
+          return `Berlaku hingga: ${parsedDate.toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })}`;
+        } catch (error) {
+          return `Berlaku hingga: ${parsedDate.toDateString()}`;
+        }
+      }
+
+      return `Berlaku hingga: ${rawDate}`;
+    }
+
+    if (strategy === 'semester') {
+      return 'Berlaku hingga akhir semester aktif';
+    }
+
+    return null;
+  };
+
   const renderStudentItem = ({ item }) => {
     const isSelected = selectedStudents.includes(item.id_anak);
     const token = studentTokens[item.id_anak];
-    
+    const expiryInfo = getExpiryInfo(token);
+
     return (
       <View style={styles.studentCard}>
         <View style={styles.studentHeader}>
@@ -80,6 +113,10 @@ const QrTokenGenerationScreen = ({ navigation, route }) => {
             showExportButtons={false}
             ref={(ref) => setQrRef(item.id_anak, ref)}
           />
+        )}
+
+        {token && expiryInfo && (
+          <Text style={styles.expiryText}>{expiryInfo}</Text>
         )}
       </View>
     );
@@ -220,6 +257,12 @@ const styles = StyleSheet.create({
   exportButton: {
     backgroundColor: '#27ae60', paddingVertical: 6, paddingHorizontal: 10,
     borderRadius: 16, justifyContent: 'center', alignItems: 'center'
+  },
+  expiryText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontStyle: 'italic'
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255, 255, 255, 0.8)',

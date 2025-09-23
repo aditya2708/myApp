@@ -20,7 +20,8 @@ const QrTokenGenerationTab = ({
     tokenLoading, tokenError, tutorLoading, tutorError, exportLoading,
     setQrRef, handleGenerateToken, handleExportQr,
     handleToggleTargetSelection, handleSelectAllTargets,
-    handleBatchGenerate, handleBatchExport
+    handleBatchGenerate, handleBatchExport,
+    validDays, setValidDays, expiryStrategy, setExpiryStrategy
   } = useQrTokenGeneration({
     id_aktivitas, activityName, activityDate, activityType,
     kelompokId, kelompokName, level, completeActivity
@@ -63,6 +64,10 @@ const QrTokenGenerationTab = ({
         onBatchGenerate={handleBatchGenerate}
         onBatchExport={handleBatchExport}
         setQrRef={setQrRef}
+        validDays={validDays}
+        setValidDays={setValidDays}
+        expiryStrategy={expiryStrategy}
+        setExpiryStrategy={setExpiryStrategy}
       />
       
       {(tokenLoading || exportLoading || tutorLoading) && (

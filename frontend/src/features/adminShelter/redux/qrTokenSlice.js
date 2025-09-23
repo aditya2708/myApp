@@ -3,9 +3,12 @@ import { qrTokenApi } from '../api/qrTokenApi';
 
 export const generateToken = createAsyncThunk(
   'qrToken/generate',
-  async ({ id_anak, validDays = 30 }, { rejectWithValue }) => {
+  async ({ id_anak, validDays, expiryStrategy } = {}, { rejectWithValue }) => {
     try {
-      const response = await qrTokenApi.generateToken(id_anak, validDays);
+      const response = await qrTokenApi.generateToken(id_anak, {
+        validDays,
+        expiryStrategy
+      });
       return { ...response.data, id_anak };
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: error.message });
@@ -15,9 +18,12 @@ export const generateToken = createAsyncThunk(
 
 export const generateBatchTokens = createAsyncThunk(
   'qrToken/generateBatch',
-  async ({ studentIds, validDays = 30 }, { rejectWithValue }) => {
+  async ({ studentIds, validDays, expiryStrategy } = {}, { rejectWithValue }) => {
     try {
-      const response = await qrTokenApi.generateBatchTokens(studentIds, validDays);
+      const response = await qrTokenApi.generateBatchTokens(studentIds, {
+        validDays,
+        expiryStrategy
+      });
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: error.message });

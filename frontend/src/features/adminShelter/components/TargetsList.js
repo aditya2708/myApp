@@ -26,7 +26,11 @@ const TargetsList = ({
   onSelectAll,
   onBatchGenerate,
   onBatchExport,
-  setQrRef
+  setQrRef,
+  validDays,
+  setValidDays,
+  expiryStrategy,
+  setExpiryStrategy
 }) => {
   // Filter targets based on search query
   const filteredTargets = targets.filter(target =>
@@ -81,6 +85,77 @@ const TargetsList = ({
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+      </View>
+
+      <View style={styles.strategyContainer}>
+        <Text style={styles.strategyLabel}>Strategi Kedaluwarsa</Text>
+        <View style={styles.strategyToggleGroup}>
+          <TouchableOpacity
+            style={[
+              styles.strategyOption,
+              expiryStrategy === 'days' && styles.strategyOptionActive
+            ]}
+            onPress={() => setExpiryStrategy('days')}
+          >
+            <Ionicons
+              name="time"
+              size={16}
+              color={expiryStrategy === 'days' ? '#fff' : '#3498db'}
+            />
+            <Text
+              style={[
+                styles.strategyOptionText,
+                expiryStrategy === 'days' && styles.strategyOptionTextActive
+              ]}
+            >
+              Per X Hari
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.strategyOption,
+              styles.strategyOptionLast,
+              expiryStrategy === 'semester' && styles.strategyOptionActive
+            ]}
+            onPress={() => setExpiryStrategy('semester')}
+          >
+            <Ionicons
+              name="calendar"
+              size={16}
+              color={expiryStrategy === 'semester' ? '#fff' : '#3498db'}
+            />
+            <Text
+              style={[
+                styles.strategyOptionText,
+                expiryStrategy === 'semester' && styles.strategyOptionTextActive
+              ]}
+            >
+              Akhir Semester
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.validDaysRow}>
+          <Text style={styles.validDaysLabel}>Berlaku selama (hari)</Text>
+          <TextInput
+            style={[
+              styles.validDaysInput,
+              expiryStrategy !== 'days' && styles.validDaysInputDisabled
+            ]}
+            value={validDays.toString()}
+            onChangeText={(value) => setValidDays(parseInt(value, 10) || 30)}
+            keyboardType="number-pad"
+            editable={expiryStrategy === 'days'}
+            selectTextOnFocus
+          />
+        </View>
+
+        {expiryStrategy === 'semester' && (
+          <Text style={styles.strategyDescription}>
+            Token akan kedaluwarsa di akhir semester aktif.
+          </Text>
+        )}
       </View>
 
       {/* Batch Actions for Students */}
@@ -179,6 +254,82 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     fontSize: 16,
     color: '#2c3e50',
+  },
+  strategyContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+    marginBottom: 12,
+  },
+  strategyLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  strategyToggleGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  strategyOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#3498db',
+    borderRadius: 8,
+    paddingVertical: 8,
+    marginRight: 8,
+    backgroundColor: '#fff',
+  },
+  strategyOptionLast: {
+    marginRight: 0,
+  },
+  strategyOptionActive: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
+  },
+  strategyOptionText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#3498db',
+  },
+  strategyOptionTextActive: {
+    color: '#fff',
+  },
+  validDaysRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  validDaysLabel: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginRight: 8,
+  },
+  validDaysInput: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    width: 70,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#dce1e6',
+  },
+  validDaysInputDisabled: {
+    backgroundColor: '#f0f0f0',
+    color: '#95a5a6',
+  },
+  strategyDescription: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 8,
   },
   batchActions: {
     flexDirection: 'row',
