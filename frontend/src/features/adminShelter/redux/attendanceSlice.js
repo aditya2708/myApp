@@ -218,6 +218,23 @@ const attendanceSlice = createSlice({
           if (action.payload.existingRecord) {
             const record = action.payload.existingRecord;
             state.attendanceRecords[record.id_absen] = record;
+
+            const activityId = action.meta?.arg?.id_aktivitas;
+            if (activityId) {
+              if (!state.activityRecords[activityId]) {
+                state.activityRecords[activityId] = [];
+              }
+
+              const existingIndex = state.activityRecords[activityId].findIndex(
+                activityRecord => activityRecord.id_absen === record.id_absen
+              );
+
+              if (existingIndex === -1) {
+                state.activityRecords[activityId].push(record);
+              } else {
+                state.activityRecords[activityId][existingIndex] = record;
+              }
+            }
           }
         } else if (action.payload?.isDateValidationError) {
           state.dateValidationError = action.payload.message;
@@ -276,6 +293,23 @@ const attendanceSlice = createSlice({
           if (action.payload.existingRecord) {
             const record = action.payload.existingRecord;
             state.attendanceRecords[record.id_absen] = record;
+
+            const activityId = action.meta?.arg?.id_aktivitas;
+            if (activityId) {
+              if (!state.activityRecords[activityId]) {
+                state.activityRecords[activityId] = [];
+              }
+
+              const existingIndex = state.activityRecords[activityId].findIndex(
+                activityRecord => activityRecord.id_absen === record.id_absen
+              );
+
+              if (existingIndex === -1) {
+                state.activityRecords[activityId].push(record);
+              } else {
+                state.activityRecords[activityId][existingIndex] = record;
+              }
+            }
           }
         } else if (action.payload?.isDateValidationError) {
           state.dateValidationError = action.payload.message;
