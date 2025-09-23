@@ -29,14 +29,16 @@ class QrTokenRequest extends FormRequest
             case 'generate':
                 return [
                     'id_anak' => 'required|exists:anak,id_anak',
-                    'valid_days' => 'nullable|integer|min:1|max:365'
+                    'valid_days' => 'nullable|integer|min:1|max:365',
+                    'expiry_strategy' => 'nullable|in:days,semester'
                 ];
-                
+
             case 'generateBatch':
                 return [
                     'student_ids' => 'required|array',
                     'student_ids.*' => 'required|exists:anak,id_anak',
-                    'valid_days' => 'nullable|integer|min:1|max:365'
+                    'valid_days' => 'nullable|integer|min:1|max:365',
+                    'expiry_strategy' => 'nullable|in:days,semester'
                 ];
                 
             case 'validate':
@@ -66,6 +68,8 @@ class QrTokenRequest extends FormRequest
             'valid_days.min' => 'Valid days must be at least 1',
             'valid_days.max' => 'Valid days cannot exceed 365',
             'token.required' => 'QR token is required',
+            'expiry_strategy.in' => 'Expiry strategy must be either days or semester',
         ];
     }
 }
+

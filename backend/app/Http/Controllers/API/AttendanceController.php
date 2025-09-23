@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\Absen;
 use App\Models\Anak;
 use App\Models\Tutor;
+use App\Models\Semester;
 use App\Models\Aktivitas;
 use App\Models\AttendanceVerification;
 use App\Services\AttendanceService;
@@ -15,6 +16,7 @@ use App\Services\VerificationService;
 use App\Services\QrTokenService;
 use App\Http\Resources\AttendanceResource;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class AttendanceController extends Controller
 {
@@ -411,13 +413,31 @@ class AttendanceController extends Controller
     {
         $request->validate([
             'id_tutor' => 'required|exists:tutor,id_tutor',
-            'valid_days' => 'nullable|integer|min:1|max:365'
+            'valid_days' => 'nullable|integer|min:1|max:365',
+            'expiry_strategy' => 'nullable|in:days,semester'
         ]);
-        
+
         try {
             $validDays = $request->input('valid_days', 30);
-            $token = $this->qrTokenService->generateTutorToken($request->id_tutor, $validDays);
-            
+            $expiryStrategy = $request->input('expiry_strategy', 'days');
+            $validUntil = null;
+
+            if ($expiryStrategy === 'semester') {
+                $tutor = Tutor::findOrFail($request->id_tutor);
+                $semester = $this->findActiveSemesterForEntity($tutor->id_shelter, $this->resolveKacabId($tutor));
+
+                if (!$semester) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Active semester not found for the tutor'
+                    ], 404);
+                }
+
+                $validUntil = Carbon::parse($semester->tanggal_selesai)->endOfDay();
+            }
+
+            $token = $this->qrTokenService->generateTutorToken($request->id_tutor, $validDays, $validUntil);
+
             return response()->json([
                 'success' => true,
                 'message' => 'QR token generated successfully for tutor',
@@ -537,7 +557,7 @@ class AttendanceController extends Controller
     {
         try {
             $required = $this->attendanceService->isGpsRequired($id_aktivitas);
-            
+
             return response()->json([
                 'success' => true,
                 'gps_required' => $required
@@ -549,4 +569,65 @@ class AttendanceController extends Controller
             ], 500);
         }
     }
+
+    protected function findActiveSemesterForEntity(?int $shelterId, ?int $kacabId)
+    {
+        if ($shelterId) {
+            $semester = $this->buildActiveSemesterQuery()
+                ->where('id_shelter', $shelterId)
+                ->first();
+
+            if ($semester) {
+                return $semester;
+            }
+        }
+
+        if ($kacabId) {
+            return $this->buildActiveSemesterQuery()
+                ->where('id_kacab', $kacabId)
+                ->first();
+        }
+
+        return null;
+    }
+
+    protected function buildActiveSemesterQuery()
+    {
+        $query = Semester::query();
+
+        if (Schema::hasColumn('semester', 'status')) {
+            $query->where('status', 'active');
+        } else {
+            $query->where('is_active', true);
+        }
+
+        return $query;
+    }
+
+    protected function resolveKacabId($entity): ?int
+    {
+        if (!empty($entity->id_kacab)) {
+            return $entity->id_kacab;
+        }
+
+        if (method_exists($entity, 'wilbin')) {
+            $wilbin = $entity->wilbin;
+            if ($wilbin) {
+                return $wilbin->id_kacab ?? null;
+            }
+        }
+
+        if (method_exists($entity, 'shelter')) {
+            $shelter = $entity->shelter;
+            if ($shelter && method_exists($shelter, 'kacab')) {
+                $kacab = $shelter->kacab;
+                if ($kacab) {
+                    return $kacab->id_kacab ?? null;
+                }
+            }
+        }
+
+        return null;
+    }
 }
+
