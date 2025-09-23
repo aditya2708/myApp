@@ -21,6 +21,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { userManagementApi } from '../../api/userManagementApi';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const THEME = {
   bg: '#f5f5f5',
@@ -94,6 +95,11 @@ const UserFormScreen = () => {
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [formErrors, setFormErrors] = useState({});
+  const [footerHeight, setFooterHeight] = useState(0);
+
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets?.bottom ?? 0;
+  const contentPaddingBottom = Math.max(24, footerHeight + bottomInset + 16);
 
   const setFieldError = useCallback((field, message) => {
     setFormErrors((prev) => {
@@ -389,7 +395,7 @@ const UserFormScreen = () => {
           <View style={styles.flex}>
             <ScrollView
               style={styles.flex}
-              contentContainerStyle={styles.scrollContent}
+              contentContainerStyle={[styles.scrollContent, { paddingBottom: contentPaddingBottom }]}
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.mainContent}>
@@ -630,7 +636,13 @@ const UserFormScreen = () => {
               </View>
             </ScrollView>
 
-            <View style={styles.footerBar}>
+            <View
+              style={styles.footerBar}
+              onLayout={({ nativeEvent }) => {
+                const { height } = nativeEvent.layout;
+                setFooterHeight((prev) => (Math.abs(prev - height) > 1 ? height : prev));
+              }}
+            >
               <TouchableOpacity
                 style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
                 disabled={submitting}
@@ -650,7 +662,7 @@ const UserFormScreen = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: THEME.bg },
   flex: { flex: 1 },
-  scrollContent: { flexGrow: 1, padding: 20, paddingBottom: 140, backgroundColor: THEME.bg },
+  scrollContent: { flexGrow: 1, padding: 20, backgroundColor: THEME.bg },
   mainContent: { flexGrow: 1, gap: 16, width: '100%' },
   headerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.card, padding: 20, borderRadius: 16, elevation: 2 },
   headerIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2ecc71', alignItems: 'center', justifyContent: 'center' },
