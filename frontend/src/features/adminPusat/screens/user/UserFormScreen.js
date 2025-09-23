@@ -397,14 +397,15 @@ const UserFormScreen = () => {
         behavior={Platform.select({ ios: 'padding', android: 'height' })}
         keyboardVerticalOffset={Platform.select({ ios: 64, android: 0 })}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.flex}>
-            <ScrollView
-              style={styles.flex}
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: contentPaddingBottom }]}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
+        <View style={styles.flex}>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: contentPaddingBottom }]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}
+          >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
               <View style={[styles.mainContent, isTablet && styles.mainContentTablet]}>
                 <View style={styles.headerCard}>
                   <View style={styles.headerIconWrap}>
@@ -647,30 +648,30 @@ const UserFormScreen = () => {
                   </View>
                 )}
               </View>
-            </ScrollView>
+            </TouchableWithoutFeedback>
+          </ScrollView>
 
-            <View
-              style={[styles.footerBar, { paddingBottom: Math.max(16, bottomInset) }]}
-              onLayout={({ nativeEvent }) => {
-                const { height } = nativeEvent.layout;
-                setFooterHeight((prev) => (Math.abs(prev - height) > 1 ? height : prev));
-              }}
+          <View
+            style={[styles.footerBar, { paddingBottom: Math.max(16, bottomInset) }]}
+            onLayout={({ nativeEvent }) => {
+              const { height } = nativeEvent.layout;
+              setFooterHeight((prev) => (Math.abs(prev - height) > 1 ? height : prev));
+            }}
+          >
+            <TouchableOpacity
+              style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
+              disabled={submitting}
+              onPress={onSubmit}
             >
-              <TouchableOpacity
-                style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
-                disabled={submitting}
-                onPress={onSubmit}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="save" size={18} color="#fff" />
-                )}
-                <Text style={styles.submitText}>{submitting ? 'Menyimpan...' : 'Simpan'}</Text>
-              </TouchableOpacity>
-            </View>
+              {submitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="save" size={18} color="#fff" />
+              )}
+              <Text style={styles.submitText}>{submitting ? 'Menyimpan...' : 'Simpan'}</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
