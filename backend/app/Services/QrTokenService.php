@@ -10,20 +10,24 @@ use Illuminate\Support\Str;
 
 class QrTokenService
 {
-    public function generateToken($id_anak, $validDays = 30)
+    public function generateToken($id_anak, $validDays = 30, $validUntil = null)
     {
         $anak = Anak::find($id_anak);
         if (!$anak) {
             throw new \Exception("Student not found with ID: {$id_anak}");
         }
-        
+
         QrToken::where('id_anak', $id_anak)
                ->where('is_active', true)
                ->update(['is_active' => false]);
-        
+
         $token = $this->createSecureToken('anak', $id_anak);
-        $validUntil = Carbon::now()->addDays($validDays);
-        
+        if ($validUntil) {
+            $validUntil = $validUntil instanceof Carbon ? $validUntil : Carbon::parse($validUntil);
+        } else {
+            $validUntil = Carbon::now()->addDays($validDays);
+        }
+
         return QrToken::create([
             'id_anak' => $id_anak,
             'id_tutor' => null,
@@ -33,21 +37,25 @@ class QrTokenService
             'is_active' => true
         ]);
     }
-    
-    public function generateTutorToken($id_tutor, $validDays = 30)
+
+    public function generateTutorToken($id_tutor, $validDays = 30, $validUntil = null)
     {
         $tutor = Tutor::find($id_tutor);
         if (!$tutor) {
             throw new \Exception("Tutor not found with ID: {$id_tutor}");
         }
-        
+
         QrToken::where('id_tutor', $id_tutor)
                ->where('is_active', true)
                ->update(['is_active' => false]);
-        
+
         $token = $this->createSecureToken('tutor', $id_tutor);
-        $validUntil = Carbon::now()->addDays($validDays);
-        
+        if ($validUntil) {
+            $validUntil = $validUntil instanceof Carbon ? $validUntil : Carbon::parse($validUntil);
+        } else {
+            $validUntil = Carbon::now()->addDays($validDays);
+        }
+
         return QrToken::create([
             'id_anak' => null,
             'id_tutor' => $id_tutor,
@@ -150,33 +158,35 @@ class QrTokenService
         return true;
     }
     
-    public function generateBatchTokens($studentIds, $validDays = 30)
+    public function generateBatchTokens($studentIds, $validDays = 30, $validUntilOverrides = [])
     {
         $tokens = [];
-        
+
         foreach ($studentIds as $id_anak) {
             try {
-                $tokens[] = $this->generateToken($id_anak, $validDays);
+                $validUntil = $validUntilOverrides[$id_anak] ?? null;
+                $tokens[] = $this->generateToken($id_anak, $validDays, $validUntil);
             } catch (\Exception $e) {
                 \Log::error("Failed to generate token for student ID {$id_anak}: " . $e->getMessage());
             }
         }
-        
+
         return $tokens;
     }
-    
-    public function generateBatchTutorTokens($tutorIds, $validDays = 30)
+
+    public function generateBatchTutorTokens($tutorIds, $validDays = 30, $validUntilOverrides = [])
     {
         $tokens = [];
-        
+
         foreach ($tutorIds as $id_tutor) {
             try {
-                $tokens[] = $this->generateTutorToken($id_tutor, $validDays);
+                $validUntil = $validUntilOverrides[$id_tutor] ?? null;
+                $tokens[] = $this->generateTutorToken($id_tutor, $validDays, $validUntil);
             } catch (\Exception $e) {
                 \Log::error("Failed to generate token for tutor ID {$id_tutor}: " . $e->getMessage());
             }
         }
-        
+
         return $tokens;
     }
     

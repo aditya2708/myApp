@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\QrTokenRequest;
 use App\Models\QrToken;
 use App\Models\Anak;
+use App\Models\Semester;
 use App\Models\Aktivitas;
 use App\Services\QrTokenService;
 use App\Services\AttendanceService;
 use App\Http\Resources\QrTokenResource;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class QrTokenController extends Controller
 {
@@ -26,8 +29,25 @@ class QrTokenController extends Controller
     {
         try {
             $validDays = $request->input('valid_days', 30);
-            $token = $this->qrTokenService->generateToken($request->id_anak, $validDays);
-            
+            $expiryStrategy = $request->input('expiry_strategy', 'days');
+            $validUntil = null;
+
+            if ($expiryStrategy === 'semester') {
+                $anak = Anak::findOrFail($request->id_anak);
+                $semester = $this->findActiveSemesterForEntity($anak->id_shelter, $this->resolveKacabId($anak));
+
+                if (!$semester) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Active semester not found for the student'
+                    ], 404);
+                }
+
+                $validUntil = Carbon::parse($semester->tanggal_selesai)->endOfDay();
+            }
+
+            $token = $this->qrTokenService->generateToken($request->id_anak, $validDays, $validUntil);
+
             return response()->json([
                 'success' => true,
                 'message' => 'QR token generated successfully',
@@ -45,8 +65,39 @@ class QrTokenController extends Controller
     {
         try {
             $validDays = $request->input('valid_days', 30);
-            $tokens = $this->qrTokenService->generateBatchTokens($request->student_ids, $validDays);
-            
+            $expiryStrategy = $request->input('expiry_strategy', 'days');
+            $validUntilOverrides = [];
+            $missingSemesters = [];
+
+            if ($expiryStrategy === 'semester') {
+                foreach ($request->student_ids as $studentId) {
+                    $anak = Anak::find($studentId);
+
+                    if (!$anak) {
+                        $missingSemesters[] = $studentId;
+                        continue;
+                    }
+
+                    $semester = $this->findActiveSemesterForEntity($anak->id_shelter, $this->resolveKacabId($anak));
+
+                    if (!$semester) {
+                        $missingSemesters[] = $studentId;
+                        continue;
+                    }
+
+                    $validUntilOverrides[$studentId] = Carbon::parse($semester->tanggal_selesai)->endOfDay();
+                }
+
+                if (!empty($missingSemesters)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Active semester not found for student IDs: ' . implode(', ', $missingSemesters)
+                    ], 404);
+                }
+            }
+
+            $tokens = $this->qrTokenService->generateBatchTokens($request->student_ids, $validDays, $validUntilOverrides);
+
             return response()->json([
                 'success' => true,
                 'message' => count($tokens) . ' QR tokens generated successfully',
@@ -178,4 +229,65 @@ class QrTokenController extends Controller
             'data' => $responseData
         ]);
     }
+
+    protected function findActiveSemesterForEntity(?int $shelterId, ?int $kacabId)
+    {
+        if ($shelterId) {
+            $semester = $this->buildActiveSemesterQuery()
+                ->where('id_shelter', $shelterId)
+                ->first();
+
+            if ($semester) {
+                return $semester;
+            }
+        }
+
+        if ($kacabId) {
+            return $this->buildActiveSemesterQuery()
+                ->where('id_kacab', $kacabId)
+                ->first();
+        }
+
+        return null;
+    }
+
+    protected function buildActiveSemesterQuery()
+    {
+        $query = Semester::query();
+
+        if (Schema::hasColumn('semester', 'status')) {
+            $query->where('status', 'active');
+        } else {
+            $query->where('is_active', true);
+        }
+
+        return $query;
+    }
+
+    protected function resolveKacabId($entity): ?int
+    {
+        if (!empty($entity->id_kacab)) {
+            return $entity->id_kacab;
+        }
+
+        if (method_exists($entity, 'wilbin')) {
+            $wilbin = $entity->wilbin;
+            if ($wilbin) {
+                return $wilbin->id_kacab ?? null;
+            }
+        }
+
+        if (method_exists($entity, 'shelter')) {
+            $shelter = $entity->shelter;
+            if ($shelter && method_exists($shelter, 'kacab')) {
+                $kacab = $shelter->kacab;
+                if ($kacab) {
+                    return $kacab->id_kacab ?? null;
+                }
+            }
+        }
+
+        return null;
+    }
 }
+
