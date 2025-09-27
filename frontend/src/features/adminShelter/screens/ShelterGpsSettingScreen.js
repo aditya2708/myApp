@@ -89,7 +89,13 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
   };
 
   const handleDetectCurrentLocation = () => {
+    setIsDetectingLocation(true);
     setShowGpsModal(true);
+  };
+
+  const handleCloseGpsModal = () => {
+    setIsDetectingLocation(false);
+    setShowGpsModal(false);
   };
 
   const handleLocationSuccess = (locationData) => {
@@ -98,13 +104,13 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       latitude: locationData.latitude.toString(),
       longitude: locationData.longitude.toString()
     }));
-    setShowGpsModal(false);
+    handleCloseGpsModal();
     Alert.alert('Berhasil', 'Lokasi saat ini berhasil terdeteksi');
   };
 
 
   const handleLocationError = (error) => {
-    setShowGpsModal(false);
+    handleCloseGpsModal();
     Alert.alert('Error GPS', error);
   };
 
@@ -442,7 +448,7 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       {/* GPS Permission Modal */}
       <GpsPermissionModal
         visible={showGpsModal}
-        onClose={() => setShowGpsModal(false)}
+        onClose={handleCloseGpsModal}
         onLocationSuccess={handleLocationSuccess}
         onLocationError={handleLocationError}
         title="Deteksi Lokasi Shelter"
