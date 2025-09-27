@@ -319,7 +319,7 @@ const QrScannerScreen = ({ navigation, route }) => {
   const handleGpsLocationError = (error) => {
     setShowGpsModal(false);
     setPendingAttendanceData(null);
-    showToast(`Error GPS: ${error}`, 'error');
+    showToast(`Kesalahan GPS: ${error}`, 'error');
   };
 
   const proceedWithAttendance = async (attendanceData, gpsData) => {

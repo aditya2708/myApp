@@ -289,7 +289,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
         );
         
         if (!gpsValidation.valid) {
-          Alert.alert('Error GPS', gpsValidation.reason);
+          Alert.alert('Kesalahan GPS', gpsValidation.reason);
           setPendingSubmitData(null);
           return;
         }
@@ -305,7 +305,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const handleGpsLocationError = (error) => {
     setShowGpsModal(false);
     setPendingSubmitData(null);
-    Alert.alert('Error GPS', error);
+    Alert.alert('Kesalahan GPS', error);
   };
 
   const proceedWithSubmit = async (submitData, gpsData) => {

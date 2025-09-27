@@ -111,7 +111,7 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
 
   const handleLocationError = (error) => {
     handleCloseGpsModal();
-    Alert.alert('Error GPS', error);
+    Alert.alert('Kesalahan GPS', error);
   };
 
   const validateForm = () => {
