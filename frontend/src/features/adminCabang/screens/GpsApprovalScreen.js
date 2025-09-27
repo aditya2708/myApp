@@ -36,7 +36,10 @@ const GpsApprovalScreen = ({ navigation }) => {
   ];
 
   // Load GPS approval requests
-  const loadGpsRequests = useCallback(async (page = 1, isRefresh = false) => {
+  const loadGpsRequests = useCallback(async (page = 1, isRefresh = false, overrides = {}) => {
+    const { statusOverride } = overrides;
+    const effectiveStatus = statusOverride ?? selectedStatus;
+
     try {
       if (page === 1) {
         isRefresh ? setRefreshing(true) : setLoading(true);
@@ -48,7 +51,7 @@ const GpsApprovalScreen = ({ navigation }) => {
       const params = {
         page,
         per_page: pagination.per_page,
-        status: selectedStatus,
+        status: effectiveStatus,
         search: searchQuery.trim() || undefined,
         sort_by: 'gps_submitted_at',
         sort_order: 'desc'
@@ -94,14 +97,14 @@ const GpsApprovalScreen = ({ navigation }) => {
   );
 
   // Refresh data
-  const handleRefresh = () => {
-    loadGpsRequests(1, true);
+  const handleRefresh = (overrides) => {
+    loadGpsRequests(1, true, overrides);
   };
 
   // Load more data
-  const handleLoadMore = () => {
+  const handleLoadMore = (overrides) => {
     if (!loadingMore && pagination.current_page < pagination.last_page) {
-      loadGpsRequests(pagination.current_page + 1);
+      loadGpsRequests(pagination.current_page + 1, false, overrides);
     }
   };
 
@@ -122,7 +125,7 @@ const GpsApprovalScreen = ({ navigation }) => {
   // Status filter change
   const handleStatusChange = (status) => {
     setSelectedStatus(status);
-    loadGpsRequests(1);
+    loadGpsRequests(1, false, { statusOverride: status });
   };
 
   // Navigate to detail
