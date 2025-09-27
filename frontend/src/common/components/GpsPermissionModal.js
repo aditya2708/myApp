@@ -26,8 +26,8 @@ const GpsPermissionModal = ({
   onClose,
   onLocationSuccess,
   onLocationError,
-  title = "GPS Permission Required",
-  subtitle = "We need to access your location to record attendance",
+  title = "Izin GPS Diperlukan",
+  subtitle = "Kami perlu mengakses lokasi Anda untuk mencatat absensi",
   showLocationPreview = true,
   requiredAccuracy = 20, // meters
   autoCloseOnSuccess = true
@@ -189,43 +189,43 @@ const GpsPermissionModal = ({
       <View style={styles.bulletPoints}>
         <View style={styles.bulletPoint}>
           <Ionicons name="checkmark-circle" size={16} color="#27ae60" />
-          <Text style={styles.bulletText}>Verify you're at the correct location</Text>
+          <Text style={styles.bulletText}>Pastikan Anda berada di lokasi yang benar</Text>
         </View>
         <View style={styles.bulletPoint}>
           <Ionicons name="checkmark-circle" size={16} color="#27ae60" />
-          <Text style={styles.bulletText}>Ensure attendance accuracy</Text>
+          <Text style={styles.bulletText}>Jaga keakuratan data absensi</Text>
         </View>
         <View style={styles.bulletPoint}>
           <Ionicons name="checkmark-circle" size={16} color="#27ae60" />
-          <Text style={styles.bulletText}>Prevent fraudulent attendance</Text>
+          <Text style={styles.bulletText}>Cegah kecurangan absensi</Text>
         </View>
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.button, styles.cancelButton]} 
           onPress={handleClose}
           disabled={loading}
         >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
+          <Text style={styles.cancelButtonText}>Batal</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.button, styles.allowButton]} 
+
+        <TouchableOpacity
+          style={[styles.button, styles.allowButton]}
           onPress={handleRequestPermission}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.allowButtonText}>Allow Location</Text>
+            <Text style={styles.allowButtonText}>Izinkan Lokasi</Text>
           )}
         </TouchableOpacity>
       </View>
 
       {permissionStatus && !permissionStatus.granted && !permissionStatus.canAskAgain && (
         <TouchableOpacity style={styles.settingsLink} onPress={openAppSettings}>
-          <Text style={styles.settingsLinkText}>Open Settings to Enable Location</Text>
+          <Text style={styles.settingsLinkText}>Buka Pengaturan untuk Mengaktifkan Lokasi</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -236,21 +236,21 @@ const GpsPermissionModal = ({
       <View style={styles.iconContainer}>
         <ActivityIndicator size="large" color="#3498db" />
       </View>
-      
-      <Text style={styles.title}>Getting Your Location</Text>
-      <Text style={styles.subtitle}>Please wait while we get your GPS coordinates...</Text>
-      
+
+      <Text style={styles.title}>Mengambil Lokasi Anda</Text>
+      <Text style={styles.subtitle}>Mohon tunggu, kami sedang mengambil koordinat GPS Anda...</Text>
+
       <View style={styles.loadingInfo}>
-        <Text style={styles.loadingText}>• Make sure you're outdoors or near a window</Text>
-        <Text style={styles.loadingText}>• GPS accuracy improves with time</Text>
-        <Text style={styles.loadingText}>• Required accuracy: {requiredAccuracy}m or better</Text>
+        <Text style={styles.loadingText}>• Pastikan berada di luar ruangan atau dekat jendela</Text>
+        <Text style={styles.loadingText}>• Akurasi GPS meningkat seiring waktu</Text>
+        <Text style={styles.loadingText}>• Akurasi yang dibutuhkan: {requiredAccuracy}m atau lebih baik</Text>
       </View>
 
-      <TouchableOpacity 
-        style={[styles.button, styles.cancelButton]} 
+      <TouchableOpacity
+        style={[styles.button, styles.cancelButton]}
         onPress={handleClose}
       >
-        <Text style={styles.cancelButtonText}>Cancel</Text>
+        <Text style={styles.cancelButtonText}>Batal</Text>
       </TouchableOpacity>
     </View>
   );
@@ -260,26 +260,26 @@ const GpsPermissionModal = ({
       <View style={styles.iconContainer}>
         <Ionicons name="checkmark-circle" size={64} color="#27ae60" />
       </View>
-      
-      <Text style={styles.title}>Location Acquired!</Text>
-      <Text style={styles.subtitle}>GPS coordinates have been successfully obtained</Text>
-      
+
+      <Text style={styles.title}>Lokasi Berhasil Didapat!</Text>
+      <Text style={styles.subtitle}>Koordinat GPS berhasil diambil</Text>
+
       {showLocationPreview && locationData && (
         <View style={styles.locationPreview}>
           <View style={styles.locationRow}>
-            <Text style={styles.locationLabel}>Coordinates:</Text>
+            <Text style={styles.locationLabel}>Koordinat:</Text>
             <Text style={styles.locationValue}>
               {formatCoordinates(locationData.latitude, locationData.longitude, 4)}
             </Text>
           </View>
           <View style={styles.locationRow}>
-            <Text style={styles.locationLabel}>Accuracy:</Text>
+            <Text style={styles.locationLabel}>Akurasi:</Text>
             <Text style={styles.locationValue}>
               {locationData.accuracy?.toFixed(1)}m ({getAccuracyDescription(locationData.accuracy)})
             </Text>
           </View>
           <View style={styles.locationRow}>
-            <Text style={styles.locationLabel}>Time:</Text>
+            <Text style={styles.locationLabel}>Waktu:</Text>
             <Text style={styles.locationValue}>
               {new Date(locationData.timestamp).toLocaleTimeString()}
             </Text>
@@ -289,11 +289,11 @@ const GpsPermissionModal = ({
 
       {!autoCloseOnSuccess && (
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.button, styles.allowButton]} 
+          <TouchableOpacity
+            style={[styles.button, styles.allowButton]}
             onPress={() => handleLocationSuccess(locationData)}
           >
-            <Text style={styles.allowButtonText}>Continue</Text>
+            <Text style={styles.allowButtonText}>Lanjutkan</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -305,31 +305,31 @@ const GpsPermissionModal = ({
       <View style={styles.iconContainer}>
         <Ionicons name="warning" size={64} color="#e74c3c" />
       </View>
-      
-      <Text style={styles.title}>Location Error</Text>
-      <Text style={styles.subtitle}>We couldn't get your location</Text>
-      
+
+      <Text style={styles.title}>Lokasi Bermasalah</Text>
+      <Text style={styles.subtitle}>Kami tidak dapat memperoleh lokasi Anda</Text>
+
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={[styles.button, styles.cancelButton]} 
+        <TouchableOpacity
+          style={[styles.button, styles.cancelButton]}
           onPress={() => handleLocationError(error)}
         >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
+          <Text style={styles.cancelButtonText}>Batal</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.button, styles.retryButton]} 
+
+        <TouchableOpacity
+          style={[styles.button, styles.retryButton]}
           onPress={getCurrentLocationData}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>Coba Lagi</Text>
           )}
         </TouchableOpacity>
       </View>
