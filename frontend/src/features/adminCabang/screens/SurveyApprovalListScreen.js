@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
@@ -24,7 +24,7 @@ const SurveyApprovalListScreen = () => {
   const [searchText, setSearchText] = useState('');
   const [pagination, setPagination] = useState({});
 
-  const fetchSurveys = async (params = {}) => {
+  const fetchSurveys = useCallback(async (params = {}) => {
     try {
       setError(null);
       const response = await adminCabangSurveyApi.getAllPendingSurveys(params);
@@ -40,11 +40,20 @@ const SurveyApprovalListScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  const searchTextRef = useRef(searchText);
 
   useEffect(() => {
-    fetchSurveys();
-  }, []);
+    searchTextRef.current = searchText;
+  }, [searchText]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      fetchSurveys({ search: searchTextRef.current });
+    }, [fetchSurveys])
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -120,7 +129,12 @@ const SurveyApprovalListScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {error && <ErrorMessage message={error} onRetry={() => fetchSurveys()} />}
+      {error && (
+        <ErrorMessage
+          message={error}
+          onRetry={() => fetchSurveys({ search: searchTextRef.current })}
+        />
+      )}
 
       <View style={styles.stats}>
         <Text style={styles.statsText}>
