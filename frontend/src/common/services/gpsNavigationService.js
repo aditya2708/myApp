@@ -9,7 +9,7 @@ export class GPSNavigationService {
       const isGpsRequired = this.isGpsRequiredForActivity(activityType, shelterGpsConfig);
 
       if (!isGpsRequired) {
-        return { allowed: true, reason: 'GPS not required' };
+        return { allowed: true, reason: 'GPS tidak diperlukan' };
       }
 
       // GPS is required, check device status
@@ -39,24 +39,24 @@ export class GPSNavigationService {
           };
         }
 
-        return { 
-          allowed: true, 
-          reason: 'GPS ready and location validated',
-          locationValidation 
+        return {
+          allowed: true,
+          reason: 'GPS siap dan lokasi tervalidasi',
+          locationValidation
         };
       }
 
       // GPS enabled but no shelter coordinates to validate against
-      return { allowed: true, reason: 'GPS ready' };
+      return { allowed: true, reason: 'GPS siap' };
 
     } catch (error) {
       console.error('GPS check error:', error.message);
-      
+
       // On error, allow navigation but log the issue
-      return { 
-        allowed: true, 
-        reason: 'GPS check failed, allowing navigation',
-        error: error.message 
+      return {
+        allowed: true,
+        reason: 'Pemeriksaan GPS gagal, navigasi tetap diperbolehkan',
+        error: error.message
       };
     }
   }
@@ -118,7 +118,7 @@ export class GPSNavigationService {
 
   static getBlockingReason(gpsStatus) {
     if (!gpsStatus.enabled) {
-      return 'GPS tidak aktif. Silakan aktifkan GPS di pengaturan device.';
+      return 'GPS tidak aktif. Silakan aktifkan GPS di pengaturan perangkat.';
     }
     if (!gpsStatus.permissionGranted) {
       return 'Izin lokasi diperlukan. Silakan berikan izin lokasi untuk aplikasi.';
@@ -129,7 +129,7 @@ export class GPSNavigationService {
   static showGPSRequiredModal(reason, gpsStatus, onRetry, onCancel, locationValidation = null) {
     const title = 'GPS Diperlukan';
     
-    let message = `${reason}\n\nUntuk melanjutkan, pastikan:\n- GPS aktif di pengaturan device\n- Izin lokasi diberikan untuk aplikasi\n- Akurasi GPS dalam kondisi baik`;
+    let message = `${reason}\n\nUntuk melanjutkan, pastikan:\n- GPS aktif di pengaturan perangkat\n- Izin lokasi diberikan untuk aplikasi\n- Akurasi GPS dalam kondisi baik`;
     
     // Add location distance info if available
     if (locationValidation && locationValidation.distance && locationValidation.maxDistance) {
@@ -190,7 +190,7 @@ export class GPSNavigationService {
       if (!currentLocation.success) {
         return {
           allowed: false,
-          reason: 'Gagal mendapatkan lokasi saat ini: ' + (currentLocation.error || 'Unknown error'),
+          reason: 'Gagal mendapatkan lokasi saat ini: ' + (currentLocation.error || 'kesalahan tidak diketahui'),
           error: currentLocation.error
         };
       }
@@ -206,7 +206,7 @@ export class GPSNavigationService {
         return {
           allowed: false,
           reason: 'Koordinat shelter tidak valid',
-          error: 'Invalid shelter coordinates'
+          error: 'Koordinat shelter tidak valid'
         };
       }
 

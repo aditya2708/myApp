@@ -98,13 +98,13 @@ export const getCurrentLocation = async (config = DEFAULT_GPS_CONFIG) => {
     // Check if location services are enabled
     const servicesEnabled = await isLocationServicesEnabled();
     if (!servicesEnabled) {
-      throw new Error('Location services are disabled. Please enable GPS in your device settings.');
+      throw new Error('Layanan lokasi dinonaktifkan. Aktifkan GPS melalui pengaturan perangkat Anda.');
     }
 
     // Check/request permissions
     const permissionResult = await requestLocationPermissions();
     if (!permissionResult.granted) {
-      throw new Error('Location permission denied. GPS access is required for attendance.');
+      throw new Error('Izin lokasi ditolak. Akses GPS diperlukan untuk absensi.');
     }
 
     // Get current position
@@ -174,14 +174,14 @@ export const validateLocationDistance = (currentLocation, activityLocation, maxD
   if (!currentLocation.latitude || !currentLocation.longitude) {
     return {
       valid: false,
-      reason: 'Current location coordinates are missing'
+      reason: 'Koordinat lokasi saat ini tidak tersedia'
     };
   }
 
   if (!activityLocation.latitude || !activityLocation.longitude) {
     return {
       valid: false,
-      reason: 'Activity location coordinates are missing'
+      reason: 'Koordinat lokasi aktivitas tidak tersedia'
     };
   }
 
@@ -198,7 +198,7 @@ export const validateLocationDistance = (currentLocation, activityLocation, maxD
     valid,
     distance,
     maxDistance,
-    reason: valid ? 'Location is within allowed range' : `Location is ${distance}m away, maximum allowed is ${maxDistance}m`
+    reason: valid ? 'Lokasi berada dalam jarak yang diizinkan' : `Lokasi berjarak ${distance} m, batas maksimal ${maxDistance} m`
   };
 };
 
@@ -210,8 +210,8 @@ export const validateLocationDistance = (currentLocation, activityLocation, maxD
  * @returns {string} - Formatted coordinate string
  */
 export const formatCoordinates = (latitude, longitude, precision = 6) => {
-  if (!latitude || !longitude) return 'Coordinates not available';
-  
+  if (!latitude || !longitude) return 'Koordinat tidak tersedia';
+
   return `${latitude.toFixed(precision)}, ${longitude.toFixed(precision)}`;
 };
 
@@ -221,13 +221,13 @@ export const formatCoordinates = (latitude, longitude, precision = 6) => {
  * @returns {string} - Accuracy description
  */
 export const getAccuracyDescription = (accuracy) => {
-  if (!accuracy) return 'Unknown accuracy';
-  
-  if (accuracy <= 5) return 'Excellent accuracy';
-  if (accuracy <= 10) return 'Good accuracy';
-  if (accuracy <= 20) return 'Fair accuracy';
-  if (accuracy <= 50) return 'Poor accuracy';
-  return 'Very poor accuracy';
+  if (!accuracy) return 'Akurasi tidak diketahui';
+
+  if (accuracy <= 5) return 'Akurasi sangat baik';
+  if (accuracy <= 10) return 'Akurasi baik';
+  if (accuracy <= 20) return 'Akurasi cukup';
+  if (accuracy <= 50) return 'Akurasi kurang';
+  return 'Akurasi sangat kurang';
 };
 
 /**
@@ -237,20 +237,20 @@ export const getAccuracyDescription = (accuracy) => {
  */
 export const showGpsPermissionAlert = (onCancel, onRetry) => {
   Alert.alert(
-    'GPS Permission Required',
-    'This app needs GPS access to record attendance location. Please enable location permissions in your device settings.',
+    'Izin GPS Diperlukan',
+    'Aplikasi ini memerlukan akses GPS untuk mencatat lokasi absensi. Aktifkan izin lokasi melalui pengaturan perangkat Anda.',
     [
       {
-        text: 'Cancel',
+        text: 'Batal',
         style: 'cancel',
         onPress: onCancel
       },
       {
-        text: 'Retry',
+        text: 'Coba Lagi',
         onPress: onRetry
       },
       {
-        text: 'Settings',
+        text: 'Pengaturan',
         onPress: async () => {
           try {
             await Location.requestForegroundPermissionsAsync();
@@ -270,16 +270,16 @@ export const showGpsPermissionAlert = (onCancel, onRetry) => {
  */
 export const showGpsDisabledAlert = (onCancel, onRetry) => {
   Alert.alert(
-    'GPS Services Disabled',
-    'Location services are turned off. Please enable GPS in your device settings to record attendance.',
+    'Layanan GPS Nonaktif',
+    'Layanan lokasi sedang dimatikan. Aktifkan GPS melalui pengaturan perangkat Anda untuk mencatat absensi.',
     [
       {
-        text: 'Cancel',
+        text: 'Batal',
         style: 'cancel',
         onPress: onCancel
       },
       {
-        text: 'Retry',
+        text: 'Coba Lagi',
         onPress: onRetry
       }
     ]
