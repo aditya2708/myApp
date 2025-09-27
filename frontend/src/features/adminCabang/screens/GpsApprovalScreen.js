@@ -11,6 +11,7 @@ import EmptyState from '../../../common/components/EmptyState';
 import ErrorMessage from '../../../common/components/ErrorMessage';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import GpsApprovalCard from '../components/GpsApprovalCard';
+import ReasonInputModal from '../components/ReasonInputModal';
 import { adminCabangApi } from '../api/adminCabangApi';
 
 const GpsApprovalScreen = ({ navigation }) => {
@@ -27,6 +28,9 @@ const GpsApprovalScreen = ({ navigation }) => {
     total: 0
   });
   const [loadingMore, setLoadingMore] = useState(false);
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
 
   const statusOptions = [
     { value: 'all', label: 'Semua Status', color: '#95a5a6' },
@@ -169,41 +173,44 @@ const GpsApprovalScreen = ({ navigation }) => {
 
   // Quick reject
   const handleQuickReject = (request) => {
-    Alert.prompt(
-      'Alasan Penolakan',
-      `Masukkan alasan penolakan untuk ${request.nama_shelter}:`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Tolak',
-          style: 'destructive',
-          onPress: async (reason) => {
-            if (!reason?.trim()) {
-              Alert.alert('Error', 'Alasan penolakan harus diisi');
-              return;
-            }
+    setSelectedRequest(request);
+    setRejectModalVisible(true);
+  };
 
-            try {
-              const response = await adminCabangApi.rejectGpsRequest(request.id, {
-                rejection_reason: reason.trim()
-              });
+  const handleCloseRejectModal = () => {
+    setRejectModalVisible(false);
+    setSelectedRequest(null);
+  };
 
-              if (response.data.success) {
-                Alert.alert('Berhasil', 'GPS setting berhasil ditolak');
-                loadGpsRequests(1, true);
-              } else {
-                throw new Error(response.data.message);
-              }
-            } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || 'Gagal menolak GPS setting');
-            }
-          }
-        }
-      ],
-      'plain-text',
-      '',
-      'default'
-    );
+  const handleRejectSubmit = async (reason) => {
+    if (!selectedRequest) return;
+
+    const trimmedReason = reason.trim();
+
+    if (!trimmedReason) {
+      Alert.alert('Error', 'Alasan penolakan harus diisi');
+      return;
+    }
+
+    setRejectLoading(true);
+
+    try {
+      const response = await adminCabangApi.rejectGpsRequest(selectedRequest.id, {
+        rejection_reason: trimmedReason
+      });
+
+      if (response.data.success) {
+        Alert.alert('Berhasil', 'GPS setting berhasil ditolak');
+        handleCloseRejectModal();
+        loadGpsRequests(1, true);
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || 'Gagal menolak GPS setting');
+    } finally {
+      setRejectLoading(false);
+    }
   };
 
   // Render status filter tabs
@@ -340,6 +347,22 @@ const GpsApprovalScreen = ({ navigation }) => {
         onEndReachedThreshold={0.1}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={renderEmptyState}
+      />
+
+      <ReasonInputModal
+        visible={rejectModalVisible}
+        title="Alasan Penolakan"
+        message={
+          selectedRequest
+            ? `Masukkan alasan penolakan untuk ${selectedRequest.nama_shelter}`
+            : ''
+        }
+        placeholder="Masukkan alasan penolakan"
+        confirmText="Tolak"
+        cancelText="Batal"
+        onCancel={handleCloseRejectModal}
+        onSubmit={handleRejectSubmit}
+        loading={rejectLoading}
       />
     </View>
   );
