@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
@@ -12,6 +12,7 @@ const SurveyStatusFilterScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [searchInput, setSearchInput] = useState('');
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('pending');
   const [pagination, setPagination] = useState({});
@@ -29,11 +30,13 @@ const SurveyStatusFilterScreen = () => {
     'tidak layak': { label: 'DITOLAK', color: '#e74c3c', bgColor: '#fdeaea', icon: 'close-circle' }
   };
 
-  const fetchSurveys = async (params = {}) => {
+  const fetchSurveys = useCallback(async (params = {}) => {
     try {
       setError(null);
       const response = await adminCabangSurveyApi.getAllSurveys({
-        status: activeTab, search: searchText, ...params
+        status: activeTab,
+        search: searchText,
+        ...params
       });
       setSurveys(response.data.data.data);
       setPagination({ currentPage: response.data.data.current_page, lastPage: response.data.data.last_page, total: response.data.data.total });
@@ -43,23 +46,68 @@ const SurveyStatusFilterScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [activeTab, searchText]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await adminCabangSurveyApi.getStats();
       setStats(response.data.data);
     } catch (err) {
       console.error('Gagal memuat statistik:', err);
     }
+  }, []);
+
+  const fetchSurveysRef = useRef(fetchSurveys);
+  const fetchStatsRef = useRef(fetchStats);
+  const isInitialLoad = useRef(true);
+
+  useEffect(() => {
+    fetchSurveysRef.current = fetchSurveys;
+  }, [fetchSurveys]);
+
+  useEffect(() => {
+    fetchStatsRef.current = fetchStats;
+  }, [fetchStats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      fetchSurveysRef.current();
+      fetchStatsRef.current();
+    }, [])
+  );
+
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+
+    setLoading(true);
+    fetchSurveys();
+  }, [fetchSurveys]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchSurveys();
+    fetchStats();
   };
 
-  useEffect(() => { fetchStats(); }, []);
-  useEffect(() => { setLoading(true); fetchSurveys(); }, [activeTab]);
+  const handleSearch = () => {
+    if (searchInput === searchText) {
+      setLoading(true);
+      fetchSurveys({ search: searchInput });
+      return;
+    }
 
-  const handleRefresh = () => { setRefreshing(true); fetchSurveys(); fetchStats(); };
-  const handleSearch = () => { setLoading(true); fetchSurveys(); };
-  const handleTabChange = (tabKey) => { setActiveTab(tabKey); setSearchText(''); };
+    setSearchText(searchInput);
+  };
+
+  const handleTabChange = (tabKey) => {
+    setActiveTab(tabKey);
+    setSearchInput('');
+    setSearchText('');
+  };
   const navigateToDetail = (survey) => navigation.navigate('SurveyApprovalDetail', { surveyId: survey.id_survey });
 
   const StatusBadge = ({ status }) => {
@@ -158,7 +206,13 @@ const SurveyStatusFilterScreen = () => {
       <View style={styles.searchContainer}>
         <View style={styles.searchBox}>
           <Ionicons name="search" size={20} color="#999" />
-          <TextInput style={styles.searchInput} placeholder="Cari keluarga, nama anak, atau nomor KK..." value={searchText} onChangeText={setSearchText} onSubmitEditing={handleSearch} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cari keluarga, nama anak, atau nomor KK..."
+            value={searchInput}
+            onChangeText={setSearchInput}
+            onSubmitEditing={handleSearch}
+          />
         </View>
         <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
           <Ionicons name="search" size={20} color="#fff" />
