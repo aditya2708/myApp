@@ -105,20 +105,6 @@ const SurveyApprovalDetailScreen = () => {
     );
   };
 
-  const InputField = ({ label, value, onChangeText, placeholder, required, multiline = true }) => (
-    <View style={styles.inputContainer}>
-      <Text style={styles.inputLabel}>{label} {required && '*'}</Text>
-      <TextInput
-        style={styles.textArea}
-        placeholder={placeholder}
-        value={value}
-        onChangeText={onChangeText}
-        multiline={multiline}
-        numberOfLines={3}
-      />
-    </View>
-  );
-
   if (loading) return <LoadingSpinner fullScreen message="Memuat detail survei..." />;
   if (error) return <View style={styles.container}><ErrorMessage message={error} onRetry={fetchSurveyDetail} /></View>;
 
@@ -426,6 +412,23 @@ const SurveyApprovalDetailScreen = () => {
     </View>
   );
 };
+
+const InputField = ({ label, value, onChangeText, placeholder, required, multiline = true }) => (
+  <View style={styles.inputContainer}>
+    <Text style={styles.inputLabel}>
+      {label}
+      {required && ' *'}
+    </Text>
+    <TextInput
+      style={styles.textArea}
+      placeholder={placeholder}
+      value={value}
+      onChangeText={onChangeText}
+      multiline={multiline}
+      numberOfLines={3}
+    />
+  </View>
+);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
