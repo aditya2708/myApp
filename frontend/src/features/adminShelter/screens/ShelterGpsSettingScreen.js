@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Alert, Switch, TouchableOpacity
+  View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,13 +11,12 @@ import ErrorMessage from '../../../common/components/ErrorMessage';
 import { useAuth } from '../../../common/hooks/useAuth';
 import { adminShelterApi } from '../api/adminShelterApi';
 import GpsPermissionModal from '../../../common/components/GpsPermissionModal';
-import { getCurrentLocation, prepareGpsDataForApi } from '../../../common/utils/gpsUtils';
 
 const ShelterGpsSettingScreen = ({ navigation }) => {
   const { profile, refreshUser } = useAuth();
   
   const [gpsConfig, setGpsConfig] = useState({
-    require_gps: false,
+    require_gps: true,
     latitude: '',
     longitude: '',
     max_distance_meters: 100,
@@ -38,8 +37,10 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
   // Also reload when profile changes (backup)
   useEffect(() => {
     if (profile?.shelter) {
+      const requireGps = profile.shelter.require_gps;
+      const enforcedRequireGps = requireGps === false ? true : (requireGps ?? true);
       setGpsConfig({
-        require_gps: profile.shelter.require_gps || false,
+        require_gps: enforcedRequireGps,
         latitude: profile.shelter.latitude?.toString() || '',
         longitude: profile.shelter.longitude?.toString() || '',
         max_distance_meters: profile.shelter.max_distance_meters || 100,
@@ -54,8 +55,10 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       const response = await adminShelterApi.getShelterGpsConfig();
       if (response.data && response.data.data) {
         const data = response.data.data;
+        const requireGps = data.require_gps;
+        const enforcedRequireGps = requireGps === false ? true : (requireGps ?? true);
         setGpsConfig({
-          require_gps: data.require_gps || false,
+          require_gps: enforcedRequireGps,
           latitude: data.latitude?.toString() || '',
           longitude: data.longitude?.toString() || '',
           max_distance_meters: data.max_distance_meters || 100,
@@ -67,8 +70,10 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       console.error('Error loading GPS config:', error);
       // Fallback to profile data if API fails
       if (profile?.shelter) {
+        const requireGps = profile.shelter.require_gps;
+        const enforcedRequireGps = requireGps === false ? true : (requireGps ?? true);
         setGpsConfig({
-          require_gps: profile.shelter.require_gps || false,
+          require_gps: enforcedRequireGps,
           latitude: profile.shelter.latitude?.toString() || '',
           longitude: profile.shelter.longitude?.toString() || '',
           max_distance_meters: profile.shelter.max_distance_meters || 100,
@@ -104,41 +109,39 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
   };
 
   const validateForm = () => {
-    if (gpsConfig.require_gps) {
-      const lat = parseFloat(gpsConfig.latitude);
-      const lng = parseFloat(gpsConfig.longitude);
-      
-      if (!gpsConfig.latitude || !gpsConfig.longitude) {
-        Alert.alert('Error Validasi', 'Koordinat GPS harus diisi');
-        return false;
-      }
-      
-      if (isNaN(lat) || isNaN(lng)) {
-        Alert.alert('Error Validasi', 'Koordinat GPS tidak valid. Gunakan format angka desimal.');
-        return false;
-      }
-      
-      if (lat < -90 || lat > 90) {
-        Alert.alert('Error Validasi', 'Latitude harus antara -90 sampai 90');
-        return false;
-      }
-      
-      if (lng < -180 || lng > 180) {
-        Alert.alert('Error Validasi', 'Longitude harus antara -180 sampai 180');
-        return false;
-      }
-      
-      if (gpsConfig.max_distance_meters < 10 || gpsConfig.max_distance_meters > 1000) {
-        Alert.alert('Error Validasi', 'Radius harus antara 10-1000 meter');
-        return false;
-      }
-      
-      if (!gpsConfig.location_name.trim()) {
-        Alert.alert('Error Validasi', 'Nama lokasi harus diisi');
-        return false;
-      }
+    const lat = parseFloat(gpsConfig.latitude);
+    const lng = parseFloat(gpsConfig.longitude);
+
+    if (!gpsConfig.latitude || !gpsConfig.longitude) {
+      Alert.alert('Error Validasi', 'Koordinat GPS harus diisi');
+      return false;
     }
-    
+
+    if (isNaN(lat) || isNaN(lng)) {
+      Alert.alert('Error Validasi', 'Koordinat GPS tidak valid. Gunakan format angka desimal.');
+      return false;
+    }
+
+    if (lat < -90 || lat > 90) {
+      Alert.alert('Error Validasi', 'Latitude harus antara -90 sampai 90');
+      return false;
+    }
+
+    if (lng < -180 || lng > 180) {
+      Alert.alert('Error Validasi', 'Longitude harus antara -180 sampai 180');
+      return false;
+    }
+
+    if (gpsConfig.max_distance_meters < 10 || gpsConfig.max_distance_meters > 1000) {
+      Alert.alert('Error Validasi', 'Radius harus antara 10-1000 meter');
+      return false;
+    }
+
+    if (!gpsConfig.location_name.trim()) {
+      Alert.alert('Error Validasi', 'Nama lokasi harus diisi');
+      return false;
+    }
+
     return true;
   };
 
@@ -150,12 +153,12 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       setError(null);
       
       const updateData = {
-        require_gps: gpsConfig.require_gps,
-        latitude: gpsConfig.require_gps ? parseFloat(gpsConfig.latitude) : null,
-        longitude: gpsConfig.require_gps ? parseFloat(gpsConfig.longitude) : null,
+        require_gps: true,
+        latitude: parseFloat(gpsConfig.latitude),
+        longitude: parseFloat(gpsConfig.longitude),
         max_distance_meters: gpsConfig.max_distance_meters,
         gps_accuracy_required: gpsConfig.gps_accuracy_required,
-        location_name: gpsConfig.require_gps ? gpsConfig.location_name.trim() : null
+        location_name: gpsConfig.location_name.trim()
       };
       
       // Call API to update shelter GPS config
@@ -167,8 +170,10 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       // Update local state with the response data to ensure UI shows correct values
       if (response.data && response.data.data) {
         const updatedData = response.data.data;
+        const requireGps = updatedData.require_gps;
+        const enforcedRequireGps = requireGps === false ? true : requireGps ?? true;
         setGpsConfig({
-          require_gps: updatedData.require_gps || false,
+          require_gps: enforcedRequireGps,
           latitude: updatedData.latitude?.toString() || '',
           longitude: updatedData.longitude?.toString() || '',
           max_distance_meters: updatedData.max_distance_meters || 100,
@@ -190,8 +195,6 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
   };
 
   const renderGpsLocationSection = () => {
-    if (!gpsConfig.require_gps) return null;
-    
     return (
       <View style={styles.coordinateCard}>
         <View style={styles.coordinateHeader}>
@@ -237,8 +240,6 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
   };
 
   const renderApprovalStatus = () => {
-    if (!gpsConfig.require_gps) return null;
-    
     const status = profile?.shelter?.gps_approval_status || 'draft';
     
     const getStatusInfo = (status) => {
@@ -322,20 +323,13 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
           </Text>
         </View>
         
-        {/* GPS Toggle */}
         <View style={styles.toggleContainer}>
           <View style={styles.toggleInfo}>
-            <Text style={styles.toggleLabel}>Aktifkan GPS untuk Absensi</Text>
+            <Text style={styles.toggleLabel}>GPS Wajib untuk Absensi</Text>
             <Text style={styles.toggleDescription}>
-              Jika diaktifkan, siswa dan tutor harus berada di lokasi shelter untuk absen
+              Siswa dan tutor harus berada di lokasi shelter untuk dapat melakukan absensi
             </Text>
           </View>
-          <Switch
-            value={gpsConfig.require_gps}
-            onValueChange={(value) => handleInputChange('require_gps', value)}
-            trackColor={{ false: '#bdc3c7', true: '#3498db' }}
-            thumbColor={gpsConfig.require_gps ? '#2980b9' : '#ecf0f1'}
-          />
         </View>
         
         {/* GPS Approval Status */}
@@ -344,80 +338,78 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
         {/* GPS Location Section */}
         {renderGpsLocationSection()}
         
-        {gpsConfig.require_gps && (
-          <View style={styles.formContainer}>
-            <Text style={styles.sectionTitle}>Detail Lokasi</Text>
-            
+        <View style={styles.formContainer}>
+          <Text style={styles.sectionTitle}>Detail Lokasi</Text>
+
+          <TextInput
+            label="Nama Lokasi"
+            value={gpsConfig.location_name}
+            onChangeText={(value) => handleInputChange('location_name', value)}
+            placeholder="Contoh: Shelter Indramayu"
+            style={styles.input}
+          />
+
+          {/* Manual Coordinate Input */}
+          <View style={styles.coordinateInputs}>
+            <View style={[styles.coordinateInputContainer, styles.coordinateInput]}>
+              <TextInput
+                label="Latitude"
+                value={gpsConfig.latitude}
+                onChangeText={(value) => handleInputChange('latitude', value)}
+                placeholder="-6.208800"
+                keyboardType="numeric"
+                style={styles.input}
+              />
+            </View>
+            <View style={[styles.coordinateInputContainer, styles.coordinateInput]}>
+              <TextInput
+                label="Longitude"
+                value={gpsConfig.longitude}
+                onChangeText={(value) => handleInputChange('longitude', value)}
+                placeholder="106.845600"
+                keyboardType="numeric"
+                style={styles.input}
+              />
+            </View>
+          </View>
+
+          <View style={styles.helpContainer}>
+            <Ionicons name="information-circle-outline" size={16} color="#7f8c8d" />
+            <Text style={styles.helpText}>
+              Masukkan koordinat GPS manual atau gunakan tombol "Deteksi Lokasi Saat Ini" di atas
+            </Text>
+          </View>
+
+          <View style={styles.advancedSettings}>
+            <Text style={styles.sectionTitle}>Pengaturan Lanjutan</Text>
+
             <TextInput
-              label="Nama Lokasi"
-              value={gpsConfig.location_name}
-              onChangeText={(value) => handleInputChange('location_name', value)}
-              placeholder="Contoh: Shelter Indramayu"
+              label="Radius Maksimal (meter)"
+              value={gpsConfig.max_distance_meters.toString()}
+              onChangeText={(value) => handleInputChange('max_distance_meters', parseInt(value) || 100)}
+              placeholder="100"
+              keyboardType="numeric"
               style={styles.input}
             />
-            
-            {/* Manual Coordinate Input */}
-            <View style={styles.coordinateInputs}>
-              <View style={[styles.coordinateInputContainer, styles.coordinateInput]}>
-                <TextInput
-                  label="Latitude"
-                  value={gpsConfig.latitude}
-                  onChangeText={(value) => handleInputChange('latitude', value)}
-                  placeholder="-6.208800"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
-              <View style={[styles.coordinateInputContainer, styles.coordinateInput]}>
-                <TextInput
-                  label="Longitude"
-                  value={gpsConfig.longitude}
-                  onChangeText={(value) => handleInputChange('longitude', value)}
-                  placeholder="106.845600"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
-            </View>
-            
+
+            <TextInput
+              label="Akurasi GPS Diperlukan (meter)"
+              value={gpsConfig.gps_accuracy_required.toString()}
+              onChangeText={(value) => handleInputChange('gps_accuracy_required', parseInt(value) || 25)}
+              placeholder="25"
+              keyboardType="numeric"
+              style={styles.input}
+            />
+
             <View style={styles.helpContainer}>
               <Ionicons name="information-circle-outline" size={16} color="#7f8c8d" />
               <Text style={styles.helpText}>
-                Masukkan koordinat GPS manual atau gunakan tombol "Deteksi Lokasi Saat Ini" di atas
+                Siswa/tutor hanya bisa absen jika berada dalam radius {gpsConfig.max_distance_meters}m
+                dari lokasi shelter dengan akurasi GPS minimal {gpsConfig.gps_accuracy_required}m
               </Text>
             </View>
-            
-            <View style={styles.advancedSettings}>
-              <Text style={styles.sectionTitle}>Pengaturan Lanjutan</Text>
-              
-              <TextInput
-                label="Radius Maksimal (meter)"
-                value={gpsConfig.max_distance_meters.toString()}
-                onChangeText={(value) => handleInputChange('max_distance_meters', parseInt(value) || 100)}
-                placeholder="100"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              
-              <TextInput
-                label="Akurasi GPS Diperlukan (meter)"
-                value={gpsConfig.gps_accuracy_required.toString()}
-                onChangeText={(value) => handleInputChange('gps_accuracy_required', parseInt(value) || 25)}
-                placeholder="25"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              
-              <View style={styles.helpContainer}>
-                <Ionicons name="information-circle-outline" size={16} color="#7f8c8d" />
-                <Text style={styles.helpText}>
-                  Siswa/tutor hanya bisa absen jika berada dalam radius {gpsConfig.max_distance_meters}m 
-                  dari lokasi shelter dengan akurasi GPS minimal {gpsConfig.gps_accuracy_required}m
-                </Text>
-              </View>
-            </View>
           </View>
-        )}
+        </View>
         
         <View style={styles.buttonContainer}>
           <Button
