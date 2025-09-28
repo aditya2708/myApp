@@ -174,6 +174,57 @@ const normalizeFilterOptions = (raw = {}) => {
   };
 };
 
+const resolveFilterValue = (value) => {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((item) => resolveFilterValue(item))
+      .filter((item) => item != null && item !== '');
+
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  if (value && typeof value === 'object') {
+    return (
+      value.value ??
+      value.id ??
+      value.slug ??
+      value.key ??
+      value.kode ??
+      value.code ??
+      value.uid ??
+      value.uuid ??
+      value.identifier ??
+      null
+    );
+  }
+
+  return value;
+};
+
+const buildRequestParams = (filters = {}, extras = {}) => {
+  const params = { ...(filters || {}) };
+
+  const mapping = {
+    jenisKegiatan: 'jenis_kegiatan',
+    wilayahBinaan: 'wilbin_id',
+    shelter: 'shelter_id',
+  };
+
+  Object.entries(mapping).forEach(([sourceKey, targetKey]) => {
+    if (Object.prototype.hasOwnProperty.call(params, sourceKey)) {
+      const resolvedValue = resolveFilterValue(params[sourceKey]);
+
+      delete params[sourceKey];
+
+      if (resolvedValue != null && resolvedValue !== '') {
+        params[targetKey] = resolvedValue;
+      }
+    }
+  });
+
+  return { ...params, ...(extras || {}) };
+};
+
 const extractListPayload = (response) => {
   const payload = response?.data?.data || response?.data || {};
   const children =
@@ -235,7 +286,7 @@ export const fetchReportAnakList = createAsyncThunk(
   'reportAnak/fetchList',
   async ({ filters = {}, page = 1, append = false } = {}, { rejectWithValue }) => {
     try {
-      const params = { ...filters, page };
+      const params = buildRequestParams(filters, { page });
       const response = await adminCabangReportApi.getLaporanAnakBinaan(params);
       const payload = extractListPayload(response);
 
@@ -250,7 +301,7 @@ export const fetchMoreReportAnak = createAsyncThunk(
   'reportAnak/fetchMore',
   async ({ filters = {}, page }, { rejectWithValue }) => {
     try {
-      const params = { ...filters, page };
+      const params = buildRequestParams(filters, { page });
       const response = await adminCabangReportApi.getLaporanAnakBinaan(params);
       const payload = extractListPayload(response);
 
@@ -265,7 +316,8 @@ export const fetchReportAnakChildDetail = createAsyncThunk(
   'reportAnak/fetchChildDetail',
   async ({ childId, filters = {} }, { rejectWithValue }) => {
     try {
-      const response = await adminCabangReportApi.getChildDetailReport(childId, filters);
+      const params = buildRequestParams(filters);
+      const response = await adminCabangReportApi.getChildDetailReport(childId, params);
       return extractDetailPayload(response);
     } catch (error) {
       return rejectWithValue(parseError(error, 'Gagal memuat detail anak.'));
