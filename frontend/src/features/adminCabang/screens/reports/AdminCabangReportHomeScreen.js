@@ -317,7 +317,6 @@ const AdminCabangReportHomeScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Aksi Cepat</Text>
         <View style={styles.quickActionsGrid}>
           {quickActions.map((action) => (
             <ReportQuickActionTile
@@ -390,6 +389,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginTop: 12,
     rowGap: 12,
     columnGap: 12,
   },
