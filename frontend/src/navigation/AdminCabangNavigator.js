@@ -20,6 +20,9 @@ import GpsApprovalDetailScreen from '../features/adminCabang/screens/GpsApproval
 import AdminCabangUserManagementScreen from '../features/adminCabang/screens/user/UserManagementScreen';
 import AdminCabangUserFormScreen from '../features/adminCabang/screens/user/UserFormScreen';
 import AdminCabangUserDetailScreen from '../features/adminCabang/screens/user/UserDetailScreen';
+import AdminCabangReportHomeScreen from '../features/adminCabang/screens/reports/AdminCabangReportHomeScreen';
+import AdminCabangChildrenReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildrenReportScreen';
+import AdminCabangTutorReportScreen from '../features/adminCabang/screens/reports/AdminCabangTutorReportScreen';
 
 // Kurikulum screens
 import KurikulumHomeScreen from '../features/adminCabang/screens/kurikulum/KurikulumHomeScreen';
@@ -39,6 +42,7 @@ import MasterDataScreen from '../features/adminCabang/screens/kurikulum/MasterDa
 const Tab = createBottomTabNavigator();
 const DashboardStack = createStackNavigator();
 const KurikulumStack = createStackNavigator();
+const ReportsStack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 
 // Dashboard Stack Navigator
@@ -192,6 +196,27 @@ const KurikulumStackNavigator = () => (
   </KurikulumStack.Navigator>
 );
 
+// Reports Stack Navigator
+const ReportsStackNavigator = () => (
+  <ReportsStack.Navigator>
+    <ReportsStack.Screen
+      name="AdminCabangReportHome"
+      component={AdminCabangReportHomeScreen}
+      options={{ headerTitle: 'Laporan' }}
+    />
+    <ReportsStack.Screen
+      name="AdminCabangChildrenReport"
+      component={AdminCabangChildrenReportScreen}
+      options={{ headerTitle: 'Laporan Anak Binaan' }}
+    />
+    <ReportsStack.Screen
+      name="AdminCabangTutorReport"
+      component={AdminCabangTutorReportScreen}
+      options={{ headerTitle: 'Laporan Tutor' }}
+    />
+  </ReportsStack.Navigator>
+);
+
 // Profile Stack Navigator
 const ProfileStackNavigator = () => (
   <ProfileStack.Navigator>
@@ -210,6 +235,7 @@ const AdminCabangNavigator = () => (
         let iconName;
         if (route.name === 'Home') iconName = focused ? 'grid' : 'grid-outline';
         else if (route.name === 'Kurikulum') iconName = focused ? 'library' : 'library-outline';
+        else if (route.name === 'Reports') iconName = focused ? 'stats-chart' : 'stats-chart-outline';
         else if (route.name === 'Profile') iconName = focused ? 'person-circle' : 'person-circle-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
@@ -227,6 +253,11 @@ const AdminCabangNavigator = () => (
       name="Kurikulum"
       component={KurikulumStackNavigator}
       options={{ tabBarLabel: 'Kurikulum' }}
+    />
+    <Tab.Screen
+      name="Reports"
+      component={ReportsStackNavigator}
+      options={{ tabBarLabel: 'Laporan' }}
     />
     <Tab.Screen
       name="Profile"
