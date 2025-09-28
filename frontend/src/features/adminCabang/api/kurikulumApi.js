@@ -335,7 +335,7 @@ export const kurikulumApi = createApi({
         const data = result?.data;
         if (Array.isArray(data)) {
           return [
-            ...data.map(({ id_semester }) => ({ type: 'Semester', id: id_semester })),
+            ...data.map(({ id_semester, id }) => ({ type: 'Semester', id: id_semester ?? id })),
             { type: 'Semester', id: 'LIST' },
           ];
         }

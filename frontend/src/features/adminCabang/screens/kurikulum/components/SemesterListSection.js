@@ -48,6 +48,10 @@ const formatDate = (dateString) => {
   });
 };
 
+const resolveSemesterId = (semester) => (
+  semester?.id_semester ?? semester?.id ?? null
+);
+
 const SemesterListSection = ({
   tabs,
   selectedTab,
@@ -86,72 +90,77 @@ const SemesterListSection = ({
           />
         }
       >
-        {data.map((semester) => (
-          <View key={semester.id_semester} style={styles.semesterCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitle}>
-                <Text style={styles.semesterName}>{semester.nama_semester}</Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(semester.status) }
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {getStatusText(semester.status)}
+        {data.map((semester, index) => {
+          const semesterId = resolveSemesterId(semester);
+          const key = semesterId ? semesterId.toString() : `semester-${index}`;
+
+          return (
+            <View key={key} style={styles.semesterCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.cardTitle}>
+                  <Text style={styles.semesterName}>{semester.nama_semester}</Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: getStatusColor(semester.status) }
+                    ]}
+                  >
+                    <Text style={styles.statusText}>
+                      {getStatusText(semester.status)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.cardContent}>
+                <View style={styles.infoRow}>
+                  <Ionicons name="calendar-outline" size={14} color="#6c757d" />
+                  <Text style={styles.infoText}>
+                    {formatDate(semester.tanggal_mulai)} - {formatDate(semester.tanggal_selesai)}
+                  </Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Ionicons name="school-outline" size={14} color="#6c757d" />
+                  <Text style={styles.infoText}>
+                    Tahun Ajaran {semester.tahun_ajaran}
+                  </Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Ionicons name="time-outline" size={14} color="#6c757d" />
+                  <Text style={styles.infoText}>
+                    Periode {semester.periode === 'ganjil' ? 'Ganjil' : 'Genap'}
                   </Text>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.cardContent}>
-              <View style={styles.infoRow}>
-                <Ionicons name="calendar-outline" size={14} color="#6c757d" />
-                <Text style={styles.infoText}>
-                  {formatDate(semester.tanggal_mulai)} - {formatDate(semester.tanggal_selesai)}
-                </Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Ionicons name="school-outline" size={14} color="#6c757d" />
-                <Text style={styles.infoText}>
-                  Tahun Ajaran {semester.tahun_ajaran}
-                </Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Ionicons name="time-outline" size={14} color="#6c757d" />
-                <Text style={styles.infoText}>
-                  Periode {semester.periode === 'ganjil' ? 'Ganjil' : 'Genap'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.cardActions}>
-              {semester.status === 'draft' && (
+              <View style={styles.cardActions}>
+                {semester.status === 'draft' && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.activateButton]}
+                    onPress={() => onSetActive(semester)}
+                  >
+                    <Ionicons name="play-circle" size={16} color="#28a745" />
+                    <Text style={[styles.actionText, { color: '#28a745' }]}>Aktifkan</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.activateButton]}
-                  onPress={() => onSetActive(semester)}
+                  style={styles.actionButton}
+                  onPress={() => onEdit(semester)}
                 >
-                  <Ionicons name="play-circle" size={16} color="#28a745" />
-                  <Text style={[styles.actionText, { color: '#28a745' }]}>Aktifkan</Text>
+                  <Ionicons name="pencil" size={16} color="#007bff" />
+                  <Text style={styles.actionText}>Edit</Text>
                 </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => onEdit(semester)}
-              >
-                <Ionicons name="pencil" size={16} color="#007bff" />
-                <Text style={styles.actionText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={() => onDelete(semester)}
-              >
-                <Ionicons name="trash" size={16} color="#dc3545" />
-                <Text style={[styles.actionText, styles.deleteText]}>Hapus</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => onDelete(semester)}
+                >
+                  <Ionicons name="trash" size={16} color="#dc3545" />
+                  <Text style={[styles.actionText, styles.deleteText]}>Hapus</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         {data.length === 0 && (
           <View style={styles.emptyState}>

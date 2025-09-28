@@ -170,8 +170,15 @@ const SemesterFormScreen = () => {
 
     try {
       if (isEditMode) {
+        const semesterId = semesterParam?.id_semester ?? semesterParam?.id;
+
+        if (!semesterId) {
+          Alert.alert('Error', 'ID semester tidak ditemukan');
+          return;
+        }
+
         await updateSemester({
-          id: semesterParam.id_semester,
+          id: semesterId,
           ...payload,
         }).unwrap();
         Alert.alert('Berhasil', 'Semester berhasil diupdate');

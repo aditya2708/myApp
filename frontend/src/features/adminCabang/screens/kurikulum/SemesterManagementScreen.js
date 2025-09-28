@@ -21,6 +21,10 @@ import SemesterListSection from './components/SemesterListSection';
  * Semester Management Screen - API Integrated
  * CRUD interface for semester management
  */
+const resolveSemesterId = (semester) => (
+  semester?.id_semester ?? semester?.id ?? null
+);
+
 const SemesterManagementScreen = ({ navigation }) => {
   const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
   const activeKurikulumId = selectedKurikulumId
@@ -74,6 +78,13 @@ const SemesterManagementScreen = ({ navigation }) => {
   };
 
   const handleDeleteSemester = async (semester) => {
+    const semesterId = resolveSemesterId(semester);
+
+    if (!semesterId) {
+      Alert.alert('Error', 'ID semester tidak ditemukan');
+      return;
+    }
+
     Alert.alert(
       'Hapus Semester',
       `Apakah Anda yakin ingin menghapus semester "${semester.nama_semester}"?`,
@@ -84,7 +95,7 @@ const SemesterManagementScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteSemester(semester.id_semester).unwrap();
+              await deleteSemester(semesterId).unwrap();
               Alert.alert('Berhasil', 'Semester berhasil dihapus');
             } catch (error) {
               Alert.alert('Error', error?.data?.message || 'Gagal menghapus semester');
@@ -96,6 +107,13 @@ const SemesterManagementScreen = ({ navigation }) => {
   };
 
   const handleSetActive = async (semester) => {
+    const semesterId = resolveSemesterId(semester);
+
+    if (!semesterId) {
+      Alert.alert('Error', 'ID semester tidak ditemukan');
+      return;
+    }
+
     Alert.alert(
       'Aktifkan Semester',
       `Aktifkan semester "${semester.nama_semester}"? Semester aktif lainnya akan dinonaktifkan.`,
@@ -105,7 +123,7 @@ const SemesterManagementScreen = ({ navigation }) => {
           text: 'Aktifkan',
           onPress: async () => {
             try {
-              await setActiveSemester(semester.id_semester).unwrap();
+              await setActiveSemester(semesterId).unwrap();
               Alert.alert('Berhasil', 'Semester berhasil diaktifkan');
             } catch (error) {
               Alert.alert('Error', error?.data?.message || 'Gagal mengaktifkan semester');
