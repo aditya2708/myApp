@@ -151,7 +151,15 @@ export const ADMIN_CABANG_ENDPOINTS = {
   },
   REPORTS: {
     SUMMARY: '/admin-cabang/reports/summary',
-    CHILDREN: '/admin-cabang/reports/children',
+    ANAK: {
+      LIST: '/admin-cabang/reports/anak',
+      DETAIL: (childId) => `/admin-cabang/reports/anak/${childId}`,
+      FILTERS: {
+        JENIS_KEGIATAN: '/admin-cabang/reports/anak/filter-options/jenis-kegiatan',
+        WILAYAH_BINAAN: '/admin-cabang/reports/anak/filter-options/wilayah-binaan',
+        SHELTER_BY_WILAYAH: (wilbinId) => `/admin-cabang/reports/anak/filter-options/wilayah-binaan/${wilbinId}/shelters`,
+      },
+    },
     TUTORS: '/admin-cabang/reports/tutors',
   },
   KURIKULUM: {
