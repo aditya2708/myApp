@@ -184,12 +184,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/semester/{id}/complete', [App\Http\Controllers\API\AdminCabang\SemesterController::class, 'complete']);
 
         Route::post('/semester/{id}/archive', [App\Http\Controllers\API\AdminCabang\SemesterController::class, 'archive']);
-        
+
         // Debug route to test if routes are working
         Route::get('/semester-test', function() {
             return response()->json(['message' => 'Semester routes are working!', 'time' => now()]);
         });
-       
+
+        Route::prefix('laporan')->group(function () {
+            Route::get('/summary', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangReportSummaryController::class, 'getSummary']);
+        });
+
     });
     
  Route::middleware('role:admin_shelter')->prefix('admin-shelter')->group(function () {
