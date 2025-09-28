@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -45,6 +46,7 @@ import {
 
 const LaporanRaportAnakScreen = () => {
   const dispatch = useDispatch();
+  const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -167,8 +169,10 @@ const LaporanRaportAnakScreen = () => {
 
   // Handle child item press
   const handleChildPress = (child) => {
-    console.log('Child pressed:', child.full_name);
-    // TODO: Navigate to child detail
+    navigation.navigate('RaportChildDetail', {
+      childId: child.id_anak,
+      filters: { ...filters, search: searchText },
+    });
   };
 
   // Handle card expand/collapse
