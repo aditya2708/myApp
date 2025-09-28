@@ -60,6 +60,7 @@ const AdminCabangDashboardScreen = () => {
   const navigateToKurikulum = () => navigation.navigate('Kurikulum', { screen: 'KurikulumHome' });
   const navigateToGpsApproval = () => navigation.navigate('GpsApprovalScreen');
   const navigateToProfile = () => navigation.navigate('Profile');
+  const navigateToReports = () => navigation.navigate('Reports', { screen: 'AdminCabangReportHome' });
   const navigateToUserManagement = () =>
     Alert.alert('Segera Hadir', 'Fitur Manajemen Pengguna sedang dalam pengembangan.');
 
@@ -91,10 +92,18 @@ const AdminCabangDashboardScreen = () => {
       badge: null
     },
     {
+      title: 'Laporan',
+      description: 'Lihat ringkasan laporan cabang',
+      icon: 'stats-chart',
+      color: '#1abc9c',
+      onPress: navigateToReports,
+      badge: null
+    },
+    {
       title: 'Kurikulum',
       description: 'Kelola materi pembelajaran cabang',
       icon: 'library',
-      color: '#9b59b6', 
+      color: '#9b59b6',
       onPress: navigateToKurikulum, 
       badge: null 
     },
