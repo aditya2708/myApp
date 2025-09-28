@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
+import { useNavigation } from '@react-navigation/native';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -55,6 +56,7 @@ import {
 
 const LaporanAnakBinaanScreen = () => {
   const dispatch = useDispatch();
+  const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -232,8 +234,10 @@ const LaporanAnakBinaanScreen = () => {
 
   // Handle child item press
   const handleChildPress = (child) => {
-    console.log('Child pressed:', child.full_name);
-    // TODO: Navigate to child detail
+    navigation.navigate('AnakDetail', {
+      childId: child.id_anak,
+      filters: { ...filters, search: searchText },
+    });
   };
 
   // Handle PDF export
