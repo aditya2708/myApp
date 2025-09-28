@@ -13,16 +13,163 @@ const parseError = (error, defaultMessage = 'Terjadi kesalahan. Silakan coba lag
   return defaultMessage;
 };
 
-const normalizeFilterOptions = (raw = {}) => {
-  const safeRaw = raw || {};
-  const jenis = safeRaw.jenisKegiatan || safeRaw.jenis_kegiatan || safeRaw.activity_types || safeRaw.activities || [];
-  const wilayah = safeRaw.wilayahBinaan || safeRaw.wilayah_binaan || safeRaw.wilayah || safeRaw.regions || [];
-  const sheltersMap = safeRaw.sheltersByWilayah || safeRaw.shelters_by_wilayah || safeRaw.shelter_map || safeRaw.shelters || {};
+const ensureArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'object') {
+    return Object.values(value);
+  }
+  return [value];
+};
+
+const normalizeOptionItem = (item) => {
+  if (item && typeof item === 'object') {
+    const idCandidate =
+      item.value ??
+      item.id ??
+      item.slug ??
+      item.key ??
+      item.kode ??
+      item.code ??
+      item.uid ??
+      item.uuid ??
+      item.identifier ??
+      null;
+
+    const labelCandidate =
+      item.label ??
+      item.name ??
+      item.nama ??
+      item.title ??
+      item.text ??
+      item.description ??
+      null;
+
+    const fallback = labelCandidate ?? idCandidate;
+
+    return {
+      ...item,
+      id: idCandidate ?? fallback ?? '',
+      name: labelCandidate ?? (fallback != null ? fallback : ''),
+    };
+  }
 
   return {
-    jenisKegiatan: jenis,
-    wilayahBinaan: wilayah,
-    sheltersByWilayah: sheltersMap,
+    id: item,
+    name: item,
+  };
+};
+
+const extractWilbinId = (shelter) => {
+  if (!shelter) return null;
+
+  const directId =
+    shelter.wilbin_id ??
+    shelter.wilbinId ??
+    shelter.wilayah_id ??
+    shelter.wilayahId ??
+    shelter.wilayahBinaanId ??
+    shelter.wilbin ??
+    shelter.wilayah ??
+    shelter.wilayahBinaan ??
+    null;
+
+  if (directId && typeof directId !== 'object') {
+    return directId;
+  }
+
+  const nested =
+    (directId && typeof directId === 'object' ? directId : null) ||
+    shelter.wilbin ||
+    shelter.wilayah ||
+    shelter.wilayahBinaan ||
+    null;
+
+  if (!nested) {
+    return null;
+  }
+
+  if (typeof nested !== 'object') {
+    return nested;
+  }
+
+  return (
+    nested.id ??
+    nested.value ??
+    nested.slug ??
+    nested.key ??
+    nested.kode ??
+    nested.code ??
+    nested.uid ??
+    nested.uuid ??
+    nested.identifier ??
+    null
+  );
+};
+
+const normalizeFilterOptions = (raw = {}) => {
+  const safeRaw = raw || {};
+
+  const jenisSource = ensureArray(
+    safeRaw.jenisKegiatan ||
+      safeRaw.jenis_kegiatan ||
+      safeRaw.activity_types ||
+      safeRaw.activities ||
+      safeRaw.available_activity_types
+  );
+
+  const wilayahSource = ensureArray(
+    safeRaw.wilayahBinaan ||
+      safeRaw.wilayah_binaan ||
+      safeRaw.wilayah ||
+      safeRaw.regions ||
+      safeRaw.wilbins
+  );
+
+  const sheltersSource =
+    safeRaw.sheltersByWilayah ||
+    safeRaw.shelters_by_wilayah ||
+    safeRaw.shelter_map ||
+    safeRaw.shelters ||
+    {};
+
+  const jenisKegiatan = jenisSource
+    .filter((item) => item !== undefined && item !== null)
+    .map((item) => normalizeOptionItem(item));
+  const wilayahBinaan = wilayahSource
+    .filter((item) => item !== undefined && item !== null)
+    .map((item) => normalizeOptionItem(item));
+
+  const sheltersByWilayah = {};
+
+  if (Array.isArray(sheltersSource)) {
+    sheltersSource.forEach((shelter) => {
+      const normalizedShelter = normalizeOptionItem(shelter);
+      const wilbinId = extractWilbinId(shelter);
+
+      if (wilbinId == null) {
+        return;
+      }
+
+      if (!sheltersByWilayah[wilbinId]) {
+        sheltersByWilayah[wilbinId] = [];
+      }
+
+      sheltersByWilayah[wilbinId].push(normalizedShelter);
+    });
+  } else if (sheltersSource && typeof sheltersSource === 'object') {
+    Object.entries(sheltersSource).forEach(([wilbinKey, shelterList]) => {
+      const normalizedList = ensureArray(shelterList).map((item) => normalizeOptionItem(item));
+      if (normalizedList.length > 0) {
+        sheltersByWilayah[wilbinKey] = normalizedList;
+      }
+    });
+  }
+
+  return {
+    jenisKegiatan,
+    wilayahBinaan,
+    sheltersByWilayah,
     raw: safeRaw,
   };
 };
@@ -76,32 +223,8 @@ export const initializeReportAnak = createAsyncThunk(
   'reportAnak/initialize',
   async (_, { rejectWithValue }) => {
     try {
-      const [listResponse, jenisResponse, wilayahResponse] = await Promise.all([
-        adminCabangReportApi.getLaporanAnakBinaan(),
-        adminCabangReportApi.getJenisKegiatanOptions(),
-        adminCabangReportApi.getWilayahBinaanOptions(),
-      ]);
-
-      const listPayload = extractListPayload(listResponse);
-      const jenisOptions =
-        jenisResponse?.data?.data ||
-        jenisResponse?.data?.options ||
-        jenisResponse?.data ||
-        [];
-      const wilayahOptions =
-        wilayahResponse?.data?.data ||
-        wilayahResponse?.data?.options ||
-        wilayahResponse?.data ||
-        [];
-
-      return {
-        ...listPayload,
-        filterOptions: {
-          ...listPayload.filterOptions,
-          jenisKegiatan: jenisOptions.length > 0 ? jenisOptions : listPayload.filterOptions.jenisKegiatan,
-          wilayahBinaan: wilayahOptions.length > 0 ? wilayahOptions : listPayload.filterOptions.wilayahBinaan,
-        },
-      };
+      const response = await adminCabangReportApi.getLaporanAnakBinaan();
+      return extractListPayload(response);
     } catch (error) {
       return rejectWithValue(parseError(error, 'Gagal memuat laporan anak binaan.'));
     }
@@ -152,9 +275,18 @@ export const fetchReportAnakChildDetail = createAsyncThunk(
 
 export const fetchShelterOptionsByWilayah = createAsyncThunk(
   'reportAnak/fetchShelterOptions',
-  async (wilbinId, { rejectWithValue }) => {
+  async (wilbinId, { rejectWithValue, getState }) => {
     if (!wilbinId) {
       return [];
+    }
+
+    const state = getState();
+    const existing =
+      state?.reportAnak?.filterOptions?.sheltersByWilayah?.[wilbinId] ||
+      state?.reportAnak?.filterOptions?.sheltersByWilayah?.[String(wilbinId)];
+
+    if (Array.isArray(existing)) {
+      return existing;
     }
 
     try {
