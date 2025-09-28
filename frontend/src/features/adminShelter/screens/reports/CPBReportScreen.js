@@ -139,11 +139,13 @@ const CPBReportScreen = () => {
           editable={!childrenLoading}
         />
         {searchText ? (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.clearSearchButton}
             onPress={handleClearSearch}
           >
-            <Ionicons name="close-circle" size={20} color="#666" />
+            <Text>
+              <Ionicons name="close-circle" size={20} color="#666" />
+            </Text>
           </TouchableOpacity>
         ) : null}
         
@@ -166,12 +168,14 @@ const CPBReportScreen = () => {
 
       {/* Clear Search */}
       {filters.search && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.clearFiltersButton}
           onPress={handleClearSearch}
           disabled={childrenLoading}
         >
-          <Ionicons name="close-circle" size={16} color="#9b59b6" />
+          <Text>
+            <Ionicons name="close-circle" size={16} color="#9b59b6" />
+          </Text>
           <Text style={styles.clearFiltersText}>Hapus Pencarian</Text>
         </TouchableOpacity>
       )}
