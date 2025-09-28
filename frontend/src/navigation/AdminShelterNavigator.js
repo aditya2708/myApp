@@ -178,6 +178,9 @@ const ManagementStackNavigator = () => (
     <ManagementStack.Screen name="LaporanKegiatanMain" component={LaporanKegiatanMainScreen} options={{ headerTitle: 'Laporan Kegiatan' }} />
     <ManagementStack.Screen name="LaporanAnakBinaan" component={LaporanAnakBinaanScreen} options={{ headerTitle: 'Laporan Anak Binaan' }} />
     <ManagementStack.Screen name="LaporanRaportAnak" component={LaporanRaportAnakScreen} options={{ headerTitle: 'Laporan Raport Anak' }} />
+    <ManagementStack.Screen name="LaporanHistoriAnak" component={LaporanHistoriAnakScreen} options={{ headerTitle: 'Laporan Histori Anak' }} />
+    <ManagementStack.Screen name="LaporanAktivitas" component={LaporanAktivitasScreen} options={{ headerTitle: 'Laporan Aktivitas' }} />
+    <ManagementStack.Screen name="LaporanSuratAnak" component={LaporanSuratAnakScreen} options={{ headerTitle: 'Laporan Surat Anak' }} />
     <ManagementStack.Screen name="ShelterReport" component={ShelterReportScreen} options={{ headerTitle: 'Shelter Report' }} />
     <ManagementStack.Screen name="CPBReport" component={CPBReportScreen} options={{ headerTitle: 'CPB Report' }} />
     <ManagementStack.Screen name="RaportGenerate" component={RaportGenerateScreen} options={{ headerTitle: 'Generate Raport' }} />
