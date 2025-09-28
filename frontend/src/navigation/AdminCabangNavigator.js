@@ -31,6 +31,7 @@ import MateriFormScreen from '../features/adminCabang/screens/kurikulum/MateriFo
 import SelectKurikulumScreen from '../features/adminCabang/screens/kurikulum/SelectKurikulumScreen';
 import CreateKurikulumScreen from '../features/adminCabang/screens/kurikulum/CreateKurikulumScreen';
 import SemesterManagementScreen from '../features/adminCabang/screens/kurikulum/SemesterManagementScreen';
+import SemesterFormScreen from '../features/adminCabang/screens/kurikulum/SemesterFormScreen';
 import TemplateAdoptionScreen from '../features/adminCabang/screens/kurikulum/TemplateAdoptionScreen';
 import MasterDataScreen from '../features/adminCabang/screens/kurikulum/MasterDataScreen';
 
@@ -170,6 +171,13 @@ const KurikulumStackNavigator = () => (
       name="SemesterManagement"
       component={SemesterManagementScreen}
       options={{ headerTitle: 'Kelola Semester' }}
+    />
+    <KurikulumStack.Screen
+      name="SemesterForm"
+      component={SemesterFormScreen}
+      options={({ route }) => ({
+        headerTitle: route.params?.mode === 'edit' ? 'Edit Semester' : 'Tambah Semester'
+      })}
     />
     <KurikulumStack.Screen
       name="TemplateAdoption"
