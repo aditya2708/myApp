@@ -38,13 +38,14 @@ const ReportQuickActionTile = ({
 
 const styles = StyleSheet.create({
   card: {
-    width: '48%',
+    flexBasis: '48%',
+    minWidth: 160,
+    flexGrow: 1,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 12,
-    marginHorizontal: 6,
-    marginBottom: 12,
+    marginBottom: 0,
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
     borderWidth: 1,
