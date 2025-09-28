@@ -150,10 +150,10 @@ export const ADMIN_CABANG_ENDPOINTS = {
     STATS: '/admin-cabang/donatur-stats'
   },
   REPORTS: {
-    SUMMARY: '/admin-cabang/reports/summary',
+    SUMMARY: '/admin-cabang/laporan/summary',
     ANAK: {
-      LIST: '/admin-cabang/reports/anak',
-      DETAIL: (childId) => `/admin-cabang/reports/anak/${childId}`,
+      LIST: '/admin-cabang/laporan/anak-binaan',
+      DETAIL: (childId) => `/admin-cabang/laporan/anak-binaan/child/${childId}`,
       FILTERS: {
         JENIS_KEGIATAN: '/admin-cabang/reports/anak/filter-options/jenis-kegiatan',
         WILAYAH_BINAAN: '/admin-cabang/reports/anak/filter-options/wilayah-binaan',

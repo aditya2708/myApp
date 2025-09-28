@@ -3,22 +3,22 @@ import { ADMIN_CABANG_ENDPOINTS } from '../../../constants/endpoints';
 
 const {
   REPORTS: {
-    SUMMARY,
-    ANAK: { LIST, DETAIL, FILTERS }
+    SUMMARY: SUMMARY_ENDPOINT,
+    ANAK: { LIST: LIST_ENDPOINT, DETAIL: DETAIL_ENDPOINT, FILTERS }
   }
 } = ADMIN_CABANG_ENDPOINTS;
 
 export const adminCabangReportApi = {
   async getSummary(params = {}) {
-    return api.get(SUMMARY, { params });
+    return api.get(SUMMARY_ENDPOINT, { params });
   },
 
   async getLaporanAnakBinaan(params = {}) {
-    return api.get(LIST, { params });
+    return api.get(LIST_ENDPOINT, { params });
   },
 
   async getChildDetailReport(childId, params = {}) {
-    return api.get(DETAIL(childId), { params });
+    return api.get(DETAIL_ENDPOINT(childId), { params });
   },
 
   async getJenisKegiatanOptions() {
