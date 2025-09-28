@@ -7,14 +7,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   TextInput,
-  Alert,
-  Platform
+  Alert
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -26,8 +22,7 @@ import {
   fetchCpbReport,
   fetchCpbByStatus,
   initializeCpbLaporanPage,
-  fetchCpbTabData,
-  exportCpbPdf
+  fetchCpbTabData
 } from '../../redux/cpbLaporanThunks';
 
 import {
@@ -41,14 +36,9 @@ import {
   selectCpbError,
   selectCpbChildrenError,
   selectCpbTabCounts,
-  selectCpbPdfExportLoading,
-  selectCpbPdfExportError,
-  selectCpbPdfBlob,
-  selectCpbPdfFilename,
   setActiveTab,
   setSearch,
-  clearAllErrors,
-  clearPdfData
+  clearAllErrors
 } from '../../redux/cpbLaporanSlice';
 
 const CPBReportScreen = () => {
@@ -65,10 +55,6 @@ const CPBReportScreen = () => {
   const error = useSelector(selectCpbError);
   const childrenError = useSelector(selectCpbChildrenError);
   const tabCounts = useSelector(selectCpbTabCounts);
-  const pdfExportLoading = useSelector(selectCpbPdfExportLoading);
-  const pdfExportError = useSelector(selectCpbPdfExportError);
-  const pdfBlob = useSelector(selectCpbPdfBlob);
-  const pdfFilename = useSelector(selectCpbPdfFilename);
   
   // Local state
   const [refreshing, setRefreshing] = useState(false);
@@ -79,63 +65,6 @@ const CPBReportScreen = () => {
     dispatch(clearAllErrors());
     dispatch(initializeCpbLaporanPage());
   }, [dispatch]);
-
-  // Handle PDF download when blob is available
-  useEffect(() => {
-    if (pdfBlob && pdfFilename) {
-      handlePdfDownload();
-    }
-  }, [pdfBlob, pdfFilename]);
-
-  const handlePdfDownload = async () => {
-    try {
-      // Create file URI
-      const fileUri = FileSystem.documentDirectory + pdfFilename;
-      
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result.split(',')[1];
-        
-        try {
-          // Write file
-          await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          // Check if sharing is available
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(fileUri, {
-              mimeType: 'application/pdf',
-              dialogTitle: 'Simpan atau Bagikan PDF'
-            });
-          } else {
-            // Fallback: save to media library
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (status === 'granted') {
-              await MediaLibrary.saveToLibraryAsync(fileUri);
-              Alert.alert('Berhasil', 'PDF berhasil disimpan ke galeri');
-            } else {
-              Alert.alert('Info', `PDF tersimpan di: ${fileUri}`);
-            }
-          }
-          
-          // Clear PDF data after successful download
-          dispatch(clearPdfData());
-          
-        } catch (error) {
-          console.error('File operation error:', error);
-          Alert.alert('Error', 'Gagal menyimpan file PDF');
-        }
-      };
-      
-      reader.readAsDataURL(pdfBlob);
-      
-    } catch (error) {
-      console.error('Error unduh PDF:', error);
-      Alert.alert('Error', 'Gagal mendownload PDF');
-    }
-  };
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -191,44 +120,11 @@ const CPBReportScreen = () => {
     console.log('Child pressed:', child.full_name);
   };
 
-  // Handle PDF export
-  const handleExport = async () => {
-    if (!children.length) {
-      Alert.alert('Peringatan', 'Tidak ada data untuk diexport');
-      return;
-    }
-
-    try {
-      // Export all data regardless of active tab
-      await dispatch(exportCpbPdf()).unwrap();
-    } catch (error) {
-      console.error('Export failed:', error);
-      Alert.alert('Error', 'Gagal export PDF: ' + error);
-    }
-  };
-
-  // Render header with PDF export only
+  // Render header
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerTop}>
         <Text style={styles.title}>Laporan CPB</Text>
-        <TouchableOpacity
-          style={[styles.exportButton, pdfExportLoading && styles.exportButtonDisabled]}
-          onPress={handleExport}
-          disabled={pdfExportLoading || !children.length}
-        >
-          {pdfExportLoading ? (
-            <LoadingSpinner size="small" color="#fff" />
-          ) : (
-            <Ionicons name="document-text" size={18} color="#fff" />
-          )}
-          <Text style={[
-            styles.exportButtonText,
-            pdfExportLoading && styles.exportButtonTextDisabled
-          ]}>
-            Export PDF
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -278,15 +174,6 @@ const CPBReportScreen = () => {
           <Ionicons name="close-circle" size={16} color="#9b59b6" />
           <Text style={styles.clearFiltersText}>Hapus Pencarian</Text>
         </TouchableOpacity>
-      )}
-
-      {/* Export Error */}
-      {pdfExportError && (
-        <View style={styles.exportErrorContainer}>
-          <Text style={styles.exportErrorText}>
-            Export gagal: {pdfExportError}
-          </Text>
-        </View>
       )}
     </View>
   );
@@ -401,26 +288,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333'
   },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#9b59b6'
-  },
-  exportButtonDisabled: {
-    opacity: 0.5
-  },
-  exportButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 6
-  },
-  exportButtonTextDisabled: {
-    color: '#ccc'
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -475,16 +342,6 @@ const styles = StyleSheet.create({
     color: '#9b59b6',
     fontWeight: '500',
     marginLeft: 4
-  },
-  exportErrorContainer: {
-    backgroundColor: '#ffebee',
-    padding: 8,
-    borderRadius: 4,
-    marginTop: 8
-  },
-  exportErrorText: {
-    fontSize: 12,
-    color: '#c62828'
   },
   content: {
     flex: 1
