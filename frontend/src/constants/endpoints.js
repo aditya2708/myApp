@@ -149,6 +149,11 @@ export const ADMIN_CABANG_ENDPOINTS = {
     SHELTERS_BY_WILBIN: (wilbinId) => `/admin-cabang/donatur-shelters/${wilbinId}`,
     STATS: '/admin-cabang/donatur-stats'
   },
+  REPORTS: {
+    SUMMARY: '/admin-cabang/reports/summary',
+    CHILDREN: '/admin-cabang/reports/children',
+    TUTORS: '/admin-cabang/reports/tutors',
+  },
   KURIKULUM: {
     LIST: '/admin-cabang/kurikulum',
     DETAIL: (id) => `/admin-cabang/kurikulum/${id}`,
