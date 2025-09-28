@@ -389,7 +389,9 @@ const styles = StyleSheet.create({
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
+    justifyContent: 'space-between',
+    rowGap: 12,
+    columnGap: 12,
   },
 });
 
