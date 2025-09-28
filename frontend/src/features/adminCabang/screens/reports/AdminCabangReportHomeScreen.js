@@ -109,14 +109,18 @@ const AdminCabangReportHomeScreen = () => {
     if (!payload) return DEFAULT_SUMMARY;
 
     if (Array.isArray(payload) && payload.length > 0) {
-      return payload.map((item, index) => ({
-        key: item.key || `${item.label || 'summary'}-${index}`,
-        label: item.label || item.title || 'Ringkasan',
-        value: item.value ?? item.total ?? 0,
-        icon: item.icon || 'stats-chart',
-        color: item.color || '#2ecc71',
-        description: item.description || item.subtitle || null,
-      }));
+      return payload.map((item = {}, index) => {
+        const { key, ref: _ref, ...rest } = item;
+
+        return {
+          key: key || `${rest.label || rest.title || 'summary'}-${index}`,
+          label: rest.label || rest.title || 'Ringkasan',
+          value: rest.value ?? rest.total ?? 0,
+          icon: rest.icon || 'stats-chart',
+          color: rest.color || '#2ecc71',
+          description: rest.description || rest.subtitle || null,
+        };
+      });
     }
 
     const cards = [];
@@ -307,8 +311,8 @@ const AdminCabangReportHomeScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ringkasan</Text>
-        {summaryCards.map((card) => (
-          <ReportSummaryCard key={card.key} {...card} />
+        {summaryCards.map(({ key, ...cardProps }) => (
+          <ReportSummaryCard key={key} {...cardProps} />
         ))}
       </View>
 
