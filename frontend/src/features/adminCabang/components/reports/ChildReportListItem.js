@@ -30,6 +30,17 @@ const normalizeToDisplayString = (value) => {
   return String(value);
 };
 
+const pickDisplayString = (...candidates) => {
+  for (const candidate of candidates) {
+    const normalized = normalizeToDisplayString(candidate);
+    if (normalized !== null) {
+      return normalized;
+    }
+  }
+
+  return null;
+};
+
 const ChildReportListItem = ({ child, onPress }) => {
   const {
     displayName,
@@ -46,9 +57,13 @@ const ChildReportListItem = ({ child, onPress }) => {
     const percentage = child.attendance_percentage ?? child.overall_percentage ?? child.percentage ?? null;
 
     return {
-      displayName: child.full_name || child.name || child.nama || 'Anak Binaan',
-      nickname: child.nick_name || child.nickname || null,
-      shelterName: child.shelter_name || child.shelter || child.nama_shelter || null,
+      displayName: pickDisplayString(child.full_name, child.name, child.nama) ?? 'Anak Binaan',
+      nickname: pickDisplayString(child.nick_name, child.nickname),
+      shelterName: pickDisplayString(
+        child.shelter_name,
+        child.shelter,
+        child.nama_shelter,
+      ),
       wilayahName:
         normalizeToDisplayString(child.wilayah_name) ??
         normalizeToDisplayString(child.wilbin_name) ??
@@ -58,7 +73,7 @@ const ChildReportListItem = ({ child, onPress }) => {
       attendanceSummary: (totalAttended !== undefined && totalActivities !== undefined)
         ? `${totalAttended}/${totalActivities} aktivitas`
         : null,
-      lastActivity: child.last_activity || child.latest_activity || null,
+      lastActivity: pickDisplayString(child.last_activity, child.latest_activity),
       photoUrl: child.photo_url || child.foto_url || child.avatar_url || null,
     };
   }, [child]);
