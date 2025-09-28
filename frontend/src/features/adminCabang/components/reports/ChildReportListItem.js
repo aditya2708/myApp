@@ -4,6 +4,32 @@ import { Ionicons } from '@expo/vector-icons';
 
 const DEFAULT_PHOTO = require('../../../../assets/images/logo.png');
 
+const normalizeToDisplayString = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'object') {
+    const nestedValue = value?.name ?? value?.wilbin ?? null;
+
+    if (typeof nestedValue === 'string') {
+      return nestedValue;
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      return '';
+    }
+  }
+
+  return String(value);
+};
+
 const ChildReportListItem = ({ child, onPress }) => {
   const {
     displayName,
@@ -23,7 +49,11 @@ const ChildReportListItem = ({ child, onPress }) => {
       displayName: child.full_name || child.name || child.nama || 'Anak Binaan',
       nickname: child.nick_name || child.nickname || null,
       shelterName: child.shelter_name || child.shelter || child.nama_shelter || null,
-      wilayahName: child.wilayah_name || child.wilbin_name || child.nama_wilayah || null,
+      wilayahName:
+        normalizeToDisplayString(child.wilayah_name) ??
+        normalizeToDisplayString(child.wilbin_name) ??
+        normalizeToDisplayString(child.nama_wilayah) ??
+        null,
       attendancePercentage: percentage !== null ? `${percentage}%` : null,
       attendanceSummary: (totalAttended !== undefined && totalActivities !== undefined)
         ? `${totalAttended}/${totalActivities} aktivitas`
