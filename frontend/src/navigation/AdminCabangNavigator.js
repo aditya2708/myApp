@@ -21,7 +21,8 @@ import AdminCabangUserManagementScreen from '../features/adminCabang/screens/use
 import AdminCabangUserFormScreen from '../features/adminCabang/screens/user/UserFormScreen';
 import AdminCabangUserDetailScreen from '../features/adminCabang/screens/user/UserDetailScreen';
 import AdminCabangReportHomeScreen from '../features/adminCabang/screens/reports/AdminCabangReportHomeScreen';
-import AdminCabangChildrenReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildrenReportScreen';
+import AdminCabangChildReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildReportScreen';
+import AdminCabangChildDetailScreen from '../features/adminCabang/screens/reports/AdminCabangChildDetailScreen';
 import AdminCabangTutorReportScreen from '../features/adminCabang/screens/reports/AdminCabangTutorReportScreen';
 
 // Kurikulum screens
@@ -205,9 +206,14 @@ const ReportsStackNavigator = () => (
       options={{ headerTitle: 'Laporan' }}
     />
     <ReportsStack.Screen
-      name="AdminCabangChildrenReport"
-      component={AdminCabangChildrenReportScreen}
+      name="AdminCabangChildReport"
+      component={AdminCabangChildReportScreen}
       options={{ headerTitle: 'Laporan Anak Binaan' }}
+    />
+    <ReportsStack.Screen
+      name="AdminCabangChildDetail"
+      component={AdminCabangChildDetailScreen}
+      options={{ headerTitle: 'Detail Anak' }}
     />
     <ReportsStack.Screen
       name="AdminCabangTutorReport"

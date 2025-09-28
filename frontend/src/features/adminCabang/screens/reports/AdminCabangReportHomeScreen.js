@@ -12,7 +12,7 @@ import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import ReportSummaryCard from '../../components/reports/ReportSummaryCard';
 import ReportQuickLinkTile from '../../components/reports/ReportQuickLinkTile';
-import { adminCabangReportsApi } from '../../api/adminCabangReportsApi';
+import { adminCabangReportApi } from '../../api/adminCabangReportApi';
 
 const DEFAULT_LINKS = [
   {
@@ -21,7 +21,7 @@ const DEFAULT_LINKS = [
     description: 'Pantau perkembangan dan kebutuhan anak binaan di cabang Anda.',
     icon: 'school',
     color: '#2980b9',
-    route: 'AdminCabangChildrenReport',
+    route: 'AdminCabangChildReport',
   },
   {
     key: 'tutors',
@@ -70,7 +70,7 @@ const AdminCabangReportHomeScreen = () => {
 
   const routeMap = useMemo(
     () => ({
-      children: 'AdminCabangChildrenReport',
+      children: 'AdminCabangChildReport',
       tutors: 'AdminCabangTutorReport',
     }),
     []
@@ -194,7 +194,7 @@ const AdminCabangReportHomeScreen = () => {
 
     try {
       setError(null);
-      const response = await adminCabangReportsApi.getSummary();
+      const response = await adminCabangReportApi.getSummary();
       const responseData = response?.data?.data || response?.data || {};
       setSummaryCards(parseSummaryCards(responseData.summary || responseData.cards || responseData));
       setQuickLinks(parseQuickLinks(responseData.quick_links || responseData.links || []));
