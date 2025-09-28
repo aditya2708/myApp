@@ -6,8 +6,7 @@ import {
   fetchTutorAvailableYears,
   initializeTutorLaporanPage,
   updateTutorFiltersAndRefreshAll,
-  exportTutorData,
-  exportTutorPdf
+  exportTutorData
 } from './tutorLaporanThunks';
 
 const initialState = {
@@ -29,24 +28,20 @@ const initialState = {
   
   // Export data
   exportData: null,
-  pdfBlob: null,
-  pdfFilename: null,
-  
+
   loading: false,
   tutorDetailLoading: false,
   filterOptionsLoading: false,
   initializingPage: false,
   refreshingAll: false,
   exportLoading: false,
-  pdfExportLoading: false,
-  
+
   error: null,
   tutorDetailError: null,
   filterOptionsError: null,
   initializeError: null,
   refreshAllError: null,
   exportError: null,
-  pdfExportError: null,
   
   filters: {
     start_date: null,
@@ -122,11 +117,6 @@ const tutorLaporanSlice = createSlice({
       state.exportData = null;
       state.exportError = null;
     },
-    clearPdfData: (state) => {
-      state.pdfBlob = null;
-      state.pdfFilename = null;
-      state.pdfExportError = null;
-    },
     clearError: (state) => {
       state.error = null;
     },
@@ -145,9 +135,6 @@ const tutorLaporanSlice = createSlice({
     clearExportError: (state) => {
       state.exportError = null;
     },
-    clearPdfExportError: (state) => {
-      state.pdfExportError = null;
-    },
     clearAllErrors: (state) => {
       state.error = null;
       state.tutorDetailError = null;
@@ -155,7 +142,6 @@ const tutorLaporanSlice = createSlice({
       state.initializeError = null;
       state.refreshAllError = null;
       state.exportError = null;
-      state.pdfExportError = null;
     }
   },
   extraReducers: (builder) => {
@@ -277,22 +263,6 @@ const tutorLaporanSlice = createSlice({
       .addCase(exportTutorData.rejected, (state, action) => {
         state.exportLoading = false;
         state.exportError = action.payload;
-      })
-      
-      // Export PDF
-      .addCase(exportTutorPdf.pending, (state) => {
-        state.pdfExportLoading = true;
-        state.pdfExportError = null;
-      })
-      .addCase(exportTutorPdf.fulfilled, (state, action) => {
-        state.pdfExportLoading = false;
-        state.pdfBlob = action.payload.blob;
-        state.pdfFilename = action.payload.filename;
-        state.pdfExportError = null;
-      })
-      .addCase(exportTutorPdf.rejected, (state, action) => {
-        state.pdfExportLoading = false;
-        state.pdfExportError = action.payload;
       });
   }
 });
@@ -310,14 +280,12 @@ export const {
   collapseAllCards,
   clearTutorDetail,
   clearExportData,
-  clearPdfData,
   clearError,
   clearTutorDetailError,
   clearFilterOptionsError,
   clearInitializeError,
   clearRefreshAllError,
   clearExportError,
-  clearPdfExportError,
   clearAllErrors
 } = tutorLaporanSlice.actions;
 
@@ -332,22 +300,18 @@ export const selectTutorFilters = (state) => state.tutorLaporan.filters;
 export const selectTutorExpandedCards = (state) => state.tutorLaporan.expandedCards;
 export const selectTutorDetail = (state) => state.tutorLaporan.tutorDetail;
 export const selectTutorExportData = (state) => state.tutorLaporan.exportData;
-export const selectTutorPdfBlob = (state) => state.tutorLaporan.pdfBlob;
-export const selectTutorPdfFilename = (state) => state.tutorLaporan.pdfFilename;
 export const selectTutorLoading = (state) => state.tutorLaporan.loading;
 export const selectTutorDetailLoading = (state) => state.tutorLaporan.tutorDetailLoading;
 export const selectTutorFilterOptionsLoading = (state) => state.tutorLaporan.filterOptionsLoading;
 export const selectTutorInitializingPage = (state) => state.tutorLaporan.initializingPage;
 export const selectTutorRefreshingAll = (state) => state.tutorLaporan.refreshingAll;
 export const selectTutorExportLoading = (state) => state.tutorLaporan.exportLoading;
-export const selectTutorPdfExportLoading = (state) => state.tutorLaporan.pdfExportLoading;
 export const selectTutorError = (state) => state.tutorLaporan.error;
 export const selectTutorDetailError = (state) => state.tutorLaporan.tutorDetailError;
 export const selectTutorFilterOptionsError = (state) => state.tutorLaporan.filterOptionsError;
 export const selectTutorInitializeError = (state) => state.tutorLaporan.initializeError;
 export const selectTutorRefreshAllError = (state) => state.tutorLaporan.refreshAllError;
 export const selectTutorExportError = (state) => state.tutorLaporan.exportError;
-export const selectTutorPdfExportError = (state) => state.tutorLaporan.pdfExportError;
 
 export const selectIsTutorCardExpanded = (state, tutorId) => 
   state.tutorLaporan.expandedCards.includes(tutorId);

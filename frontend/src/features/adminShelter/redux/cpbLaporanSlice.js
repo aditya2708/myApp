@@ -3,8 +3,7 @@ import {
   fetchCpbReport,
   fetchCpbByStatus,
   initializeCpbLaporanPage,
-  exportCpbData,
-  exportCpbPdf
+  exportCpbData
 } from './cpbLaporanThunks';
 
 const initialState = {
@@ -21,22 +20,18 @@ const initialState = {
   
   // Export data
   exportData: null,
-  pdfBlob: null,
-  pdfFilename: null,
-  
+
   // Loading states
   loading: false,
   childrenLoading: false,
   initializingPage: false,
   exportLoading: false,
-  pdfExportLoading: false,
-  
+
   // Error states
   error: null,
   childrenError: null,
   initializeError: null,
   exportError: null,
-  pdfExportError: null,
   
   // UI state
   filters: {
@@ -70,11 +65,6 @@ const cpbLaporanSlice = createSlice({
       state.exportData = null;
       state.exportError = null;
     },
-    clearPdfData: (state) => {
-      state.pdfBlob = null;
-      state.pdfFilename = null;
-      state.pdfExportError = null;
-    },
     clearError: (state) => {
       state.error = null;
     },
@@ -87,15 +77,11 @@ const cpbLaporanSlice = createSlice({
     clearExportError: (state) => {
       state.exportError = null;
     },
-    clearPdfExportError: (state) => {
-      state.pdfExportError = null;
-    },
     clearAllErrors: (state) => {
       state.error = null;
       state.childrenError = null;
       state.initializeError = null;
       state.exportError = null;
-      state.pdfExportError = null;
     }
   },
   extraReducers: (builder) => {
@@ -158,22 +144,6 @@ const cpbLaporanSlice = createSlice({
       .addCase(exportCpbData.rejected, (state, action) => {
         state.exportLoading = false;
         state.exportError = action.payload;
-      })
-      
-      // Export CPB PDF
-      .addCase(exportCpbPdf.pending, (state) => {
-        state.pdfExportLoading = true;
-        state.pdfExportError = null;
-      })
-      .addCase(exportCpbPdf.fulfilled, (state, action) => {
-        state.pdfExportLoading = false;
-        state.pdfBlob = action.payload.blob;
-        state.pdfFilename = action.payload.filename;
-        state.pdfExportError = null;
-      })
-      .addCase(exportCpbPdf.rejected, (state, action) => {
-        state.pdfExportLoading = false;
-        state.pdfExportError = action.payload;
       });
   }
 });
@@ -185,12 +155,10 @@ export const {
   setActiveTab,
   clearChildren,
   clearExportData,
-  clearPdfData,
   clearError,
   clearChildrenError,
   clearInitializeError,
   clearExportError,
-  clearPdfExportError,
   clearAllErrors
 } = cpbLaporanSlice.actions;
 
@@ -202,18 +170,14 @@ export const selectCpbCurrentStatus = (state) => state.cpbLaporan.currentStatus;
 export const selectCpbFilters = (state) => state.cpbLaporan.filters;
 export const selectCpbActiveTab = (state) => state.cpbLaporan.activeTab;
 export const selectCpbExportData = (state) => state.cpbLaporan.exportData;
-export const selectCpbPdfBlob = (state) => state.cpbLaporan.pdfBlob;
-export const selectCpbPdfFilename = (state) => state.cpbLaporan.pdfFilename;
 export const selectCpbLoading = (state) => state.cpbLaporan.loading;
 export const selectCpbChildrenLoading = (state) => state.cpbLaporan.childrenLoading;
 export const selectCpbInitializingPage = (state) => state.cpbLaporan.initializingPage;
 export const selectCpbExportLoading = (state) => state.cpbLaporan.exportLoading;
-export const selectCpbPdfExportLoading = (state) => state.cpbLaporan.pdfExportLoading;
 export const selectCpbError = (state) => state.cpbLaporan.error;
 export const selectCpbChildrenError = (state) => state.cpbLaporan.childrenError;
 export const selectCpbInitializeError = (state) => state.cpbLaporan.initializeError;
 export const selectCpbExportError = (state) => state.cpbLaporan.exportError;
-export const selectCpbPdfExportError = (state) => state.cpbLaporan.pdfExportError;
 
 // Derived selectors
 export const selectCpbHasActiveFilters = (state) => {

@@ -134,37 +134,6 @@ export const updateFiltersAndRefreshAll = createAsyncThunk(
   }
 );
 
-// Export PDF functionality
-export const exportLaporanAnakPdf = createAsyncThunk(
-  'laporan/exportLaporanAnakPdf',
-  async ({ start_date, end_date, jenisKegiatan, search } = {}, { rejectWithValue }) => {
-    try {
-      const params = {};
-      if (start_date) params.start_date = start_date;
-      if (end_date) params.end_date = end_date;
-      if (jenisKegiatan) params.jenisKegiatan = jenisKegiatan;
-      if (search) params.search = search;
-      
-      const response = await laporanAnakApi.exportLaporanAnakPdf(params);
-      
-      if (response.data instanceof Blob) {
-        return {
-          blob: response.data,
-          filename: response.headers['content-disposition']?.match(/filename="([^"]+)"/)?.[1] || 
-                   `laporan-anak-binaan-${new Date().toISOString().split('T')[0]}.pdf`
-        };
-      }
-      
-      return response.data;
-    } catch (error) {
-      const message = error.response?.data?.message || 
-        error.message || 
-        'Failed to export PDF';
-      return rejectWithValue(message);
-    }
-  }
-);
-
 // Refresh laporan with current filters
 export const refreshLaporanWithFilters = createAsyncThunk(
   'laporan/refreshLaporanWithFilters',

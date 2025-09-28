@@ -55,35 +55,6 @@ export const exportCpbData = createAsyncThunk(
   }
 );
 
-// Export CPB data as PDF
-export const exportCpbPdf = createAsyncThunk(
-  'cpbLaporan/exportCpbPdf',
-  async ({ status } = {}, { rejectWithValue }) => {
-    try {
-      const params = { format: 'pdf' };
-      if (status) params.status = status;
-      
-      const response = await cpbLaporanApi.exportCpbPdf(params);
-      
-      // Handle blob response for PDF
-      if (response.data instanceof Blob) {
-        return {
-          blob: response.data,
-          filename: response.headers['content-disposition']?.match(/filename="([^"]+)"/)?.[1] || 
-                   `laporan-cpb-${status ? status.toLowerCase() + '-' : ''}${new Date().toISOString().split('T')[0]}.pdf`
-        };
-      }
-      
-      return response.data;
-    } catch (error) {
-      const message = error.response?.data?.message || 
-        error.message || 
-        'Failed to export CPB PDF';
-      return rejectWithValue(message);
-    }
-  }
-);
-
 // Initialize CPB laporan page data
 export const initializeCpbLaporanPage = createAsyncThunk(
   'cpbLaporan/initializeCpbLaporanPage',

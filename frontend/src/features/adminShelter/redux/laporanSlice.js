@@ -5,8 +5,7 @@ import {
   fetchJenisKegiatanOptions,
   fetchAvailableYears,
   initializeLaporanPage,
-  updateFiltersAndRefreshAll,
-  exportLaporanAnakPdf
+  updateFiltersAndRefreshAll
 } from './laporanThunks';
 
 const initialState = {
@@ -24,23 +23,17 @@ const initialState = {
     filter: null
   },
   
-  // PDF export data
-  pdfBlob: null,
-  pdfFilename: null,
-  
   loading: false,
   childDetailLoading: false,
   filterOptionsLoading: false,
   initializingPage: false,
   refreshingAll: false,
-  pdfExportLoading: false,
-  
+
   error: null,
   childDetailError: null,
   filterOptionsError: null,
   initializeError: null,
   refreshAllError: null,
-  pdfExportError: null,
   
   filters: {
     start_date: null,
@@ -115,11 +108,6 @@ const laporanSlice = createSlice({
       };
       state.childDetailError = null;
     },
-    clearPdfData: (state) => {
-      state.pdfBlob = null;
-      state.pdfFilename = null;
-      state.pdfExportError = null;
-    },
     clearError: (state) => {
       state.error = null;
     },
@@ -135,16 +123,12 @@ const laporanSlice = createSlice({
     clearRefreshAllError: (state) => {
       state.refreshAllError = null;
     },
-    clearPdfExportError: (state) => {
-      state.pdfExportError = null;
-    },
     clearAllErrors: (state) => {
       state.error = null;
       state.childDetailError = null;
       state.filterOptionsError = null;
       state.initializeError = null;
       state.refreshAllError = null;
-      state.pdfExportError = null;
     }
   },
   extraReducers: (builder) => {
@@ -255,22 +239,6 @@ const laporanSlice = createSlice({
       .addCase(fetchAvailableYears.rejected, (state, action) => {
         state.filterOptionsLoading = false;
         state.filterOptionsError = action.payload;
-      })
-      
-      // Export PDF
-      .addCase(exportLaporanAnakPdf.pending, (state) => {
-        state.pdfExportLoading = true;
-        state.pdfExportError = null;
-      })
-      .addCase(exportLaporanAnakPdf.fulfilled, (state, action) => {
-        state.pdfExportLoading = false;
-        state.pdfBlob = action.payload.blob;
-        state.pdfFilename = action.payload.filename;
-        state.pdfExportError = null;
-      })
-      .addCase(exportLaporanAnakPdf.rejected, (state, action) => {
-        state.pdfExportLoading = false;
-        state.pdfExportError = action.payload;
       });
   }
 });
@@ -288,13 +256,11 @@ export const {
   expandAllCards,
   collapseAllCards,
   clearChildDetail,
-  clearPdfData,
   clearError,
   clearChildDetailError,
   clearFilterOptionsError,
   clearInitializeError,
   clearRefreshAllError,
-  clearPdfExportError,
   clearAllErrors
 } = laporanSlice.actions;
 
@@ -312,15 +278,11 @@ export const selectChildDetailLoading = (state) => state.laporan.childDetailLoad
 export const selectFilterOptionsLoading = (state) => state.laporan.filterOptionsLoading;
 export const selectInitializingPage = (state) => state.laporan.initializingPage;
 export const selectRefreshingAll = (state) => state.laporan.refreshingAll;
-export const selectPdfExportLoading = (state) => state.laporan.pdfExportLoading;
 export const selectError = (state) => state.laporan.error;
 export const selectChildDetailError = (state) => state.laporan.childDetailError;
 export const selectFilterOptionsError = (state) => state.laporan.filterOptionsError;
 export const selectInitializeError = (state) => state.laporan.initializeError;
 export const selectRefreshAllError = (state) => state.laporan.refreshAllError;
-export const selectPdfExportError = (state) => state.laporan.pdfExportError;
-export const selectPdfBlob = (state) => state.laporan.pdfBlob;
-export const selectPdfFilename = (state) => state.laporan.pdfFilename;
 
 // Derived selectors
 export const selectHasActiveFilters = (state) => {

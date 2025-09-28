@@ -6,15 +6,10 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
-  TextInput,
-  Alert,
-  Platform
+  TextInput
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { useNavigation } from '@react-navigation/native';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
@@ -37,22 +32,16 @@ import {
   selectTutorError,
   selectTutorRefreshAllError,
   selectTutorHasActiveFilters,
-  selectTutorPdfExportLoading,
-  selectTutorPdfExportError,
-  selectTutorPdfBlob,
-  selectTutorPdfFilename,
   setSearch,
   resetFilters,
   toggleCardExpanded,
-  clearAllErrors,
-  clearPdfData
+  clearAllErrors
 } from '../../redux/tutorLaporanSlice';
 
 import {
   fetchLaporanTutor,
   initializeTutorLaporanPage,
-  updateTutorFiltersAndRefreshAll,
-  exportTutorPdf
+  updateTutorFiltersAndRefreshAll
 } from '../../redux/tutorLaporanThunks';
 
 const LaporanTutorScreen = () => {
@@ -76,67 +65,12 @@ const LaporanTutorScreen = () => {
   const error = useSelector(selectTutorError);
   const refreshAllError = useSelector(selectTutorRefreshAllError);
   const hasActiveFilters = useSelector(selectTutorHasActiveFilters);
-  const pdfExportLoading = useSelector(selectTutorPdfExportLoading);
-  const pdfExportError = useSelector(selectTutorPdfExportError);
-  const pdfBlob = useSelector(selectTutorPdfBlob);
-  const pdfFilename = useSelector(selectTutorPdfFilename);
 
   // Initialize page
   useEffect(() => {
     dispatch(clearAllErrors());
     initializePage();
   }, [dispatch]);
-
-  // Handle PDF download when blob is available
-  useEffect(() => {
-    if (pdfBlob && pdfFilename) {
-      handlePdfDownload();
-    }
-  }, [pdfBlob, pdfFilename]);
-
-  const handlePdfDownload = async () => {
-    try {
-      const fileUri = FileSystem.documentDirectory + pdfFilename;
-      
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result.split(',')[1];
-        
-        try {
-          await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(fileUri, {
-              mimeType: 'application/pdf',
-              dialogTitle: 'Simpan atau Bagikan PDF'
-            });
-          } else {
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (status === 'granted') {
-              await MediaLibrary.saveToLibraryAsync(fileUri);
-              Alert.alert('Berhasil', 'PDF berhasil disimpan ke galeri');
-            } else {
-              Alert.alert('Info', `PDF tersimpan di: ${fileUri}`);
-            }
-          }
-          
-          dispatch(clearPdfData());
-          
-        } catch (error) {
-          console.error('File operation error:', error);
-          Alert.alert('Error', 'Gagal menyimpan file PDF');
-        }
-      };
-      
-      reader.readAsDataURL(pdfBlob);
-      
-    } catch (error) {
-      console.error('Error unduh PDF:', error);
-      Alert.alert('Error', 'Gagal mendownload PDF');
-    }
-  };
 
   const initializePage = async () => {
     try {
@@ -250,26 +184,6 @@ const LaporanTutorScreen = () => {
     dispatch(toggleCardExpanded(tutorId));
   };
 
-  // Handle PDF export
-  const handleExportPdf = async () => {
-    if (!tutors.length) {
-      Alert.alert('Peringatan', 'Tidak ada data untuk diexport');
-      return;
-    }
-
-    try {
-      await dispatch(exportTutorPdf({
-        start_date: filters.start_date,
-        end_date: filters.end_date,
-        jenisKegiatan: filters.jenisKegiatan,
-        search: searchText
-      })).unwrap();
-    } catch (error) {
-      console.error('Export failed:', error);
-      Alert.alert('Error', 'Gagal export PDF: ' + error);
-    }
-  };
-
   const renderSummary = () => {
     if (!summary) return null;
 
@@ -323,29 +237,11 @@ const LaporanTutorScreen = () => {
             onPress={() => setShowFilters(true)}
             disabled={refreshingAll}
           >
-            <Ionicons 
-              name="filter" 
-              size={20} 
-              color={hasActiveFilters ? '#9b59b6' : '#666'} 
+            <Ionicons
+              name="filter"
+              size={20}
+              color={hasActiveFilters ? '#9b59b6' : '#666'}
             />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.exportButton, pdfExportLoading && styles.exportButtonDisabled]}
-            onPress={handleExportPdf}
-            disabled={pdfExportLoading || !tutors.length}
-          >
-            {pdfExportLoading ? (
-              <LoadingSpinner size="small" color="#fff" />
-            ) : (
-              <Ionicons name="document-text" size={18} color="#fff" />
-            )}
-            <Text style={[
-              styles.exportButtonText,
-              pdfExportLoading && styles.exportButtonTextDisabled
-            ]}>
-              Export PDF
-            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -396,15 +292,6 @@ const LaporanTutorScreen = () => {
         <View style={styles.refreshingIndicator}>
           <LoadingSpinner size="small" />
           <Text style={styles.refreshingText}>Memperbarui data...</Text>
-        </View>
-      )}
-
-      {/* Export Error */}
-      {pdfExportError && (
-        <View style={styles.exportErrorContainer}>
-          <Text style={styles.exportErrorText}>
-            Export gagal: {pdfExportError}
-          </Text>
         </View>
       )}
 
@@ -532,26 +419,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#f8f9fa'
   },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#9b59b6'
-  },
-  exportButtonDisabled: {
-    opacity: 0.5
-  },
-  exportButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 4
-  },
-  exportButtonTextDisabled: {
-    color: '#ccc'
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -615,16 +482,6 @@ const styles = StyleSheet.create({
     color: '#9b59b6',
     fontWeight: '500',
     marginLeft: 8
-  },
-  exportErrorContainer: {
-    backgroundColor: '#ffebee',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 8
-  },
-  exportErrorText: {
-    fontSize: 12,
-    color: '#c62828'
   },
   resultCount: {
     fontSize: 14,
