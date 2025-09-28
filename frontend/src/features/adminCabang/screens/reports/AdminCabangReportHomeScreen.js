@@ -36,22 +36,6 @@ const DEFAULT_LINKS = [
 
 const DEFAULT_ACTIONS = [
   {
-    key: 'childrenOverview',
-    title: 'Anak Binaan',
-    description: 'Lihat statistik dan detail anak binaan.',
-    icon: 'people',
-    color: '#27ae60',
-    route: 'AdminCabangChildReport',
-  },
-  {
-    key: 'tutorOverview',
-    title: 'Tutor',
-    description: 'Pantau performa tutor shelter.',
-    icon: 'school',
-    color: '#9b59b6',
-    route: 'AdminCabangTutorReport',
-  },
-  {
     key: 'shelterOverview',
     title: 'Shelter',
     description: 'Ringkasan kapasitas dan kebutuhan shelter.',
@@ -103,6 +87,39 @@ const AdminCabangReportHomeScreen = () => {
       tutors: 'AdminCabangTutorReport',
     }),
     []
+  );
+
+  const createSignature = useCallback((item = {}) => {
+    const title = (item.title || item.label || '').trim().toLowerCase();
+    const route = (item.route || '').toString().trim();
+
+    if (!title && !route) {
+      return null;
+    }
+
+    return `${title}::${route}`;
+  }, []);
+
+  const dedupeByRouteAndTitle = useCallback(
+    (items = [], seenSignatures = []) => {
+      const seen = new Set(seenSignatures);
+
+      return items.filter((item) => {
+        const signature = createSignature(item);
+
+        if (!signature) {
+          return true;
+        }
+
+        if (seen.has(signature)) {
+          return false;
+        }
+
+        seen.add(signature);
+        return true;
+      });
+    },
+    [createSignature]
   );
 
   const parseSummaryCards = useCallback((payload) => {
@@ -200,46 +217,60 @@ const AdminCabangReportHomeScreen = () => {
     return cards.length > 0 ? cards : DEFAULT_SUMMARY;
   }, []);
 
-  const parseQuickLinks = useCallback((payload) => {
-    if (!payload || !Array.isArray(payload) || payload.length === 0) {
-      return DEFAULT_LINKS;
-    }
+  const parseQuickLinks = useCallback(
+    (payload) => {
+      if (!payload || !Array.isArray(payload) || payload.length === 0) {
+        return dedupeByRouteAndTitle([...DEFAULT_LINKS]);
+      }
 
-    return payload.map((link, index) => {
-      const key = link.key || `link-${index}`;
-      return {
-        key,
-        title: link.title || link.label || 'Laporan',
-        description: link.description || link.subtitle || '',
-        icon: link.icon || 'document-text',
-        color: link.color || '#3498db',
-        route: link.route || routeMap[key] || 'AdminCabangReportHome',
-        params: link.params || {},
-        disabled: link.disabled || false,
-      };
-    });
-  }, [routeMap]);
+      const mappedLinks = payload.map((link, index) => {
+        const key = link.key || `link-${index}`;
+        return {
+          key,
+          title: link.title || link.label || 'Laporan',
+          description: link.description || link.subtitle || '',
+          icon: link.icon || 'document-text',
+          color: link.color || '#3498db',
+          route: link.route || routeMap[key] || 'AdminCabangReportHome',
+          params: link.params || {},
+          disabled: link.disabled || false,
+        };
+      });
 
-  const parseQuickActions = useCallback((payload) => {
-    const source = Array.isArray(payload) && payload.length > 0 ? payload : DEFAULT_ACTIONS;
+      return dedupeByRouteAndTitle(mappedLinks);
+    },
+    [dedupeByRouteAndTitle, routeMap]
+  );
 
-    return source.map((action, index) => {
-      const key = action.key || `action-${index}`;
-      const mappedRoute = action.route || routeMap[key] || 'AdminCabangReportHome';
+  const parseQuickActions = useCallback(
+    (payload, existingLinks = []) => {
+      const source = Array.isArray(payload) && payload.length > 0 ? payload : DEFAULT_ACTIONS;
 
-      return {
-        key,
-        title: action.title || action.label || 'Aksi',
-        description: action.description || action.subtitle || '',
-        icon: action.icon || 'flash',
-        color: action.color || '#2980b9',
-        route: mappedRoute,
-        params: action.params || {},
-        disabled: action.disabled || false,
-        badge: action.badge ?? action.count ?? null,
-      };
-    });
-  }, [routeMap]);
+      const mappedActions = source.map((action, index) => {
+        const key = action.key || `action-${index}`;
+        const mappedRoute = action.route || routeMap[key] || 'AdminCabangReportHome';
+
+        return {
+          key,
+          title: action.title || action.label || 'Aksi',
+          description: action.description || action.subtitle || '',
+          icon: action.icon || 'flash',
+          color: action.color || '#2980b9',
+          route: mappedRoute,
+          params: action.params || {},
+          disabled: action.disabled || false,
+          badge: action.badge ?? action.count ?? null,
+        };
+      });
+
+      const existingSignatures = existingLinks
+        .map((link) => createSignature(link))
+        .filter(Boolean);
+
+      return dedupeByRouteAndTitle(mappedActions, existingSignatures);
+    },
+    [createSignature, dedupeByRouteAndTitle, routeMap]
+  );
 
   const fetchSummary = useCallback(async ({ showLoading = false } = {}) => {
     if (showLoading) {
@@ -250,15 +281,24 @@ const AdminCabangReportHomeScreen = () => {
       setError(null);
       const response = await adminCabangReportApi.getSummary();
       const responseData = response?.data?.data || response?.data || {};
-      setSummaryCards(parseSummaryCards(responseData.summary || responseData.cards || responseData));
-      setQuickLinks(parseQuickLinks(responseData.quick_links || responseData.links || []));
-      setQuickActions(parseQuickActions(responseData.quick_actions || responseData.actions || []));
+      setSummaryCards(
+        parseSummaryCards(responseData.summary || responseData.cards || responseData)
+      );
+
+      const parsedLinks = parseQuickLinks(responseData.quick_links || responseData.links || []);
+      setQuickLinks(parsedLinks);
+
+      setQuickActions(
+        parseQuickActions(responseData.quick_actions || responseData.actions || [], parsedLinks)
+      );
     } catch (err) {
       console.error('Failed to fetch report summary:', err);
       setError('Gagal memuat ringkasan laporan. Silakan coba lagi.');
       setSummaryCards(DEFAULT_SUMMARY);
-      setQuickLinks(DEFAULT_LINKS);
-      setQuickActions(DEFAULT_ACTIONS);
+
+      const fallbackLinks = parseQuickLinks();
+      setQuickLinks(fallbackLinks);
+      setQuickActions(parseQuickActions(undefined, fallbackLinks));
     } finally {
       setLoading(false);
       setRefreshing(false);
