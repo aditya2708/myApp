@@ -12,6 +12,7 @@ import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import ReportSummaryCard from '../../components/reports/ReportSummaryCard';
 import ReportQuickLinkTile from '../../components/reports/ReportQuickLinkTile';
+import ReportQuickActionTile from '../../components/reports/ReportQuickActionTile';
 import { adminCabangReportApi } from '../../api/adminCabangReportApi';
 
 const DEFAULT_LINKS = [
@@ -30,6 +31,33 @@ const DEFAULT_LINKS = [
     icon: 'people-circle',
     color: '#9b59b6',
     route: 'AdminCabangTutorReport',
+  },
+];
+
+const DEFAULT_ACTIONS = [
+  {
+    key: 'childrenOverview',
+    title: 'Anak Binaan',
+    description: 'Lihat statistik dan detail anak binaan.',
+    icon: 'people',
+    color: '#27ae60',
+    route: 'AdminCabangChildReport',
+  },
+  {
+    key: 'tutorOverview',
+    title: 'Tutor',
+    description: 'Pantau performa tutor shelter.',
+    icon: 'school',
+    color: '#9b59b6',
+    route: 'AdminCabangTutorReport',
+  },
+  {
+    key: 'shelterOverview',
+    title: 'Shelter',
+    description: 'Ringkasan kapasitas dan kebutuhan shelter.',
+    icon: 'home',
+    color: '#e67e22',
+    route: 'AdminCabangReportHome',
   },
 ];
 
@@ -64,6 +92,7 @@ const AdminCabangReportHomeScreen = () => {
   const navigation = useNavigation();
   const [summaryCards, setSummaryCards] = useState(DEFAULT_SUMMARY);
   const [quickLinks, setQuickLinks] = useState(DEFAULT_LINKS);
+  const [quickActions, setQuickActions] = useState(DEFAULT_ACTIONS);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -187,6 +216,27 @@ const AdminCabangReportHomeScreen = () => {
     });
   }, [routeMap]);
 
+  const parseQuickActions = useCallback((payload) => {
+    const source = Array.isArray(payload) && payload.length > 0 ? payload : DEFAULT_ACTIONS;
+
+    return source.map((action, index) => {
+      const key = action.key || `action-${index}`;
+      const mappedRoute = action.route || routeMap[key] || 'AdminCabangReportHome';
+
+      return {
+        key,
+        title: action.title || action.label || 'Aksi',
+        description: action.description || action.subtitle || '',
+        icon: action.icon || 'flash',
+        color: action.color || '#2980b9',
+        route: mappedRoute,
+        params: action.params || {},
+        disabled: action.disabled || false,
+        badge: action.badge ?? action.count ?? null,
+      };
+    });
+  }, [routeMap]);
+
   const fetchSummary = useCallback(async ({ showLoading = false } = {}) => {
     if (showLoading) {
       setLoading(true);
@@ -198,16 +248,18 @@ const AdminCabangReportHomeScreen = () => {
       const responseData = response?.data?.data || response?.data || {};
       setSummaryCards(parseSummaryCards(responseData.summary || responseData.cards || responseData));
       setQuickLinks(parseQuickLinks(responseData.quick_links || responseData.links || []));
+      setQuickActions(parseQuickActions(responseData.quick_actions || responseData.actions || []));
     } catch (err) {
       console.error('Failed to fetch report summary:', err);
       setError('Gagal memuat ringkasan laporan. Silakan coba lagi.');
       setSummaryCards(DEFAULT_SUMMARY);
       setQuickLinks(DEFAULT_LINKS);
+      setQuickActions(DEFAULT_ACTIONS);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [parseQuickLinks, parseSummaryCards]);
+  }, [parseQuickActions, parseQuickLinks, parseSummaryCards]);
 
   useEffect(() => {
     fetchSummary({ showLoading: true });
@@ -221,6 +273,11 @@ const AdminCabangReportHomeScreen = () => {
   const handleLinkPress = useCallback((link) => {
     if (!link.route) return;
     navigation.navigate(link.route, link.params);
+  }, [navigation]);
+
+  const handleActionPress = useCallback((action) => {
+    if (!action.route || action.disabled) return;
+    navigation.navigate(action.route, action.params);
   }, [navigation]);
 
   if (loading && !refreshing) {
@@ -253,6 +310,24 @@ const AdminCabangReportHomeScreen = () => {
         {summaryCards.map((card) => (
           <ReportSummaryCard key={card.key} {...card} />
         ))}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+        <View style={styles.quickActionsGrid}>
+          {quickActions.map((action) => (
+            <ReportQuickActionTile
+              key={action.key}
+              title={action.title}
+              description={action.description}
+              icon={action.icon}
+              color={action.color}
+              badge={action.badge}
+              disabled={action.disabled}
+              onPress={() => handleActionPress(action)}
+            />
+          ))}
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -306,6 +381,11 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     marginBottom: 16,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
   },
 });
 
