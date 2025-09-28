@@ -123,9 +123,20 @@ const AdminCabangChildReportScreen = () => {
   };
 
   const handleWilayahFetch = (wilayahId) => {
-    if (wilayahId) {
-      dispatch(fetchShelterOptionsByWilayah(wilayahId));
+    if (!wilayahId) {
+      return;
     }
+
+    const existingOptions =
+      filterOptions.sheltersByWilayah?.[wilayahId] ||
+      filterOptions.sheltersByWilayah?.[String(wilayahId)];
+
+    if (Array.isArray(existingOptions)) {
+      // Data for this wilayah has already been loaded from the initial payload.
+      return;
+    }
+
+    dispatch(fetchShelterOptionsByWilayah(wilayahId));
   };
 
   const listHeader = (
