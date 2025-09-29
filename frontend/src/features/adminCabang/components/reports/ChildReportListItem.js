@@ -41,6 +41,33 @@ const pickDisplayString = (...candidates) => {
   return null;
 };
 
+const formatAttendancePercentage = (rawValue) => {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
+  }
+
+  let numericValue;
+
+  if (typeof rawValue === 'string') {
+    const cleanedString = rawValue.replace(/%/g, '').trim();
+    numericValue = Number.parseFloat(cleanedString);
+  } else {
+    numericValue = Number(rawValue);
+  }
+
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  if (numericValue <= 1 && numericValue >= 0) {
+    numericValue *= 100;
+  }
+
+  const formattedValue = numericValue.toFixed(1);
+
+  return `${formattedValue}%`;
+};
+
 const ChildReportListItem = ({ child, onPress }) => {
   const {
     displayName,
@@ -69,7 +96,7 @@ const ChildReportListItem = ({ child, onPress }) => {
         normalizeToDisplayString(child.wilbin_name) ??
         normalizeToDisplayString(child.nama_wilayah) ??
         null,
-      attendancePercentage: percentage !== null ? `${percentage}%` : null,
+      attendancePercentage: formatAttendancePercentage(percentage),
       attendanceSummary: (totalAttended !== undefined && totalActivities !== undefined)
         ? `${totalAttended}/${totalActivities} aktivitas`
         : null,
@@ -223,5 +250,9 @@ const styles = StyleSheet.create({
     color: '#27ae60',
   },
 });
+
+// Dev Notes (Manual QA):
+// - attendancePercentage handles string input "85%" ➜ renders "85.0%".
+// - attendancePercentage handles numeric ratio 0.82 ➜ renders "82.0%".
 
 export default ChildReportListItem;
