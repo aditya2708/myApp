@@ -193,8 +193,19 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       ]);
       
     } catch (err) {
-      console.error('Error updating GPS config:', err);
-      setError(err.response?.data?.message || 'Gagal menyimpan GPS setting');
+      console.error(
+        'Error updating GPS config:',
+        err.response?.status,
+        err.response?.data,
+        err
+      );
+
+      const backendMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        (typeof err.response?.data === 'string' ? err.response?.data : null);
+
+      setError(backendMessage || 'Gagal menyimpan GPS setting');
     } finally {
       setLoading(false);
     }
