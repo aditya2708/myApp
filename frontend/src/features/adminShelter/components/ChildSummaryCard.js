@@ -32,11 +32,29 @@ const ChildSummaryCard = ({ summary }) => {
     return Number.isNaN(numeric) ? null : numeric;
   };
 
-  const rawAverage = hasAttendanceDetails
-    ? calculateAttendancePercentage(totalAttended, totalActivities)
-    : summary.average_attendance;
+  const candidateAverageKeys = [
+    'average_attendance',
+    'attendance_rate',
+    'average',
+    'average_percentage',
+    'attendance_percentage',
+    'percentage',
+    'overall_percentage'
+  ];
 
-  const derivedAverage = normalizePercentageValue(rawAverage);
+  const explicitAverage = candidateAverageKeys.reduce((acc, key) => {
+    if (acc !== null) return acc;
+    return normalizePercentageValue(summary[key]);
+  }, null);
+
+  const shouldUseFallback =
+    explicitAverage === null && hasAttendanceDetails && totalActivities > 0;
+
+  const derivedAverage = shouldUseFallback
+    ? normalizePercentageValue(
+        calculateAttendancePercentage(totalAttended, totalActivities)
+      )
+    : explicitAverage;
 
   return (
     <View style={styles.container}>
@@ -51,7 +69,7 @@ const ChildSummaryCard = ({ summary }) => {
             {formatPercentage(derivedAverage ?? 0)}%
           </Text>
           <Text style={styles.label}>Rata-rata Kehadiran</Text>
-          {hasAttendanceDetails && (
+          {shouldUseFallback && (
             <>
               <Text style={styles.helperText}>= total hadir ÷ total aktivitas</Text>
               <Text style={styles.helperRatio}>
