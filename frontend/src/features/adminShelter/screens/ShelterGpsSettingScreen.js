@@ -67,7 +67,19 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
         });
       }
     } catch (error) {
-      console.error('Error loading GPS config:', error);
+      console.error(
+        'Error loading GPS config:',
+        error.response?.status,
+        error.response?.data,
+        error.message,
+        error
+      );
+
+      const backendMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        (typeof error.response?.data === 'string' ? error.response?.data : null);
+      setError(backendMessage || 'Gagal memuat konfigurasi GPS');
       // Fallback to profile data if API fails
       if (profile?.shelter) {
         const requireGps = profile.shelter.require_gps;
