@@ -44,21 +44,6 @@ class ActivityReportController extends Controller
                 ], 404);
             }
 
-            // Check if activity is completed (current time > end_time)
-            $now = now();
-            $activityDate = $aktivitas->tanggal;
-            $endTime = $aktivitas->end_time;
-            
-            if ($endTime) {
-                $endDateTime = \Carbon\Carbon::parse($activityDate->format('Y-m-d') . ' ' . $endTime);
-                if ($now <= $endDateTime) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Aktivitas belum selesai. Laporan hanya dapat dibuat setelah aktivitas selesai.'
-                    ], 400);
-                }
-            }
-
             // Check if report already exists
             $existingReport = ActivityReport::where('id_aktivitas', $request->id_aktivitas)->first();
             if ($existingReport) {
