@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 
 class AktivitasRequest extends FormRequest
@@ -58,11 +59,20 @@ class AktivitasRequest extends FormRequest
                     $validator->errors()->add('materi', 'Either select materi from dropdown or provide custom materi text for Bimbel activities.');
                 }
             }
-            
+
             // For Kegiatan activities, ensure materi is provided
             if ($this->jenis_kegiatan === 'Kegiatan') {
                 if (empty($this->materi)) {
                     $validator->errors()->add('materi', 'Materi is required for Kegiatan activities.');
+                }
+            }
+
+            if (!empty($this->start_time) && !empty($this->end_time)) {
+                $startTime = Carbon::createFromFormat('H:i:s', $this->start_time);
+                $endTime = Carbon::createFromFormat('H:i:s', $this->end_time);
+
+                if ($startTime->diffInMinutes($endTime) < 45) {
+                    $validator->errors()->add('end_time', 'Durasi kegiatan minimal 45 menit.');
                 }
             }
         });
