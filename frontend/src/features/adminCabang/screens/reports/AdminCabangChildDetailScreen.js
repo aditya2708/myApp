@@ -22,6 +22,181 @@ import { fetchReportAnakChildDetail } from '../../redux/reportAnakThunks';
 
 const FALLBACK_PHOTO = require('../../../../assets/images/logo.png');
 
+const extractFirstAvailable = (source, keys = []) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  for (const key of keys) {
+    if (source[key] !== undefined && source[key] !== null) {
+      return source[key];
+    }
+  }
+
+  return null;
+};
+
+const normalizeTextValue = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    const joined = value
+      .map((item) => normalizeTextValue(item))
+      .filter((item) => item !== null && item !== '');
+
+    return joined.length > 0 ? joined.join(', ') : null;
+  }
+
+  const nestedValue = extractFirstAvailable(value, [
+    'full_name',
+    'name',
+    'nama',
+    'title',
+    'label',
+    'text',
+    'display',
+    'display_name',
+    'displayName',
+    'description',
+    'wilayah',
+    'wilayah_name',
+    'wilbin',
+    'wilbin_name',
+    'value',
+  ]);
+
+  return nestedValue !== null ? normalizeTextValue(nestedValue) : null;
+};
+
+const pickTextValue = (...candidates) => {
+  for (const candidate of candidates) {
+    const normalized = normalizeTextValue(candidate);
+    if (normalized !== null && normalized !== undefined) {
+      return normalized;
+    }
+  }
+
+  return null;
+};
+
+const normalizeNumberValue = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 1 : 0;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const numericString = trimmed
+      .replace(/%/g, '')
+      .replace(/[^0-9.,-]/g, '')
+      .replace(',', '.');
+    const parsed = Number(numericString);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const normalized = normalizeNumberValue(item);
+      if (normalized !== null) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  const nestedValue = extractFirstAvailable(value, [
+    'value',
+    'total',
+    'count',
+    'jumlah',
+    'amount',
+    'score',
+    'percentage',
+    'percent',
+  ]);
+
+  return nestedValue !== null ? normalizeNumberValue(nestedValue) : null;
+};
+
+const pickNumberValue = (...candidates) => {
+  for (const candidate of candidates) {
+    const normalized = normalizeNumberValue(candidate);
+    if (normalized !== null && normalized !== undefined) {
+      return normalized;
+    }
+  }
+
+  return null;
+};
+
+const normalizeUrlValue = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const normalized = normalizeUrlValue(item);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  const nestedValue = extractFirstAvailable(value, [
+    'url',
+    'uri',
+    'path',
+    'photo',
+    'photo_url',
+    'foto',
+    'foto_url',
+    'image',
+    'image_url',
+    'link',
+  ]);
+
+  return nestedValue ? normalizeUrlValue(nestedValue) : null;
+};
+
+const pickUrlValue = (...candidates) => {
+  for (const candidate of candidates) {
+    const normalized = normalizeUrlValue(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+};
+
 const AdminCabangChildDetailScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
@@ -58,68 +233,112 @@ const AdminCabangChildDetailScreen = () => {
   const profile = useMemo(() => {
     const child = detail.child || {};
     return {
-      name: child.full_name || child.name || child.nama || childName || 'Anak Binaan',
-      nickname: child.nick_name || child.nickname || null,
-      shelter: child.shelter_name || child.shelter || child.nama_shelter || null,
-      wilayah: child.wilayah_name || child.wilbin_name || child.nama_wilayah || null,
-      joinedAt: child.joined_at || child.created_at || null,
-      grade: child.class_name || child.kelas || null,
-      photo: child.photo_url || child.foto_url || child.avatar_url || null,
+      name:
+        pickTextValue(
+          child.full_name,
+          child.name,
+          child.nama,
+          detail.metadata?.child_name,
+          childName,
+        ) || 'Anak Binaan',
+      nickname: pickTextValue(child.nick_name, child.nickname),
+      shelter: pickTextValue(child.shelter_name, child.shelter, child.nama_shelter),
+      wilayah: pickTextValue(
+        child.wilayah_name,
+        child.wilbin_name,
+        child.nama_wilayah,
+        child.wilayah,
+        child.wilbin,
+      ),
+      joinedAt: pickTextValue(child.joined_at, child.created_at, child.registration_date),
+      grade: pickTextValue(child.class_name, child.kelas, child.grade, child.grade_name),
+      photo: pickUrlValue(
+        child.photo_url,
+        child.foto_url,
+        child.avatar_url,
+        child.photo,
+        child.profile_photo,
+      ),
     };
-  }, [detail.child, childName]);
+  }, [detail.child, childName, detail.metadata]);
 
   const summaryCards = useMemo(() => {
     const summary = detail.summary || {};
     const cards = [];
 
-    if (summary.total_activities ?? summary.activities_count) {
+    const totalActivitiesNumber = pickNumberValue(summary.total_activities, summary.activities_count);
+    const totalActivitiesValue =
+      totalActivitiesNumber ?? pickTextValue(summary.total_activities, summary.activities_count);
+
+    if (totalActivitiesValue !== null && totalActivitiesValue !== undefined) {
       cards.push({
         key: 'activities',
         label: 'Total Aktivitas',
-        value: summary.total_activities ?? summary.activities_count,
+        value: totalActivitiesNumber ?? totalActivitiesValue,
         icon: 'calendar-number',
         color: '#2980b9',
-        description: summary.activity_description,
+        description: pickTextValue(summary.activity_description, summary.activities_description),
       });
     }
 
-    if (summary.attendance_percentage ?? summary.kehadiran) {
+    const attendanceNumber = pickNumberValue(summary.attendance_percentage, summary.kehadiran);
+    const attendanceValue = pickTextValue(summary.attendance_percentage, summary.kehadiran);
+
+    if (attendanceNumber !== null || attendanceValue !== null) {
       cards.push({
         key: 'attendance',
         label: 'Kehadiran',
-        value: `${summary.attendance_percentage ?? summary.kehadiran}%`,
+        value:
+          attendanceNumber !== null && attendanceNumber !== undefined
+            ? `${attendanceNumber}%`
+            : attendanceValue,
         icon: 'stats-chart',
         color: '#27ae60',
-        description: summary.attendance_description,
+        description: pickTextValue(summary.attendance_description, summary.kehadiran_description),
       });
     }
 
-    if (summary.average_score ?? summary.nilai_rata_rata) {
+    const averageScoreNumber = pickNumberValue(summary.average_score, summary.nilai_rata_rata);
+    const averageScoreValue =
+      averageScoreNumber ?? pickTextValue(summary.average_score, summary.nilai_rata_rata);
+
+    if (averageScoreValue !== null && averageScoreValue !== undefined) {
       cards.push({
         key: 'score',
         label: 'Nilai Rata-rata',
-        value: summary.average_score ?? summary.nilai_rata_rata,
+        value: averageScoreNumber ?? averageScoreValue,
         icon: 'school',
         color: '#9b59b6',
-        description: summary.score_description,
+        description: pickTextValue(summary.score_description, summary.score_details),
       });
     }
 
-    if (summary.total_programs ?? summary.programs_count) {
+    const totalProgramsNumber = pickNumberValue(summary.total_programs, summary.programs_count);
+    const totalProgramsValue =
+      totalProgramsNumber ?? pickTextValue(summary.total_programs, summary.programs_count);
+
+    if (totalProgramsValue !== null && totalProgramsValue !== undefined) {
       cards.push({
         key: 'programs',
         label: 'Program Diikuti',
-        value: summary.total_programs ?? summary.programs_count,
+        value: totalProgramsNumber ?? totalProgramsValue,
         icon: 'layers',
         color: '#e67e22',
-        description: summary.program_description,
+        description: pickTextValue(summary.program_description, summary.programs_description),
       });
     }
 
     return cards;
   }, [detail.summary]);
 
-  const activities = detail.activities || [];
+  const activities = (detail.activities || []).map((activity) => ({
+    id: activity.id || activity.activity_id,
+    title:
+      pickTextValue(activity.title, activity.nama_kegiatan, activity.name) || 'Aktivitas',
+    status: pickTextValue(activity.status, activity.state),
+    date: pickTextValue(activity.date, activity.tanggal, activity.periode) || '-',
+    description: pickTextValue(activity.description, activity.deskripsi),
+  }));
 
   return (
     <ScrollView
@@ -206,23 +425,23 @@ const AdminCabangChildDetailScreen = () => {
           <Text style={styles.emptyText}>Belum ada catatan aktivitas untuk ditampilkan.</Text>
         ) : (
           activities.map((activity, index) => (
-            <View key={activity.id || activity.activity_id || index} style={styles.activityItem}>
+            <View key={activity.id || index} style={styles.activityItem}>
               <View style={styles.activityHeader}>
                 <Text style={styles.activityTitle} numberOfLines={2}>
-                  {activity.title || activity.nama_kegiatan || activity.name || 'Aktivitas'}
+                  {activity.title}
                 </Text>
-                {activity.status && (
+                {activity.status ? (
                   <View style={styles.activityStatus}>
                     <Text style={styles.activityStatusText}>{activity.status}</Text>
                   </View>
-                )}
+                ) : null}
               </View>
               <Text style={styles.activityMeta}>
-                {activity.date || activity.tanggal || activity.periode || '-'}
+                {activity.date}
               </Text>
-              {activity.description || activity.deskripsi ? (
+              {activity.description ? (
                 <Text style={styles.activityDescription}>
-                  {activity.description || activity.deskripsi}
+                  {activity.description}
                 </Text>
               ) : null}
             </View>
