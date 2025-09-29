@@ -13,6 +13,12 @@ const ChildReportSummary = ({ summary }) => {
       total_children: summary.total_children ?? summary.children_total ?? summary.totalAnak ?? summary.total ?? 0,
       average_attendance: summary.average_attendance ?? summary.attendance_rate ?? summary.average ?? 0,
       total_activities: summary.total_activities ?? summary.activities_total ?? summary.totalActivities ?? 0,
+      total_attended:
+        summary.total_attended ??
+        summary.attended_count ??
+        summary.totalAttended ??
+        summary.attendedCount ??
+        null,
       total_wilayah: summary.total_wilayah ?? summary.wilayah_total ?? summary.totalWilayah ?? null,
       total_shelters: summary.total_shelters ?? summary.shelter_total ?? summary.totalShelter ?? null,
       active_programs: summary.active_programs ?? summary.programs_active ?? null,
