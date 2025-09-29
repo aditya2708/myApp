@@ -12,13 +12,22 @@ import {
 const ChildSummaryCard = ({ summary }) => {
   if (!summary) return null;
 
+  const totalChildren = summary.total_children;
   const totalAttended = summary.total_attended;
   const totalActivities = summary.total_activities;
+  const numericTotalChildren = Number(totalChildren);
+  const numericTotalAttended = Number(totalAttended);
+  const numericTotalActivities = Number(totalActivities);
   const hasAttendanceDetails =
+    totalChildren !== undefined &&
+    totalChildren !== null &&
     totalAttended !== undefined &&
     totalAttended !== null &&
     totalActivities !== undefined &&
-    totalActivities !== null;
+    totalActivities !== null &&
+    !Number.isNaN(numericTotalChildren) &&
+    !Number.isNaN(numericTotalAttended) &&
+    !Number.isNaN(numericTotalActivities);
 
   const normalizePercentageValue = (value) => {
     if (value === null || value === undefined) return null;
@@ -47,12 +56,18 @@ const ChildSummaryCard = ({ summary }) => {
     return normalizePercentageValue(summary[key]);
   }, null);
 
+  const totalPotentialAttendance = hasAttendanceDetails
+    ? numericTotalChildren * numericTotalActivities
+    : 0;
+
   const shouldUseFallback =
-    explicitAverage === null && hasAttendanceDetails && totalActivities > 0;
+    explicitAverage === null &&
+    hasAttendanceDetails &&
+    totalPotentialAttendance > 0;
 
   const derivedAverage = shouldUseFallback
     ? normalizePercentageValue(
-        calculateAttendancePercentage(totalAttended, totalActivities)
+        calculateAttendancePercentage(numericTotalAttended, totalPotentialAttendance)
       )
     : explicitAverage;
 
@@ -71,9 +86,11 @@ const ChildSummaryCard = ({ summary }) => {
           <Text style={styles.label}>Rata-rata Kehadiran</Text>
           {shouldUseFallback && (
             <>
-              <Text style={styles.helperText}>= total hadir ÷ total aktivitas</Text>
+              <Text style={styles.helperText}>
+                = total hadir ÷ (total anak × total aktivitas)
+              </Text>
               <Text style={styles.helperRatio}>
-                {`${totalAttended}/${totalActivities}`}
+                {`${totalAttended}/${totalPotentialAttendance}`}
               </Text>
             </>
           )}
