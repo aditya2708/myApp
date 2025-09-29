@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 // Core screens
 import AdminShelterDashboardScreen from '../features/adminShelter/screens/AdminShelterDashboardScreen';
 import AdminShelterProfileScreen from '../features/adminShelter/screens/AdminShelterProfileScreen';
+import AdminShelterSettingsScreen from '../features/adminShelter/screens/AdminShelterSettingsScreen';
 import ShelterGpsSettingScreen from '../features/adminShelter/screens/ShelterGpsSettingScreen';
 
 // Primary feature screens  
@@ -161,10 +162,15 @@ const ProfileStackNavigator = () => (
       component={AdminShelterProfileScreen}
       options={{ headerTitle: 'Profil Admin Shelter' }}
     />
-    <ProfileStack.Screen 
-      name="ShelterGpsSetting" 
-      component={ShelterGpsSettingScreen} 
-      options={{ headerTitle: 'Setting GPS Shelter' }} 
+    <ProfileStack.Screen
+      name="ShelterGpsSetting"
+      component={ShelterGpsSettingScreen}
+      options={{ headerTitle: 'Setting GPS Shelter' }}
+    />
+    <ProfileStack.Screen
+      name="AdminShelterSettings"
+      component={AdminShelterSettingsScreen}
+      options={{ headerTitle: 'Pengaturan' }}
     />
   </ProfileStack.Navigator>
 );
