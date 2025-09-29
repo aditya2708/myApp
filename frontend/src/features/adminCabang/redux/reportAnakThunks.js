@@ -262,10 +262,85 @@ const extractListPayload = (response) => {
 const extractDetailPayload = (response) => {
   const payload = response?.data?.data || response?.data || {};
 
+  const child = payload.child || payload.profile || payload.data || payload || {};
+
+  const summaryFromPayload = payload.summary || payload.overview || null;
+
+  let summary = summaryFromPayload;
+
+  if (!summary && child) {
+    const totalActivities = child.total_activities ?? child.totalActivities ?? null;
+    const totalAttended = child.total_attended ?? child.totalAttended ?? null;
+    const attendancePercentage =
+      child.overall_percentage ?? child.overallPercentage ?? child.attendance_percentage ?? null;
+
+    if (
+      totalActivities !== null ||
+      totalAttended !== null ||
+      attendancePercentage !== null
+    ) {
+      summary = {
+        total_activities: totalActivities,
+        total_attended: totalAttended,
+        attendance_percentage: attendancePercentage,
+      };
+
+      if (totalActivities !== null && totalAttended !== null) {
+        summary.attendance_description = `${totalAttended}/${totalActivities} aktivitas dihadiri`;
+      }
+    }
+  }
+
+  const rawActivities = payload.activities || payload.records || payload.attendance || null;
+
+  let activities = [];
+
+  if (Array.isArray(rawActivities)) {
+    activities = rawActivities;
+  } else if (rawActivities && typeof rawActivities === 'object') {
+    activities = Object.values(rawActivities);
+  } else if (rawActivities) {
+    activities = [rawActivities];
+  }
+
+  if (activities.length === 0) {
+    const monthlyData = child.monthly_data || child.monthlyData;
+
+    if (monthlyData && typeof monthlyData === 'object') {
+      activities = Object.entries(monthlyData).map(([monthKey, value]) => {
+        const monthlyItem = value || {};
+        const totalMonthlyActivities =
+          monthlyItem.activities_count ?? monthlyItem.total_activities ?? null;
+        const totalMonthlyAttended =
+          monthlyItem.attended_count ?? monthlyItem.total_attended ?? null;
+        const monthlyPercentage =
+          monthlyItem.percentage ?? monthlyItem.attendance_percentage ?? monthlyItem.overall_percentage ?? null;
+
+        const baseTitle =
+          monthlyItem.month_name || monthlyItem.title || monthlyItem.name || monthKey;
+
+        const activity = {
+          id: monthlyItem.id ?? monthlyItem.month_id ?? monthKey,
+          title: baseTitle,
+          periode: monthlyItem.month_name || monthlyItem.period || monthlyItem.periode || baseTitle,
+          attended_count: totalMonthlyAttended,
+          activities_count: totalMonthlyActivities,
+          percentage: monthlyPercentage,
+        };
+
+        if (totalMonthlyActivities !== null && totalMonthlyAttended !== null) {
+          activity.description = `${totalMonthlyAttended}/${totalMonthlyActivities} aktivitas dihadiri`;
+        }
+
+        return activity;
+      });
+    }
+  }
+
   return {
-    child: payload.child || payload.profile || payload.data || payload,
-    summary: payload.summary || payload.overview || null,
-    activities: payload.activities || payload.records || payload.attendance || [],
+    child,
+    summary,
+    activities,
     metadata: payload.metadata || payload.meta || {},
   };
 };
