@@ -263,6 +263,7 @@ const extractDetailPayload = (response) => {
   const payload = response?.data?.data || response?.data || {};
 
   const child = payload.child || payload.profile || payload.data || payload || {};
+  const monthlyData = child.monthly_data ?? child.monthlyData ?? null;
 
   const summaryFromPayload = payload.summary || payload.overview || null;
 
@@ -304,8 +305,6 @@ const extractDetailPayload = (response) => {
   }
 
   if (activities.length === 0) {
-    const monthlyData = child.monthly_data || child.monthlyData;
-
     if (monthlyData && typeof monthlyData === 'object') {
       activities = Object.entries(monthlyData).map(([monthKey, value]) => {
         const monthlyItem = value || {};
@@ -341,6 +340,7 @@ const extractDetailPayload = (response) => {
     child,
     summary,
     activities,
+    monthlyData,
     metadata: payload.metadata || payload.meta || {},
   };
 };
