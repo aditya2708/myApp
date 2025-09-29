@@ -79,8 +79,17 @@ const ChildReportListItem = ({ child, onPress }) => {
     lastActivity,
     photoUrl,
   } = useMemo(() => {
-    const totalAttended = child.total_attended ?? child.attended_count ?? child.totalAktivitasHadir;
-    const totalActivities = child.total_activities ?? child.activities_count ?? child.totalAktivitas;
+    const totalAttended =
+      child.total_attended ?? child.attended_count ?? child.totalAktivitasHadir;
+    const totalOpportunities =
+      child.total_attendance_opportunities ??
+      child.attendance_opportunities_total ??
+      child.totalAttendanceOpportunities ??
+      child.total_attendance_opportunity ??
+      child.totalAttendanceOpportunity ??
+      child.total_activities ??
+      child.activities_count ??
+      child.totalAktivitas;
     const percentage = child.attendance_percentage ?? child.overall_percentage ?? child.percentage ?? null;
 
     return {
@@ -97,8 +106,12 @@ const ChildReportListItem = ({ child, onPress }) => {
         normalizeToDisplayString(child.nama_wilayah) ??
         null,
       attendancePercentage: formatAttendancePercentage(percentage),
-      attendanceSummary: (totalAttended !== undefined && totalActivities !== undefined)
-        ? `${totalAttended}/${totalActivities} aktivitas`
+      attendanceSummary:
+        totalAttended !== undefined &&
+        totalAttended !== null &&
+        totalOpportunities !== undefined &&
+        totalOpportunities !== null
+          ? `${totalAttended}/${totalOpportunities} peluang kehadiran`
         : null,
       lastActivity: pickDisplayString(child.last_activity, child.latest_activity),
       photoUrl: child.photo_url || child.foto_url || child.avatar_url || null,
