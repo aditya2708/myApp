@@ -194,6 +194,8 @@ class AdminCabangLaporanAnakController extends Controller
         $totalActivitiesByShelter = $this->getTotalActivitiesByShelter($childShelterIds, $startDate, $endDate, $jenisKegiatan);
         $attendancePerChildPerMonth = $this->getAttendancePerChildPerMonth($childIds, $startDate, $endDate, $jenisKegiatan);
         $totalAttendanceByChild = $this->getTotalAttendanceByChild($childIds, $startDate, $endDate, $jenisKegiatan);
+        $attendanceOpportunitiesPerChildPerMonth = $this->getAttendanceOpportunitiesPerChildPerMonth($childIds, $startDate, $endDate, $jenisKegiatan);
+        $totalAttendanceOpportunitiesByChild = $this->getTotalAttendanceOpportunitiesByChild($childIds, $startDate, $endDate, $jenisKegiatan);
 
         $childrenData = [];
         foreach ($children as $child) {
@@ -201,10 +203,12 @@ class AdminCabangLaporanAnakController extends Controller
             foreach ($monthsInRange as $month) {
                 $activityKey = $child->id_shelter . '-' . $month['year'] . '-' . $month['month'];
                 $attendanceKey = $child->id_anak . '-' . $month['year'] . '-' . $month['month'];
+                $opportunityKey = $attendanceKey;
 
                 $activitiesCount = $activitiesPerShelterPerMonth[$activityKey] ?? 0;
                 $attendedCount = $attendancePerChildPerMonth[$attendanceKey] ?? 0;
-                $percentage = $activitiesCount > 0 ? round(($attendedCount / $activitiesCount) * 100, 1) : 0;
+                $opportunitiesCount = $attendanceOpportunitiesPerChildPerMonth[$opportunityKey] ?? 0;
+                $percentage = $opportunitiesCount > 0 ? round(($attendedCount / $opportunitiesCount) * 100, 1) : 0;
 
                 $childMonthly[$month['key']] = [
                     'month_name' => $month['name'],
@@ -212,13 +216,15 @@ class AdminCabangLaporanAnakController extends Controller
                     'year' => $month['year'],
                     'activities_count' => $activitiesCount,
                     'attended_count' => $attendedCount,
+                    'attendance_opportunities_count' => $opportunitiesCount,
                     'percentage' => $percentage,
                 ];
             }
 
             $totalActivities = $totalActivitiesByShelter[$child->id_shelter] ?? 0;
             $totalAttended = $totalAttendanceByChild[$child->id_anak] ?? 0;
-            $overallPercentage = $totalActivities > 0 ? round(($totalAttended / $totalActivities) * 100, 1) : 0;
+            $totalOpportunities = $totalAttendanceOpportunitiesByChild[$child->id_anak] ?? 0;
+            $overallPercentage = $totalOpportunities > 0 ? round(($totalAttended / $totalOpportunities) * 100, 1) : 0;
 
             $childrenData[] = [
                 'id_anak' => $child->id_anak,
@@ -236,6 +242,7 @@ class AdminCabangLaporanAnakController extends Controller
                 'monthly_data' => $childMonthly,
                 'total_activities' => $totalActivities,
                 'total_attended' => $totalAttended,
+                'total_attendance_opportunities' => $totalOpportunities,
                 'overall_percentage' => $overallPercentage,
             ];
         }
@@ -247,6 +254,8 @@ class AdminCabangLaporanAnakController extends Controller
         $activityTotalsAllShelters = $this->getTotalActivitiesByShelter($allShelterIds, $startDate, $endDate, $jenisKegiatan);
         $attendanceByChildAll = $this->getTotalAttendanceByChild($allChildIds, $startDate, $endDate, $jenisKegiatan, $search, $filteredShelterIds);
         $attendanceByShelterAll = $this->getAttendanceByShelter($allShelterIds, $startDate, $endDate, $jenisKegiatan, $search);
+        $attendanceOpportunitiesByChildAll = $this->getTotalAttendanceOpportunitiesByChild($allChildIds, $startDate, $endDate, $jenisKegiatan, $search, $filteredShelterIds);
+        $attendanceOpportunitiesByShelterAll = $this->getAttendanceOpportunitiesByShelter($allShelterIds, $startDate, $endDate, $jenisKegiatan, $search);
 
         $childShelterCounts = $allChildren
             ->groupBy('id_shelter')
@@ -260,7 +269,8 @@ class AdminCabangLaporanAnakController extends Controller
         foreach ($allChildren as $childRecord) {
             $totalActivities = $activityTotalsAllShelters[$childRecord->id_shelter] ?? 0;
             $totalAttended = $attendanceByChildAll[$childRecord->id_anak] ?? 0;
-            $percentage = $totalActivities > 0 ? round(($totalAttended / $totalActivities) * 100, 1) : 0;
+            $totalOpportunities = $attendanceOpportunitiesByChildAll[$childRecord->id_anak] ?? 0;
+            $percentage = $totalOpportunities > 0 ? round(($totalAttended / $totalOpportunities) * 100, 1) : 0;
             $childPercentages[] = $percentage;
         }
 
@@ -269,7 +279,7 @@ class AdminCabangLaporanAnakController extends Controller
             $childCount = $childShelterCounts->get($shelterId, 0);
             $activityCount = $activityTotalsAllShelters[$shelterId] ?? 0;
             $attendedCount = $attendanceByShelterAll[$shelterId] ?? 0;
-            $opportunities = $childCount * $activityCount;
+            $opportunities = $attendanceOpportunitiesByShelterAll[$shelterId] ?? 0;
             $percentage = $opportunities > 0 ? round(($attendedCount / $opportunities) * 100, 1) : 0;
 
             $wilbinData = null;
@@ -287,6 +297,7 @@ class AdminCabangLaporanAnakController extends Controller
                 'total_children' => $childCount,
                 'total_activities' => $activityCount,
                 'total_attended' => $attendedCount,
+                'total_attendance_opportunities' => $opportunities,
                 'attendance_percentage' => $percentage,
             ];
 
@@ -299,17 +310,19 @@ class AdminCabangLaporanAnakController extends Controller
                         'total_children' => 0,
                         'total_activities' => 0,
                         'total_attended' => 0,
+                        'total_attendance_opportunities' => 0,
                     ];
                 }
 
                 $wilbinSummary[$wilbinId]['total_children'] += $childCount;
                 $wilbinSummary[$wilbinId]['total_activities'] += $activityCount;
                 $wilbinSummary[$wilbinId]['total_attended'] += $attendedCount;
+                $wilbinSummary[$wilbinId]['total_attendance_opportunities'] += $opportunities;
             }
         }
 
         foreach ($wilbinSummary as $wilbinId => $data) {
-            $opportunities = $data['total_children'] * $data['total_activities'];
+            $opportunities = $data['total_attendance_opportunities'];
             $wilbinSummary[$wilbinId]['attendance_percentage'] = $opportunities > 0
                 ? round(($data['total_attended'] / $opportunities) * 100, 1)
                 : 0;
@@ -318,6 +331,7 @@ class AdminCabangLaporanAnakController extends Controller
         $totalChildren = $allChildren->count();
         $totalActivities = array_sum($activityTotalsAllShelters);
         $totalAttended = array_sum($attendanceByShelterAll);
+        $totalOpportunities = array_sum($attendanceOpportunitiesByShelterAll);
         $averageAttendance = !empty($childPercentages)
             ? round(array_sum($childPercentages) / count($childPercentages), 1)
             : 0;
@@ -328,6 +342,7 @@ class AdminCabangLaporanAnakController extends Controller
             'total_children' => $totalChildren,
             'total_activities' => $totalActivities,
             'total_attended' => $totalAttended,
+            'total_attendance_opportunities' => $totalOpportunities,
             'average_attendance' => $averageAttendance,
             'highest_attendance' => $highestAttendance,
             'lowest_attendance' => $lowestAttendance,
@@ -442,15 +457,19 @@ class AdminCabangLaporanAnakController extends Controller
         $attendancePerMonth = $this->getAttendancePerChildPerMonth([$child->id_anak], $startDate, $endDate, $jenisKegiatan);
         $totalActivitiesByShelter = $this->getTotalActivitiesByShelter([$child->id_shelter], $startDate, $endDate, $jenisKegiatan);
         $totalAttendanceByChild = $this->getTotalAttendanceByChild([$child->id_anak], $startDate, $endDate, $jenisKegiatan);
+        $attendanceOpportunitiesPerMonth = $this->getAttendanceOpportunitiesPerChildPerMonth([$child->id_anak], $startDate, $endDate, $jenisKegiatan);
+        $totalAttendanceOpportunitiesByChild = $this->getTotalAttendanceOpportunitiesByChild([$child->id_anak], $startDate, $endDate, $jenisKegiatan);
 
         $monthlyData = [];
         foreach ($monthsInRange as $month) {
             $activityKey = $child->id_shelter . '-' . $month['year'] . '-' . $month['month'];
             $attendanceKey = $child->id_anak . '-' . $month['year'] . '-' . $month['month'];
+            $opportunityKey = $attendanceKey;
 
             $activitiesCount = $activitiesPerMonth[$activityKey] ?? 0;
             $attendedCount = $attendancePerMonth[$attendanceKey] ?? 0;
-            $percentage = $activitiesCount > 0 ? round(($attendedCount / $activitiesCount) * 100, 1) : 0;
+            $opportunitiesCount = $attendanceOpportunitiesPerMonth[$opportunityKey] ?? 0;
+            $percentage = $opportunitiesCount > 0 ? round(($attendedCount / $opportunitiesCount) * 100, 1) : 0;
 
             $monthlyData[$month['key']] = [
                 'month_name' => $month['name'],
@@ -458,13 +477,15 @@ class AdminCabangLaporanAnakController extends Controller
                 'year' => $month['year'],
                 'activities_count' => $activitiesCount,
                 'attended_count' => $attendedCount,
+                'attendance_opportunities_count' => $opportunitiesCount,
                 'percentage' => $percentage,
             ];
         }
 
         $totalActivities = $totalActivitiesByShelter[$child->id_shelter] ?? 0;
         $totalAttended = $totalAttendanceByChild[$child->id_anak] ?? 0;
-        $overallPercentage = $totalActivities > 0 ? round(($totalAttended / $totalActivities) * 100, 1) : 0;
+        $totalOpportunities = $totalAttendanceOpportunitiesByChild[$child->id_anak] ?? 0;
+        $overallPercentage = $totalOpportunities > 0 ? round(($totalAttended / $totalOpportunities) * 100, 1) : 0;
 
         return response()->json([
             'message' => 'Detail laporan anak binaan berhasil diambil',
@@ -485,6 +506,7 @@ class AdminCabangLaporanAnakController extends Controller
                     'monthly_data' => $monthlyData,
                     'total_activities' => $totalActivities,
                     'total_attended' => $totalAttended,
+                    'total_attendance_opportunities' => $totalOpportunities,
                     'overall_percentage' => $overallPercentage,
                 ],
                 'filter_options' => $this->buildFilterOptions(
@@ -628,6 +650,102 @@ class AdminCabangLaporanAnakController extends Controller
         return $query
             ->groupBy('child_id')
             ->pluck('total', 'child_id')
+            ->map(fn ($value) => (int) $value)
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $childIds
+     * @return array<string, int>
+     */
+    protected function getAttendanceOpportunitiesPerChildPerMonth(array $childIds, Carbon $start, Carbon $end, ?string $jenisKegiatan): array
+    {
+        if (empty($childIds)) {
+            return [];
+        }
+
+        return Absen::query()
+            ->selectRaw('absen_user.id_anak as child_id, YEAR(aktivitas.tanggal) as year, MONTH(aktivitas.tanggal) as month, COUNT(*) as total')
+            ->join('absen_user', 'absen_user.id_absen_user', '=', 'absen.id_absen_user')
+            ->join('aktivitas', 'aktivitas.id_aktivitas', '=', 'absen.id_aktivitas')
+            ->whereIn('absen_user.id_anak', $childIds)
+            ->whereBetween('aktivitas.tanggal', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->when($jenisKegiatan, fn ($query) => $query->where('aktivitas.jenis_kegiatan', $jenisKegiatan))
+            ->groupBy('child_id', 'year', 'month')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                $key = $item->child_id . '-' . $item->year . '-' . $item->month;
+                return [$key => (int) $item->total];
+            })
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $childIds
+     * @return array<int, int>
+     */
+    protected function getTotalAttendanceOpportunitiesByChild(array $childIds, Carbon $start, Carbon $end, ?string $jenisKegiatan, ?string $search = null, ?array $shelterFilter = null): array
+    {
+        if (empty($childIds)) {
+            return [];
+        }
+
+        $query = Absen::query()
+            ->selectRaw('absen_user.id_anak as child_id, COUNT(*) as total')
+            ->join('absen_user', 'absen_user.id_absen_user', '=', 'absen.id_absen_user')
+            ->join('aktivitas', 'aktivitas.id_aktivitas', '=', 'absen.id_aktivitas')
+            ->join('anak', 'anak.id_anak', '=', 'absen_user.id_anak')
+            ->whereIn('absen_user.id_anak', $childIds)
+            ->whereBetween('aktivitas.tanggal', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->when($jenisKegiatan, fn ($builder) => $builder->where('aktivitas.jenis_kegiatan', $jenisKegiatan));
+
+        if ($search) {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('anak.full_name', 'like', "%{$search}%")
+                    ->orWhere('anak.nick_name', 'like', "%{$search}%");
+            });
+        }
+
+        if ($shelterFilter) {
+            $query->whereIn('anak.id_shelter', $shelterFilter);
+        }
+
+        return $query
+            ->groupBy('child_id')
+            ->pluck('total', 'child_id')
+            ->map(fn ($value) => (int) $value)
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $shelterIds
+     * @return array<int, int>
+     */
+    protected function getAttendanceOpportunitiesByShelter(array $shelterIds, Carbon $start, Carbon $end, ?string $jenisKegiatan, ?string $search = null): array
+    {
+        if (empty($shelterIds)) {
+            return [];
+        }
+
+        $query = Absen::query()
+            ->selectRaw('anak.id_shelter, COUNT(*) as total')
+            ->join('absen_user', 'absen_user.id_absen_user', '=', 'absen.id_absen_user')
+            ->join('anak', 'anak.id_anak', '=', 'absen_user.id_anak')
+            ->join('aktivitas', 'aktivitas.id_aktivitas', '=', 'absen.id_aktivitas')
+            ->whereIn('anak.id_shelter', $shelterIds)
+            ->whereBetween('aktivitas.tanggal', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->when($jenisKegiatan, fn ($builder) => $builder->where('aktivitas.jenis_kegiatan', $jenisKegiatan));
+
+        if ($search) {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('anak.full_name', 'like', "%{$search}%")
+                    ->orWhere('anak.nick_name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query
+            ->groupBy('anak.id_shelter')
+            ->pluck('total', 'anak.id_shelter')
             ->map(fn ($value) => (int) $value)
             ->all();
     }
