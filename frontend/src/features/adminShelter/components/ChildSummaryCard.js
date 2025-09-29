@@ -9,6 +9,14 @@ import { formatPercentage } from '../utils/reportUtils';
 const ChildSummaryCard = ({ summary }) => {
   if (!summary) return null;
 
+  const totalAttended = summary.total_attended;
+  const totalActivities = summary.total_activities;
+  const hasAttendanceDetails =
+    totalAttended !== undefined &&
+    totalAttended !== null &&
+    totalActivities !== undefined &&
+    totalActivities !== null;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Ringkasan</Text>
@@ -21,7 +29,15 @@ const ChildSummaryCard = ({ summary }) => {
           <Text style={[styles.value, { color: '#9b59b6' }]}>
             {formatPercentage(summary.average_attendance)}%
           </Text>
-          <Text style={styles.label}>Rata-rata</Text>
+          <Text style={styles.label}>Rata-rata Kehadiran</Text>
+          {hasAttendanceDetails && (
+            <>
+              <Text style={styles.helperText}>= total hadir ÷ total aktivitas</Text>
+              <Text style={styles.helperRatio}>
+                {`${totalAttended}/${totalActivities}`}
+              </Text>
+            </>
+          )}
         </View>
         <View style={styles.item}>
           <Text style={styles.value}>{summary.total_activities}</Text>
@@ -65,6 +81,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 4
+  },
+  helperText: {
+    fontSize: 10,
+    color: '#888',
+    marginTop: 4,
+    textAlign: 'center'
+  },
+  helperRatio: {
+    fontSize: 10,
+    color: '#888',
+    marginTop: 2,
+    textAlign: 'center'
   }
 });
 
