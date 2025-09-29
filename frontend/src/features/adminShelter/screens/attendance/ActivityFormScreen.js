@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image,
   Alert, Platform, ActivityIndicator, Switch
@@ -50,6 +50,8 @@ const ActivityFormScreen = ({ navigation, route }) => {
     showLateThresholdPicker: false, useCustomLateThreshold: false, useCustomMateri: false
   });
   
+  const MIN_ACTIVITY_DURATION = 45;
+
   const [kelompokList, setKelompokList] = useState([]);
   const [tutorList, setTutorList] = useState([]);
   const [loadingStates, setLoadingStates] = useState({
@@ -275,11 +277,39 @@ const ActivityFormScreen = ({ navigation, route }) => {
     dispatch(clearSelectedMateri());
   };
   
+  const calculateDurationMinutes = (start, end) => {
+    if (!start || !end) return null;
+    const difference = end.getTime() - start.getTime();
+    if (difference <= 0) return null;
+    return Math.round(difference / 60000);
+  };
+
   const handleTimeChange = (event, selectedTime, field, pickerField) => {
     setUIState(prev => ({ ...prev, [pickerField]: false }));
-    if (selectedTime) {
-      setFormData(prev => ({ ...prev, [field]: selectedTime }));
-      // Clear any existing conflict warning when time changes
+    if (!selectedTime) return;
+
+    let shouldClearConflict = false;
+    setFormData(prev => {
+      const updated = { ...prev, [field]: selectedTime };
+
+      if (updated.start_time && updated.end_time) {
+        if (updated.start_time >= updated.end_time) {
+          Alert.alert('Error Validasi', 'Waktu selesai harus setelah waktu mulai');
+          return prev;
+        }
+
+        const duration = calculateDurationMinutes(updated.start_time, updated.end_time);
+        if (duration !== null && duration < MIN_ACTIVITY_DURATION) {
+          Alert.alert('Durasi Tidak Valid', `Durasi kegiatan minimal ${MIN_ACTIVITY_DURATION} menit.`);
+          return prev;
+        }
+      }
+
+      shouldClearConflict = true;
+      return updated;
+    });
+
+    if (shouldClearConflict) {
       setConflictWarning(null);
     }
   };
@@ -336,6 +366,11 @@ const ActivityFormScreen = ({ navigation, route }) => {
     return () => clearTimeout(timeoutId);
   }, [formData.tanggal, formData.start_time, formData.end_time, formData.id_tutor, formData.nama_kelompok, formData.jenis_kegiatan, tutorList]);
   
+  const durationMinutes = useMemo(
+    () => calculateDurationMinutes(formData.start_time, formData.end_time),
+    [formData.start_time, formData.end_time]
+  );
+
   const validateForm = () => {
     if (!formData.jenis_kegiatan || !formData.tanggal) {
       Alert.alert('Error Validasi', 'Jenis aktivitas dan tanggal wajib diisi');
@@ -362,9 +397,16 @@ const ActivityFormScreen = ({ navigation, route }) => {
       return false;
     }
     
-    if (formData.start_time && formData.end_time && formData.start_time >= formData.end_time) {
-      Alert.alert('Error Validasi', 'Waktu selesai harus setelah waktu mulai');
-      return false;
+    if (formData.start_time && formData.end_time) {
+      if (formData.start_time >= formData.end_time) {
+        Alert.alert('Error Validasi', 'Waktu selesai harus setelah waktu mulai');
+        return false;
+      }
+
+      if (durationMinutes !== null && durationMinutes < MIN_ACTIVITY_DURATION) {
+        Alert.alert('Error Validasi', `Durasi kegiatan minimal ${MIN_ACTIVITY_DURATION} menit`);
+        return false;
+      }
     }
     
     if (uiState.useCustomLateThreshold && formData.late_threshold && formData.start_time && 
@@ -716,7 +758,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
           placeholder="Ketuk untuk mengatur waktu selesai"
           onPress={() => setUIState(prev => ({ ...prev, showEndTimePicker: true }))}
         />
-        
+
         {uiState.showEndTimePicker && (
           <DateTimePicker
             value={formData.end_time || new Date()}
@@ -725,6 +767,22 @@ const ActivityFormScreen = ({ navigation, route }) => {
             display="default"
             onChange={(event, time) => handleTimeChange(event, time, 'end_time', 'showEndTimePicker')}
           />
+        )}
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Durasi Kegiatan</Text>
+        <TextInput
+          style={[styles.input, styles.disabledInput]}
+          value={durationMinutes !== null
+            ? `${durationMinutes} menit`
+            : 'Durasi belum tersedia'}
+          editable={false}
+        />
+        {durationMinutes !== null && durationMinutes < MIN_ACTIVITY_DURATION && (
+          <Text style={[styles.helperText, styles.durationWarning]}>
+            Durasi minimal kegiatan adalah {MIN_ACTIVITY_DURATION} menit.
+          </Text>
         )}
       </View>
       
@@ -889,6 +947,9 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 12, color: '#95a5a6', marginTop: 6, fontStyle: 'italic'
+  },
+  durationWarning: {
+    color: '#e67e22'
   },
   buttonContainer: { marginTop: 20 },
   cancelButton: { marginTop: 12 },
