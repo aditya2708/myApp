@@ -158,7 +158,7 @@ const HomeStackNavigator = () => (
 const ProfileStackNavigator = () => (
   <ProfileStack.Navigator>
     <ProfileStack.Screen
-      name="AdminShelterProfile"
+      name="ProfileHome"
       component={AdminShelterProfileScreen}
       options={{ headerTitle: 'Profil Admin Shelter' }}
     />
@@ -249,7 +249,7 @@ const AdminShelterNavigator = () => (
           iconName = focused ? 'home' : 'home-outline';
         } else if (route.name === 'Management') {
           iconName = focused ? 'settings' : 'settings-outline';
-        } else if (route.name === 'Profile') {
+        } else if (route.name === 'ProfileTab') {
           iconName = focused ? 'person' : 'person-outline';
         }
         return <Ionicons name={iconName} size={size} color={color} />;
@@ -269,8 +269,8 @@ const AdminShelterNavigator = () => (
       component={ManagementStackNavigator}
       options={{ tabBarLabel: 'Management' }}
     />
-    <Tab.Screen 
-      name="Profile" 
+    <Tab.Screen
+      name="ProfileTab"
       component={ProfileStackNavigator}
       options={{ tabBarLabel: 'Profile' }}
     />
