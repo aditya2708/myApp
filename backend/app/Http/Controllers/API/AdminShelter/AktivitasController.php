@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
 
 class AktivitasController extends Controller
 {
@@ -841,11 +842,35 @@ class AktivitasController extends Controller
      */
     public function duplicateAktivitas($id, Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $payload = $request->all();
+
+        $normalizedTimes = [];
+        foreach (['start_time', 'end_time'] as $timeField) {
+            if (array_key_exists($timeField, $payload)) {
+                $value = $payload[$timeField];
+
+                if ($value === '' || $value === null) {
+                    $payload[$timeField] = null;
+                    $normalizedTimes[$timeField] = null;
+                    continue;
+                }
+
+                if (preg_match('/^\d{2}:\d{2}$/', $value)) {
+                    $payload[$timeField] = $value . ':00';
+                }
+
+                $normalizedTimes[$timeField] = $payload[$timeField];
+            }
+        }
+
+        $validator = Validator::make($payload, [
             'tanggal' => 'required|date',
-            'start_time' => 'sometimes|date_format:H:i',
-            'end_time' => 'sometimes|date_format:H:i',
+            'start_time' => 'sometimes|nullable|date_format:H:i:s',
+            'end_time' => 'sometimes|nullable|date_format:H:i:s',
             'nama_kelompok' => 'sometimes|string|max:255'
+        ], [
+            'start_time.date_format' => 'The start time must be in HH:MM:SS format.',
+            'end_time.date_format' => 'The end time must be in HH:MM:SS format.'
         ]);
 
         if ($validator->fails()) {
@@ -854,6 +879,10 @@ class AktivitasController extends Controller
                 'message' => 'Validasi gagal',
                 'errors' => $validator->errors()
             ], 422);
+        }
+
+        if (!empty($normalizedTimes)) {
+            $request->merge($normalizedTimes);
         }
 
         DB::beginTransaction();
@@ -868,7 +897,7 @@ class AktivitasController extends Controller
             }
 
             $shelterId = $user->adminShelter->shelter->id_shelter;
-            
+
             // Get original aktivitas
             $originalAktivitas = Aktivitas::where('id_shelter', $shelterId)
                 ->where('id_aktivitas', $id)
@@ -881,11 +910,45 @@ class AktivitasController extends Controller
                 ], 404);
             }
 
+            $parseTime = function ($time) {
+                if (empty($time)) {
+                    return null;
+                }
+
+                foreach (['H:i:s', 'H:i'] as $format) {
+                    try {
+                        return Carbon::createFromFormat($format, $time);
+                    } catch (\Exception $e) {
+                        continue;
+                    }
+                }
+
+                return null;
+            };
+
+            $finalStartTime = $request->input('start_time', $originalAktivitas->start_time);
+            $finalEndTime = $request->input('end_time', $originalAktivitas->end_time);
+
+            $startTimeCarbon = $parseTime($finalStartTime);
+            $endTimeCarbon = $parseTime($finalEndTime);
+
+            if ($startTimeCarbon && $endTimeCarbon && $startTimeCarbon->diffInMinutes($endTimeCarbon) < 45) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => [
+                        'end_time' => ['Durasi kegiatan minimal 45 menit.']
+                    ]
+                ], 422);
+            }
+
             // Create duplicate aktivitas
             $duplicateAktivitas = $originalAktivitas->replicate();
             $duplicateAktivitas->tanggal = $request->tanggal;
-            $duplicateAktivitas->start_time = $request->start_time ?? $originalAktivitas->start_time;
-            $duplicateAktivitas->end_time = $request->end_time ?? $originalAktivitas->end_time;
+            $duplicateAktivitas->start_time = $finalStartTime;
+            $duplicateAktivitas->end_time = $finalEndTime;
             $duplicateAktivitas->nama_kelompok = $request->nama_kelompok ?? $originalAktivitas->nama_kelompok;
             
             // Clear photo fields (photos won't be duplicated)
