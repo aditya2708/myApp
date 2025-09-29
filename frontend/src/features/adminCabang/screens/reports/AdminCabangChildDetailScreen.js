@@ -14,7 +14,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import ReportSummaryCard from '../../components/reports/ReportSummaryCard';
-import ChildAttendanceTrendChart from '../../components/reports/ChildAttendanceTrendChart';
 import {
   calculateAttendancePercentage,
   formatPercentage,
@@ -210,8 +209,6 @@ const AdminCabangChildDetailScreen = () => {
 
   const detail = useSelector(selectReportAnakDetail);
   const [refreshing, setRefreshing] = useState(false);
-  const shouldShowChart =
-    detail.monthlyData != null || (!detail.loading && !detail.error);
 
   useEffect(() => {
     if (childName) {
@@ -563,10 +560,6 @@ const AdminCabangChildDetailScreen = () => {
           ))}
         </View>
       )}
-
-      {shouldShowChart ? (
-        <ChildAttendanceTrendChart monthlyData={detail.monthlyData} type="line" />
-      ) : null}
 
       <View style={styles.activitiesSection}>
         <Text style={styles.sectionTitle}>Aktivitas Terakhir</Text>
