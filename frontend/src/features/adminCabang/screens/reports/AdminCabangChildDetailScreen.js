@@ -16,6 +16,10 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
 import ReportSummaryCard from '../../components/reports/ReportSummaryCard';
 import ChildAttendanceTrendChart from '../../components/reports/ChildAttendanceTrendChart';
 import {
+  calculateAttendancePercentage,
+  formatPercentage,
+} from '../../../adminShelter/utils/reportUtils';
+import {
   clearDetail,
   selectReportAnakDetail,
 } from '../../redux/reportAnakSlice';
@@ -269,13 +273,41 @@ const AdminCabangChildDetailScreen = () => {
     const summary = detail.summary || {};
     const cards = [];
 
-    const totalActivitiesNumber = pickNumberValue(summary.total_activities, summary.activities_count);
+    const totalActivitiesNumber = pickNumberValue(
+      summary.total_activities,
+      summary.activities_count,
+      summary.totalActivities,
+      summary.activitiesCount,
+      summary.total_activity,
+      summary.activity_total,
+    );
     const totalActivitiesValue =
-      totalActivitiesNumber ?? pickTextValue(summary.total_activities, summary.activities_count);
+      totalActivitiesNumber ??
+      pickTextValue(
+        summary.total_activities,
+        summary.activities_count,
+        summary.totalActivities,
+        summary.activitiesCount,
+        summary.total_activity,
+        summary.activity_total,
+      );
 
-    const totalAttendedNumber = pickNumberValue(summary.total_attended, summary.attended_count);
+    const totalAttendedNumber = pickNumberValue(
+      summary.total_attended,
+      summary.attended_count,
+      summary.totalAttended,
+      summary.attendedCount,
+      summary.attended_total,
+    );
     const totalAttendedValue =
-      totalAttendedNumber ?? pickTextValue(summary.total_attended, summary.attended_count);
+      totalAttendedNumber ??
+      pickTextValue(
+        summary.total_attended,
+        summary.attended_count,
+        summary.totalAttended,
+        summary.attendedCount,
+        summary.attended_total,
+      );
 
     if (totalActivitiesValue !== null && totalActivitiesValue !== undefined) {
       cards.push({
@@ -288,24 +320,68 @@ const AdminCabangChildDetailScreen = () => {
       });
     }
 
-    const attendanceNumber = pickNumberValue(summary.attendance_percentage, summary.kehadiran);
-    const attendanceValue = pickTextValue(summary.attendance_percentage, summary.kehadiran);
+    const attendanceNumber = pickNumberValue(
+      summary.attendance_percentage,
+      summary.kehadiran,
+      summary.average_attendance,
+      summary.attendance_rate,
+      summary.average,
+      summary.averageAttendance,
+      summary.attendanceRate,
+    );
+    const attendanceValue = pickTextValue(
+      summary.attendance_percentage,
+      summary.kehadiran,
+      summary.average_attendance,
+      summary.attendance_rate,
+      summary.average,
+      summary.averageAttendance,
+      summary.attendanceRate,
+    );
 
-    if (attendanceNumber !== null || attendanceValue !== null) {
+    const derivedAttendancePercentage =
+      totalAttendedNumber !== null &&
+      totalActivitiesNumber !== null &&
+      totalActivitiesNumber !== 0
+        ? calculateAttendancePercentage(totalAttendedNumber, totalActivitiesNumber)
+        : null;
+
+    if (attendanceNumber !== null || attendanceValue !== null || derivedAttendancePercentage !== null) {
+      const ratioAttendedDisplay =
+        totalAttendedValue !== null && totalAttendedValue !== undefined
+          ? totalAttendedValue
+          : totalAttendedNumber;
+      const ratioActivitiesDisplay =
+        totalActivitiesValue !== null && totalActivitiesValue !== undefined
+          ? totalActivitiesValue
+          : totalActivitiesNumber;
+
       const ratioText =
-        totalAttendedValue !== null && totalActivitiesValue !== null
-          ? `${totalAttendedValue}/${totalActivitiesValue} aktivitas dihadiri`
+        ratioAttendedDisplay !== null &&
+        ratioAttendedDisplay !== undefined &&
+        ratioActivitiesDisplay !== null &&
+        ratioActivitiesDisplay !== undefined
+          ? `${ratioAttendedDisplay}/${ratioActivitiesDisplay} aktivitas dihadiri`
           : null;
       const attendanceDescription =
         pickTextValue(summary.attendance_description, summary.kehadiran_description) || ratioText;
 
+      const attendanceLabelValue = (() => {
+        if (derivedAttendancePercentage !== null) {
+          return `${formatPercentage(derivedAttendancePercentage)}%`;
+        }
+
+        if (attendanceNumber !== null && attendanceNumber !== undefined) {
+          return `${attendanceNumber}%`;
+        }
+
+        return attendanceValue;
+      })();
+
       cards.push({
         key: 'attendance',
         label: 'Kehadiran',
-        value:
-          attendanceNumber !== null && attendanceNumber !== undefined
-            ? `${attendanceNumber}%`
-            : attendanceValue,
+        value: attendanceLabelValue,
         icon: 'stats-chart',
         color: '#27ae60',
         description: attendanceDescription,
