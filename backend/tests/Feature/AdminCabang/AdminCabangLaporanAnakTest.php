@@ -186,45 +186,35 @@ class AdminCabangLaporanAnakTest extends TestCase
             'full_name' => 'Cici Maharani',
         ]);
 
-        $activityOne = Aktivitas::create([
-            'id_shelter' => $shelterOne->id_shelter,
-            'jenis_kegiatan' => 'Belajar',
-            'tanggal' => '2024-05-01',
-        ]);
+        $baseDate = Carbon::parse('2024-01-01');
+        $positiveStatuses = [
+            Absen::TEXT_YA,
+            Absen::TEXT_TERLAMBAT,
+            Absen::TEXT_YA,
+        ];
+        $positiveIndex = 0;
 
-        $activityTwo = Aktivitas::create([
-            'id_shelter' => $shelterOne->id_shelter,
-            'jenis_kegiatan' => 'Belajar',
-            'tanggal' => '2024-05-08',
-        ]);
+        for ($i = 0; $i < 92; $i++) {
+            $activityDate = $baseDate->copy()->addDays($i);
+            $activity = Aktivitas::create([
+                'id_shelter' => $shelterOne->id_shelter,
+                'jenis_kegiatan' => 'Belajar',
+                'tanggal' => $activityDate->toDateString(),
+            ]);
 
-        $activityThree = Aktivitas::create([
-            'id_shelter' => $shelterTwo->id_shelter,
-            'jenis_kegiatan' => 'Outing',
-            'tanggal' => '2024-05-03',
-        ]);
+            foreach ([$childOne, $childTwo] as $child) {
+                $absenUser = AbsenUser::create(['id_anak' => $child->id_anak]);
+                $status = $positiveIndex < count($positiveStatuses)
+                    ? $positiveStatuses[$positiveIndex++]
+                    : Absen::TEXT_TIDAK;
 
-        $absenUserOne = AbsenUser::create(['id_anak' => $childOne->id_anak]);
-        $absenUserTwo = AbsenUser::create(['id_anak' => $childTwo->id_anak]);
-        $absenUserThree = AbsenUser::create(['id_anak' => $childThree->id_anak]);
-
-        Absen::create([
-            'id_absen_user' => $absenUserOne->id_absen_user,
-            'id_aktivitas' => $activityOne->id_aktivitas,
-            'absen' => Absen::TEXT_YA,
-        ]);
-
-        Absen::create([
-            'id_absen_user' => $absenUserTwo->id_absen_user,
-            'id_aktivitas' => $activityTwo->id_aktivitas,
-            'absen' => Absen::TEXT_TERLAMBAT,
-        ]);
-
-        Absen::create([
-            'id_absen_user' => $absenUserThree->id_absen_user,
-            'id_aktivitas' => $activityThree->id_aktivitas,
-            'absen' => Absen::TEXT_YA,
-        ]);
+                Absen::create([
+                    'id_absen_user' => $absenUser->id_absen_user,
+                    'id_aktivitas' => $activity->id_aktivitas,
+                    'absen' => $status,
+                ]);
+            }
+        }
 
         Sanctum::actingAs($user, ['*']);
 
@@ -238,7 +228,27 @@ class AdminCabangLaporanAnakTest extends TestCase
             ->assertJsonCount(2, 'data.children')
             ->assertJsonPath('data.summary.total_children', 3)
             ->assertJsonPath('data.summary.by_shelter.0.nama_shelter', 'Shelter Alpha')
-            ->assertJsonPath('data.summary.by_wilbin.0.nama_wilbin', 'Wilbin 1');
+            ->assertJsonPath('data.summary.by_wilbin.0.nama_wilbin', 'Wilbin 1')
+            ->assertJsonPath('data.summary.total_attended', 3)
+            ->assertJsonPath('data.summary.total_activities', 92)
+            ->assertJsonPath('data.summary.total_attendance_opportunities', 184)
+            ->assertJsonPath('data.summary.average_attendance', 1.1)
+            ->assertJsonPath('data.summary.highest_attendance', 2.2)
+            ->assertJsonPath('data.summary.lowest_attendance', 0.0)
+            ->assertJsonPath('data.summary.by_shelter.0.total_attendance_opportunities', 184)
+            ->assertJsonPath('data.summary.by_shelter.0.attendance_percentage', 1.6)
+            ->assertJsonPath('data.summary.by_wilbin.0.total_attendance_opportunities', 184)
+            ->assertJsonPath('data.summary.by_wilbin.0.attendance_percentage', 1.6)
+            ->assertJsonPath('data.children.0.total_attendance_opportunities', 92)
+            ->assertJsonPath('data.children.0.total_attended', 2)
+            ->assertJsonPath('data.children.0.overall_percentage', 2.2)
+            ->assertJsonPath('data.children.0.monthly_data.2024-01.attendance_opportunities_count', 31)
+            ->assertJsonPath('data.children.0.monthly_data.2024-01.attended_count', 2)
+            ->assertJsonPath('data.children.1.total_attendance_opportunities', 92)
+            ->assertJsonPath('data.children.1.total_attended', 1)
+            ->assertJsonPath('data.children.1.overall_percentage', 1.1)
+            ->assertJsonPath('data.children.1.monthly_data.2024-01.attendance_opportunities_count', 31)
+            ->assertJsonPath('data.children.1.monthly_data.2024-01.attended_count', 1);
     }
 
     public function test_admin_cabang_can_filter_by_date_jenis_and_shelter(): void
@@ -331,7 +341,10 @@ class AdminCabangLaporanAnakTest extends TestCase
             ->assertJsonPath('data.children.0.full_name', 'Bara Filter')
             ->assertJsonPath('data.summary.total_children', 1)
             ->assertJsonPath('data.children.0.monthly_data.2024-03.activities_count', 1)
-            ->assertJsonPath('data.children.0.monthly_data.2024-03.attended_count', 1);
+            ->assertJsonPath('data.children.0.monthly_data.2024-03.attended_count', 1)
+            ->assertJsonPath('data.children.0.monthly_data.2024-03.attendance_opportunities_count', 1)
+            ->assertJsonPath('data.children.0.total_attendance_opportunities', 1)
+            ->assertJsonPath('data.summary.total_attendance_opportunities', 1);
     }
 
     public function test_admin_cabang_without_profile_cannot_access_report(): void
