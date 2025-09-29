@@ -156,10 +156,10 @@ const HomeStackNavigator = () => (
 
 const ProfileStackNavigator = () => (
   <ProfileStack.Navigator>
-    <ProfileStack.Screen 
-      name="Profile" 
-      component={AdminShelterProfileScreen} 
-      options={{ headerTitle: 'Profil Admin Shelter' }} 
+    <ProfileStack.Screen
+      name="AdminShelterProfile"
+      component={AdminShelterProfileScreen}
+      options={{ headerTitle: 'Profil Admin Shelter' }}
     />
     <ProfileStack.Screen 
       name="ShelterGpsSetting" 
