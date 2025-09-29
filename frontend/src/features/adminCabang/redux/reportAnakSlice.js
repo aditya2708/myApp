@@ -39,6 +39,7 @@ const initialState = {
     child: null,
     summary: null,
     activities: [],
+    monthlyData: null,
     metadata: {},
     loading: false,
     error: null,
@@ -192,6 +193,7 @@ const reportAnakSlice = createSlice({
           child: action.payload.child || null,
           summary: action.payload.summary || null,
           activities: action.payload.activities || [],
+          monthlyData: action.payload.monthlyData || null,
           metadata: action.payload.metadata || {},
           error: null,
         };
