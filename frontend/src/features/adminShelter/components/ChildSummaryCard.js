@@ -15,19 +15,36 @@ const ChildSummaryCard = ({ summary }) => {
   const totalChildren = summary.total_children;
   const totalAttended = summary.total_attended;
   const totalActivities = summary.total_activities;
+  const totalAttendanceOpportunities =
+    summary.total_attendance_opportunities ??
+    summary.attendance_opportunities_total ??
+    summary.totalAttendanceOpportunities ??
+    summary.total_attendance_opportunity ??
+    summary.totalAttendanceOpportunity ??
+    null;
   const numericTotalChildren = Number(totalChildren);
   const numericTotalAttended = Number(totalAttended);
   const numericTotalActivities = Number(totalActivities);
+  const numericTotalAttendanceOpportunities =
+    totalAttendanceOpportunities !== null && totalAttendanceOpportunities !== undefined
+      ? Number(totalAttendanceOpportunities)
+      : null;
+  const hasValidAttended =
+    totalAttended !== undefined &&
+    totalAttended !== null &&
+    !Number.isNaN(numericTotalAttended);
   const hasAttendanceDetails =
     totalChildren !== undefined &&
     totalChildren !== null &&
-    totalAttended !== undefined &&
-    totalAttended !== null &&
+    hasValidAttended &&
     totalActivities !== undefined &&
     totalActivities !== null &&
     !Number.isNaN(numericTotalChildren) &&
-    !Number.isNaN(numericTotalAttended) &&
     !Number.isNaN(numericTotalActivities);
+  const hasAttendanceOpportunityDetails =
+    hasValidAttended &&
+    numericTotalAttendanceOpportunities !== null &&
+    !Number.isNaN(numericTotalAttendanceOpportunities);
 
   const normalizePercentageValue = (value) => {
     if (value === null || value === undefined) return null;
@@ -58,18 +75,32 @@ const ChildSummaryCard = ({ summary }) => {
 
   const totalPotentialAttendance = hasAttendanceDetails
     ? numericTotalChildren * numericTotalActivities
-    : 0;
+    : null;
+
+  const fallbackAttendanceOpportunities =
+    hasAttendanceOpportunityDetails && Number.isFinite(numericTotalAttendanceOpportunities)
+      ? numericTotalAttendanceOpportunities
+      : totalPotentialAttendance;
 
   const shouldUseFallback =
     explicitAverage === null &&
-    hasAttendanceDetails &&
-    totalPotentialAttendance > 0;
+    hasValidAttended &&
+    fallbackAttendanceOpportunities !== null &&
+    Number.isFinite(fallbackAttendanceOpportunities) &&
+    fallbackAttendanceOpportunities > 0;
 
   const derivedAverage = shouldUseFallback
     ? normalizePercentageValue(
-        calculateAttendancePercentage(numericTotalAttended, totalPotentialAttendance)
+        calculateAttendancePercentage(
+          numericTotalAttended,
+          fallbackAttendanceOpportunities
+        )
       )
     : explicitAverage;
+
+  const fallbackOpportunitiesDisplay = shouldUseFallback
+    ? fallbackAttendanceOpportunities
+    : null;
 
   return (
     <View style={styles.container}>
@@ -87,10 +118,12 @@ const ChildSummaryCard = ({ summary }) => {
           {shouldUseFallback && (
             <>
               <Text style={styles.helperText}>
-                = total hadir ÷ (total anak × total aktivitas)
+                = total hadir ÷ total peluang kehadiran
               </Text>
               <Text style={styles.helperRatio}>
-                {`${totalAttended}/${totalPotentialAttendance}`}
+                {`${totalAttended ?? 0}/${
+                  fallbackOpportunitiesDisplay ?? 0
+                }`}
               </Text>
             </>
           )}
