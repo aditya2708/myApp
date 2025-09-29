@@ -270,6 +270,10 @@ const AdminCabangChildDetailScreen = () => {
     const totalActivitiesValue =
       totalActivitiesNumber ?? pickTextValue(summary.total_activities, summary.activities_count);
 
+    const totalAttendedNumber = pickNumberValue(summary.total_attended, summary.attended_count);
+    const totalAttendedValue =
+      totalAttendedNumber ?? pickTextValue(summary.total_attended, summary.attended_count);
+
     if (totalActivitiesValue !== null && totalActivitiesValue !== undefined) {
       cards.push({
         key: 'activities',
@@ -285,6 +289,13 @@ const AdminCabangChildDetailScreen = () => {
     const attendanceValue = pickTextValue(summary.attendance_percentage, summary.kehadiran);
 
     if (attendanceNumber !== null || attendanceValue !== null) {
+      const ratioText =
+        totalAttendedValue !== null && totalActivitiesValue !== null
+          ? `${totalAttendedValue}/${totalActivitiesValue} aktivitas dihadiri`
+          : null;
+      const attendanceDescription =
+        pickTextValue(summary.attendance_description, summary.kehadiran_description) || ratioText;
+
       cards.push({
         key: 'attendance',
         label: 'Kehadiran',
@@ -294,7 +305,7 @@ const AdminCabangChildDetailScreen = () => {
             : attendanceValue,
         icon: 'stats-chart',
         color: '#27ae60',
-        description: pickTextValue(summary.attendance_description, summary.kehadiran_description),
+        description: attendanceDescription,
       });
     }
 
@@ -331,14 +342,69 @@ const AdminCabangChildDetailScreen = () => {
     return cards;
   }, [detail.summary]);
 
-  const activities = (detail.activities || []).map((activity) => ({
-    id: activity.id || activity.activity_id,
-    title:
-      pickTextValue(activity.title, activity.nama_kegiatan, activity.name) || 'Aktivitas',
-    status: pickTextValue(activity.status, activity.state),
-    date: pickTextValue(activity.date, activity.tanggal, activity.periode) || '-',
-    description: pickTextValue(activity.description, activity.deskripsi),
-  }));
+  const activities = (detail.activities || []).map((activity) => {
+    const attendedCount = pickNumberValue(
+      activity.attended_count,
+      activity.total_attended,
+      activity.attended,
+    );
+    const activitiesCount = pickNumberValue(
+      activity.activities_count,
+      activity.total_activities,
+      activity.activities,
+    );
+    const percentageNumber = pickNumberValue(
+      activity.percentage,
+      activity.attendance_percentage,
+      activity.overall_percentage,
+      activity.kehadiran,
+    );
+    const percentageValue =
+      percentageNumber ??
+      pickTextValue(
+        activity.percentage,
+        activity.attendance_percentage,
+        activity.overall_percentage,
+        activity.kehadiran,
+      );
+
+    const ratioText =
+      attendedCount !== null && activitiesCount !== null
+        ? `${attendedCount}/${activitiesCount} aktivitas dihadiri`
+        : null;
+
+    const percentageText =
+      percentageNumber !== null && percentageNumber !== undefined
+        ? `${percentageNumber}%`
+        : percentageValue;
+
+    const baseDescription = pickTextValue(activity.description, activity.deskripsi);
+    const metricsDescription = [ratioText, percentageText]
+      .filter((item) => item)
+      .join(' · ');
+
+    return {
+      id: activity.id || activity.activity_id,
+      title:
+        pickTextValue(
+          activity.title,
+          activity.nama_kegiatan,
+          activity.name,
+          activity.periode,
+          activity.month_name,
+        ) || 'Aktivitas',
+      status: pickTextValue(activity.status, activity.state) || percentageText || null,
+      date:
+        pickTextValue(
+          activity.date,
+          activity.tanggal,
+          activity.periode,
+          activity.month_name,
+        ) || '-',
+      description:
+        baseDescription || (metricsDescription ? metricsDescription : undefined),
+    };
+  });
 
   return (
     <ScrollView
