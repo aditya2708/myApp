@@ -29,8 +29,12 @@ import {
   selectReportAnakLoadingStates,
   selectReportAnakPagination,
   selectReportAnakSummary,
+  setDateRange,
   setFilters,
+  setJenisKegiatan,
   setSearch,
+  setShelter,
+  setWilayahBinaan,
 } from '../../redux/reportAnakSlice';
 import {
   fetchMoreReportAnak,
@@ -38,6 +42,7 @@ import {
   fetchShelterOptionsByWilayah,
   initializeReportAnak,
 } from '../../redux/reportAnakThunks';
+import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
 const AdminCabangChildReportScreen = () => {
   const dispatch = useDispatch();
@@ -105,6 +110,106 @@ const AdminCabangChildReportScreen = () => {
     setRefreshing(false);
   };
 
+  const handleRemoveDateRange = useCallback(() => {
+    const nextFilters = { ...filters, start_date: null, end_date: null };
+    dispatch(setDateRange({ start_date: null, end_date: null }));
+    dispatch(fetchReportAnakList({ filters: nextFilters, page: 1 }));
+  }, [dispatch, filters]);
+
+  const handleRemoveJenis = useCallback(() => {
+    const nextFilters = { ...filters, jenisKegiatan: null };
+    dispatch(setJenisKegiatan(null));
+    dispatch(fetchReportAnakList({ filters: nextFilters, page: 1 }));
+  }, [dispatch, filters]);
+
+  const handleRemoveWilayah = useCallback(() => {
+    const nextFilters = { ...filters, wilayahBinaan: null, shelter: null };
+    dispatch(setWilayahBinaan(null));
+    dispatch(fetchReportAnakList({ filters: nextFilters, page: 1 }));
+  }, [dispatch, filters]);
+
+  const handleRemoveShelter = useCallback(() => {
+    const nextFilters = { ...filters, shelter: null };
+    dispatch(setShelter(null));
+    dispatch(fetchReportAnakList({ filters: nextFilters, page: 1 }));
+  }, [dispatch, filters]);
+
+  const handleRemoveSearch = useCallback(() => {
+    setSearchText('');
+    const nextFilters = { ...filters, search: '' };
+    dispatch(setSearch(''));
+    dispatch(fetchReportAnakList({ filters: nextFilters, page: 1 }));
+  }, [dispatch, filters]);
+
+  const getOptionLabel = useCallback((options, value) => {
+    if (!value || !Array.isArray(options)) {
+      return null;
+    }
+
+    const stringValue = String(value);
+    const match = options.find((option) => {
+      const optionValue = option?.value ?? option?.id ?? option?.slug ?? option?.key ?? option;
+      return String(optionValue) === stringValue;
+    });
+
+    if (!match) {
+      return null;
+    }
+
+    return match?.label ?? match?.name ?? match?.nama ?? match;
+  }, []);
+
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+
+    if (filters.start_date || filters.end_date) {
+      const formattedStart = filters.start_date ? formatDateToIndonesian(filters.start_date) : null;
+      const formattedEnd = filters.end_date ? formatDateToIndonesian(filters.end_date) : null;
+
+      let label = 'Rentang Tanggal';
+      if (formattedStart && formattedEnd) {
+        label = `Rentang: ${formattedStart} - ${formattedEnd}`;
+      } else if (formattedStart) {
+        label = `Mulai: ${formattedStart}`;
+      } else if (formattedEnd) {
+        label = `Selesai: ${formattedEnd}`;
+      }
+
+      chips.push({ key: 'date_range', label, onRemove: handleRemoveDateRange });
+    }
+
+    const jenisLabel = getOptionLabel(filterOptions.jenisKegiatan, filters.jenisKegiatan);
+    if (jenisLabel) {
+      chips.push({ key: 'jenis', label: `Jenis: ${jenisLabel}`, onRemove: handleRemoveJenis });
+    }
+
+    const wilayahLabel = getOptionLabel(filterOptions.wilayahBinaan, filters.wilayahBinaan);
+    if (wilayahLabel) {
+      chips.push({ key: 'wilayah', label: `Wilayah: ${wilayahLabel}`, onRemove: handleRemoveWilayah });
+    }
+
+    const sheltersByWilayah = filterOptions.sheltersByWilayah?.[filters.wilayahBinaan] || [];
+    const shelterLabel = getOptionLabel(sheltersByWilayah, filters.shelter);
+    if (shelterLabel) {
+      chips.push({ key: 'shelter', label: `Shelter: ${shelterLabel}`, onRemove: handleRemoveShelter });
+    }
+
+    if (filters.search) {
+      chips.push({ key: 'search', label: `Cari: "${filters.search}"`, onRemove: handleRemoveSearch });
+    }
+
+    return chips;
+  }, [
+    filters,
+    filterOptions,
+    getOptionLabel,
+    handleRemoveDateRange,
+    handleRemoveJenis,
+    handleRemoveShelter,
+    handleRemoveSearch,
+    handleRemoveWilayah,
+  ]);
+
   const handleLoadMore = () => {
     if (!hasMore || loadingMore) return;
 
@@ -170,6 +275,24 @@ const AdminCabangChildReportScreen = () => {
           </TouchableOpacity>
         )}
       </View>
+
+      {activeFilterChips.length > 0 && (
+        <View style={styles.activeFiltersContainer}>
+          {activeFilterChips.map((chip) => (
+            <View key={chip.key} style={styles.filterChip}>
+              <Text style={styles.filterChipText}>{chip.label}</Text>
+              <TouchableOpacity
+                onPress={chip.onRemove}
+                style={styles.filterChipRemove}
+                accessibilityRole="button"
+                accessibilityLabel={`Hapus filter ${chip.label}`}
+              >
+                <Ionicons name="close" size={14} color="#7f8c8d" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
 
       <ChildReportSummary summary={summary} />
 
@@ -289,6 +412,29 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#2c3e50',
+  },
+  activeFiltersContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ecf0f1',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#2c3e50',
+  },
+  filterChipRemove: {
+    marginLeft: 6,
+    padding: 2,
   },
   errorWrapper: {
     marginTop: 8,
