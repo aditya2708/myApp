@@ -4,7 +4,10 @@ import {
   Text,
   StyleSheet
 } from 'react-native';
-import { formatPercentage } from '../utils/reportUtils';
+import {
+  formatPercentage,
+  calculateAttendancePercentage
+} from '../utils/reportUtils';
 
 const ChildSummaryCard = ({ summary }) => {
   if (!summary) return null;
@@ -17,6 +20,24 @@ const ChildSummaryCard = ({ summary }) => {
     totalActivities !== undefined &&
     totalActivities !== null;
 
+  const normalizePercentageValue = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const numeric = parseFloat(value.replace('%', '').trim());
+      return Number.isNaN(numeric) ? null : numeric;
+    }
+
+    const numeric = Number(value);
+    return Number.isNaN(numeric) ? null : numeric;
+  };
+
+  const rawAverage = hasAttendanceDetails
+    ? calculateAttendancePercentage(totalAttended, totalActivities)
+    : summary.average_attendance;
+
+  const derivedAverage = normalizePercentageValue(rawAverage);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Ringkasan</Text>
@@ -27,7 +48,7 @@ const ChildSummaryCard = ({ summary }) => {
         </View>
         <View style={styles.item}>
           <Text style={[styles.value, { color: '#9b59b6' }]}>
-            {formatPercentage(summary.average_attendance)}%
+            {formatPercentage(derivedAverage ?? 0)}%
           </Text>
           <Text style={styles.label}>Rata-rata Kehadiran</Text>
           {hasAttendanceDetails && (
