@@ -128,6 +128,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/kurikulum/statistics', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'getStatistics']);
         Route::get('/kurikulum/dropdown-data', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'getDropdownData']);
         Route::get('/kurikulum/mata-pelajaran', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'getMataPelajaran']);
+        Route::post('/kurikulum/{kurikulum}/set-active', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'setActive']);
 
         // Kurikulum materi management
         Route::get('/kurikulum/{kurikulum}/materi', [App\Http\Controllers\API\AdminCabang\KurikulumMateriController::class, 'index']);
