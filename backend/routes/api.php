@@ -291,6 +291,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/activity-reports/by-activity/{id_aktivitas}', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'getByActivity']);
         Route::delete('/activity-reports/{id}', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'destroy']);
 
+        Route::get('/kurikulum', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'index']);
+        Route::get('/kurikulum/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'show']);
+        Route::get('/kurikulum/{id}/preview', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'getPreview']);
+        Route::get('/kurikulum-dropdown', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'getForDropdown']);
+
         // Phase 3: Kurikulum Consumer (SIMPLIFIED - Read-only data provider)
         Route::get('/kurikulum/all-materi', [App\Http\Controllers\API\AdminShelter\KurikulumConsumerController::class, 'getAllMateri']);
         Route::get('/kurikulum/available-kelas', [App\Http\Controllers\API\AdminShelter\KurikulumConsumerController::class, 'getAvailableKelas']);
