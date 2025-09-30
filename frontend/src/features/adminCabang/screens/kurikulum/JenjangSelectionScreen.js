@@ -6,19 +6,42 @@ import { useSelector } from 'react-redux';
 import { useGetKurikulumStrukturQuery } from '../../api/kurikulumApi';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
+import {
+  selectSelectedKurikulum,
+  selectSelectedKurikulumId,
+  selectActiveKurikulum,
+  selectActiveKurikulumId,
+} from '../../redux/kurikulumSlice';
 
 /**
  * Jenjang Selection Screen - Sprint 1 Placeholder
  * Allows user to select educational level (SD, SMP, SMA)
  */
+const resolveKurikulumId = (value) => (
+  value?.id_kurikulum
+  ?? value?.kurikulum_id
+  ?? value?.id
+  ?? null
+);
+
 const JenjangSelectionScreen = ({ navigation, route }) => {
   const { kurikulumId: routeKurikulumId, kurikulum: routeKurikulum } = route?.params || {};
 
-  const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
+  const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
+  const selectedKurikulum = useSelector(selectSelectedKurikulum);
+  const activeKurikulumId = useSelector(selectActiveKurikulumId);
+  const activeKurikulum = useSelector(selectActiveKurikulum);
 
-  const activeKurikulum = routeKurikulum || selectedKurikulum;
-  const activeKurikulumId = routeKurikulumId ?? selectedKurikulumId ?? activeKurikulum?.id_kurikulum;
-  const shouldSkipQuery = !activeKurikulumId;
+  const resolvedRouteId = routeKurikulumId ?? resolveKurikulumId(routeKurikulum);
+  const resolvedSelectedId = selectedKurikulumId ?? resolveKurikulumId(selectedKurikulum);
+  const resolvedActiveId = activeKurikulumId ?? resolveKurikulumId(activeKurikulum);
+
+  const effectiveKurikulumId = resolvedRouteId ?? resolvedSelectedId ?? resolvedActiveId ?? null;
+  const effectiveKurikulum = routeKurikulum || selectedKurikulum || activeKurikulum || null;
+  const shouldSkipQuery = !effectiveKurikulumId;
+  const isUsingActive = Boolean(
+    effectiveKurikulumId && resolvedActiveId && String(effectiveKurikulumId) === String(resolvedActiveId)
+  );
 
   const {
     data: struktur,
@@ -26,7 +49,7 @@ const JenjangSelectionScreen = ({ navigation, route }) => {
     isFetching,
     error,
     refetch
-  } = useGetKurikulumStrukturQuery(activeKurikulumId, {
+  } = useGetKurikulumStrukturQuery(effectiveKurikulumId, {
     skip: shouldSkipQuery
   });
 
@@ -42,8 +65,8 @@ const JenjangSelectionScreen = ({ navigation, route }) => {
   const handleJenjangSelect = (jenjang) => {
     navigation.navigate('KelasSelection', {
       jenjang,
-      kurikulumId: activeKurikulumId,
-      kurikulum: activeKurikulum
+      kurikulumId: effectiveKurikulumId,
+      kurikulum: effectiveKurikulum
     });
   };
 
@@ -51,9 +74,9 @@ const JenjangSelectionScreen = ({ navigation, route }) => {
     return (
       <View style={styles.emptyWrapper}>
         <Ionicons name="library-outline" size={56} color="#adb5bd" style={styles.emptyIcon} />
-        <Text style={styles.emptyTitle}>Pilih Kurikulum Terlebih Dahulu</Text>
+        <Text style={styles.emptyTitle}>Tetapkan Kurikulum Lebih Dulu</Text>
         <Text style={styles.emptySubtitle}>
-          Untuk mengelola jenjang, pilih kurikulum yang ingin digunakan.
+          Tetapkan kurikulum aktif atau pilih kurikulum untuk mulai mengelola jenjang.
         </Text>
         <TouchableOpacity
           style={styles.emptyButton}
@@ -97,12 +120,38 @@ const JenjangSelectionScreen = ({ navigation, route }) => {
         <Text style={styles.subtitle}>
           Pilih jenjang untuk mengelola kurikulum
         </Text>
-        {activeKurikulum && (
-          <View style={styles.kurikulumBadge}>
-            <Ionicons name="ribbon-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />
-            <Text style={styles.kurikulumBadgeText} numberOfLines={1}>
-              {activeKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
-            </Text>
+        {effectiveKurikulum && (
+          <View
+            style={[
+              styles.kurikulumBadge,
+              isUsingActive ? styles.kurikulumBadgeActive : styles.kurikulumBadgeSelected,
+            ]}
+          >
+            <Ionicons
+              name={isUsingActive ? 'flash-outline' : 'checkmark-circle-outline'}
+              size={18}
+              color={isUsingActive ? '#0d6efd' : '#198754'}
+              style={{ marginRight: 8 }}
+            />
+            <View style={styles.kurikulumBadgeTextContainer}>
+              <Text
+                style={[
+                  styles.kurikulumBadgeLabel,
+                  isUsingActive ? styles.kurikulumBadgeLabelActive : styles.kurikulumBadgeLabelSelected,
+                ]}
+              >
+                {isUsingActive ? 'Menggunakan kurikulum aktif' : 'Menggunakan kurikulum terpilih'}
+              </Text>
+              <Text
+                style={[
+                  styles.kurikulumBadgeText,
+                  isUsingActive ? styles.kurikulumBadgeTextActive : styles.kurikulumBadgeTextSelected,
+                ]}
+                numberOfLines={1}
+              >
+                {effectiveKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
+              </Text>
+            </View>
           </View>
         )}
       </View>
@@ -171,16 +220,45 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e7f1ff',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
   },
-  kurikulumBadgeText: {
+  kurikulumBadgeActive: {
+    backgroundColor: '#e7f1ff',
+    borderWidth: 1,
+    borderColor: '#cfe2ff',
+  },
+  kurikulumBadgeSelected: {
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  kurikulumBadgeTextContainer: {
     flex: 1,
-    fontSize: 13,
-    color: '#0d6efd',
+  },
+  kurikulumBadgeLabel: {
+    fontSize: 11,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  kurikulumBadgeLabelActive: {
+    color: '#0d6efd',
+  },
+  kurikulumBadgeLabelSelected: {
+    color: '#198754',
+  },
+  kurikulumBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  kurikulumBadgeTextActive: {
+    color: '#0d3b66',
+  },
+  kurikulumBadgeTextSelected: {
+    color: '#166534',
   },
   content: {
     padding: 20,

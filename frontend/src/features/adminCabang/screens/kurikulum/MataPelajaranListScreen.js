@@ -6,6 +6,12 @@ import { useSelector } from 'react-redux';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import { useGetMataPelajaranQuery } from '../../api/kurikulumApi';
+import {
+  selectSelectedKurikulum,
+  selectSelectedKurikulumId,
+  selectActiveKurikulum,
+  selectActiveKurikulumId,
+} from '../../redux/kurikulumSlice';
 
 const getFirstDefined = (...values) => values.find((value) => value !== undefined && value !== null);
 
@@ -13,20 +19,31 @@ const getFirstDefined = (...values) => values.find((value) => value !== undefine
  * Mata Pelajaran List Screen - API Integrated
  * Shows list of subjects for selected jenjang and kelas
  */
+const resolveKurikulumId = (value) => (
+  value?.id_kurikulum
+  ?? value?.kurikulum_id
+  ?? value?.id
+  ?? null
+);
+
 const MataPelajaranListScreen = ({ navigation, route }) => {
   const { jenjang, kelas, kurikulumId: routeKurikulumId, kurikulum: routeKurikulum } = route.params || {};
 
-  const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
+  const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
+  const selectedKurikulum = useSelector(selectSelectedKurikulum);
+  const activeKurikulumId = useSelector(selectActiveKurikulumId);
+  const activeKurikulum = useSelector(selectActiveKurikulum);
 
-  const activeKurikulum = routeKurikulum || selectedKurikulum;
-  const activeKurikulumId = getFirstDefined(
-    routeKurikulumId,
-    selectedKurikulumId,
-    activeKurikulum?.id_kurikulum,
-    activeKurikulum?.kurikulum_id,
-    activeKurikulum?.id
+  const resolvedRouteId = getFirstDefined(routeKurikulumId, resolveKurikulumId(routeKurikulum));
+  const resolvedSelectedId = getFirstDefined(selectedKurikulumId, resolveKurikulumId(selectedKurikulum));
+  const resolvedActiveId = getFirstDefined(activeKurikulumId, resolveKurikulumId(activeKurikulum));
+
+  const effectiveKurikulumId = getFirstDefined(resolvedRouteId, resolvedSelectedId, resolvedActiveId);
+  const effectiveKurikulum = routeKurikulum || selectedKurikulum || activeKurikulum || null;
+  const shouldSkipQuery = !jenjang?.id_jenjang || !kelas?.id_kelas || !effectiveKurikulumId;
+  const isUsingActive = Boolean(
+    effectiveKurikulumId && resolvedActiveId && String(effectiveKurikulumId) === String(resolvedActiveId)
   );
-  const shouldSkipQuery = !jenjang?.id_jenjang || !kelas?.id_kelas || !activeKurikulumId;
 
   // API hooks
   const {
@@ -56,18 +73,18 @@ const MataPelajaranListScreen = ({ navigation, route }) => {
       jenjang,
       kelas,
       mataPelajaran,
-      kurikulumId: activeKurikulumId,
-      kurikulum: activeKurikulum
+      kurikulumId: effectiveKurikulumId,
+      kurikulum: effectiveKurikulum
     });
   };
 
-  if (!activeKurikulumId) {
+  if (!effectiveKurikulumId) {
     return (
       <View style={styles.emptyWrapper}>
         <Ionicons name="library-outline" size={56} color="#adb5bd" style={styles.emptyIcon} />
-        <Text style={styles.emptyTitle}>Kurikulum Belum Dipilih</Text>
+        <Text style={styles.emptyTitle}>Tetapkan Kurikulum Lebih Dulu</Text>
         <Text style={styles.emptySubtitle}>
-          Pilih kurikulum terlebih dahulu untuk melihat daftar mata pelajaran.
+          Tetapkan kurikulum aktif atau pilih kurikulum untuk melihat daftar mata pelajaran.
         </Text>
         <TouchableOpacity
           style={styles.emptyButton}
@@ -114,12 +131,38 @@ const MataPelajaranListScreen = ({ navigation, route }) => {
         <Text style={styles.subtitle}>
           {jenjang.nama_jenjang} - {kelas.nama_kelas}
         </Text>
-        {activeKurikulum && (
-          <View style={styles.kurikulumBadge}>
-            <Ionicons name="ribbon-outline" size={18} color="#ffc107" style={{ marginRight: 6 }} />
-            <Text style={styles.kurikulumBadgeText} numberOfLines={1}>
-              {activeKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
-            </Text>
+        {effectiveKurikulum && (
+          <View
+            style={[
+              styles.kurikulumBadge,
+              isUsingActive ? styles.kurikulumBadgeActive : styles.kurikulumBadgeSelected,
+            ]}
+          >
+            <Ionicons
+              name={isUsingActive ? 'flash-outline' : 'checkmark-circle-outline'}
+              size={18}
+              color={isUsingActive ? '#0d6efd' : '#f59f00'}
+              style={{ marginRight: 8 }}
+            />
+            <View style={styles.kurikulumBadgeTextContainer}>
+              <Text
+                style={[
+                  styles.kurikulumBadgeLabel,
+                  isUsingActive ? styles.kurikulumBadgeLabelActive : styles.kurikulumBadgeLabelSelected,
+                ]}
+              >
+                {isUsingActive ? 'Menggunakan kurikulum aktif' : 'Menggunakan kurikulum terpilih'}
+              </Text>
+              <Text
+                style={[
+                  styles.kurikulumBadgeText,
+                  isUsingActive ? styles.kurikulumBadgeTextActive : styles.kurikulumBadgeTextSelected,
+                ]}
+                numberOfLines={1}
+              >
+                {effectiveKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
+              </Text>
+            </View>
           </View>
         )}
       </View>
@@ -203,16 +246,45 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff7e0',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
   },
-  kurikulumBadgeText: {
+  kurikulumBadgeActive: {
+    backgroundColor: '#e7f1ff',
+    borderWidth: 1,
+    borderColor: '#cfe2ff',
+  },
+  kurikulumBadgeSelected: {
+    backgroundColor: '#fff7e0',
+    borderWidth: 1,
+    borderColor: '#ffe08a',
+  },
+  kurikulumBadgeTextContainer: {
     flex: 1,
-    fontSize: 13,
-    color: '#ffc107',
+  },
+  kurikulumBadgeLabel: {
+    fontSize: 11,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  kurikulumBadgeLabelActive: {
+    color: '#0d6efd',
+  },
+  kurikulumBadgeLabelSelected: {
+    color: '#d97706',
+  },
+  kurikulumBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  kurikulumBadgeTextActive: {
+    color: '#0d3b66',
+  },
+  kurikulumBadgeTextSelected: {
+    color: '#b45309',
   },
   content: {
     padding: 20,

@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
 import { useGetKurikulumStatisticsQuery, useGetTemplateAdoptionsQuery } from '../../api/kurikulumApi';
-import { resetNavigation } from '../../redux/kurikulumSlice';
+import { resetNavigation, selectActiveKurikulum, selectSelectedKurikulum } from '../../redux/kurikulumSlice';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 
@@ -20,9 +20,22 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
  * Kurikulum Home Screen - Sprint 1 Basic Implementation
  * Main entry point for kurikulum management
  */
+const getKurikulumId = (kurikulum) => (
+  kurikulum?.id_kurikulum
+  ?? kurikulum?.kurikulum_id
+  ?? kurikulum?.id
+  ?? null
+);
+
 const KurikulumHomeScreen = ({ navigation }) => {
   const dispatch = useDispatch();
-  const { selectedKurikulum } = useSelector(state => state?.kurikulum || {});
+  const activeKurikulum = useSelector(selectActiveKurikulum);
+  const selectedKurikulum = useSelector(selectSelectedKurikulum);
+  const activeKurikulumId = React.useMemo(() => getKurikulumId(activeKurikulum), [activeKurikulum]);
+  const selectedKurikulumId = React.useMemo(() => getKurikulumId(selectedKurikulum), [selectedKurikulum]);
+  const showSelectedSnapshot = Boolean(
+    selectedKurikulum && (!activeKurikulumId || activeKurikulumId !== selectedKurikulumId)
+  );
   
   // Get statistics from API
   const {
@@ -104,12 +117,30 @@ const KurikulumHomeScreen = ({ navigation }) => {
         <Text style={styles.headerSubtitle}>
           Sistem manajemen kurikulum untuk Admin Cabang
         </Text>
-        {selectedKurikulum && (
-          <View style={styles.selectedKurikulumBanner}>
+        {activeKurikulum && (
+          <View style={[styles.selectedKurikulumBanner, styles.activeKurikulumBanner]}>
             <Ionicons name="ribbon" size={22} color="#0d6efd" style={{ marginRight: 12 }} />
             <View style={styles.selectedKurikulumTextContainer}>
-              <Text style={styles.selectedKurikulumLabel}>Kurikulum aktif</Text>
-              <Text style={styles.selectedKurikulumName} numberOfLines={1}>
+              <Text style={[styles.selectedKurikulumLabel, styles.activeKurikulumLabel]}>Kurikulum aktif</Text>
+              <Text style={[styles.selectedKurikulumName, styles.activeKurikulumName]} numberOfLines={1}>
+                {activeKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.changeKurikulumButton}
+              onPress={() => navigation.navigate('SelectKurikulum')}
+            >
+              <Text style={styles.changeKurikulumButtonText}>Kelola</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {showSelectedSnapshot && (
+          <View style={[styles.selectedKurikulumBanner, styles.snapshotKurikulumBanner]}>
+            <Ionicons name="time" size={22} color="#198754" style={{ marginRight: 12 }} />
+            <View style={styles.selectedKurikulumTextContainer}>
+              <Text style={[styles.selectedKurikulumLabel, styles.snapshotKurikulumLabel]}>Terakhir dipilih</Text>
+              <Text style={[styles.selectedKurikulumName, styles.snapshotKurikulumName]} numberOfLines={1}>
                 {selectedKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
               </Text>
             </View>
@@ -271,12 +302,23 @@ const styles = StyleSheet.create({
   },
   selectedKurikulumBanner: {
     marginTop: 18,
-    backgroundColor: '#eef4ff',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#eef4ff',
+  },
+  activeKurikulumBanner: {
+    backgroundColor: '#e7f1ff',
+    borderWidth: 1,
+    borderColor: '#cfe2ff',
+  },
+  snapshotKurikulumBanner: {
+    backgroundColor: '#e8f6ed',
+    borderWidth: 1,
+    borderColor: '#c7eed8',
+    marginTop: 12,
   },
   selectedKurikulumTextContainer: {
     flex: 1,
@@ -287,11 +329,23 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
+  activeKurikulumLabel: {
+    color: '#0d6efd',
+  },
   selectedKurikulumName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#1c3d8f',
     marginTop: 4,
+  },
+  activeKurikulumName: {
+    color: '#0b3d91',
+  },
+  snapshotKurikulumLabel: {
+    color: '#198754',
+  },
+  snapshotKurikulumName: {
+    color: '#14532d',
   },
   changeKurikulumButton: {
     backgroundColor: '#0d6efd',

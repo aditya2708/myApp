@@ -16,6 +16,12 @@ import {
   useSetActiveSemesterMutation
 } from '../../api/kurikulumApi';
 import SemesterListSection from './components/SemesterListSection';
+import {
+  selectSelectedKurikulum,
+  selectSelectedKurikulumId,
+  selectActiveKurikulum,
+  selectActiveKurikulumId,
+} from '../../redux/kurikulumSlice';
 
 /**
  * Semester Management Screen - API Integrated
@@ -25,14 +31,27 @@ const resolveSemesterId = (semester) => (
   semester?.id_semester ?? semester?.id ?? null
 );
 
+const resolveKurikulumId = (value) => (
+  value?.id_kurikulum
+  ?? value?.kurikulum_id
+  ?? value?.id
+  ?? null
+);
+
 const SemesterManagementScreen = ({ navigation }) => {
-  const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
-  const activeKurikulumId = selectedKurikulumId
-    ?? selectedKurikulum?.id_kurikulum
-    ?? selectedKurikulum?.kurikulum_id
-    ?? selectedKurikulum?.id
-    ?? null;
-  const activeKurikulumName = selectedKurikulum?.nama_kurikulum || '';
+  const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
+  const selectedKurikulum = useSelector(selectSelectedKurikulum);
+  const activeKurikulumIdFromStore = useSelector(selectActiveKurikulumId);
+  const activeKurikulum = useSelector(selectActiveKurikulum);
+
+  const resolvedSelectedId = selectedKurikulumId ?? resolveKurikulumId(selectedKurikulum);
+  const resolvedActiveId = activeKurikulumIdFromStore ?? resolveKurikulumId(activeKurikulum);
+  const effectiveKurikulumId = resolvedSelectedId ?? resolvedActiveId ?? null;
+  const effectiveKurikulum = selectedKurikulum || activeKurikulum || null;
+  const effectiveKurikulumName = effectiveKurikulum?.nama_kurikulum || '';
+  const isUsingActiveKurikulum = Boolean(
+    effectiveKurikulumId && resolvedActiveId && String(effectiveKurikulumId) === String(resolvedActiveId)
+  );
 
   const [selectedTab, setSelectedTab] = useState('active');
 
@@ -53,18 +72,18 @@ const SemesterManagementScreen = ({ navigation }) => {
   );
 
   const handleAddSemester = () => {
-    if (!activeKurikulumId) {
+    if (!effectiveKurikulumId) {
       Alert.alert(
-        'Kurikulum Belum Dipilih',
-        'Pilih kurikulum terlebih dahulu sebelum menambah semester baru.'
+        'Kurikulum Belum Ditentukan',
+        'Tetapkan kurikulum aktif atau pilih kurikulum sebelum menambah semester baru.'
       );
       return;
     }
 
     navigation.navigate('SemesterForm', {
       mode: 'create',
-      kurikulumId: activeKurikulumId,
-      kurikulumName: activeKurikulumName,
+      kurikulumId: effectiveKurikulumId,
+      kurikulumName: effectiveKurikulumName,
     });
   };
 
@@ -72,8 +91,8 @@ const SemesterManagementScreen = ({ navigation }) => {
     navigation.navigate('SemesterForm', {
       mode: 'edit',
       semester,
-      kurikulumId: activeKurikulumId,
-      kurikulumName: activeKurikulumName,
+      kurikulumId: effectiveKurikulumId,
+      kurikulumName: effectiveKurikulumName,
     });
   };
 
@@ -203,6 +222,48 @@ const SemesterManagementScreen = ({ navigation }) => {
         <Text style={styles.subtitle}>
           Manajemen semester untuk kurikulum cabang
         </Text>
+        {effectiveKurikulum && (
+          <View
+            style={[
+              styles.kurikulumContextBanner,
+              isUsingActiveKurikulum
+                ? styles.kurikulumContextBannerActive
+                : styles.kurikulumContextBannerSelected,
+            ]}
+          >
+            <Ionicons
+              name={isUsingActiveKurikulum ? 'flash-outline' : 'checkmark-circle-outline'}
+              size={18}
+              color={isUsingActiveKurikulum ? '#0d6efd' : '#198754'}
+              style={{ marginRight: 8 }}
+            />
+            <View style={styles.kurikulumContextTextContainer}>
+              <Text
+                style={[
+                  styles.kurikulumContextLabel,
+                  isUsingActiveKurikulum
+                    ? styles.kurikulumContextLabelActive
+                    : styles.kurikulumContextLabelSelected,
+                ]}
+              >
+                {isUsingActiveKurikulum
+                  ? 'Mengelola kurikulum aktif'
+                  : 'Mengelola kurikulum terpilih'}
+              </Text>
+              <Text
+                style={[
+                  styles.kurikulumContextName,
+                  isUsingActiveKurikulum
+                    ? styles.kurikulumContextNameActive
+                    : styles.kurikulumContextNameSelected,
+                ]}
+                numberOfLines={1}
+              >
+                {effectiveKurikulumName || 'Kurikulum tanpa nama'}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <SemesterListSection
@@ -246,6 +307,51 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#6c757d',
+  },
+  kurikulumContextBanner: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  kurikulumContextBannerActive: {
+    backgroundColor: '#e7f1ff',
+    borderWidth: 1,
+    borderColor: '#cfe2ff',
+  },
+  kurikulumContextBannerSelected: {
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  kurikulumContextTextContainer: {
+    flex: 1,
+  },
+  kurikulumContextLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  kurikulumContextLabelActive: {
+    color: '#0d6efd',
+  },
+  kurikulumContextLabelSelected: {
+    color: '#198754',
+  },
+  kurikulumContextName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 4,
+  },
+  kurikulumContextNameActive: {
+    color: '#0d3b66',
+  },
+  kurikulumContextNameSelected: {
+    color: '#166534',
   },
 });
 
