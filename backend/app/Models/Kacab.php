@@ -145,10 +145,6 @@ class Kacab extends Model
         return $this->nama_kacab;
     }
 
-    public function getNoTelpAttribute($value)
-    {
-        return $value ?? $this->no_telpon; // Fallback untuk compatibility
-    }
 
     public function getFullAddressAttribute()
     {
