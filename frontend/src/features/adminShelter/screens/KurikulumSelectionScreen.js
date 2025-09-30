@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 
@@ -24,47 +24,64 @@ import {
   selectKurikulumLoading,
   selectKurikulumError,
   selectSelectedKurikulum,
-  selectKurikulumPreview
+  selectKurikulumPreview,
+  selectActiveKurikulum
 } from '../redux/kurikulumShelterSlice';
+
+const resolveKurikulumId = (kurikulum) => kurikulum?.id_kurikulum ?? kurikulum?.id;
 
 const KurikulumSelectionScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute();
   const dispatch = useDispatch();
-  
+
   const kurikulumList = useSelector(selectKurikulumList);
   const loading = useSelector(selectKurikulumLoading);
   const error = useSelector(selectKurikulumError);
   const selectedKurikulum = useSelector(selectSelectedKurikulum);
   const kurikulumPreview = useSelector(selectKurikulumPreview);
-  
+  const activeKurikulum = useSelector(selectActiveKurikulum);
+
   const [refreshing, setRefreshing] = useState(false);
   const [localSelected, setLocalSelected] = useState(null);
 
-  useEffect(() => {
-    loadKurikulum();
-  }, []);
+  const loadKurikulum = useCallback(
+    (options = {}) => dispatch(fetchKurikulumList(options)),
+    [dispatch]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      loadKurikulum({ force: true });
+    }, [loadKurikulum])
+  );
 
   useEffect(() => {
     if (selectedKurikulum) {
       setLocalSelected(selectedKurikulum);
+      return;
     }
-  }, [selectedKurikulum]);
 
-  const loadKurikulum = async () => {
-    dispatch(fetchKurikulumList());
-  };
+    if (activeKurikulum) {
+      setLocalSelected(activeKurikulum);
+    } else {
+      setLocalSelected(null);
+    }
+  }, [selectedKurikulum, activeKurikulum]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadKurikulum();
+    await loadKurikulum({ force: true });
     setRefreshing(false);
   };
 
   const handleSelectKurikulum = async (kurikulum) => {
     setLocalSelected(kurikulum);
     // Load preview untuk kurikulum yang dipilih
-    dispatch(fetchKurikulumPreview(kurikulum.id_kurikulum));
+    const kurikulumId = resolveKurikulumId(kurikulum);
+
+    if (kurikulumId) {
+      dispatch(fetchKurikulumPreview(kurikulumId));
+    }
   };
 
   const handleConfirmSelection = () => {
@@ -108,7 +125,10 @@ const KurikulumSelectionScreen = () => {
     <KurikulumSelectionCard
       kurikulum={item}
       onSelect={handleSelectKurikulum}
-      isSelected={localSelected?.id_kurikulum === item.id_kurikulum}
+      isSelected={
+        resolveKurikulumId(localSelected)?.toString() ===
+        resolveKurikulumId(item)?.toString()
+      }
     />
   );
 
@@ -121,7 +141,7 @@ const KurikulumSelectionScreen = () => {
       {error && (
         <ErrorMessage
           message={error}
-          onRetry={loadKurikulum}
+          onRetry={() => loadKurikulum({ force: true })}
         />
       )}
 
@@ -130,12 +150,27 @@ const KurikulumSelectionScreen = () => {
         <Text style={styles.headerSubtitle}>
           Pilih kurikulum yang akan digunakan untuk semester ini
         </Text>
+        <View style={styles.activeInfoContainer}>
+          <Ionicons
+            name={activeKurikulum ? 'checkmark-circle' : 'information-circle-outline'}
+            size={18}
+            color={activeKurikulum ? '#27ae60' : '#f39c12'}
+            style={styles.activeInfoIcon}
+          />
+          <Text style={styles.activeInfoText}>
+            {activeKurikulum
+              ? `Kurikulum aktif cabang: ${activeKurikulum.nama_kurikulum}`
+              : 'Belum ada kurikulum aktif dari cabang'}
+          </Text>
+        </View>
       </View>
 
       <FlatList
         data={kurikulumList}
         renderItem={renderKurikulum}
-        keyExtractor={(item) => item.id_kurikulum.toString()}
+        keyExtractor={(item, index) =>
+          resolveKurikulumId(item)?.toString() ?? `kurikulum-${index}`
+        }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
@@ -203,6 +238,20 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#7f8c8d',
+  },
+  activeInfoContainer: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activeInfoIcon: {
+    marginRight: 6,
+  },
+  activeInfoText: {
+    fontSize: 12,
+    color: '#34495e',
+    flex: 1,
+    lineHeight: 16,
   },
   listContent: {
     padding: 16,

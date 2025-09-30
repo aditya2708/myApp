@@ -3,6 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const KurikulumSelectionCard = ({ kurikulum, onSelect, isSelected }) => {
+  const hasIsActive = typeof kurikulum?.is_active === 'boolean';
+  const isActive = hasIsActive ? kurikulum.is_active : false;
+  const statusLabel = hasIsActive
+    ? isActive
+      ? 'Aktif'
+      : 'Tidak Aktif'
+    : kurikulum?.status_text || kurikulum?.status || 'Status tidak diketahui';
+
   return (
     <TouchableOpacity
       style={[styles.card, isSelected && styles.selectedCard]}
@@ -43,8 +51,28 @@ const KurikulumSelectionCard = ({ kurikulum, onSelect, isSelected }) => {
       </View>
 
       <View style={styles.statusContainer}>
-        <View style={[styles.statusBadge, styles.aktivBadge]}>
-          <Text style={styles.statusText}>Aktif</Text>
+        <View
+          style={[
+            styles.statusBadge,
+            hasIsActive
+              ? isActive
+                ? styles.activeBadge
+                : styles.inactiveBadge
+              : styles.neutralBadge
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusText,
+              hasIsActive
+                ? isActive
+                  ? styles.activeStatusText
+                  : styles.inactiveStatusText
+                : styles.neutralStatusText
+            ]}
+          >
+            {statusLabel}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -121,13 +149,27 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  aktivBadge: {
+  activeBadge: {
     backgroundColor: '#e8f5e8',
+  },
+  inactiveBadge: {
+    backgroundColor: '#fdecea',
+  },
+  neutralBadge: {
+    backgroundColor: '#ecf0f1',
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  activeStatusText: {
     color: '#27ae60',
+  },
+  inactiveStatusText: {
+    color: '#c0392b',
+  },
+  neutralStatusText: {
+    color: '#7f8c8d',
   },
 });
 

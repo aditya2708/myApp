@@ -1,22 +1,34 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  RefreshControl, Dimensions, Alert 
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  RefreshControl, Dimensions, Alert, ActivityIndicator
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import { adminShelterKurikulumApi } from '../../api/adminShelterKurikulumApi';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchKurikulumList,
+  selectActiveKurikulum,
+  selectKurikulumLoading,
+  selectKurikulumError
+} from '../../redux/kurikulumShelterSlice';
 
 const { width } = Dimensions.get('window');
 
 const KurikulumHomeScreen = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  const activeKurikulum = useSelector(selectActiveKurikulum);
+  const kurikulumLoading = useSelector(selectKurikulumLoading);
+  const kurikulumError = useSelector(selectKurikulumError);
 
   // Operational menu items for daily kurikulum activities
   const operationalMenuItems = [
@@ -58,13 +70,22 @@ const KurikulumHomeScreen = () => {
     );
   };
 
-  const fetchDashboardData = async () => {
+  const refreshKurikulumList = useCallback(
+    () => dispatch(fetchKurikulumList({ force: true })),
+    [dispatch]
+  );
+
+  const fetchDashboardData = useCallback(async ({ withLoader = false } = {}) => {
     try {
+      if (withLoader) {
+        setLoading(true);
+      }
+
       setError(null);
-      
+
       // Call real API to get dashboard data
       const response = await adminShelterKurikulumApi.getDashboard();
-      
+
       if (response.data && response.data.success) {
         setDashboardData(response.data.data);
       } else {
@@ -76,22 +97,96 @@ const KurikulumHomeScreen = () => {
       setError(errorMessage);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
-
-  useEffect(() => { 
-    fetchDashboardData(); 
   }, []);
 
-  const handleRefresh = () => {
+  useEffect(() => {
+    fetchDashboardData({ withLoader: true });
+    refreshKurikulumList();
+  }, [fetchDashboardData, refreshKurikulumList]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+      refreshKurikulumList();
+    }, [fetchDashboardData, refreshKurikulumList])
+  );
+
+  const handleRefresh = async () => {
     setRefreshing(true);
-    fetchDashboardData();
+    try {
+      await Promise.all([fetchDashboardData(), refreshKurikulumList()]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (loading && !refreshing) {
     return <LoadingSpinner fullScreen message="Memuat dashboard kurikulum..." />;
   }
+
+  const ActiveKurikulumCard = () => (
+    <View style={styles.activeKurikulumCard}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="library" size={20} color="#2c3e50" />
+        <Text style={styles.cardTitle}>Kurikulum Cabang Aktif</Text>
+        <View
+          style={[
+            styles.kurikulumStatusBadge,
+            activeKurikulum ? styles.kurikulumStatusActive : styles.kurikulumStatusInactive
+          ]}
+        >
+          <Text
+            style={[
+              styles.kurikulumStatusText,
+              activeKurikulum ? styles.kurikulumStatusActiveText : styles.kurikulumStatusInactiveText
+            ]}
+          >
+            {activeKurikulum ? 'Aktif' : 'Tidak Ada'}
+          </Text>
+        </View>
+      </View>
+
+      {kurikulumLoading ? (
+        <View style={styles.kurikulumLoadingContainer}>
+          <ActivityIndicator size="small" color="#3498db" />
+          <Text style={styles.kurikulumLoadingText}>Memuat kurikulum cabang...</Text>
+        </View>
+      ) : activeKurikulum ? (
+        <View>
+          <Text style={styles.activeKurikulumName}>{activeKurikulum.nama_kurikulum}</Text>
+          <Text style={styles.activeKurikulumMeta}>
+            Tahun Berlaku: {activeKurikulum.tahun_berlaku || '-'}
+          </Text>
+          <Text style={styles.activeKurikulumMeta}>
+            Mata Pelajaran: {activeKurikulum.mata_pelajaran_count ?? activeKurikulum.total_mata_pelajaran ?? 0}
+          </Text>
+          <Text style={styles.activeKurikulumMeta}>
+            Total Materi: {activeKurikulum.kurikulum_materi_count ?? activeKurikulum.total_materi ?? 0}
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.noActiveKurikulumText}>
+          Belum ada kurikulum aktif dari cabang. Silakan cek daftar kurikulum untuk memastikan data terbaru.
+        </Text>
+      )}
+
+      {!!kurikulumError && (
+        <Text style={styles.kurikulumErrorText}>
+          Tidak dapat memuat kurikulum cabang: {kurikulumError}
+        </Text>
+      )}
+
+      <TouchableOpacity
+        style={styles.manageKurikulumButton}
+        onPress={() => navigation.navigate('KurikulumSelection')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="swap-horizontal" size={18} color="#fff" />
+        <Text style={styles.manageKurikulumButtonText}>Kelola Kurikulum Cabang</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   const SemesterBanner = ({ semesterData }) => (
     <View style={styles.semesterBanner}>
@@ -211,8 +306,16 @@ const KurikulumHomeScreen = () => {
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
-      {error && <ErrorMessage message={error} onRetry={fetchDashboardData} />}
+      {error && (
+        <ErrorMessage
+          message={error}
+          onRetry={() => fetchDashboardData({ withLoader: true })}
+        />
+      )}
       
+      {/* Active Kurikulum Overview */}
+      <ActiveKurikulumCard />
+
       {/* Semester Banner */}
       <SemesterBanner semesterData={dashboardData?.semesterAktif} />
       
@@ -233,11 +336,92 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#f5f5f5' 
   },
-  content: { 
-    padding: 16, 
-    paddingBottom: 32 
+  content: {
+    padding: 16,
+    paddingBottom: 32
   },
-  
+
+  activeKurikulumCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2
+  },
+  kurikulumStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  kurikulumStatusActive: {
+    backgroundColor: '#e8f5e8',
+  },
+  kurikulumStatusInactive: {
+    backgroundColor: '#fdecea',
+  },
+  kurikulumStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  kurikulumStatusActiveText: {
+    color: '#27ae60',
+  },
+  kurikulumStatusInactiveText: {
+    color: '#c0392b',
+  },
+  kurikulumLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  kurikulumLoadingText: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: '#7f8c8d',
+  },
+  activeKurikulumName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  activeKurikulumMeta: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 2,
+  },
+  noActiveKurikulumText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 12,
+    lineHeight: 18,
+  },
+  kurikulumErrorText: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#c0392b',
+    lineHeight: 16,
+  },
+  manageKurikulumButton: {
+    marginTop: 16,
+    backgroundColor: '#3498db',
+    borderRadius: 8,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  manageKurikulumButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+
   // Semester Banner
   semesterBanner: {
     backgroundColor: '#3498db',
