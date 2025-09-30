@@ -18,6 +18,7 @@ import { useGetKurikulumListQuery, useSetKurikulumActiveMutation } from '../../a
 import {
   setSelectedKurikulum,
   setActiveKurikulum,
+  clearActiveKurikulum,
   selectActiveKurikulum,
   selectActiveKurikulumId,
   selectSelectedKurikulum,
@@ -124,12 +125,14 @@ const SelectKurikulumScreen = ({ navigation }) => {
 
   React.useEffect(() => {
     if (!Array.isArray(kurikulumList) || kurikulumList.length === 0) {
+      dispatch(clearActiveKurikulum());
       return;
     }
 
     const activeFromList = kurikulumList.find((item) => item?.is_active);
 
     if (!activeFromList) {
+      dispatch(clearActiveKurikulum());
       return;
     }
 
