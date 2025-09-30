@@ -206,8 +206,8 @@ Route::middleware('auth:sanctum')->group(function () {
     
         Route::controller(App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class)->group(function () {
             Route::get('/kurikulum', 'index');
-            Route::get('/kurikulum/{id}', 'show');
-            Route::get('/kurikulum/{id}/preview', 'getPreview');
+            Route::get('/kurikulum/{id}', 'show')->whereNumber('id');
+            Route::get('/kurikulum/{id}/preview', 'getPreview')->whereNumber('id');
             Route::get('/kurikulum-dropdown', 'getForDropdown');
         });
 
@@ -300,8 +300,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Kurikulum read endpoints (index, detail, preview, dropdown)
         Route::get('/kurikulum', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'index']);
-        Route::get('/kurikulum/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'show']);
-        Route::get('/kurikulum/{id}/preview', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'getPreview']);
+        Route::get('/kurikulum/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'show'])->whereNumber('id');
+        Route::get('/kurikulum/{id}/preview', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'getPreview'])->whereNumber('id');
         Route::get('/kurikulum-dropdown', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'getForDropdown']);
 
         // Phase 3: Kurikulum Consumer (SIMPLIFIED - Read-only data provider)
@@ -314,7 +314,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/kurikulum/dashboard', [App\Http\Controllers\API\AdminShelter\KurikulumDashboardController::class, 'getDashboard']);
         Route::get('/kurikulum/semester-info', [App\Http\Controllers\API\AdminShelter\KurikulumDashboardController::class, 'getSemesterInfo']);
         Route::get('/kurikulum/today-activities', [App\Http\Controllers\API\AdminShelter\KurikulumDashboardController::class, 'getTodayActivities']);
-        Route::post('/kurikulum/{id}/set-active', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'setActive']);
+        Route::post('/kurikulum/{id}/set-active', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'setActive'])->whereNumber('id');
 
         // Semester Management for Admin Shelter (Read-only access to cabang semesters)
         Route::get('/semester', [App\Http\Controllers\API\AdminShelter\SemesterController::class, 'index']);
