@@ -39,13 +39,13 @@ const KurikulumSelectionCard = ({ kurikulum, onSelect, isSelected }) => {
         <View style={styles.statItem}>
           <Ionicons name="book-outline" size={16} color="#7f8c8d" />
           <Text style={styles.statText}>
-            {kurikulum.kurikulum_materi_count || 0} Mata Pelajaran
+            {kurikulum.mata_pelajaran_count || 0} Mata Pelajaran
           </Text>
         </View>
         <View style={styles.statItem}>
           <Ionicons name="document-text-outline" size={16} color="#7f8c8d" />
           <Text style={styles.statText}>
-            {kurikulum.mata_pelajaran_count || 0} Materi
+            {kurikulum.kurikulum_materi_count || 0} Materi
           </Text>
         </View>
       </View>
