@@ -36,44 +36,19 @@ export const kurikulumShelterApi = {
     return await api.get(`/admin-shelter/kurikulum/materi/${materiId}`);
   },
 
-  // Legacy methods - kept for backward compatibility
-  /**
-   * @deprecated Use getAllMateri instead
-   */
-  getAllKurikulum: async (params = {}) => {
-    console.warn('getAllKurikulum is deprecated. Use getAllMateri instead.');
+  getKurikulumList: async (params = {}) => {
     return await api.get('/admin-shelter/kurikulum', { params });
   },
 
-  /**
-   * @deprecated Use getMateriDetail instead
-   */
   getKurikulumDetail: async (id) => {
-    console.warn('getKurikulumDetail is deprecated. Use getMateriDetail instead.');
     return await api.get(`/admin-shelter/kurikulum/${id}`);
   },
 
-  /**
-   * @deprecated Use getMateriDetail instead
-   */
   getKurikulumPreview: async (id) => {
-    console.warn('getKurikulumPreview is deprecated. Use getMateriDetail instead.');
     return await api.get(`/admin-shelter/kurikulum/${id}/preview`);
   },
 
-  /**
-   * @deprecated Use getAllMateri or getAvailableKelas instead
-   */
   getForDropdown: async () => {
-    console.warn('getForDropdown is deprecated. Use getAllMateri or getAvailableKelas instead.');
     return await api.get('/admin-shelter/kurikulum-dropdown');
-  },
-
-  /**
-   * @deprecated Use getAllMateri instead
-   */
-  getKurikulumList: async (params = {}) => {
-    console.warn('getKurikulumList is deprecated. Use getAllMateri instead.');
-    return await api.get('/admin-shelter/kurikulum', { params });
   }
 };
