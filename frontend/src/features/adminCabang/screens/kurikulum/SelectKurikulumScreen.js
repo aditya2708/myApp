@@ -5,15 +5,24 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
-import { useGetKurikulumListQuery } from '../../api/kurikulumApi';
-import { setSelectedKurikulum } from '../../redux/kurikulumSlice';
+import { useGetKurikulumListQuery, useSetKurikulumActiveMutation } from '../../api/kurikulumApi';
+import {
+  setSelectedKurikulum,
+  setActiveKurikulum,
+  selectActiveKurikulum,
+  selectActiveKurikulumId,
+  selectSelectedKurikulum,
+  selectSelectedKurikulumId,
+} from '../../redux/kurikulumSlice';
 
 const getKurikulumId = (item) => item?.id_kurikulum ?? item?.id;
 
@@ -73,7 +82,12 @@ const getStatusInfo = (item) => {
 
 const SelectKurikulumScreen = ({ navigation }) => {
   const dispatch = useDispatch();
-  const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
+  const selectedKurikulum = useSelector(selectSelectedKurikulum);
+  const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
+  const activeKurikulum = useSelector(selectActiveKurikulum);
+  const activeKurikulumId = useSelector(selectActiveKurikulumId);
+  const [setKurikulumActive, { isLoading: isSettingActive }] = useSetKurikulumActiveMutation();
+  const [activatingId, setActivatingId] = React.useState(null);
 
   const {
     data,
@@ -92,6 +106,45 @@ const SelectKurikulumScreen = ({ navigation }) => {
     const fallbackId = getKurikulumId(selectedKurikulum);
     return fallbackId ? fallbackId.toString() : null;
   }, [selectedKurikulumId, selectedKurikulum]);
+  const activeId = React.useMemo(() => {
+    if (activeKurikulumId) {
+      return activeKurikulumId.toString();
+    }
+
+    const fallbackId = getKurikulumId(activeKurikulum);
+    return fallbackId ? fallbackId.toString() : null;
+  }, [activeKurikulumId, activeKurikulum]);
+  const isSelectedSameAsActive = React.useMemo(() => (
+    selectedId && activeId ? selectedId === activeId : false
+  ), [selectedId, activeId]);
+  const activatingKey = React.useMemo(
+    () => (activatingId !== null && activatingId !== undefined ? activatingId.toString() : null),
+    [activatingId],
+  );
+
+  React.useEffect(() => {
+    if (!Array.isArray(kurikulumList) || kurikulumList.length === 0) {
+      return;
+    }
+
+    const activeFromList = kurikulumList.find((item) => item?.is_active);
+
+    if (!activeFromList) {
+      return;
+    }
+
+    const listActiveId = getKurikulumId(activeFromList);
+    const normalizedListId = listActiveId ? listActiveId.toString() : null;
+
+    if (!activeId || normalizedListId !== activeId) {
+      dispatch(setActiveKurikulum(activeFromList));
+      return;
+    }
+
+    if (activeKurikulum && activeKurikulum.updated_at !== activeFromList?.updated_at) {
+      dispatch(setActiveKurikulum(activeFromList));
+    }
+  }, [kurikulumList, dispatch, activeId, activeKurikulum]);
 
   const handleSelect = (kurikulum) => {
     dispatch(setSelectedKurikulum(kurikulum));
@@ -105,25 +158,87 @@ const SelectKurikulumScreen = ({ navigation }) => {
     navigation.navigate('CreateKurikulum');
   };
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <Text style={styles.headerTitle}>Pilih Kurikulum Cabang</Text>
-      <Text style={styles.headerSubtitle}>
-        Pilih salah satu kurikulum untuk mulai mengelola jenjang, kelas, dan materi.
-      </Text>
-      {selectedKurikulum && (
-        <View style={styles.currentSelectionCard}>
-          <Ionicons name="checkmark-circle" size={20} color="#28a745" style={styles.currentSelectionIcon} />
-          <View style={styles.currentSelectionTextContainer}>
-            <Text style={styles.currentSelectionLabel}>Terakhir dipilih</Text>
-            <Text style={styles.currentSelectionTitle} numberOfLines={1}>
-              {selectedKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
-            </Text>
+  const confirmActivate = async (kurikulum) => {
+    const kurikulumId = getKurikulumId(kurikulum);
+
+    if (!kurikulumId) {
+      Alert.alert('Error', 'ID kurikulum tidak valid.');
+      return;
+    }
+
+    try {
+      setActivatingId(kurikulumId);
+      const response = await setKurikulumActive({ kurikulumId }).unwrap();
+      const activatedData = response?.data || { ...kurikulum, is_active: true, status: 'aktif' };
+
+      dispatch(setActiveKurikulum(activatedData));
+
+      if (selectedId && kurikulumId.toString() === selectedId) {
+        dispatch(setSelectedKurikulum(activatedData));
+      }
+
+      await refetch();
+      Alert.alert('Berhasil', 'Kurikulum berhasil dijadikan aktif.');
+    } catch (err) {
+      Alert.alert('Error', err?.data?.message || err?.message || 'Gagal menjadikan kurikulum aktif.');
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
+  const handleActivate = (kurikulum) => {
+    const name = kurikulum?.nama_kurikulum || 'Kurikulum tanpa nama';
+
+    Alert.alert(
+      'Jadikan kurikulum aktif',
+      `Kurikulum "${name}" akan menjadi kurikulum aktif cabang. Lanjutkan?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Jadikan aktif',
+          style: 'default',
+          onPress: () => confirmActivate(kurikulum),
+        },
+      ],
+    );
+  };
+
+  const renderHeader = () => {
+    const showSelectedBanner = Boolean(selectedKurikulum && !isSelectedSameAsActive);
+
+    return (
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Pilih Kurikulum Cabang</Text>
+        <Text style={styles.headerSubtitle}>
+          Pilih salah satu kurikulum untuk mulai mengelola jenjang, kelas, dan materi.
+        </Text>
+
+        {activeKurikulum && (
+          <View style={[styles.currentSelectionCard, styles.activeBannerCard]}>
+            <Ionicons name="flash" size={20} color="#0d6efd" style={styles.currentSelectionIcon} />
+            <View style={styles.currentSelectionTextContainer}>
+              <Text style={[styles.currentSelectionLabel, styles.activeBannerLabel]}>Aktif sekarang</Text>
+              <Text style={[styles.currentSelectionTitle, styles.activeBannerTitle]} numberOfLines={1}>
+                {activeKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
+              </Text>
+            </View>
           </View>
-        </View>
-      )}
-    </View>
-  );
+        )}
+
+        {showSelectedBanner && (
+          <View style={[styles.currentSelectionCard, styles.selectedBannerCard]}>
+            <Ionicons name="checkmark-circle" size={20} color="#198754" style={styles.currentSelectionIcon} />
+            <View style={styles.currentSelectionTextContainer}>
+              <Text style={styles.currentSelectionLabel}>Terakhir dipilih</Text>
+              <Text style={styles.currentSelectionTitle} numberOfLines={1}>
+                {selectedKurikulum?.nama_kurikulum || 'Kurikulum tanpa nama'}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const renderCreateButton = () => (
     <TouchableOpacity style={styles.createButton} onPress={handleCreateNew}>
@@ -145,12 +260,19 @@ const SelectKurikulumScreen = ({ navigation }) => {
 
   const renderItem = ({ item }) => {
     const itemId = getKurikulumId(item);
-    const isSelected = itemId && selectedId ? itemId.toString() === selectedId : false;
+    const normalizedItemId = itemId ? itemId.toString() : null;
+    const isSelected = normalizedItemId && selectedId ? normalizedItemId === selectedId : false;
+    const isActive = Boolean(
+      item?.is_active || (normalizedItemId && activeId ? normalizedItemId === activeId : false)
+    );
     const statusInfo = getStatusInfo(item);
+    const isActivatingThis = Boolean(
+      isSettingActive && activatingKey && normalizedItemId === activatingKey
+    );
 
     return (
       <TouchableOpacity
-        style={[styles.card, isSelected && styles.cardSelected]}
+        style={[styles.card, isSelected && styles.cardSelected, isActive && styles.cardActive]}
         onPress={() => handleSelect(item)}
         activeOpacity={0.85}
       >
@@ -170,9 +292,17 @@ const SelectKurikulumScreen = ({ navigation }) => {
               </Text>
             )}
           </View>
-          {isSelected && (
-            <Ionicons name="checkmark-circle" size={24} color="#28a745" />
-          )}
+          <View style={styles.cardHeaderRight}>
+            {isActive && (
+              <View style={styles.activeChip}>
+                <Ionicons name="flash" size={14} color="#0d6efd" style={{ marginRight: 4 }} />
+                <Text style={styles.activeChipText}>Aktif</Text>
+              </View>
+            )}
+            {isSelected && (
+              <Ionicons name="checkmark-circle" size={24} color="#28a745" style={styles.selectedIcon} />
+            )}
+          </View>
         </View>
 
         <View style={styles.cardFooter}>
@@ -190,12 +320,36 @@ const SelectKurikulumScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {statusInfo && (
-          <View style={styles.statusBadge}>
-            <Ionicons name="ellipse" size={10} color={statusInfo.color} style={{ marginRight: 6 }} />
-            <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
-          </View>
-        )}
+        <View style={styles.cardMetaRow}>
+          {statusInfo && (
+            <View style={styles.statusBadge}>
+              <Ionicons name="ellipse" size={10} color={statusInfo.color} style={{ marginRight: 6 }} />
+              <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
+            </View>
+          )}
+          <View style={styles.metaSpacer} />
+          {isActive ? (
+            <View style={styles.activePill}>
+              <Ionicons name="ribbon-outline" size={14} color="#14532d" style={{ marginRight: 6 }} />
+              <Text style={styles.activePillText}>Aktif sekarang</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.activateButton, isActivatingThis && styles.activateButtonDisabled]}
+              onPress={() => handleActivate(item)}
+              disabled={isSettingActive}
+            >
+              {isActivatingThis ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="flash" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.activateButtonText}>Jadikan aktif</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -265,10 +419,20 @@ const styles = StyleSheet.create({
     marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e8f6ed',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    backgroundColor: '#f1f5f9',
+  },
+  activeBannerCard: {
+    backgroundColor: '#e7f1ff',
+    borderWidth: 1,
+    borderColor: '#cfe2ff',
+  },
+  selectedBannerCard: {
+    backgroundColor: '#e8f6ed',
+    borderWidth: 1,
+    borderColor: '#c7eed8',
   },
   currentSelectionIcon: {
     marginRight: 12,
@@ -288,6 +452,12 @@ const styles = StyleSheet.create({
     color: '#14532d',
     marginTop: 2,
   },
+  activeBannerLabel: {
+    color: '#0d6efd',
+  },
+  activeBannerTitle: {
+    color: '#0d3b66',
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -306,7 +476,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
   },
+  cardActive: {
+    borderColor: '#198754',
+    shadowOpacity: 0.12,
+    shadowRadius: 9,
+    backgroundColor: '#f0fdf4',
+  },
   cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -337,6 +517,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 16,
   },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  metaSpacer: {
+    flex: 1,
+  },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -347,7 +535,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusBadge: {
-    marginTop: 14,
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
@@ -359,6 +546,52 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#edf2ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  activeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0d6efd',
+  },
+  selectedIcon: {
+    marginLeft: 4,
+  },
+  activePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  activePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  activateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0d6efd',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  activateButtonDisabled: {
+    opacity: 0.7,
+  },
+  activateButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 13,
   },
   createButton: {
     flexDirection: 'row',

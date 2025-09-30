@@ -80,6 +80,10 @@ const MateriFormScreen = ({ navigation, route }) => {
   const { jenjang, kelas, mataPelajaran, isEdit, materi, kurikulumId: routeKurikulumId, kurikulum } = route.params || {};
 
   const kurikulumState = useSelector(state => state?.kurikulum);
+  const navigationKurikulum = kurikulum
+    || kurikulumState?.selectedKurikulum
+    || kurikulumState?.activeKurikulum
+    || null;
   const kurikulumId = getFirstDefined(
     routeKurikulumId,
     kurikulum?.id_kurikulum,
@@ -87,6 +91,9 @@ const MateriFormScreen = ({ navigation, route }) => {
     kurikulumState?.selectedKurikulumId,
     kurikulumState?.selectedKurikulum?.id_kurikulum,
     kurikulumState?.selectedKurikulum?.kurikulum_id,
+    kurikulumState?.activeKurikulumId,
+    kurikulumState?.activeKurikulum?.id_kurikulum,
+    kurikulumState?.activeKurikulum?.kurikulum_id,
     materi?.kurikulum_id,
     materi?.id_kurikulum,
     materi?.pivot?.id_kurikulum,
@@ -171,7 +178,7 @@ const MateriFormScreen = ({ navigation, route }) => {
         kelas,
         mataPelajaran,
         kurikulumId,
-        kurikulum
+        kurikulum: navigationKurikulum
       });
     };
 

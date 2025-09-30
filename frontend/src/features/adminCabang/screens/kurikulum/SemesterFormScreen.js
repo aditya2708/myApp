@@ -18,6 +18,12 @@ import {
   useUpdateSemesterMutation,
   kurikulumApi
 } from '../../api/kurikulumApi';
+import {
+  selectSelectedKurikulum,
+  selectSelectedKurikulumId,
+  selectActiveKurikulum,
+  selectActiveKurikulumId,
+} from '../../redux/kurikulumSlice';
 
 const resolveKurikulumIdValue = (value) => {
   if (value === undefined || value === null || value === '') {
@@ -31,6 +37,13 @@ const resolveKurikulumIdValue = (value) => {
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
 };
+
+const getKurikulumIdFromObject = (value) => (
+  value?.id_kurikulum
+  ?? value?.kurikulum_id
+  ?? value?.id
+  ?? null
+);
 
 const formatDisplayDate = (dateString) => {
   if (!dateString) return 'Pilih tanggal';
@@ -46,7 +59,10 @@ const SemesterFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
-  const { selectedKurikulumId, selectedKurikulum } = useSelector(state => state?.kurikulum || {});
+  const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
+  const selectedKurikulum = useSelector(selectSelectedKurikulum);
+  const activeKurikulumIdFromStore = useSelector(selectActiveKurikulumId);
+  const activeKurikulum = useSelector(selectActiveKurikulum);
 
   const {
     mode = 'create',
@@ -55,17 +71,34 @@ const SemesterFormScreen = () => {
     kurikulumName: paramKurikulumName,
   } = route.params || {};
 
-  const activeKurikulumId = useMemo(() => (
-    paramKurikulumId
-    ?? selectedKurikulumId
-    ?? selectedKurikulum?.id_kurikulum
-    ?? selectedKurikulum?.kurikulum_id
-    ?? selectedKurikulum?.id
-    ?? null
-  ), [paramKurikulumId, selectedKurikulumId, selectedKurikulum]);
+  const activeKurikulumId = useMemo(() => {
+    const resolvedParamId = resolveKurikulumIdValue(paramKurikulumId);
+    if (resolvedParamId) {
+      return resolvedParamId;
+    }
+
+    const resolvedSelected = resolveKurikulumIdValue(
+      selectedKurikulumId ?? getKurikulumIdFromObject(selectedKurikulum)
+    );
+
+    if (resolvedSelected) {
+      return resolvedSelected;
+    }
+
+    return resolveKurikulumIdValue(
+      activeKurikulumIdFromStore ?? getKurikulumIdFromObject(activeKurikulum)
+    );
+  }, [
+    paramKurikulumId,
+    selectedKurikulumId,
+    selectedKurikulum,
+    activeKurikulumIdFromStore,
+    activeKurikulum,
+  ]);
 
   const activeKurikulumName = paramKurikulumName
     ?? selectedKurikulum?.nama_kurikulum
+    ?? activeKurikulum?.nama_kurikulum
     ?? '';
 
   const { defaultStartDate, defaultEndDate } = useMemo(() => {

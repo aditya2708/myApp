@@ -23,7 +23,10 @@ const MateriManagementScreen = ({ navigation, route }) => {
   const { jenjang, kelas, mataPelajaran, kurikulumId: routeKurikulumId, kurikulum } = route.params || {};
 
   const kurikulumState = useSelector(state => state?.kurikulum);
-  const activeKurikulum = kurikulum || kurikulumState?.selectedKurikulum || null;
+  const activeKurikulum = kurikulum
+    || kurikulumState?.selectedKurikulum
+    || kurikulumState?.activeKurikulum
+    || null;
   const kurikulumId = getFirstDefined(
     routeKurikulumId,
     kurikulum?.id_kurikulum,
@@ -31,6 +34,9 @@ const MateriManagementScreen = ({ navigation, route }) => {
     kurikulumState?.selectedKurikulumId,
     kurikulumState?.selectedKurikulum?.id_kurikulum,
     kurikulumState?.selectedKurikulum?.kurikulum_id,
+    kurikulumState?.activeKurikulumId,
+    kurikulumState?.activeKurikulum?.id_kurikulum,
+    kurikulumState?.activeKurikulum?.kurikulum_id,
     mataPelajaran?.kurikulum_id,
     mataPelajaran?.id_kurikulum,
     kelas?.kurikulum_id,
