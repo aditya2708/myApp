@@ -15,6 +15,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { MediaTypeOptions } from 'expo-image-picker';
 import TextInput from '../../../common/components/TextInput';
 import Button from '../../../common/components/Button';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
@@ -229,7 +230,7 @@ const AdminCabangDonaturFormScreen = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: MediaTypeOptions?.Images ?? MediaTypeOptions.All,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
