@@ -208,6 +208,86 @@ class KurikulumController extends Controller
     }
 
     /**
+     * Set a kurikulum as the active one for current cabang
+     */
+    public function setActive(Request $request, $kurikulumId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user || !$user->adminCabang) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak memiliki akses untuk mengatur kurikulum aktif'
+                ], 403);
+            }
+
+            $kacabId = $user->adminCabang->id_kacab;
+
+            $kurikulum = Kurikulum::byKacab($kacabId)
+                ->with(['jenjang'])
+                ->withCount(['kurikulumMateri', 'semester', 'materi'])
+                ->find($kurikulumId);
+
+            if (!$kurikulum) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kurikulum tidak ditemukan'
+                ], 404);
+            }
+
+            $kurikulum->is_active = true;
+            $kurikulum->status = 'aktif';
+            $kurikulum->save();
+
+            $kurikulum->refresh();
+            $kurikulum->loadMissing(['jenjang']);
+            $kurikulum->loadCount(['kurikulumMateri', 'semester', 'materi']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kurikulum berhasil diaktifkan',
+                'data' => $this->transformKurikulum($kurikulum)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengatur kurikulum aktif: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function transformKurikulum(Kurikulum $kurikulum): array
+    {
+        $mataPelajaranCount = (int) $kurikulum->kurikulumMateri()
+            ->distinct('id_mata_pelajaran')
+            ->count('id_mata_pelajaran');
+
+        $materiCount = (int) ($kurikulum->kurikulum_materi_count ?? $kurikulum->materi_count ?? $kurikulum->getTotalMateri());
+        $semesterCount = (int) ($kurikulum->semester_count ?? $kurikulum->semester()->count());
+
+        return [
+            'id_kurikulum' => $kurikulum->id_kurikulum,
+            'nama_kurikulum' => $kurikulum->nama_kurikulum,
+            'kode_kurikulum' => $kurikulum->kode_kurikulum,
+            'tahun_berlaku' => $kurikulum->tahun_berlaku,
+            'jenis' => $kurikulum->jenis,
+            'deskripsi' => $kurikulum->deskripsi,
+            'status' => $kurikulum->status,
+            'status_text' => $kurikulum->status_text,
+            'status_color' => $kurikulum->status_color,
+            'is_active' => (bool) $kurikulum->is_active,
+            'mata_pelajaran_count' => $mataPelajaranCount,
+            'total_mata_pelajaran' => $mataPelajaranCount,
+            'kurikulum_materi_count' => $materiCount,
+            'total_materi' => $materiCount,
+            'semester_count' => $semesterCount,
+            'created_at' => $kurikulum->created_at ? $kurikulum->created_at->toIso8601String() : null,
+            'updated_at' => $kurikulum->updated_at ? $kurikulum->updated_at->toIso8601String() : null,
+        ];
+    }
+
+    /**
      * Get kurikulum hierarchy structure (jenjang -> kelas -> mata pelajaran)
      */
     public function getStruktur(Request $request): JsonResponse

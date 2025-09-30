@@ -212,7 +212,7 @@ class Kurikulum extends Model
 
         static::updating(function ($kurikulum) {
             // If setting as active, deactivate others in same kacab
-            if (($kurikulum->is_active || $kurikulum->status === 'aktif') && 
+            if (($kurikulum->is_active || $kurikulum->status === 'aktif') &&
                 ($kurikulum->isDirty('is_active') || $kurikulum->isDirty('status'))) {
                 static::byKacab($kurikulum->id_kacab)
                     ->where('id_kurikulum', '!=', $kurikulum->id_kurikulum)
@@ -221,6 +221,61 @@ class Kurikulum extends Model
                           ->orWhere('status', 'aktif');
                     })
                     ->update(['is_active' => false, 'status' => 'nonaktif']);
+            }
+        });
+
+        static::saving(function ($kurikulum) {
+            $status = $kurikulum->status !== null ? strtolower($kurikulum->status) : null;
+            $isActive = (bool) $kurikulum->is_active;
+
+            if ($kurikulum->isDirty('status') && !$kurikulum->isDirty('is_active')) {
+                if (in_array($status, ['inactive', 'non-active'], true)) {
+                    $kurikulum->status = 'nonaktif';
+                    $status = 'nonaktif';
+                } elseif ($status === null || $status === '') {
+                    $kurikulum->status = 'nonaktif';
+                    $status = 'nonaktif';
+                }
+
+                if ($status === 'aktif') {
+                    $kurikulum->is_active = true;
+                } elseif ($status === 'draft') {
+                    $kurikulum->is_active = false;
+                } else {
+                    $kurikulum->is_active = false;
+                }
+
+                return;
+            }
+
+            if ($kurikulum->isDirty('is_active') && !$kurikulum->isDirty('status')) {
+                if ($isActive) {
+                    $kurikulum->status = 'aktif';
+                } else {
+                    if ($status === 'draft') {
+                        $kurikulum->status = 'draft';
+                    } else {
+                        $kurikulum->status = 'nonaktif';
+                    }
+                }
+
+                return;
+            }
+
+            if ($status === 'aktif' || $isActive) {
+                $kurikulum->status = 'aktif';
+                $kurikulum->is_active = true;
+                return;
+            }
+
+            if (in_array($status, ['inactive', 'non-active'], true)) {
+                $kurikulum->status = 'nonaktif';
+            } elseif ($status === null || $status === '') {
+                $kurikulum->status = 'nonaktif';
+            }
+
+            if ($kurikulum->status !== 'draft') {
+                $kurikulum->is_active = false;
             }
         });
     }
