@@ -204,6 +204,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'getProfile']);
     Route::post('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'updateProfile']);
     
+        Route::controller(App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class)->group(function () {
+            Route::get('/kurikulum', 'index');
+            Route::get('/kurikulum/{id}', 'show');
+            Route::get('/kurikulum/{id}/preview', 'getPreview');
+            Route::get('/kurikulum-dropdown', 'getForDropdown');
+        });
+
         Route::get('/anak', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'index']);
         Route::post('/anak', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'store']);
         Route::get('/anak/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'show']);
