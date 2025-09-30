@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Alert
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import FloatingActionButton from '../../../../common/components/FloatingActionButton';
