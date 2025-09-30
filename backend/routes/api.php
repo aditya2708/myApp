@@ -291,7 +291,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/activity-reports/by-activity/{id_aktivitas}', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'getByActivity']);
         Route::delete('/activity-reports/{id}', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'destroy']);
 
-        // Kurikulum read endpoints
+        // Kurikulum read endpoints (index, detail, preview, dropdown)
         Route::get('/kurikulum', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'index']);
         Route::get('/kurikulum/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'show']);
         Route::get('/kurikulum/{id}/preview', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'getPreview']);
