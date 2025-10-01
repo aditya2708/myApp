@@ -34,6 +34,7 @@ class Aktivitas extends Model
         'gps_recorded_at',
         'location_name',
         'status',
+        'notified_at',
     ];
 
     protected $attributes = [
@@ -49,7 +50,8 @@ class Aktivitas extends Model
         'require_gps' => 'boolean',
         'max_distance_meters' => 'integer',
         'gps_accuracy' => 'decimal:2',
-        'gps_recorded_at' => 'datetime'
+        'gps_recorded_at' => 'datetime',
+        'notified_at' => 'datetime',
     ];
 
 

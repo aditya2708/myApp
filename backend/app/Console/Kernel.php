@@ -17,6 +17,12 @@ class Kernel extends ConsoleKernel
                  ->dailyAt('01:00')
                  ->withoutOverlapping()
                  ->runInBackground();
+
+        // Send push notifications for upcoming Admin Shelter activities
+        $schedule->command('notifications:send-upcoming-activities')
+                 ->everyFiveMinutes()
+                 ->withoutOverlapping()
+                 ->runInBackground();
     }
 
     /**
