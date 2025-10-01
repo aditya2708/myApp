@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1055477950973",
+    "project_id": "kilau-bp",
+    "storage_bucket": "kilau-bp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055477950973:android:b2dfb25ede338bda2f9194",
+        "android_client_info": {
+          "package_name": "com.anonymous.BPEXPO2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAyMR8gbL0KJSqiSymnJVu7r6__pPOSlbM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
