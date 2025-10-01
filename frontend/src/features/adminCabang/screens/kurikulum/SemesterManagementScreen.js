@@ -39,6 +39,15 @@ const resolveKurikulumId = (value) => (
   ?? null
 );
 
+const resolveSemesterKurikulumId = (semester) => (
+  semester?.kurikulum_id
+  ?? semester?.id_kurikulum
+  ?? semester?.kurikulum?.id_kurikulum
+  ?? semester?.kurikulum?.kurikulum_id
+  ?? semester?.kurikulum?.id
+  ?? null
+);
+
 const SemesterManagementScreen = ({ navigation }) => {
   const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
   const selectedKurikulum = useSelector(selectSelectedKurikulum);
@@ -56,12 +65,23 @@ const SemesterManagementScreen = ({ navigation }) => {
 
   const [selectedTab, setSelectedTab] = useState('active');
 
+  const semesterQueryParams = React.useMemo(() => {
+    const params = { status: 'all' };
+
+    if (effectiveKurikulumId) {
+      params.kurikulum_id = effectiveKurikulumId;
+    }
+
+    return params;
+  }, [effectiveKurikulumId]);
+
   const {
     data: semesterResponse,
     isLoading,
+    isFetching,
     error,
     refetch
-  } = useGetSemesterListQuery({ status: 'all' });
+  } = useGetSemesterListQuery(semesterQueryParams);
 
   const [deleteSemester, { isLoading: isDeleting }] = useDeleteSemesterMutation();
   const [setActiveSemester, { isLoading: isActivating }] = useSetActiveSemesterMutation();
@@ -180,12 +200,43 @@ const SemesterManagementScreen = ({ navigation }) => {
   console.log('- Final allSemesters:', allSemesters);
   console.log('- Final allSemesters length:', allSemesters.length);
 
-  const semesterData = {
-    active: allSemesters.filter(semester => semester.is_active),
-    draft: allSemesters.filter(semester => !semester.is_active && (!semester.status || semester.status === 'draft')),
-    completed: allSemesters.filter(semester => semester.status === 'completed'),
-    archived: allSemesters.filter(semester => semester.status === 'archived')
-  };
+  const normalizedEffectiveId = effectiveKurikulumId ? String(effectiveKurikulumId) : null;
+  const filteredSemesters = React.useMemo(() => {
+    if (!normalizedEffectiveId) {
+      return [];
+    }
+
+    const filtered = allSemesters.filter((semester) => {
+      const semesterKurikulumId = resolveSemesterKurikulumId(semester);
+
+      return semesterKurikulumId && String(semesterKurikulumId) === normalizedEffectiveId;
+    });
+
+    console.log('- Filtered semesters length:', filtered.length);
+
+    return filtered;
+  }, [allSemesters, normalizedEffectiveId]);
+
+  const semesterData = React.useMemo(() => ({
+    active: filteredSemesters.filter((semester) => semester.is_active),
+    draft: filteredSemesters.filter(
+      (semester) => !semester.is_active && (!semester.status || semester.status === 'draft')
+    ),
+    completed: filteredSemesters.filter((semester) => semester.status === 'completed'),
+    archived: filteredSemesters.filter((semester) => semester.status === 'archived'),
+  }), [filteredSemesters]);
+
+  const hasMismatchedSemesters = React.useMemo(() => {
+    if (!normalizedEffectiveId || allSemesters.length === 0) {
+      return false;
+    }
+
+    return allSemesters.some((semester) => {
+      const semesterKurikulumId = resolveSemesterKurikulumId(semester);
+
+      return semesterKurikulumId && String(semesterKurikulumId) !== normalizedEffectiveId;
+    });
+  }, [allSemesters, normalizedEffectiveId]);
 
   console.log('- Semester counts:', {
     active: semesterData.active.length,
@@ -201,7 +252,7 @@ const SemesterManagementScreen = ({ navigation }) => {
   ];
 
   const currentData = semesterData[selectedTab] || [];
-  const isRefreshing = isLoading || isDeleting || isActivating;
+  const isRefreshing = isFetching || isDeleting || isActivating;
 
   if (isLoading) {
     return <LoadingSpinner message="Memuat data semester..." />;
@@ -263,6 +314,19 @@ const SemesterManagementScreen = ({ navigation }) => {
                 {effectiveKurikulumName || 'Kurikulum tanpa nama'}
               </Text>
             </View>
+          </View>
+        )}
+        {normalizedEffectiveId && currentData.length === 0 && hasMismatchedSemesters && (
+          <View style={styles.noticeBanner}>
+            <Ionicons
+              name="information-circle-outline"
+              size={18}
+              color="#b45309"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.noticeText}>
+              Tidak ada semester yang terhubung dengan kurikulum ini. Tambahkan semester baru agar data selaras.
+            </Text>
           </View>
         )}
       </View>
@@ -353,6 +417,22 @@ const styles = StyleSheet.create({
   },
   kurikulumContextNameSelected: {
     color: '#166534',
+  },
+  noticeBanner: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fcd34d',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#92400e',
   },
 });
 
