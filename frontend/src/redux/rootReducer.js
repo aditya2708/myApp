@@ -22,6 +22,7 @@ import raportLaporanReducer from '../features/adminShelter/redux/raportLaporanSl
 import laporanSuratReducer from '../features/adminShelter/redux/laporanSuratSlice';
 import laporanAktivitasReducer from '../features/adminShelter/redux/laporanAktivitasSlice';
 import historiLaporanReducer from '../features/adminShelter/redux/historiLaporanSlice';
+import notificationReducer from '../features/adminShelter/redux/notificationSlice';
 
 // Admin Cabang reducers
 import kurikulumReducer from '../features/adminCabang/redux/kurikulumSlice';
@@ -60,6 +61,7 @@ const appReducer = combineReducers({
   laporanSurat: laporanSuratReducer,
   laporanAktivitas: laporanAktivitasReducer,
   historiLaporan: historiLaporanReducer,
+  notification: notificationReducer,
   
   // Admin Cabang reducers
   kurikulum: kurikulumReducer,
