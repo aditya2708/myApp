@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,99 @@ import {
   useDeleteKelasCustomMutation,
   useGetMasterDataDropdownQuery,
 } from '../../../api/kurikulumApi';
+
+const DEFAULT_TINGKAT_RANGE = { min: 1, max: 12 };
+
+const parseNumber = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const extractRangeFromMetadata = (metadata = {}) => {
+  if (!metadata || typeof metadata !== 'object') {
+    return { min: null, max: null };
+  }
+
+  const rangeSource = [
+    metadata.rentang_tingkat,
+    metadata.tingkat_range,
+    metadata.range_tingkat,
+    metadata.tingkat,
+  ].find((candidate) => candidate && typeof candidate === 'object');
+
+  const min = [
+    metadata.tingkat_min,
+    metadata.tingkatMin,
+    rangeSource?.min,
+    rangeSource?.start,
+    rangeSource?.from,
+    rangeSource?.lowest,
+  ]
+    .map(parseNumber)
+    .find((value) => value !== null);
+
+  const max = [
+    metadata.tingkat_max,
+    metadata.tingkatMax,
+    rangeSource?.max,
+    rangeSource?.end,
+    rangeSource?.to,
+    rangeSource?.highest,
+  ]
+    .map(parseNumber)
+    .find((value) => value !== null);
+
+  return { min, max };
+};
+
+const getAllowedTingkat = (jenjang) => {
+  if (!jenjang) {
+    return {
+      min: null,
+      max: null,
+      list: [],
+    };
+  }
+
+  const { min, max } = extractRangeFromMetadata(jenjang.metadata || {});
+  const finalMin = parseNumber(min) ?? DEFAULT_TINGKAT_RANGE.min;
+  const finalMax = parseNumber(max) ?? DEFAULT_TINGKAT_RANGE.max;
+
+  if (!Number.isFinite(finalMin) || !Number.isFinite(finalMax) || finalMin > finalMax) {
+    return {
+      min: DEFAULT_TINGKAT_RANGE.min,
+      max: DEFAULT_TINGKAT_RANGE.max,
+      list: Array.from(
+        { length: DEFAULT_TINGKAT_RANGE.max - DEFAULT_TINGKAT_RANGE.min + 1 },
+        (_, index) => DEFAULT_TINGKAT_RANGE.min + index
+      ),
+    };
+  }
+
+  const minInt = Math.ceil(finalMin);
+  const maxInt = Math.floor(finalMax);
+
+  if (minInt > maxInt) {
+    return {
+      min: DEFAULT_TINGKAT_RANGE.min,
+      max: DEFAULT_TINGKAT_RANGE.max,
+      list: Array.from(
+        { length: DEFAULT_TINGKAT_RANGE.max - DEFAULT_TINGKAT_RANGE.min + 1 },
+        (_, index) => DEFAULT_TINGKAT_RANGE.min + index
+      ),
+    };
+  }
+
+  return {
+    min: minInt,
+    max: maxInt,
+    list: Array.from({ length: maxInt - minInt + 1 }, (_, index) => minInt + index),
+  };
+};
 
 const KelasCustomTab = ({ refreshing, onRefresh }) => {
   const [showModal, setShowModal] = useState(false);
@@ -45,6 +138,13 @@ const KelasCustomTab = ({ refreshing, onRefresh }) => {
   const [createKelas, { isLoading: isCreating }] = useCreateKelasCustomMutation();
   const [updateKelas, { isLoading: isUpdating }] = useUpdateKelasCustomMutation();
   const [deleteKelas] = useDeleteKelasCustomMutation();
+
+  const jenjangOptions = useMemo(() => dropdownData?.data?.jenjang || [], [dropdownData]);
+  const selectedJenjangOption = useMemo(
+    () => jenjangOptions.find((jenjang) => jenjang.id_jenjang?.toString() === formData.id_jenjang),
+    [jenjangOptions, formData.id_jenjang]
+  );
+  const allowedTingkat = useMemo(() => getAllowedTingkat(selectedJenjangOption), [selectedJenjangOption]);
 
   // Refresh when tab refreshing prop changes
   useEffect(() => {
@@ -121,11 +221,30 @@ const KelasCustomTab = ({ refreshing, onRefresh }) => {
       return;
     }
 
+    const tingkatNumber = formData.tingkat ? parseInt(formData.tingkat, 10) : null;
+    if (tingkatNumber !== null) {
+      if (Number.isNaN(tingkatNumber)) {
+        Alert.alert('Error', 'Tingkat tidak valid');
+        return;
+      }
+
+      if (allowedTingkat.min !== null && allowedTingkat.max !== null) {
+        if (tingkatNumber < allowedTingkat.min || tingkatNumber > allowedTingkat.max) {
+          const jenjangName = selectedJenjangOption?.nama_jenjang || 'jenjang ini';
+          Alert.alert(
+            'Error',
+            `Tingkat harus berada dalam rentang ${allowedTingkat.min}-${allowedTingkat.max} untuk ${jenjangName}.`
+          );
+          return;
+        }
+      }
+    }
+
     try {
       const submitData = {
         id_jenjang: parseInt(formData.id_jenjang),
         nama_kelas: formData.nama_kelas,
-        tingkat: formData.tingkat ? parseInt(formData.tingkat) : null,
+        tingkat: tingkatNumber,
         deskripsi: formData.deskripsi,
         is_global: formData.is_global,
         target_jenjang: formData.target_jenjang,
@@ -193,8 +312,6 @@ const KelasCustomTab = ({ refreshing, onRefresh }) => {
   );
 
   const renderJenjangPicker = () => {
-    const jenjangOptions = dropdownData?.data?.jenjang || [];
-    
     return (
       <View style={styles.formGroup}>
         <Text style={styles.formLabel}>Jenjang *</Text>
@@ -206,10 +323,12 @@ const KelasCustomTab = ({ refreshing, onRefresh }) => {
                 styles.pickerOption,
                 formData.id_jenjang === jenjang.id_jenjang.toString() && styles.pickerOptionActive
               ]}
-              onPress={() => setFormData(prev => ({ 
-                ...prev, 
-                id_jenjang: jenjang.id_jenjang.toString() 
-              }))}
+              onPress={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  id_jenjang: jenjang.id_jenjang.toString(),
+                }))
+              }
             >
               <Text style={[
                 styles.pickerOptionText,
@@ -219,6 +338,108 @@ const KelasCustomTab = ({ refreshing, onRefresh }) => {
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+      </View>
+    );
+  };
+
+  useEffect(() => {
+    if (!formData.id_jenjang || !formData.tingkat) {
+      return;
+    }
+
+    if (allowedTingkat.min === null || allowedTingkat.max === null) {
+      return;
+    }
+
+    const numericTingkat = parseInt(formData.tingkat, 10);
+    if (
+      Number.isNaN(numericTingkat) ||
+      numericTingkat < allowedTingkat.min ||
+      numericTingkat > allowedTingkat.max
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        tingkat: '',
+      }));
+    }
+  }, [formData.id_jenjang, formData.tingkat, allowedTingkat.min, allowedTingkat.max]);
+
+  const renderTingkatPicker = () => {
+    const hasRange =
+      allowedTingkat.list.length > 0 &&
+      allowedTingkat.min !== null &&
+      allowedTingkat.max !== null;
+    const min = hasRange ? allowedTingkat.min : DEFAULT_TINGKAT_RANGE.min;
+    const max = hasRange ? allowedTingkat.max : DEFAULT_TINGKAT_RANGE.max;
+    const jenjangName = selectedJenjangOption?.nama_jenjang;
+    const placeholder = formData.id_jenjang
+      ? hasRange
+        ? `Pilih tingkat (${min}-${max})`
+        : 'Rentang tingkat belum tersedia'
+      : 'Pilih tingkat setelah memilih jenjang';
+
+    return (
+      <View style={styles.formGroup}>
+        <Text style={styles.formLabel}>Tingkat</Text>
+        <Text style={styles.helperText}>
+          {formData.id_jenjang
+            ? hasRange
+              ? `Rentang tingkat valid${jenjangName ? ` untuk ${jenjangName}` : ''}: ${min}-${max}`
+              : `Rentang tingkat${jenjangName ? ` untuk ${jenjangName}` : ''} belum tersedia.`
+            : 'Silakan pilih jenjang terlebih dahulu untuk melihat pilihan tingkat.'}
+        </Text>
+        {!formData.tingkat && (
+          <Text style={styles.placeholderText}>{placeholder}</Text>
+        )}
+        <View style={[styles.pickerContainer, styles.tingkatPickerContainer]}>
+          <TouchableOpacity
+            style={[
+              styles.pickerOption,
+              formData.tingkat === '' && styles.pickerOptionActive,
+            ]}
+            onPress={() =>
+              setFormData((prev) => ({
+                ...prev,
+                tingkat: '',
+              }))
+            }
+          >
+            <Text
+              style={[
+                styles.pickerOptionText,
+                formData.tingkat === '' && styles.pickerOptionTextActive,
+              ]}
+            >
+              Kosong
+            </Text>
+          </TouchableOpacity>
+
+          {hasRange &&
+            allowedTingkat.list.map((tingkat) => (
+              <TouchableOpacity
+                key={tingkat}
+                style={[
+                  styles.pickerOption,
+                  formData.tingkat === tingkat.toString() && styles.pickerOptionActive,
+                ]}
+                onPress={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    tingkat: tingkat.toString(),
+                  }))
+                }
+              >
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    formData.tingkat === tingkat.toString() && styles.pickerOptionTextActive,
+                  ]}
+                >
+                  {tingkat}
+                </Text>
+              </TouchableOpacity>
+            ))}
         </View>
       </View>
     );
@@ -256,16 +477,7 @@ const KelasCustomTab = ({ refreshing, onRefresh }) => {
             />
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Tingkat</Text>
-            <TextInput
-              style={styles.formInput}
-              value={formData.tingkat}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, tingkat: text }))}
-              placeholder="Masukkan tingkat (1-12)"
-              keyboardType="numeric"
-            />
-          </View>
+          {renderTingkatPicker()}
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Deskripsi</Text>
@@ -587,6 +799,17 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
   },
+  helperText: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginBottom: 4,
+  },
+  placeholderText: {
+    fontSize: 12,
+    color: '#adb5bd',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   formInput: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -602,6 +825,9 @@ const styles = StyleSheet.create({
   pickerContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+  },
+  tingkatPickerContainer: {
+    marginTop: 8,
   },
   pickerOption: {
     paddingHorizontal: 16,
