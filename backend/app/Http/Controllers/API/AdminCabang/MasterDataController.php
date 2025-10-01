@@ -638,7 +638,50 @@ class MasterDataController extends Controller
             $data['jenjang'] = Jenjang::active()
                 ->select('id_jenjang', 'nama_jenjang', 'kode_jenjang')
                 ->orderBy('urutan')
-                ->get();
+                ->get()
+                ->map(function (Jenjang $jenjang) {
+                    $kodeJenjang = strtoupper((string) $jenjang->kode_jenjang);
+                    $tingkatRange = self::JENJANG_TINGKAT_RANGE[$kodeJenjang] ?? null;
+
+                    $minTingkat = $tingkatRange['min'] ?? null;
+                    $maxTingkat = $tingkatRange['max'] ?? null;
+                    $allowedTingkat = ($minTingkat !== null && $maxTingkat !== null)
+                        ? range($minTingkat, $maxTingkat)
+                        : [];
+
+                    $existingMetadata = $jenjang->metadata ?? null;
+                    if (is_string($existingMetadata)) {
+                        $decoded = json_decode($existingMetadata, true);
+                        $existingMetadata = json_last_error() === JSON_ERROR_NONE ? $decoded : null;
+                    }
+
+                    $metadata = is_array($existingMetadata) ? $existingMetadata : [];
+
+                    $rangeMetadata = array_filter([
+                        'min_tingkat' => $minTingkat,
+                        'max_tingkat' => $maxTingkat,
+                        'allowed_tingkat' => !empty($allowedTingkat) ? $allowedTingkat : null,
+                        'tingkat_range' => ($minTingkat !== null && $maxTingkat !== null) ? [
+                            'min' => $minTingkat,
+                            'max' => $maxTingkat,
+                            'allowed' => $allowedTingkat,
+                        ] : null,
+                    ], fn ($value) => $value !== null);
+
+                    $metadata = array_merge($metadata, $rangeMetadata);
+                    $metadata = empty($metadata) ? (object) [] : $metadata;
+
+                    return [
+                        'id_jenjang' => $jenjang->id_jenjang,
+                        'nama_jenjang' => $jenjang->nama_jenjang,
+                        'kode_jenjang' => $jenjang->kode_jenjang,
+                        'min_tingkat' => $minTingkat,
+                        'max_tingkat' => $maxTingkat,
+                        'allowed_tingkat' => $allowedTingkat,
+                        'metadata' => $metadata,
+                    ];
+                })
+                ->values();
 
             // Get kategori mata pelajaran options
             $data['kategori_mata_pelajaran'] = [
