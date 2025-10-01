@@ -138,16 +138,46 @@ const SelectKurikulumScreen = ({ navigation }) => {
 
     const listActiveId = getKurikulumId(activeFromList);
     const normalizedListId = listActiveId ? listActiveId.toString() : null;
+    const shouldSyncSelected = !selectedId
+      || (normalizedListId && selectedId ? normalizedListId === selectedId : false);
+
+    const syncSelection = () => {
+      if (!shouldSyncSelected) {
+        return;
+      }
+
+      const currentSelectedId = selectedKurikulum
+        ? getKurikulumId(selectedKurikulum)?.toString() ?? null
+        : null;
+
+      if (currentSelectedId === normalizedListId && selectedKurikulum?.updated_at === activeFromList?.updated_at) {
+        return;
+      }
+
+      dispatch(setSelectedKurikulum(activeFromList));
+    };
 
     if (!activeId || normalizedListId !== activeId) {
       dispatch(setActiveKurikulum(activeFromList));
+      syncSelection();
       return;
     }
 
     if (activeKurikulum && activeKurikulum.updated_at !== activeFromList?.updated_at) {
       dispatch(setActiveKurikulum(activeFromList));
+      syncSelection();
+      return;
     }
-  }, [kurikulumList, dispatch, activeId, activeKurikulum]);
+
+    syncSelection();
+  }, [
+    kurikulumList,
+    dispatch,
+    activeId,
+    activeKurikulum,
+    selectedId,
+    selectedKurikulum,
+  ]);
 
   const handleSelect = (kurikulum) => {
     dispatch(setSelectedKurikulum(kurikulum));

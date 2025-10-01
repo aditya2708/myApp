@@ -1,5 +1,12 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+const resolveKurikulumId = (kurikulum) => (
+  kurikulum?.id_kurikulum
+  ?? kurikulum?.kurikulum_id
+  ?? kurikulum?.id
+  ?? null
+);
+
 /**
  * Kurikulum slice for Admin Cabang
  * Manages kurikulum hierarchy navigation state and structure data
@@ -56,13 +63,34 @@ const kurikulumSlice = createSlice({
 
     setActiveKurikulum: (state, action) => {
       const payload = action.payload || null;
+      const resolvedActiveId = resolveKurikulumId(payload);
+      const previousActiveId = state.activeKurikulumId
+        ?? resolveKurikulumId(state.activeKurikulum);
+      const selectedId = state.selectedKurikulumId
+        ?? resolveKurikulumId(state.selectedKurikulum);
+
       state.activeKurikulum = payload;
-      state.activeKurikulumId = payload?.id_kurikulum ?? payload?.kurikulum_id ?? payload?.id ?? null;
+      state.activeKurikulumId = resolvedActiveId;
+
+      if (!selectedId || (previousActiveId && selectedId === previousActiveId)) {
+        state.selectedKurikulum = payload;
+        state.selectedKurikulumId = resolvedActiveId;
+      }
     },
 
     clearActiveKurikulum: (state) => {
+      const previousActiveId = state.activeKurikulumId
+        ?? resolveKurikulumId(state.activeKurikulum);
+      const selectedId = state.selectedKurikulumId
+        ?? resolveKurikulumId(state.selectedKurikulum);
+
       state.activeKurikulum = null;
       state.activeKurikulumId = null;
+
+      if (!selectedId || (previousActiveId && selectedId === previousActiveId)) {
+        state.selectedKurikulum = null;
+        state.selectedKurikulumId = null;
+      }
     },
 
     clearSelectedKurikulum: (state) => {
@@ -247,13 +275,6 @@ export const selectKurikulumLoading = (state) => state.kurikulum.loading;
 export const selectKurikulumError = (state) => state.kurikulum.error;
 
 // Combined selectors
-const resolveKurikulumId = (kurikulum) => (
-  kurikulum?.id_kurikulum
-  ?? kurikulum?.kurikulum_id
-  ?? kurikulum?.id
-  ?? null
-);
-
 export const selectEffectiveKurikulum = (state) => (
   state.kurikulum.selectedKurikulum || state.kurikulum.activeKurikulum
 );

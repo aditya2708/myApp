@@ -18,10 +18,10 @@ import {
 } from '../../api/kurikulumApi';
 import SemesterListSection from './components/SemesterListSection';
 import {
-  selectSelectedKurikulum,
-  selectSelectedKurikulumId,
   selectActiveKurikulum,
   selectActiveKurikulumId,
+  selectEffectiveKurikulum,
+  selectEffectiveKurikulumId,
 } from '../../redux/kurikulumSlice';
 
 // --- Helpers ---
@@ -55,18 +55,25 @@ const normalizeSemesterList = (response) => {
 
 // --- Screen Component ---
 const SemesterManagementScreen = ({ navigation }) => {
-  const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
-  const selectedKurikulum = useSelector(selectSelectedKurikulum);
   const activeKurikulumIdFromStore = useSelector(selectActiveKurikulumId);
   const activeKurikulum = useSelector(selectActiveKurikulum);
+  const effectiveKurikulum = useSelector(selectEffectiveKurikulum);
+  const effectiveKurikulumIdFromStore = useSelector(selectEffectiveKurikulumId);
 
-  const resolvedSelectedId = selectedKurikulumId ?? resolveKurikulumId(selectedKurikulum);
-  const resolvedActiveId = activeKurikulumIdFromStore ?? resolveKurikulumId(activeKurikulum);
-  const effectiveKurikulumId = resolvedSelectedId ?? resolvedActiveId ?? null;
-  const effectiveKurikulum = selectedKurikulum || activeKurikulum || null;
+  const effectiveKurikulumId = effectiveKurikulumIdFromStore
+    ?? resolveKurikulumId(effectiveKurikulum);
   const effectiveKurikulumName = effectiveKurikulum?.nama_kurikulum || '';
+
+  const normalizedEffectiveId = effectiveKurikulumId
+    ? String(effectiveKurikulumId)
+    : null;
+  const normalizedActiveId = activeKurikulumIdFromStore
+    ? String(activeKurikulumIdFromStore)
+    : activeKurikulum
+      ? String(resolveKurikulumId(activeKurikulum))
+      : null;
   const isUsingActiveKurikulum = Boolean(
-    effectiveKurikulumId && resolvedActiveId && String(effectiveKurikulumId) === String(resolvedActiveId)
+    normalizedEffectiveId && normalizedActiveId && normalizedEffectiveId === normalizedActiveId
   );
 
   const [selectedTab, setSelectedTab] = useState('active');
@@ -179,7 +186,6 @@ const SemesterManagementScreen = ({ navigation }) => {
 
   const allSemesters = useMemo(() => normalizeSemesterList(semesterResponse), [semesterResponse]);
 
-  const normalizedEffectiveId = effectiveKurikulumId ? String(effectiveKurikulumId) : null;
   const filteredSemesters = useMemo(() => {
     if (!normalizedEffectiveId) return [];
     return allSemesters.filter((semester) => {
