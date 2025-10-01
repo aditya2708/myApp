@@ -19,10 +19,8 @@ import {
   kurikulumApi
 } from '../../api/kurikulumApi';
 import {
-  selectSelectedKurikulum,
-  selectSelectedKurikulumId,
-  selectActiveKurikulum,
-  selectActiveKurikulumId,
+  selectEffectiveKurikulum,
+  selectEffectiveKurikulumId,
 } from '../../redux/kurikulumSlice';
 
 const resolveKurikulumIdValue = (value) => {
@@ -59,10 +57,8 @@ const SemesterFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
-  const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
-  const selectedKurikulum = useSelector(selectSelectedKurikulum);
-  const activeKurikulumIdFromStore = useSelector(selectActiveKurikulumId);
-  const activeKurikulum = useSelector(selectActiveKurikulum);
+  const effectiveKurikulumIdFromStore = useSelector(selectEffectiveKurikulumId);
+  const effectiveKurikulum = useSelector(selectEffectiveKurikulum);
 
   const {
     mode = 'create',
@@ -71,34 +67,23 @@ const SemesterFormScreen = () => {
     kurikulumName: paramKurikulumName,
   } = route.params || {};
 
-  const activeKurikulumId = useMemo(() => {
+  const resolvedKurikulumId = useMemo(() => {
     const resolvedParamId = resolveKurikulumIdValue(paramKurikulumId);
     if (resolvedParamId) {
       return resolvedParamId;
     }
 
-    const resolvedSelected = resolveKurikulumIdValue(
-      selectedKurikulumId ?? getKurikulumIdFromObject(selectedKurikulum)
-    );
-
-    if (resolvedSelected) {
-      return resolvedSelected;
-    }
-
     return resolveKurikulumIdValue(
-      activeKurikulumIdFromStore ?? getKurikulumIdFromObject(activeKurikulum)
+      effectiveKurikulumIdFromStore ?? getKurikulumIdFromObject(effectiveKurikulum)
     );
   }, [
     paramKurikulumId,
-    selectedKurikulumId,
-    selectedKurikulum,
-    activeKurikulumIdFromStore,
-    activeKurikulum,
+    effectiveKurikulumIdFromStore,
+    effectiveKurikulum,
   ]);
 
-  const activeKurikulumName = paramKurikulumName
-    ?? selectedKurikulum?.nama_kurikulum
-    ?? activeKurikulum?.nama_kurikulum
+  const effectiveKurikulumName = paramKurikulumName
+    ?? effectiveKurikulum?.nama_kurikulum
     ?? '';
 
   const { defaultStartDate, defaultEndDate } = useMemo(() => {
@@ -115,7 +100,7 @@ const SemesterFormScreen = () => {
     periode: 'ganjil',
     tanggal_mulai: '',
     tanggal_selesai: '',
-    kurikulum_id: activeKurikulumId ?? '',
+    kurikulum_id: resolvedKurikulumId ?? '',
   });
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
@@ -131,7 +116,7 @@ const SemesterFormScreen = () => {
     if (isEditMode) {
       const semesterKurikulumId = semesterParam.kurikulum_id
         ?? semesterParam.id_kurikulum
-        ?? activeKurikulumId
+        ?? resolvedKurikulumId
         ?? '';
 
       setFormData({
@@ -153,12 +138,12 @@ const SemesterFormScreen = () => {
     } else {
       setFormData((prev) => ({
         ...prev,
-        kurikulum_id: activeKurikulumId ?? '',
+        kurikulum_id: resolvedKurikulumId ?? '',
       }));
       setStartDate(defaultStartDate);
       setEndDate(defaultEndDate);
     }
-  }, [isEditMode, semesterParam, activeKurikulumId, defaultStartDate, defaultEndDate]);
+  }, [isEditMode, semesterParam, resolvedKurikulumId, defaultStartDate, defaultEndDate]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -190,7 +175,9 @@ const SemesterFormScreen = () => {
       return;
     }
 
-    const normalizedKurikulumId = resolveKurikulumIdValue(formData.kurikulum_id ?? activeKurikulumId);
+    const normalizedKurikulumId = resolveKurikulumIdValue(
+      formData.kurikulum_id ?? resolvedKurikulumId
+    );
     if (!normalizedKurikulumId) {
       Alert.alert('Error', 'Kurikulum belum dipilih atau tidak valid');
       return;
@@ -275,9 +262,9 @@ const SemesterFormScreen = () => {
             selectTextOnFocus={false}
             placeholder="ID kurikulum terpilih"
           />
-          {(semesterParam?.kurikulum?.nama_kurikulum || activeKurikulumName) ? (
+          {(semesterParam?.kurikulum?.nama_kurikulum || effectiveKurikulumName) ? (
             <Text style={styles.helperText} numberOfLines={2}>
-              Kurikulum: {semesterParam?.kurikulum?.nama_kurikulum || activeKurikulumName}
+              Kurikulum: {semesterParam?.kurikulum?.nama_kurikulum || effectiveKurikulumName}
             </Text>
           ) : null}
         </View>
