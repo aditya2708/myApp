@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -24,10 +24,7 @@ import {
   selectActiveKurikulumId,
 } from '../../redux/kurikulumSlice';
 
-/**
- * Semester Management Screen - API Integrated
- * CRUD interface for semester management
- */
+// --- Helpers ---
 const resolveSemesterId = (semester) => (
   semester?.id_semester ?? semester?.id ?? null
 );
@@ -48,6 +45,15 @@ const resolveSemesterKurikulumId = (semester) => (
   ?? null
 );
 
+const normalizeSemesterList = (response) => {
+  if (!response) return [];
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.data?.data)) return response.data.data;
+  return [];
+};
+
+// --- Screen Component ---
 const SemesterManagementScreen = ({ navigation }) => {
   const selectedKurikulumId = useSelector(selectSelectedKurikulumId);
   const selectedKurikulum = useSelector(selectSelectedKurikulum);
@@ -65,13 +71,9 @@ const SemesterManagementScreen = ({ navigation }) => {
 
   const [selectedTab, setSelectedTab] = useState('active');
 
-  const semesterQueryParams = React.useMemo(() => {
+  const semesterQueryParams = useMemo(() => {
     const params = { status: 'all' };
-
-    if (effectiveKurikulumId) {
-      params.kurikulum_id = effectiveKurikulumId;
-    }
-
+    if (effectiveKurikulumId) params.kurikulum_id = effectiveKurikulumId;
     return params;
   }, [effectiveKurikulumId]);
 
@@ -81,15 +83,18 @@ const SemesterManagementScreen = ({ navigation }) => {
     isFetching,
     error,
     refetch
-  } = useGetSemesterListQuery(semesterQueryParams);
+  } = useGetSemesterListQuery(semesterQueryParams, {
+    skip: !effectiveKurikulumId,
+  });
 
   const [deleteSemester, { isLoading: isDeleting }] = useDeleteSemesterMutation();
   const [setActiveSemester, { isLoading: isActivating }] = useSetActiveSemesterMutation();
 
   useFocusEffect(
     React.useCallback(() => {
+      if (!effectiveKurikulumId) return;
       refetch();
-    }, [refetch])
+    }, [refetch, effectiveKurikulumId])
   );
 
   const handleAddSemester = () => {
@@ -119,7 +124,6 @@ const SemesterManagementScreen = ({ navigation }) => {
 
   const handleDeleteSemester = async (semester) => {
     const semesterId = resolveSemesterId(semester);
-
     if (!semesterId) {
       Alert.alert('Error', 'ID semester tidak ditemukan');
       return;
@@ -148,7 +152,6 @@ const SemesterManagementScreen = ({ navigation }) => {
 
   const handleSetActive = async (semester) => {
     const semesterId = resolveSemesterId(semester);
-
     if (!semesterId) {
       Alert.alert('Error', 'ID semester tidak ditemukan');
       return;
@@ -174,50 +177,18 @@ const SemesterManagementScreen = ({ navigation }) => {
     );
   };
 
-  console.log('=== SCREEN DATA PROCESSING ===');
-  console.log('- semesterResponse:', semesterResponse);
-  console.log('- semesterResponse type:', typeof semesterResponse);
-  console.log('- semesterResponse keys:', semesterResponse ? Object.keys(semesterResponse) : 'No keys');
-
-  let allSemesters = [];
-
-  if (semesterResponse?.data) {
-    if (Array.isArray(semesterResponse.data)) {
-      allSemesters = semesterResponse.data;
-      console.log('- Using transformed array data, length:', allSemesters.length);
-    } else if (semesterResponse.data.data && Array.isArray(semesterResponse.data.data)) {
-      allSemesters = semesterResponse.data.data;
-      console.log('- Using pagination data, length:', allSemesters.length);
-    } else {
-      console.log('- Unknown data structure, using empty array');
-      allSemesters = [];
-    }
-  } else {
-    console.log('- No data in response, using empty array');
-    allSemesters = [];
-  }
-
-  console.log('- Final allSemesters:', allSemesters);
-  console.log('- Final allSemesters length:', allSemesters.length);
+  const allSemesters = useMemo(() => normalizeSemesterList(semesterResponse), [semesterResponse]);
 
   const normalizedEffectiveId = effectiveKurikulumId ? String(effectiveKurikulumId) : null;
-  const filteredSemesters = React.useMemo(() => {
-    if (!normalizedEffectiveId) {
-      return [];
-    }
-
-    const filtered = allSemesters.filter((semester) => {
+  const filteredSemesters = useMemo(() => {
+    if (!normalizedEffectiveId) return [];
+    return allSemesters.filter((semester) => {
       const semesterKurikulumId = resolveSemesterKurikulumId(semester);
-
       return semesterKurikulumId && String(semesterKurikulumId) === normalizedEffectiveId;
     });
-
-    console.log('- Filtered semesters length:', filtered.length);
-
-    return filtered;
   }, [allSemesters, normalizedEffectiveId]);
 
-  const semesterData = React.useMemo(() => ({
+  const semesterData = useMemo(() => ({
     active: filteredSemesters.filter((semester) => semester.is_active),
     draft: filteredSemesters.filter(
       (semester) => !semester.is_active && (!semester.status || semester.status === 'draft')
@@ -226,24 +197,13 @@ const SemesterManagementScreen = ({ navigation }) => {
     archived: filteredSemesters.filter((semester) => semester.status === 'archived'),
   }), [filteredSemesters]);
 
-  const hasMismatchedSemesters = React.useMemo(() => {
-    if (!normalizedEffectiveId || allSemesters.length === 0) {
-      return false;
-    }
-
+  const hasMismatchedSemesters = useMemo(() => {
+    if (!normalizedEffectiveId || allSemesters.length === 0) return false;
     return allSemesters.some((semester) => {
       const semesterKurikulumId = resolveSemesterKurikulumId(semester);
-
       return semesterKurikulumId && String(semesterKurikulumId) !== normalizedEffectiveId;
     });
   }, [allSemesters, normalizedEffectiveId]);
-
-  console.log('- Semester counts:', {
-    active: semesterData.active.length,
-    draft: semesterData.draft.length,
-    completed: semesterData.completed.length,
-    archived: semesterData.archived.length
-  });
 
   const tabs = [
     { key: 'active', label: 'Aktif', count: semesterData.active.length },
@@ -254,17 +214,42 @@ const SemesterManagementScreen = ({ navigation }) => {
   const currentData = semesterData[selectedTab] || [];
   const isRefreshing = isFetching || isDeleting || isActivating;
 
-  if (isLoading) {
-    return <LoadingSpinner message="Memuat data semester..." />;
+  if (!effectiveKurikulumId) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Kelola Semester</Text>
+          <Text style={styles.subtitle}>
+            Manajemen semester untuk kurikulum cabang
+          </Text>
+          <View style={[styles.noticeBanner, styles.noticeBannerInfo]}>
+            <Ionicons
+              name="information-circle-outline"
+              size={18}
+              color="#0d6efd"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={[styles.noticeText, styles.noticeTextInfo]}>
+              Pilih atau aktifkan kurikulum terlebih dahulu sebelum mengelola semester.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.emptyStateContainer}>
+          <Ionicons name="school-outline" size={48} color="#94a3b8" style={{ marginBottom: 12 }} />
+          <Text style={styles.emptyStateTitle}>Belum ada kurikulum yang dipilih</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            Silakan pilih kurikulum dari daftar kurikulum cabang untuk melihat semester yang terkait.
+          </Text>
+        </View>
+      </View>
+    );
   }
 
+  if (isLoading) return <LoadingSpinner message="Memuat data semester..." />;
+
   if (error) {
-    return (
-      <ErrorMessage
-        message="Gagal memuat data semester"
-        onRetry={refetch}
-      />
-    );
+    return <ErrorMessage message="Gagal memuat data semester" onRetry={refetch} />;
   }
 
   return (
@@ -324,7 +309,7 @@ const SemesterManagementScreen = ({ navigation }) => {
               color="#b45309"
               style={{ marginRight: 8 }}
             />
-            <Text style={styles.noticeText}>
+            <Text style={[styles.noticeText, styles.noticeTextWarning]}>
               Tidak ada semester yang terhubung dengan kurikulum ini. Tambahkan semester baru agar data selaras.
             </Text>
           </View>
@@ -343,36 +328,27 @@ const SemesterManagementScreen = ({ navigation }) => {
         onSetActive={handleSetActive}
       />
 
-      <FloatingActionButton
-        onPress={handleAddSemester}
-        icon="add"
-        backgroundColor="#28a745"
-      />
+      {effectiveKurikulumId ? (
+        <FloatingActionButton
+          onPress={handleAddSemester}
+          icon="add"
+          backgroundColor="#28a745"
+        />
+      ) : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
     backgroundColor: '#fff',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
   },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#343a40',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
+  title: { fontSize: 18, fontWeight: 'bold', color: '#343a40', marginBottom: 4 },
+  subtitle: { fontSize: 14, color: '#6c757d' },
   kurikulumContextBanner: {
     marginTop: 12,
     flexDirection: 'row',
@@ -391,33 +367,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#bbf7d0',
   },
-  kurikulumContextTextContainer: {
-    flex: 1,
-  },
+  kurikulumContextTextContainer: { flex: 1 },
   kurikulumContextLabel: {
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  kurikulumContextLabelActive: {
-    color: '#0d6efd',
-  },
-  kurikulumContextLabelSelected: {
-    color: '#198754',
-  },
-  kurikulumContextName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginTop: 4,
-  },
-  kurikulumContextNameActive: {
-    color: '#0d3b66',
-  },
-  kurikulumContextNameSelected: {
-    color: '#166534',
-  },
+  kurikulumContextLabelActive: { color: '#0d6efd' },
+  kurikulumContextLabelSelected: { color: '#198754' },
+  kurikulumContextName: { fontSize: 13, fontWeight: '600', color: '#1f2937', marginTop: 4 },
+  kurikulumContextNameActive: { color: '#0d3b66' },
+  kurikulumContextNameSelected: { color: '#166534' },
   noticeBanner: {
     marginTop: 12,
     flexDirection: 'row',
@@ -429,11 +390,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  noticeText: {
+  noticeBannerInfo: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
+  noticeText: { flex: 1, fontSize: 12 },
+  noticeTextWarning: { color: '#92400e' },
+  noticeTextInfo: { color: '#1d4ed8' },
+  emptyStateContainer: {
     flex: 1,
-    fontSize: 12,
-    color: '#92400e',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    backgroundColor: '#f8f9fa',
   },
+  emptyStateTitle: { fontSize: 16, fontWeight: '600', color: '#1f2937', textAlign: 'center', marginBottom: 8 },
+  emptyStateSubtitle: { fontSize: 13, color: '#4b5563', textAlign: 'center', lineHeight: 18 },
 });
 
 export default SemesterManagementScreen;
