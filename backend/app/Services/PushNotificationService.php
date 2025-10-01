@@ -29,15 +29,24 @@ class PushNotificationService
         }
 
         try {
-            $response = Expo::send($message, $tokens);
+            $expo = Expo::normalSetup();
+            $response = $expo->notify($tokens, $message);
 
             $errors = [];
 
             if (is_array($response)) {
-                foreach ($response as $result) {
+                $results = Arr::isAssoc($response) ? [$response] : $response;
+
+                foreach ($results as $index => $result) {
                     $status = Arr::get($result, 'status');
-                    if ($status !== null && $status !== 'ok') {
-                        $errors[] = $result;
+
+                    if ($status === null || $status !== 'ok') {
+                        $errors[] = array_filter([
+                            'token' => $tokens[$index] ?? null,
+                            'status' => $status,
+                            'message' => Arr::get($result, 'message'),
+                            'details' => Arr::get($result, 'details'),
+                        ], static fn ($value) => $value !== null);
                     }
                 }
             }
