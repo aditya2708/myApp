@@ -33,6 +33,7 @@ export default {
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.POST_NOTIFICATIONS",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
@@ -54,6 +55,14 @@ export default {
         "expo-location",
         {
           locationAlwaysAndWhenInUsePermission: "This app uses location to verify attendance at shelter activities."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/icon.png",
+          color: "#ffffff",
+          mode: IS_DEV ? "development" : "production"
         }
       ],
       "expo-audio"
