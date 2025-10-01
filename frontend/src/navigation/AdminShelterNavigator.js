@@ -224,6 +224,7 @@ const HomeStackNavigator = () => {
    
   </HomeStack.Navigator>
 );
+};
 
 const ProfileStackNavigator = () => (
   <ProfileStack.Navigator>
