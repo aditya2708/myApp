@@ -20,7 +20,17 @@ import {
   useGetMasterDataDropdownQuery,
 } from '../../../api/kurikulumApi';
 
-const DEFAULT_TINGKAT_RANGE = { min: 1, max: 12 };
+const DEFAULT_TINGKAT_RANGE = {
+  min: 1,
+  max: 12,
+  list: Array.from({ length: 12 }, (_, index) => index + 1),
+};
+
+const cloneDefaultRange = () => ({
+  min: DEFAULT_TINGKAT_RANGE.min,
+  max: DEFAULT_TINGKAT_RANGE.max,
+  list: [...DEFAULT_TINGKAT_RANGE.list],
+});
 
 const parseNumber = (value) => {
   if (value === undefined || value === null || value === '') {
@@ -31,85 +41,189 @@ const parseNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const extractRangeFromMetadata = (metadata = {}) => {
-  if (!metadata || typeof metadata !== 'object') {
-    return { min: null, max: null };
+const parseNumberArray = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map(parseNumber)
+      .filter((item) => item !== null)
+      .sort((a, b) => a - b);
   }
 
-  const rangeSource = [
-    metadata.rentang_tingkat,
-    metadata.tingkat_range,
-    metadata.range_tingkat,
-    metadata.tingkat,
-  ].find((candidate) => candidate && typeof candidate === 'object');
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parseNumberArray(parsed);
+    } catch (error) {
+      return value
+        .split(',')
+        .map((item) => parseNumber(item.trim()))
+        .filter((item) => item !== null)
+        .sort((a, b) => a - b);
+    }
+  }
 
-  const min = [
-    metadata.tingkat_min,
-    metadata.tingkatMin,
-    rangeSource?.min,
-    rangeSource?.start,
-    rangeSource?.from,
-    rangeSource?.lowest,
-  ]
+  return [];
+};
+
+const parseObject = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parseObject(parsed);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value;
+  }
+
+  return null;
+};
+
+const collectRangeObjects = (metadata) => {
+  if (!metadata || typeof metadata !== 'object') {
+    return [];
+  }
+
+  const keys = [
+    'tingkat',
+    'tingkat_range',
+    'range_tingkat',
+    'rentang_tingkat',
+    'tingkatRange',
+    'rangeTingkat',
+    'rentangTingkat',
+  ];
+
+  return keys
+    .map((key) => parseObject(metadata[key]))
+    .filter((candidate) => candidate !== null);
+};
+
+const extractRangeFromMetadata = (metadata = {}) => {
+  const normalizedMetadata = parseObject(metadata) || {};
+  const rangeObjects = collectRangeObjects(normalizedMetadata);
+
+  const allowedCandidates = [
+    normalizedMetadata.allowed_tingkat,
+    normalizedMetadata.allowedTingkat,
+  ];
+
+  rangeObjects.forEach((range) => {
+    allowedCandidates.push(
+      range.allowed,
+      range.allowed_tingkat,
+      range.allowedTingkat,
+      range.list,
+      range.daftar
+    );
+  });
+
+  const allowedList = allowedCandidates
+    .map((candidate) => parseNumberArray(candidate))
+    .find((candidate) => candidate.length > 0) || [];
+
+  const minCandidates = [
+    normalizedMetadata.min_tingkat,
+    normalizedMetadata.minTingkat,
+    normalizedMetadata.tingkat_min,
+    normalizedMetadata.tingkatMin,
+  ];
+
+  const maxCandidates = [
+    normalizedMetadata.max_tingkat,
+    normalizedMetadata.maxTingkat,
+    normalizedMetadata.tingkat_max,
+    normalizedMetadata.tingkatMax,
+  ];
+
+  rangeObjects.forEach((range) => {
+    minCandidates.push(range.min, range.minimum, range.start, range.from, range.lowest);
+    maxCandidates.push(range.max, range.maximum, range.end, range.to, range.highest);
+  });
+
+  let min = minCandidates
     .map(parseNumber)
-    .find((value) => value !== null);
-
-  const max = [
-    metadata.tingkat_max,
-    metadata.tingkatMax,
-    rangeSource?.max,
-    rangeSource?.end,
-    rangeSource?.to,
-    rangeSource?.highest,
-  ]
+    .find((candidate) => candidate !== null);
+  let max = maxCandidates
     .map(parseNumber)
-    .find((value) => value !== null);
+    .find((candidate) => candidate !== null);
 
-  return { min, max };
+  if ((min === null || max === null) && allowedList.length > 0) {
+    min = min ?? allowedList[0];
+    max = max ?? allowedList[allowedList.length - 1];
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+    return {
+      min: null,
+      max: null,
+      list: allowedList,
+    };
+  }
+
+  const finalAllowedList = allowedList.length > 0
+    ? allowedList.filter((value) => value >= min && value <= max)
+    : Array.from({ length: max - min + 1 }, (_, index) => min + index);
+
+  return {
+    min,
+    max,
+    list: [...new Set(finalAllowedList)].sort((a, b) => a - b),
+  };
 };
 
 const getAllowedTingkat = (jenjang) => {
   if (!jenjang) {
-    return {
-      min: null,
-      max: null,
-      list: [],
-    };
+    return cloneDefaultRange();
   }
 
-  const { min, max } = extractRangeFromMetadata(jenjang.metadata || {});
-  const finalMin = parseNumber(min) ?? DEFAULT_TINGKAT_RANGE.min;
-  const finalMax = parseNumber(max) ?? DEFAULT_TINGKAT_RANGE.max;
+  const metadata = parseObject(jenjang.metadata) || {};
+  const combinedMetadata = {
+    ...metadata,
+  };
 
-  if (!Number.isFinite(finalMin) || !Number.isFinite(finalMax) || finalMin > finalMax) {
-    return {
-      min: DEFAULT_TINGKAT_RANGE.min,
-      max: DEFAULT_TINGKAT_RANGE.max,
-      list: Array.from(
-        { length: DEFAULT_TINGKAT_RANGE.max - DEFAULT_TINGKAT_RANGE.min + 1 },
-        (_, index) => DEFAULT_TINGKAT_RANGE.min + index
-      ),
-    };
+  if (jenjang.min_tingkat !== undefined && jenjang.min_tingkat !== null) {
+    combinedMetadata.min_tingkat = jenjang.min_tingkat;
+  }
+  if (jenjang.max_tingkat !== undefined && jenjang.max_tingkat !== null) {
+    combinedMetadata.max_tingkat = jenjang.max_tingkat;
+  }
+  if (jenjang.allowed_tingkat !== undefined && jenjang.allowed_tingkat !== null) {
+    combinedMetadata.allowed_tingkat = jenjang.allowed_tingkat;
+  }
+  if (jenjang.minTingkat !== undefined && jenjang.minTingkat !== null) {
+    combinedMetadata.minTingkat = jenjang.minTingkat;
+  }
+  if (jenjang.maxTingkat !== undefined && jenjang.maxTingkat !== null) {
+    combinedMetadata.maxTingkat = jenjang.maxTingkat;
+  }
+  if (jenjang.allowedTingkat !== undefined && jenjang.allowedTingkat !== null) {
+    combinedMetadata.allowedTingkat = jenjang.allowedTingkat;
   }
 
-  const minInt = Math.ceil(finalMin);
-  const maxInt = Math.floor(finalMax);
+  const range = extractRangeFromMetadata(combinedMetadata);
 
-  if (minInt > maxInt) {
-    return {
-      min: DEFAULT_TINGKAT_RANGE.min,
-      max: DEFAULT_TINGKAT_RANGE.max,
-      list: Array.from(
-        { length: DEFAULT_TINGKAT_RANGE.max - DEFAULT_TINGKAT_RANGE.min + 1 },
-        (_, index) => DEFAULT_TINGKAT_RANGE.min + index
-      ),
-    };
+  if (range.min === null || range.max === null) {
+    return cloneDefaultRange();
   }
+
+  const clampedList = range.list.length > 0
+    ? range.list
+    : Array.from({ length: range.max - range.min + 1 }, (_, index) => range.min + index);
+
+  const normalizedList = [...new Set(clampedList.map((value) => Math.floor(value)))].sort((a, b) => a - b);
 
   return {
-    min: minInt,
-    max: maxInt,
-    list: Array.from({ length: maxInt - minInt + 1 }, (_, index) => minInt + index),
+    min: Math.floor(range.min),
+    max: Math.floor(range.max),
+    list: normalizedList,
   };
 };
 

@@ -36,24 +36,7 @@ class MasterDataKelasCustomTest extends TestCase
 
     public function test_store_kelas_custom_rejects_tingkat_outside_sd_range(): void
     {
-        $user = User::create([
-            'username' => 'admin_sd',
-            'email' => 'admin-sd@example.com',
-            'password' => 'secret',
-            'level' => 'admin_cabang',
-            'status' => 'active',
-        ]);
-
-        $kacab = Kacab::create([
-            'nama_kacab' => 'Cabang Utama',
-            'status' => 'aktif',
-        ]);
-
-        AdminCabang::create([
-            'user_id' => $user->id_users,
-            'id_kacab' => $kacab->id_kacab,
-            'nama_lengkap' => 'Admin SD',
-        ]);
+        $user = $this->createAdminCabangUser('admin_sd', 'admin-sd@example.com');
 
         $jenjang = Jenjang::create([
             'nama_jenjang' => 'Sekolah Dasar',
@@ -77,6 +60,77 @@ class MasterDataKelasCustomTest extends TestCase
                 'message' => 'Tingkat untuk jenjang SD harus antara 1 dan 6',
             ])
             ->assertJsonPath('errors.tingkat.0', 'Tingkat untuk jenjang SD harus antara 1 dan 6');
+    }
+
+    public function test_master_data_dropdown_includes_tingkat_metadata(): void
+    {
+        $user = $this->createAdminCabangUser('admin_metadata', 'admin-metadata@example.com');
+
+        Jenjang::create([
+            'nama_jenjang' => 'Sekolah Dasar',
+            'kode_jenjang' => 'SD',
+            'urutan' => 1,
+            'deskripsi' => 'Jenjang SD',
+            'is_active' => true,
+        ]);
+
+        Jenjang::create([
+            'nama_jenjang' => 'Sekolah Menengah Pertama',
+            'kode_jenjang' => 'SMP',
+            'urutan' => 2,
+            'deskripsi' => 'Jenjang SMP',
+            'is_active' => true,
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->getJson('/api/admin-cabang/master-data/dropdown');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('status', 'success');
+
+        $jenjangData = $response->json('data.jenjang');
+        $this->assertIsArray($jenjangData);
+
+        $sdData = collect($jenjangData)->firstWhere('kode_jenjang', 'SD');
+        $this->assertNotNull($sdData);
+        $this->assertSame(1, $sdData['min_tingkat']);
+        $this->assertSame(6, $sdData['max_tingkat']);
+        $this->assertEquals([1, 2, 3, 4, 5, 6], $sdData['allowed_tingkat']);
+        $this->assertIsArray($sdData['metadata']);
+        $this->assertSame(1, $sdData['metadata']['min_tingkat']);
+        $this->assertSame(6, $sdData['metadata']['max_tingkat']);
+        $this->assertEquals([1, 2, 3, 4, 5, 6], $sdData['metadata']['tingkat_range']['allowed']);
+
+        $smpData = collect($jenjangData)->firstWhere('kode_jenjang', 'SMP');
+        $this->assertNotNull($smpData);
+        $this->assertSame(7, $smpData['min_tingkat']);
+        $this->assertSame(9, $smpData['max_tingkat']);
+        $this->assertEquals([7, 8, 9], $smpData['allowed_tingkat']);
+    }
+
+    private function createAdminCabangUser(string $username, string $email): User
+    {
+        $user = User::create([
+            'username' => $username,
+            'email' => $email,
+            'password' => 'secret',
+            'level' => 'admin_cabang',
+            'status' => 'active',
+        ]);
+
+        $kacab = Kacab::create([
+            'nama_kacab' => 'Cabang ' . ucfirst(str_replace('_', ' ', $username)),
+            'status' => 'aktif',
+        ]);
+
+        AdminCabang::create([
+            'user_id' => $user->id_users,
+            'id_kacab' => $kacab->id_kacab,
+            'nama_lengkap' => 'Admin ' . ucfirst(str_replace('_', ' ', $username)),
+        ]);
+
+        return $user;
     }
 
     private function createSchema(): void
