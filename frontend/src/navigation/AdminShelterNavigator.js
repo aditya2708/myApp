@@ -2,12 +2,16 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSelector } from 'react-redux';
 
 // Core screens
 import AdminShelterDashboardScreen from '../features/adminShelter/screens/AdminShelterDashboardScreen';
 import AdminShelterProfileScreen from '../features/adminShelter/screens/AdminShelterProfileScreen';
 import AdminShelterSettingsScreen from '../features/adminShelter/screens/AdminShelterSettingsScreen';
 import ShelterGpsSettingScreen from '../features/adminShelter/screens/ShelterGpsSettingScreen';
+import NotificationsScreen from '../features/adminShelter/screens/NotificationsScreen';
+import { selectUnreadNotificationCount } from '../features/adminShelter/redux/notificationSlice';
 
 // Primary feature screens  
 import QrScannerScreen from '../features/adminShelter/screens/attendance/QrScannerScreen';
@@ -104,10 +108,76 @@ const HomeStack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 const ManagementStack = createStackNavigator();
 
-const HomeStackNavigator = () => (
-  <HomeStack.Navigator>
-    <HomeStack.Screen name="Dashboard" component={AdminShelterDashboardScreen} options={{ headerTitle: 'Dashboard Admin Shelter' }} />
-    
+const headerStyles = StyleSheet.create({
+  headerButton: {
+    marginRight: 12,
+    padding: 4,
+  },
+  headerRightContainer: {
+    marginRight: 12,
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#e53935',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});
+
+const NotificationBell = ({ onPress, unreadCount }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={headerStyles.headerButton}
+    accessibilityRole="button"
+    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+  >
+    <View>
+      <Ionicons name="notifications-outline" size={24} color="#1f2933" />
+      {unreadCount > 0 && (
+        <View style={headerStyles.badgeContainer}>
+          <Text style={headerStyles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        </View>
+      )}
+    </View>
+  </TouchableOpacity>
+);
+
+const HomeStackNavigator = () => {
+  const unreadCount = useSelector(selectUnreadNotificationCount);
+
+  return (
+    <HomeStack.Navigator>
+      <HomeStack.Screen
+        name="Dashboard"
+        component={AdminShelterDashboardScreen}
+        options={({ navigation }) => ({
+          headerTitle: 'Dashboard Admin Shelter',
+          headerRight: () => (
+            <NotificationBell
+              onPress={() => navigation.navigate('Notifications')}
+              unreadCount={unreadCount}
+            />
+          ),
+          headerRightContainerStyle: headerStyles.headerRightContainer,
+        })}
+      />
+      <HomeStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ headerTitle: 'Notifikasi', headerBackTitleVisible: false }}
+      />
+
     {/* Core feature screens */}
     <HomeStack.Screen name="QrScanner" component={QrScannerScreen} options={{ headerTitle: 'Scan QR Code' }} />
     <HomeStack.Screen name="ViewReportScreen" component={ViewReportScreen} options={{ headerTitle: 'View Report' }} />

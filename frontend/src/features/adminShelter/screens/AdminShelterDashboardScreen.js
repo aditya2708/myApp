@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions, SafeAreaView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
 import TodayActivitiesCard from '../components/TodayActivitiesCard';
 import { adminShelterApi } from '../api/adminShelterApi';
+import { useDispatch } from 'react-redux';
+import { fetchNotifications } from '../redux/notificationSlice';
 
 const { width, height } = Dimensions.get('window');
 
 const AdminShelterDashboardScreen = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -25,7 +28,7 @@ const AdminShelterDashboardScreen = () => {
     { title: 'Laporan Kegiatan', icon: 'bar-chart', color: '#e67e22', onPress: () => navigation.navigate('Management', { screen: 'LaporanKegiatanMain' }) }
   ];
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setError(null);
       const response = await adminShelterApi.getDashboard();
@@ -37,9 +40,15 @@ const AdminShelterDashboardScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchDashboardData(); }, []);
+  useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchNotifications());
+    }, [dispatch])
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
