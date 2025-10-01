@@ -15,6 +15,13 @@ use Illuminate\Support\Collection;
 
 class MasterDataController extends Controller
 {
+    private const JENJANG_TINGKAT_RANGE = [
+        'SD' => ['min' => 1, 'max' => 6],
+        'SMP' => ['min' => 7, 'max' => 9],
+        'SMA' => ['min' => 10, 'max' => 12],
+        'SMK' => ['min' => 10, 'max' => 12],
+    ];
+
     /**
      * Get admin cabang data
      */
@@ -59,6 +66,17 @@ class MasterDataController extends Controller
         }
 
         return array_map('intval', $value);
+    }
+
+    private function getTingkatRangeForJenjang(?Jenjang $jenjang): ?array
+    {
+        if (!$jenjang || !$jenjang->kode_jenjang) {
+            return null;
+        }
+
+        $kodeJenjang = strtoupper($jenjang->kode_jenjang);
+
+        return self::JENJANG_TINGKAT_RANGE[$kodeJenjang] ?? null;
     }
 
     /**
@@ -131,6 +149,28 @@ class MasterDataController extends Controller
                     'message' => 'Validasi gagal',
                     'errors' => $validator->errors()
                 ], 422);
+            }
+
+            $jenjang = Jenjang::find($request->id_jenjang);
+            $tingkatRange = $this->getTingkatRangeForJenjang($jenjang);
+
+            if ($request->filled('tingkat') && $tingkatRange) {
+                if ($request->tingkat < $tingkatRange['min'] || $request->tingkat > $tingkatRange['max']) {
+                    $message = sprintf(
+                        'Tingkat untuk jenjang %s harus antara %d dan %d',
+                        $jenjang->kode_jenjang ?? $jenjang->nama_jenjang,
+                        $tingkatRange['min'],
+                        $tingkatRange['max']
+                    );
+
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => $message,
+                        'errors' => [
+                            'tingkat' => [$message]
+                        ]
+                    ], 422);
+                }
             }
 
             $adminCabang = $this->getAdminCabang();
@@ -209,7 +249,10 @@ class MasterDataController extends Controller
                 ->where('id_kacab', $adminCabang->id_kacab)
                 ->firstOrFail();
 
+            $kelasCustom->loadMissing('jenjang');
+
             $validator = Validator::make($request->all(), [
+                'id_jenjang' => 'sometimes|exists:jenjang,id_jenjang',
                 'nama_kelas' => 'required|string|max:100',
                 'tingkat' => 'nullable|integer|min:1|max:15',
                 'deskripsi' => 'nullable|string',
@@ -228,8 +271,37 @@ class MasterDataController extends Controller
                 ], 422);
             }
 
+            $targetJenjangId = $request->input('id_jenjang', $kelasCustom->id_jenjang);
+            $jenjang = $targetJenjangId ? Jenjang::find($targetJenjangId) : null;
+            $tingkatRange = $this->getTingkatRangeForJenjang($jenjang ?? $kelasCustom->jenjang);
+
+            if ($request->filled('tingkat') && $tingkatRange) {
+                if ($request->tingkat < $tingkatRange['min'] || $request->tingkat > $tingkatRange['max']) {
+                    $jenjangLabel = $jenjang?->kode_jenjang
+                        ?? $jenjang?->nama_jenjang
+                        ?? optional($kelasCustom->jenjang)->kode_jenjang
+                        ?? optional($kelasCustom->jenjang)->nama_jenjang
+                        ?? 'tertentu';
+
+                    $message = sprintf(
+                        'Tingkat untuk jenjang %s harus antara %d dan %d',
+                        $jenjangLabel,
+                        $tingkatRange['min'],
+                        $tingkatRange['max']
+                    );
+
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => $message,
+                        'errors' => [
+                            'tingkat' => [$message]
+                        ]
+                    ], 422);
+                }
+            }
+
             // Check duplicate name within jenjang and cabang (exclude current)
-            $exists = Kelas::where('id_jenjang', $kelasCustom->id_jenjang)
+            $exists = Kelas::where('id_jenjang', $targetJenjangId)
                 ->where('id_kacab', $adminCabang->id_kacab)
                 ->where('nama_kelas', $request->nama_kelas)
                 ->where('id_kelas', '!=', $id)
@@ -243,6 +315,7 @@ class MasterDataController extends Controller
             }
 
             $kelasCustom->update([
+                'id_jenjang' => $targetJenjangId,
                 'nama_kelas' => $request->nama_kelas,
                 'tingkat' => $request->tingkat,
                 'deskripsi' => $request->deskripsi,
