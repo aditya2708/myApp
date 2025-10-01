@@ -37,6 +37,7 @@ export default {
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
+      googleServicesFile: "./google-services.json",
     },
     web: {
       favicon: "./assets/favicon.png"
