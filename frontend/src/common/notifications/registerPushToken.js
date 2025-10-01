@@ -35,6 +35,23 @@ const ensureAndroidChannelAsync = async () => {
   });
 };
 
+const buildDeviceInfo = () => {
+  const info = {
+    platform: Platform.OS,
+    brand: Device.brand,
+    manufacturer: Device.manufacturer,
+    modelName: Device.modelName,
+    osName: Device.osName,
+    osVersion: Device.osVersion,
+    deviceYearClass: Device.deviceYearClass,
+    totalMemory: Device.totalMemory,
+  };
+
+  return Object.fromEntries(
+    Object.entries(info).filter(([, value]) => value !== undefined && value !== null)
+  );
+};
+
 const registerPushToken = async (currentToken = null) => {
   try {
     if (!Device.isDevice) {
@@ -72,10 +89,30 @@ const registerPushToken = async (currentToken = null) => {
       return expoPushToken;
     }
 
-    await api.post(
-      ADMIN_SHELTER_ENDPOINTS.NOTIFICATIONS.REGISTER_PUSH_TOKEN,
-      { token: expoPushToken }
-    );
+    const payload = {
+      expo_push_token: expoPushToken,
+    };
+
+    const deviceInfo = buildDeviceInfo();
+
+    if (Object.keys(deviceInfo).length > 0) {
+      payload.device_info = deviceInfo;
+    }
+
+    try {
+      await api.post(
+        ADMIN_SHELTER_ENDPOINTS.NOTIFICATIONS.REGISTER_PUSH_TOKEN,
+        payload
+      );
+    } catch (error) {
+      const status = error?.response?.status;
+
+      if (status === 409 || status === 422) {
+        return expoPushToken;
+      }
+
+      throw error;
+    }
 
     return expoPushToken;
   } catch (error) {

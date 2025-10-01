@@ -12,7 +12,13 @@ class NotificationTokenController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $input = $request->all();
+
+        if (! isset($input['expo_push_token']) && isset($input['token'])) {
+            $input['expo_push_token'] = $input['token'];
+        }
+
+        $validator = Validator::make($input, [
             'expo_push_token' => 'required|string',
             'device_info' => 'nullable',
         ]);

@@ -343,7 +343,7 @@ export const ADMIN_SHELTER_ENDPOINTS = {
     AVAILABLE_YEARS: '/admin-shelter/laporan/histori/available-years'
   },
   NOTIFICATIONS: {
-    REGISTER_PUSH_TOKEN: '/admin-shelter/notifications/device-token'
+    REGISTER_PUSH_TOKEN: '/admin-shelter/notifications/token'
   }
 };
 
