@@ -11,7 +11,8 @@ const initialState = {
   profile: null,              // User profile data based on role
   loading: false,             // Loading state
   initializing: true,         // App initialization state
-  error: null                 // Error message if any
+  error: null,                // Error message if any
+  pushToken: null             // Expo push notification token
 };
 
 /**
@@ -119,6 +120,11 @@ const authSlice = createSlice({
     
     initializeFailure: (state) => {
       state.initializing = false;
+    },
+
+    // Push notification token management
+    setPushToken: (state, action) => {
+      state.pushToken = action.payload;
     }
   }
 });
@@ -139,7 +145,8 @@ export const {
   fetchUserFailure,
   initializeStart,
   initializeSuccess,
-  initializeFailure
+  initializeFailure,
+  setPushToken
 } = authSlice.actions;
 
 // Export selectors
@@ -152,6 +159,7 @@ export const selectUser = (state) => state.auth.user;
 export const selectUserProfile = (state) => state.auth.profile;
 export const selectAuthLoading = (state) => state.auth.loading;
 export const selectAuthError = (state) => state.auth.error;
+export const selectPushToken = (state) => state.auth.pushToken;
 
 // Export reducer
 export default authSlice.reducer;
