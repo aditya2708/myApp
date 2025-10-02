@@ -1,0 +1,31 @@
+# Node dependencies
+frontend/node_modules/
+backend/node_modules/
+node_modules/
+
+# PHP Composer dependencies
+backend/vendor/
+vendor/
+
+# Environment files
+backend/.env
+.env
+
+# Expo/React Native build output
+frontend/.expo/
+frontend/.expo-shared/
+frontend/dist/
+
+# Logs and temporary files
+*.log
+backend/storage/logs/
+frontend/.cache/
+
+# IDE settings
+.vscode/
+.idea/
+.DS_Store
+
+# Build artifacts
+frontend/build/
+backend/bootstrap/cache/*.php
