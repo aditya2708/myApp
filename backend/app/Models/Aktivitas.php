@@ -34,7 +34,6 @@ class Aktivitas extends Model
         'gps_recorded_at',
         'location_name',
         'status',
-        'notified_at',
     ];
 
     protected $attributes = [
@@ -42,7 +41,7 @@ class Aktivitas extends Model
         'late_minutes_threshold' => 15,
     ];
 
-  protected $casts = [
+    protected $casts = [
         'tanggal' => 'date',
         'late_minutes_threshold' => 'integer',
         'latitude' => 'decimal:8',
@@ -51,11 +50,9 @@ class Aktivitas extends Model
         'max_distance_meters' => 'integer',
         'gps_accuracy' => 'decimal:2',
         'gps_recorded_at' => 'datetime',
-        'notified_at' => 'datetime',
     ];
 
-
-  public function shelter(): BelongsTo
+    public function shelter(): BelongsTo
     {
         return $this->belongsTo(Shelter::class, 'id_shelter', 'id_shelter');
     }
@@ -75,11 +72,10 @@ class Aktivitas extends Model
         return $this->hasMany(Absen::class, 'id_aktivitas');
     }
 
-   public function tutor(): BelongsTo
+    public function tutor(): BelongsTo
     {
         return $this->belongsTo(Tutor::class, 'id_tutor', 'id_tutor');
     }
-
 
     // Level attribute removed - can be derived from kelompok->kelas_gabungan or materi->kelas->jenjang
 
@@ -215,7 +211,6 @@ class Aktivitas extends Model
                       ->first();
     }
 
-    
     // Scopes
     public function scopeByDate($query, $date)
     {
