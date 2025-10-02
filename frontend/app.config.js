@@ -69,6 +69,9 @@ export default {
       "expo-audio"
     ],
     extra: {
+      firebase: {
+        gcmSenderId: "1055477950973"
+      },
       eas: {
         projectId: "2e83c4d0-499c-413b-ad59-f173fff2ae4f"
       }

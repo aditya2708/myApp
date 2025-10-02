@@ -13,13 +13,9 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const getProjectId = () => {
-  const easProjectId = Constants?.expoConfig?.extra?.eas?.projectId;
-  if (easProjectId) {
-    return easProjectId;
-  }
-
-  return Constants?.easConfig?.projectId;
+const getGcmSenderId = () => {
+  const config = Constants?.expoConfig ?? Constants?.manifest;
+  return config?.extra?.firebase?.gcmSenderId;
 };
 
 const ensureAndroidChannelAsync = async () => {
@@ -52,11 +48,85 @@ const buildDeviceInfo = () => {
   );
 };
 
-const registerPushToken = async (currentToken = null) => {
+const sendTokenToBackend = async ({ token, deviceInfo }) => {
+  if (!token) {
+    return;
+  }
+
+  const payload = {
+    fcm_token: token,
+  };
+
+  if (deviceInfo && Object.keys(deviceInfo).length > 0) {
+    payload.device_info = deviceInfo;
+  }
+
+  try {
+    await api.post(
+      ADMIN_SHELTER_ENDPOINTS.NOTIFICATIONS.REGISTER_PUSH_TOKEN,
+      payload
+    );
+  } catch (error) {
+    const status = error?.response?.status;
+
+    if (status === 409 || status === 422) {
+      return;
+    }
+
+    throw error;
+  }
+};
+
+let refreshSubscription = null;
+let refreshCallback = null;
+
+const ensureTokenRefreshListener = (onTokenRefresh) => {
+  refreshCallback = onTokenRefresh;
+
+  if (refreshSubscription) {
+    return;
+  }
+
+  refreshSubscription = Notifications.addPushTokenListener(async (pushToken) => {
+    const refreshedToken = pushToken?.data;
+
+    if (!refreshedToken) {
+      return;
+    }
+
+    try {
+      await sendTokenToBackend({ token: refreshedToken });
+    } catch (error) {
+      console.error('Failed to synchronize refreshed push token with backend:', error);
+    }
+
+    if (typeof refreshCallback === 'function') {
+      try {
+        refreshCallback(refreshedToken);
+      } catch (callbackError) {
+        console.error('Push token refresh callback failed:', callbackError);
+      }
+    }
+  });
+};
+
+export const removePushTokenRefreshListener = () => {
+  if (refreshSubscription) {
+    refreshSubscription.remove?.();
+    refreshSubscription = null;
+  }
+
+  refreshCallback = null;
+};
+
+const registerPushToken = async ({ currentToken = null, onTokenRefresh } = {}) => {
   try {
     if (!Device.isDevice) {
       console.warn('Push notifications require a physical device.');
-      return null;
+      return {
+        token: null,
+        removeRefreshListener: removePushTokenRefreshListener,
+      };
     }
 
     await ensureAndroidChannelAsync();
@@ -71,50 +141,55 @@ const registerPushToken = async (currentToken = null) => {
 
     if (finalStatus !== 'granted') {
       console.warn('Push notification permissions not granted.');
-      return null;
+      return {
+        token: null,
+        removeRefreshListener: removePushTokenRefreshListener,
+      };
     }
 
-    const projectId = getProjectId();
-    const tokenResponse = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined
-    );
-    const expoPushToken = tokenResponse?.data;
+    const gcmSenderId = getGcmSenderId();
 
-    if (!expoPushToken) {
-      console.warn('Unable to retrieve Expo push token.');
-      return null;
+    if (!gcmSenderId) {
+      console.warn('FCM sender ID is not configured.');
+      return {
+        token: null,
+        removeRefreshListener: removePushTokenRefreshListener,
+      };
     }
 
-    if (currentToken && currentToken === expoPushToken) {
-      return expoPushToken;
+    const tokenResponse = await Notifications.getDevicePushTokenAsync({
+      gcmSenderId,
+    });
+    const fcmToken = tokenResponse?.data;
+
+    if (!fcmToken) {
+      console.warn('Unable to retrieve FCM device token.');
+      return {
+        token: null,
+        removeRefreshListener: removePushTokenRefreshListener,
+      };
     }
 
-    const payload = {
-      expo_push_token: expoPushToken,
-    };
+    ensureTokenRefreshListener(onTokenRefresh);
+
+    if (currentToken && currentToken === fcmToken) {
+      return {
+        token: fcmToken,
+        removeRefreshListener: removePushTokenRefreshListener,
+      };
+    }
 
     const deviceInfo = buildDeviceInfo();
 
-    if (Object.keys(deviceInfo).length > 0) {
-      payload.device_info = deviceInfo;
-    }
+    await sendTokenToBackend({
+      token: fcmToken,
+      deviceInfo,
+    });
 
-    try {
-      await api.post(
-        ADMIN_SHELTER_ENDPOINTS.NOTIFICATIONS.REGISTER_PUSH_TOKEN,
-        payload
-      );
-    } catch (error) {
-      const status = error?.response?.status;
-
-      if (status === 409 || status === 422) {
-        return expoPushToken;
-      }
-
-      throw error;
-    }
-
-    return expoPushToken;
+    return {
+      token: fcmToken,
+      removeRefreshListener: removePushTokenRefreshListener,
+    };
   } catch (error) {
     console.error('Failed to register push notification token:', error);
     throw error;

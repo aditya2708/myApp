@@ -16,11 +16,13 @@ import {
   selectIsAuthenticated,
   selectUserLevel,
   selectIsInitializing,
-  selectPushToken,
-  setPushToken
+  selectFcmToken,
+  setFcmToken
 } from '../features/auth/redux/authSlice';
 import { useAuth } from '../common/hooks/useAuth';
-import registerPushToken from '../common/notifications/registerPushToken';
+import registerPushToken, {
+  removePushTokenRefreshListener
+} from '../common/notifications/registerPushToken';
 import { useNotifications } from '../common/hooks/useNotifications';
 
 // Import LoadingScreen
@@ -34,7 +36,7 @@ const AppNavigator = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const userLevel = useSelector(selectUserLevel);
   const initializing = useSelector(selectIsInitializing);
-  const pushToken = useSelector(selectPushToken);
+  const fcmToken = useSelector(selectFcmToken);
 
   const handleNotificationResponse = useCallback(
     (response) => {
@@ -75,15 +77,25 @@ const AppNavigator = () => {
       isAuthenticated && userLevel === USER_ROLES.ADMIN_SHELTER;
 
     if (!shouldRegisterToken) {
-      return;
+      removePushTokenRefreshListener();
+      return undefined;
     }
+
+    let cleanup = removePushTokenRefreshListener;
 
     const syncPushToken = async () => {
       try {
-        const token = await registerPushToken(pushToken);
+        const { token, removeRefreshListener } = await registerPushToken({
+          currentToken: fcmToken,
+          onTokenRefresh: (nextToken) => {
+            dispatch(setFcmToken(nextToken));
+          },
+        });
 
-        if (token && token !== pushToken) {
-          dispatch(setPushToken(token));
+        cleanup = removeRefreshListener;
+
+        if (token && token !== fcmToken) {
+          dispatch(setFcmToken(token));
         }
       } catch (error) {
         console.error('Failed to synchronize push token with backend:', error);
@@ -91,7 +103,13 @@ const AppNavigator = () => {
     };
 
     syncPushToken();
-  }, [dispatch, isAuthenticated, pushToken, userLevel]);
+
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
+  }, [dispatch, fcmToken, isAuthenticated, userLevel]);
 
   // Show loading screen while initializing
   if (initializing) {
