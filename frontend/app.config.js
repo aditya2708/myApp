@@ -33,11 +33,9 @@ export default {
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.POST_NOTIFICATIONS",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      googleServicesFile: "./google-services.json",
     },
     web: {
       favicon: "./assets/favicon.png"
@@ -58,20 +56,9 @@ export default {
           locationAlwaysAndWhenInUsePermission: "This app uses location to verify attendance at shelter activities."
         }
       ],
-      [
-        "expo-notifications",
-        {
-          icon: "./assets/icon.png",
-          color: "#ffffff",
-          mode: IS_DEV ? "development" : "production"
-        }
-      ],
       "expo-audio"
     ],
     extra: {
-      firebase: {
-        gcmSenderId: "1055477950973"
-      },
       eas: {
         projectId: "2e83c4d0-499c-413b-ad59-f173fff2ae4f"
       }
