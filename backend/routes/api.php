@@ -203,8 +203,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [App\Http\Controllers\API\AdminShelterController::class, 'dashboard']);
     Route::get('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'getProfile']);
     Route::post('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'updateProfile']);
-    Route::post('/notifications/token', [App\Http\Controllers\API\AdminShelter\NotificationTokenController::class, 'store']);
-    Route::delete('/notifications/token', [App\Http\Controllers\API\AdminShelter\NotificationTokenController::class, 'destroy']);
     Route::get('/kurikulum/notifications', [App\Http\Controllers\API\AdminShelter\NotificationController::class, 'index']);
     Route::put('/notifications/{notification}/read', [App\Http\Controllers\API\AdminShelter\NotificationController::class, 'markAsRead']);
     
