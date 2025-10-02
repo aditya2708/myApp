@@ -14,12 +14,17 @@ class NotificationTokenController extends Controller
     {
         $input = $request->all();
 
-        if (! isset($input['expo_push_token']) && isset($input['token'])) {
-            $input['expo_push_token'] = $input['token'];
+        if (! isset($input['fcm_token']) && isset($input['token'])) {
+            $input['fcm_token'] = $input['token'];
+        }
+
+        if (! isset($input['fcm_token']) && isset($input['expo_push_token'])) {
+            $input['fcm_token'] = $input['expo_push_token'];
         }
 
         $validator = Validator::make($input, [
-            'expo_push_token' => 'required|string',
+            'fcm_token' => 'required|string|max:8192',
+            'platform' => 'nullable|string|max:64',
             'device_info' => 'nullable',
         ]);
 
@@ -39,17 +44,43 @@ class NotificationTokenController extends Controller
             }
         }
 
+        if ($deviceInfo !== null && ! is_array($deviceInfo)) {
+            $deviceInfo = ['value' => $deviceInfo];
+        }
+
+        if (is_array($deviceInfo) && empty($deviceInfo)) {
+            $deviceInfo = null;
+        }
+
+        $platform = $validated['platform'] ?? null;
+
+        if (! $platform && is_array($deviceInfo) && isset($deviceInfo['platform']) && is_string($deviceInfo['platform'])) {
+            $platform = $deviceInfo['platform'];
+        }
+
+        if (is_string($platform)) {
+            $platform = trim(mb_substr($platform, 0, 64));
+
+            if ($platform === '') {
+                $platform = null;
+            }
+        } else {
+            $platform = null;
+        }
+
         $user = $request->user();
 
         $token = $user->pushTokens()->updateOrCreate(
-            ['expo_push_token' => $validated['expo_push_token']],
+            ['fcm_token' => $validated['fcm_token']],
             [
+                'platform' => $platform,
                 'device_info' => $deviceInfo,
                 'last_used_at' => now(),
+                'invalidated_at' => null,
             ]
         );
 
-        Log::info('Expo push token stored for user', [
+        Log::info('FCM push token stored for user', [
             'user_id' => $user->id_users,
             'token_id' => $token->id,
         ]);
@@ -62,8 +93,14 @@ class NotificationTokenController extends Controller
 
     public function destroy(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'expo_push_token' => 'required|string',
+        $input = $request->all();
+
+        if (! isset($input['fcm_token']) && isset($input['expo_push_token'])) {
+            $input['fcm_token'] = $input['expo_push_token'];
+        }
+
+        $validator = Validator::make($input, [
+            'fcm_token' => 'required|string',
         ]);
 
         if ($validator->fails()) {
@@ -72,8 +109,10 @@ class NotificationTokenController extends Controller
 
         $user = $request->user();
 
+        $validated = $validator->validated();
+
         $deleted = $user->pushTokens()
-            ->where('expo_push_token', $validator->validated()['expo_push_token'])
+            ->where('fcm_token', $validated['fcm_token'])
             ->delete();
 
         if (! $deleted) {
@@ -82,9 +121,9 @@ class NotificationTokenController extends Controller
             ], 404);
         }
 
-        Log::info('Expo push token removed for user', [
+        Log::info('FCM push token removed for user', [
             'user_id' => $user->id_users,
-            'expo_push_token' => $validator->validated()['expo_push_token'],
+            'fcm_token' => $validated['fcm_token'],
         ]);
 
         return response()->json([

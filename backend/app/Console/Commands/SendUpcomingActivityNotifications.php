@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\PurgeInvalidFcmTokens;
 use App\Models\Aktivitas;
 use App\Models\UserPushToken;
 use App\Services\PushNotificationService;
@@ -100,9 +101,9 @@ class SendUpcomingActivityNotifications extends Command
                     return $adminShelter->user?->pushTokens ?? collect();
                 })
                 ->filter(function ($token) {
-                    return filled($token->expo_push_token);
+                    return filled($token->fcm_token) && $token->invalidated_at === null;
                 })
-                ->unique('expo_push_token')
+                ->unique('fcm_token')
                 ->values();
 
             if ($tokenModels->isEmpty()) {
@@ -114,7 +115,7 @@ class SendUpcomingActivityNotifications extends Command
                 continue;
             }
 
-            $tokens = $tokenModels->pluck('expo_push_token')->values()->all();
+            $tokens = $tokenModels->pluck('fcm_token')->values()->all();
             $activityTitle = $activity->materi ?: $activity->jenis_kegiatan ?: 'Aktivitas Shelter';
             $startTimeLabel = $startDateTime->timezone(config('app.timezone'))
                 ->format('H:i');
@@ -143,8 +144,29 @@ class SendUpcomingActivityNotifications extends Command
 
             $response = $this->pushNotificationService->send($tokens, $payload);
 
-            if (! $response['success']) {
+            $invalidTokens = $this->extractInvalidTokens($response['errors'] ?? []);
+
+            if (! empty($invalidTokens)) {
+                UserPushToken::query()
+                    ->whereIn('fcm_token', $invalidTokens)
+                    ->update([
+                        'invalidated_at' => $now,
+                    ]);
+
+                Log::warning('Menandai token FCM invalid berdasarkan respons Firebase', [
+                    'tokens' => $invalidTokens,
+                ]);
+
+                PurgeInvalidFcmTokens::dispatch();
+            }
+
+            $responseMeta = $response['response'] ?? [];
+            $successCount = is_array($responseMeta) ? (int) ($responseMeta['successes'] ?? 0) : 0;
+            $failureCount = is_array($responseMeta) ? (int) ($responseMeta['failures'] ?? 0) : 0;
+
+            if ($successCount === 0) {
                 $failedCount++;
+
                 Log::error('Gagal mengirim notifikasi aktivitas', [
                     'activity_id' => $activity->id_aktivitas,
                     'tokens' => $tokens,
@@ -161,15 +183,23 @@ class SendUpcomingActivityNotifications extends Command
 
             $activity->forceFill(['notified_at' => $now])->save();
 
-            $tokenModels->each(function (UserPushToken $token) use ($now) {
-                $token->forceFill(['last_used_at' => $now])->save();
-            });
+            $deliveredTokens = array_diff($tokens, $invalidTokens);
+
+            $tokenModels
+                ->filter(function (UserPushToken $token) use ($deliveredTokens) {
+                    return in_array($token->fcm_token, $deliveredTokens, true);
+                })
+                ->each(function (UserPushToken $token) use ($now) {
+                    $token->forceFill(['last_used_at' => $now])->save();
+                });
 
             $sentCount++;
 
             Log::info('Notifikasi aktivitas berhasil dikirim', [
                 'activity_id' => $activity->id_aktivitas,
                 'tokens' => $tokens,
+                'successes' => $successCount,
+                'failures' => $failureCount,
             ]);
         }
 
@@ -207,5 +237,66 @@ class SendUpcomingActivityNotifications extends Command
             $activity->tanggal->format('Y-m-d') . ' ' . $startTime,
             config('app.timezone')
         );
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $errors
+     * @return array<int, string>
+     */
+    private function extractInvalidTokens(array $errors): array
+    {
+        $invalidTokens = [];
+
+        foreach ($errors as $error) {
+            if (! is_array($error)) {
+                continue;
+            }
+
+            $token = $error['token'] ?? null;
+
+            if (! is_string($token)) {
+                continue;
+            }
+
+            if (! $this->isInvalidTokenError($error)) {
+                continue;
+            }
+
+            $invalidTokens[] = $token;
+        }
+
+        return array_values(array_unique($invalidTokens));
+    }
+
+    /**
+     * @param  array<string, mixed>  $error
+     */
+    private function isInvalidTokenError(array $error): bool
+    {
+        $code = isset($error['code']) ? (string) $error['code'] : '';
+        $message = isset($error['message']) ? Str::lower((string) $error['message']) : '';
+
+        $invalidCodes = [
+            'messaging/registration-token-not-registered',
+            'messaging/invalid-registration-token',
+            'messaging/mismatched-credential',
+            'messaging/invalid-argument',
+        ];
+
+        if (in_array($code, $invalidCodes, true)) {
+            return true;
+        }
+
+        if ($message === '') {
+            return false;
+        }
+
+        return Str::contains($message, [
+            'not registered',
+            'invalid registration token',
+            'mismatch sender id',
+            'mismatch sender-id',
+            'unregistered',
+        ]);
     }
 }
