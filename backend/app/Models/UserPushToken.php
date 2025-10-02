@@ -11,14 +11,17 @@ class UserPushToken extends Model
 
     protected $fillable = [
         'user_id',
-        'expo_push_token',
+        'fcm_token',
+        'platform',
         'device_info',
         'last_used_at',
+        'invalidated_at',
     ];
 
     protected $casts = [
         'device_info' => 'array',
         'last_used_at' => 'datetime',
+        'invalidated_at' => 'datetime',
     ];
 
     public function user()
