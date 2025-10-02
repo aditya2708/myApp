@@ -11,8 +11,7 @@ const initialState = {
   profile: null,              // User profile data based on role
   loading: false,             // Loading state
   initializing: true,         // App initialization state
-  error: null,                // Error message if any
-  fcmToken: null              // Firebase Cloud Messaging device token
+  error: null                 // Error message if any
 };
 
 /**
@@ -120,17 +119,12 @@ const authSlice = createSlice({
     
     initializeFailure: (state) => {
       state.initializing = false;
-    },
-
-    // Push notification token management
-    setFcmToken: (state, action) => {
-      state.fcmToken = action.payload;
     }
   }
 });
 
 // Export actions
-export const { 
+export const {
   resetAuthError, 
   setAuthToken, 
   setInitializationComplete,
@@ -145,8 +139,7 @@ export const {
   fetchUserFailure,
   initializeStart,
   initializeSuccess,
-  initializeFailure,
-  setFcmToken
+  initializeFailure
 } = authSlice.actions;
 
 // Export selectors
@@ -159,7 +152,6 @@ export const selectUser = (state) => state.auth.user;
 export const selectUserProfile = (state) => state.auth.profile;
 export const selectAuthLoading = (state) => state.auth.loading;
 export const selectAuthError = (state) => state.auth.error;
-export const selectFcmToken = (state) => state.auth.fcmToken;
 
 // Export reducer
 export default authSlice.reducer;

@@ -341,9 +341,6 @@ export const ADMIN_SHELTER_ENDPOINTS = {
     DETAIL: (id) => `/admin-shelter/laporan/histori/detail/${id}`,
     JENIS_HISTORI_OPTIONS: '/admin-shelter/laporan/histori/jenis-histori-options',
     AVAILABLE_YEARS: '/admin-shelter/laporan/histori/available-years'
-  },
-  NOTIFICATIONS: {
-    REGISTER_PUSH_TOKEN: '/admin-shelter/notifications/token'
   }
 };
 
