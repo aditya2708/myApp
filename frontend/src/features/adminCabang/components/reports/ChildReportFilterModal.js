@@ -19,16 +19,33 @@ const formatDate = (date) => {
   return instance.toISOString().split('T')[0];
 };
 
-const OptionRow = ({ label, selected, onPress, icon }) => (
+const OptionRow = ({ label, selected, onPress, icon, disabled }) => (
   <TouchableOpacity
     onPress={onPress}
-    style={[styles.optionRow, selected && styles.optionRowSelected]}
+    style={[
+      styles.optionRow,
+      selected && styles.optionRowSelected,
+      disabled && styles.optionRowDisabled,
+    ]}
+    disabled={disabled}
+    activeOpacity={disabled ? 1 : 0.7}
   >
     <View style={styles.optionLabelWrapper}>
       {icon && (
-        <Ionicons name={icon} size={16} color={selected ? '#2c3e50' : '#7f8c8d'} style={styles.optionIcon} />
+        <Ionicons
+          name={icon}
+          size={16}
+          color={selected ? '#2c3e50' : '#7f8c8d'}
+          style={styles.optionIcon}
+        />
       )}
-      <Text style={[styles.optionLabel, selected && styles.optionLabelSelected]}>
+      <Text
+        style={[
+          styles.optionLabel,
+          selected && styles.optionLabelSelected,
+          disabled && styles.optionLabelDisabled,
+        ]}
+      >
         {label}
       </Text>
     </View>
@@ -44,6 +61,7 @@ const ChildReportFilterModal = ({
   wilayahOptions = [],
   shelterOptions = [],
   shelterLoading = false,
+  shelterError = null,
   onApply,
   onClear,
   onWilayahFetch,
@@ -116,7 +134,24 @@ const ChildReportFilterModal = ({
 
   const handleClear = () => {
     onClear?.();
-    setLocalFilters({ ...filters, ...{ start_date: null, end_date: null, jenisKegiatan: null, wilayahBinaan: null, shelter: null } });
+    setLocalFilters({
+      ...filters,
+      ...{
+        start_date: null,
+        end_date: null,
+        jenisKegiatan: null,
+        wilayahBinaan: null,
+        shelter: null,
+      },
+    });
+  };
+
+  const handleRetryShelterFetch = () => {
+    if (!localFilters.wilayahBinaan) {
+      return;
+    }
+
+    onWilayahFetch?.(localFilters.wilayahBinaan);
   };
 
   return (
@@ -207,11 +242,24 @@ const ChildReportFilterModal = ({
               {shelterLoading && (
                 <Text style={styles.helperText}>Memuat shelter...</Text>
               )}
+              {shelterError && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{shelterError}</Text>
+                  <Button
+                    title="Coba lagi"
+                    type="outline"
+                    onPress={handleRetryShelterFetch}
+                    disabled={!localFilters.wilayahBinaan || shelterLoading}
+                    style={styles.retryButton}
+                  />
+                </View>
+              )}
               <View style={styles.optionList}>
                 <OptionRow
                   label="Semua"
                   selected={!localFilters.shelter}
                   onPress={() => setLocalFilters((prev) => ({ ...prev, shelter: null }))}
+                  disabled={Boolean(shelterError)}
                   icon="home"
                 />
                 {shelterItems.map((option) => (
@@ -219,7 +267,10 @@ const ChildReportFilterModal = ({
                     key={option.key}
                     label={option.label}
                     selected={localFilters.shelter === option.key}
-                    onPress={() => setLocalFilters((prev) => ({ ...prev, shelter: option.key }))}
+                    onPress={() =>
+                      setLocalFilters((prev) => ({ ...prev, shelter: option.key }))
+                    }
+                    disabled={Boolean(shelterError)}
                     icon="business"
                   />
                 ))}
@@ -332,6 +383,9 @@ const styles = StyleSheet.create({
   optionRowSelected: {
     backgroundColor: '#f0f7ff',
   },
+  optionRowDisabled: {
+    opacity: 0.5,
+  },
   optionLabelWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -348,6 +402,9 @@ const styles = StyleSheet.create({
   optionLabelSelected: {
     fontWeight: '600',
   },
+  optionLabelDisabled: {
+    color: '#95a5a6',
+  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -363,6 +420,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginBottom: 6,
+  },
+  errorContainer: {
+    backgroundColor: '#fdecea',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#f5b7b1',
+    marginBottom: 10,
+  },
+  errorText: {
+    color: '#c0392b',
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
   },
 });
 
