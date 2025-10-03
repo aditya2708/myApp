@@ -304,10 +304,18 @@ const AdminCabangChildReportScreen = () => {
     </View>
   );
 
+  const showReloadingOverlay = loading && !initializing && !loadingMore;
+
   return (
     <View style={styles.container}>
       {initializing && (
         <View style={styles.loadingOverlay}>
+          <LoadingSpinner />
+        </View>
+      )}
+
+      {showReloadingOverlay && (
+        <View style={styles.reloadingOverlay}>
           <LoadingSpinner />
         </View>
       )}
@@ -442,6 +450,13 @@ const styles = StyleSheet.create({
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  reloadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
