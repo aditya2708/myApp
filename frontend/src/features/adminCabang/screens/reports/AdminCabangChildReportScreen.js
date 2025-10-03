@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -60,6 +60,7 @@ const AdminCabangChildReportScreen = () => {
   const [searchText, setSearchText] = useState(filters.search || '');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const searchDebounceRef = useRef(null);
 
   useEffect(() => {
     dispatch(clearError());
@@ -78,13 +79,50 @@ const AdminCabangChildReportScreen = () => {
     return filterOptions.sheltersByWilayah?.[filters.wilayahBinaan] || [];
   }, [filterOptions.sheltersByWilayah, filters.wilayahBinaan]);
 
+  const clearSearchDebounce = useCallback(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+  }, []);
+
+  const triggerSearch = useCallback(
+    (value) => {
+      const trimmed = value.trim();
+      dispatch(setSearch(trimmed));
+      dispatch(fetchReportAnakList({ filters: { ...filters, search: trimmed }, page: 1 }));
+    },
+    [dispatch, filters],
+  );
+
   const handleSearch = useCallback(() => {
+    clearSearchDebounce();
+    triggerSearch(searchText);
+  }, [clearSearchDebounce, triggerSearch, searchText]);
+
+  useEffect(() => {
     const trimmed = searchText.trim();
-    dispatch(setSearch(trimmed));
-    dispatch(fetchReportAnakList({ filters: { ...filters, search: trimmed }, page: 1 }));
-  }, [dispatch, filters, searchText]);
+
+    if ((filters.search || '') === trimmed) {
+      return () => {
+        clearSearchDebounce();
+      };
+    }
+
+    clearSearchDebounce();
+
+    searchDebounceRef.current = setTimeout(() => {
+      triggerSearch(searchText);
+      searchDebounceRef.current = null;
+    }, 450);
+
+    return () => {
+      clearSearchDebounce();
+    };
+  }, [searchText, filters.search, triggerSearch, clearSearchDebounce]);
 
   const handleClearSearch = () => {
+    clearSearchDebounce();
     setSearchText('');
     dispatch(setSearch(''));
     dispatch(fetchReportAnakList({ filters: { ...filters, search: '' }, page: 1 }));
@@ -260,7 +298,14 @@ const AdminCabangChildReportScreen = () => {
       </View>
 
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color="#7f8c8d" style={styles.searchIcon} />
+        <TouchableOpacity
+          onPress={handleSearch}
+          style={styles.searchIconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Cari"
+        >
+          <Ionicons name="search" size={18} color="#7f8c8d" />
+        </TouchableOpacity>
         <TextInput
           value={searchText}
           onChangeText={setSearchText}
@@ -414,8 +459,9 @@ const styles = StyleSheet.create({
     borderColor: '#ecf0f1',
     marginBottom: 16,
   },
-  searchIcon: {
+  searchIconButton: {
     marginRight: 8,
+    padding: 4,
   },
   searchInput: {
     flex: 1,
