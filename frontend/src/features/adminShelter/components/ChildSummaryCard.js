@@ -160,9 +160,14 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-around'
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    alignItems: 'stretch'
   },
   item: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
     alignItems: 'center'
   },
   value: {
@@ -179,13 +184,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#888',
     marginTop: 4,
-    textAlign: 'center'
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    maxWidth: '100%',
+    lineHeight: 14
   },
   helperDescription: {
     fontSize: 10,
     color: '#888',
     marginTop: 4,
-    textAlign: 'center'
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    maxWidth: '100%',
+    lineHeight: 14
   },
   helperFallbackContainer: {
     marginTop: 4,
@@ -195,7 +206,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#888',
     marginTop: 2,
-    textAlign: 'center'
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    maxWidth: '100%',
+    lineHeight: 14
   }
 });
 
