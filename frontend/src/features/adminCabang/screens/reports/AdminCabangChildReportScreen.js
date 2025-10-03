@@ -236,7 +236,7 @@ const AdminCabangChildReportScreen = () => {
       filterOptions.sheltersByWilayah?.[wilayahId] ||
       filterOptions.sheltersByWilayah?.[String(wilayahId)];
 
-    if (Array.isArray(existingOptions)) {
+    if (Array.isArray(existingOptions) && !filterOptions.sheltersError) {
       // Data for this wilayah has already been loaded from the initial payload.
       return;
     }
@@ -356,6 +356,7 @@ const AdminCabangChildReportScreen = () => {
         wilayahOptions={filterOptions.wilayahBinaan}
         shelterOptions={shelterOptions}
         shelterLoading={filterOptions.sheltersLoading}
+        shelterError={filterOptions.sheltersError}
         onApply={handleApplyFilters}
         onClear={handleClearFilters}
         onWilayahFetch={handleWilayahFetch}
