@@ -115,8 +115,12 @@ const ChildSummaryCard = ({ summary }) => {
             {formatPercentage(derivedAverage ?? 0)}%
           </Text>
           <Text style={styles.label}>Rata-rata Kehadiran</Text>
+          <Text style={styles.helperDescription}>
+            Rumus backend: rata-rata dari (total hadir ÷ total peluang kehadiran)
+            setiap anak × 100%
+          </Text>
           {shouldUseFallback && (
-            <>
+            <View style={styles.helperFallbackContainer}>
               <Text style={styles.helperText}>
                 = total hadir ÷ total peluang kehadiran
               </Text>
@@ -125,7 +129,7 @@ const ChildSummaryCard = ({ summary }) => {
                   fallbackOpportunitiesDisplay ?? 0
                 }`}
               </Text>
-            </>
+            </View>
           )}
         </View>
         <View style={styles.item}>
@@ -176,6 +180,16 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 4,
     textAlign: 'center'
+  },
+  helperDescription: {
+    fontSize: 10,
+    color: '#888',
+    marginTop: 4,
+    textAlign: 'center'
+  },
+  helperFallbackContainer: {
+    marginTop: 4,
+    alignItems: 'center'
   },
   helperRatio: {
     fontSize: 10,
