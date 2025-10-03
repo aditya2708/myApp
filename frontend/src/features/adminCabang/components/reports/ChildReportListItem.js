@@ -111,7 +111,7 @@ const ChildReportListItem = ({ child, onPress }) => {
         totalAttended !== null &&
         totalOpportunities !== undefined &&
         totalOpportunities !== null
-          ? `${totalAttended}/${totalOpportunities} peluang kehadiran`
+          ? `Hadir ${totalAttended} dari ${totalOpportunities} pertemuan`
         : null,
       lastActivity: pickDisplayString(child.last_activity, child.latest_activity),
       photoUrl: child.photo_url || child.foto_url || child.avatar_url || null,
@@ -170,7 +170,12 @@ const ChildReportListItem = ({ child, onPress }) => {
         {attendancePercentage && (
           <View style={styles.statItem}>
             <Ionicons name="stats-chart" size={16} color="#27ae60" style={styles.statIcon} />
-            <Text style={[styles.statValue, styles.statHighlight]}>{attendancePercentage}</Text>
+            <View style={styles.statTextGroup}>
+              <Text style={styles.statLabel} numberOfLines={1}>
+                Persentase kehadiran keseluruhan:
+              </Text>
+              <Text style={[styles.statValue, styles.statHighlight]}>{attendancePercentage}</Text>
+            </View>
           </View>
         )}
         {lastActivity && (
@@ -253,6 +258,15 @@ const styles = StyleSheet.create({
   },
   statIcon: {
     marginRight: 8,
+  },
+  statTextGroup: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginBottom: 2,
   },
   statValue: {
     fontSize: 13,
