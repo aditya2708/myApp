@@ -41,7 +41,7 @@ const pickDisplayString = (...candidates) => {
   return null;
 };
 
-const formatAttendancePercentage = (rawValue) => {
+const parseAttendancePercentage = (rawValue) => {
   if (rawValue === null || rawValue === undefined) {
     return null;
   }
@@ -63,9 +63,30 @@ const formatAttendancePercentage = (rawValue) => {
     numericValue *= 100;
   }
 
-  const formattedValue = numericValue.toFixed(1);
+  const normalizedValue = Math.min(Math.max(numericValue, 0), 100);
 
-  return `${formattedValue}%`;
+  const formattedValue = normalizedValue.toFixed(1);
+
+  return {
+    displayValue: `${formattedValue}%`,
+    numericValue: normalizedValue,
+  };
+};
+
+const determineAttendanceLevel = (numericValue) => {
+  if (numericValue === null || numericValue === undefined) {
+    return null;
+  }
+
+  if (numericValue > 80) {
+    return { level: 'high', label: 'Tinggi' };
+  }
+
+  if (numericValue >= 50) {
+    return { level: 'medium', label: 'Sedang' };
+  }
+
+  return { level: 'low', label: 'Rendah' };
 };
 
 const ChildReportListItem = ({ child, onPress }) => {
@@ -74,7 +95,7 @@ const ChildReportListItem = ({ child, onPress }) => {
     nickname,
     shelterName,
     wilayahName,
-    attendancePercentage,
+    attendanceInfo,
     attendanceSummary,
     lastActivity,
     photoUrl,
@@ -105,7 +126,17 @@ const ChildReportListItem = ({ child, onPress }) => {
         normalizeToDisplayString(child.wilbin_name) ??
         normalizeToDisplayString(child.nama_wilayah) ??
         null,
-      attendancePercentage: formatAttendancePercentage(percentage),
+      attendanceInfo: (() => {
+        const parsed = parseAttendancePercentage(percentage);
+        if (!parsed) {
+          return null;
+        }
+
+        return {
+          ...parsed,
+          levelInfo: determineAttendanceLevel(parsed.numericValue),
+        };
+      })(),
       attendanceSummary:
         totalAttended !== undefined &&
         totalAttended !== null &&
@@ -167,14 +198,59 @@ const ChildReportListItem = ({ child, onPress }) => {
             <Text style={styles.statValue}>{attendanceSummary}</Text>
           </View>
         )}
-        {attendancePercentage && (
+        {attendanceInfo && (
           <View style={styles.statItem}>
-            <Ionicons name="stats-chart" size={16} color="#27ae60" style={styles.statIcon} />
+            <Ionicons
+              name="stats-chart"
+              size={16}
+              color="#27ae60"
+              style={styles.statIcon}
+            />
             <View style={styles.statTextGroup}>
               <Text style={styles.statLabel} numberOfLines={1}>
                 Persentase kehadiran keseluruhan:
               </Text>
-              <Text style={[styles.statValue, styles.statHighlight]}>{attendancePercentage}</Text>
+              <View style={styles.attendanceRow}>
+                <Text
+                  style={[
+                    styles.statValue,
+                    styles.statHighlight,
+                    styles[`statHighlight_${attendanceInfo.levelInfo?.level ?? 'low'}`],
+                  ]}
+                >
+                  {attendanceInfo.displayValue}
+                </Text>
+                {attendanceInfo.levelInfo && (
+                  <View
+                    style={[
+                      styles.attendanceBadge,
+                      styles[`attendanceBadge_${attendanceInfo.levelInfo.level}`],
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.attendanceBadgeText,
+                        styles[`attendanceBadgeText_${attendanceInfo.levelInfo.level}`],
+                      ]}
+                    >
+                      {attendanceInfo.levelInfo.label}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBarTrack}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      styles[`progressBarFill_${attendanceInfo.levelInfo?.level ?? 'low'}`],
+                      {
+                        width: `${attendanceInfo.numericValue}%`,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
             </View>
           </View>
         )}
@@ -274,12 +350,78 @@ const styles = StyleSheet.create({
   },
   statHighlight: {
     fontWeight: '600',
+  },
+  statHighlight_high: {
     color: '#27ae60',
+  },
+  statHighlight_medium: {
+    color: '#f39c12',
+  },
+  statHighlight_low: {
+    color: '#e74c3c',
+  },
+  attendanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  attendanceBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    backgroundColor: '#ecf0f1',
+    marginLeft: 8,
+  },
+  attendanceBadge_high: {
+    backgroundColor: '#eafaf1',
+  },
+  attendanceBadge_medium: {
+    backgroundColor: '#fef3e0',
+  },
+  attendanceBadge_low: {
+    backgroundColor: '#fdecea',
+  },
+  attendanceBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    color: '#2c3e50',
+  },
+  attendanceBadgeText_high: {
+    color: '#1e8449',
+  },
+  attendanceBadgeText_medium: {
+    color: '#d68910',
+  },
+  attendanceBadgeText_low: {
+    color: '#c0392b',
+  },
+  progressBarContainer: {
+    marginTop: 8,
+  },
+  progressBarTrack: {
+    height: 8,
+    borderRadius: 6,
+    backgroundColor: '#ecf0f1',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  progressBarFill_high: {
+    backgroundColor: '#27ae60',
+  },
+  progressBarFill_medium: {
+    backgroundColor: '#f39c12',
+  },
+  progressBarFill_low: {
+    backgroundColor: '#e74c3c',
   },
 });
 
 // Dev Notes (Manual QA):
-// - attendancePercentage handles string input "85%" ➜ renders "85.0%".
-// - attendancePercentage handles numeric ratio 0.82 ➜ renders "82.0%".
+// - attendanceInfo handles string input "85%" ➜ renders "85.0%" dengan level Tinggi.
+// - attendanceInfo handles numeric ratio 0.82 ➜ renders "82.0%" dengan level Tinggi.
 
 export default ChildReportListItem;
