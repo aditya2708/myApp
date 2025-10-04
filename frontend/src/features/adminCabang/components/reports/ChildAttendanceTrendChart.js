@@ -154,11 +154,31 @@ const ChildAttendanceTrendChart = ({
   style,
 }) => {
   const dataset = useMemo(() => normalizeMonthlyDataset(monthlyData), [monthlyData]);
+  const hasSufficientData = dataset.length >= 2;
   const [internalType, setInternalType] = useState(type);
 
   useEffect(() => {
     setInternalType(type);
   }, [type]);
+
+  useEffect(() => {
+    if (!__DEV__) {
+      return;
+    }
+
+    const insufficientReason = hasSufficientData ? null : 'dataset length below minimum threshold (2)';
+
+    console.log('[ChildAttendanceTrendChart] Dataset debug', {
+      rawMonthlyData: monthlyData,
+      normalizedDataset: {
+        length: dataset.length,
+        sample: dataset[0] ?? null,
+        labels: dataset.map((item) => item.label).slice(0, 5),
+      },
+      hasSufficientData,
+      insufficientReason,
+    });
+  }, [monthlyData, dataset, hasSufficientData]);
 
   const activeType = internalType || 'line';
 
@@ -170,8 +190,6 @@ const ChildAttendanceTrendChart = ({
     setInternalType(nextType);
     onTypeChange?.(nextType);
   };
-
-  const hasSufficientData = dataset.length >= 2;
 
   const padding = 24;
   const baseChartWidth = screenWidth - 32;

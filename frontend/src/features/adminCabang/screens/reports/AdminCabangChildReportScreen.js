@@ -618,6 +618,31 @@ const AdminCabangChildReportScreen = () => {
 
   const monthlyAttendanceData = useMemo(() => extractMonthlyAttendanceData(summary), [summary]);
 
+  useEffect(() => {
+    if (!__DEV__) {
+      return;
+    }
+
+    const monthlyAttendanceSummary = Array.isArray(monthlyAttendanceData)
+      ? {
+          type: 'array',
+          length: monthlyAttendanceData.length,
+          sample: monthlyAttendanceData[0] ?? null,
+        }
+      : monthlyAttendanceData && typeof monthlyAttendanceData === 'object'
+      ? {
+          type: 'object',
+          keys: Object.keys(monthlyAttendanceData),
+        }
+      : { type: typeof monthlyAttendanceData, value: monthlyAttendanceData ?? null };
+
+    console.log('[AdminCabangChildReportScreen] Monthly attendance debug', {
+      hasSummary: Boolean(summary),
+      summaryKeys: summary ? Object.keys(summary).slice(0, 10) : [],
+      monthlyAttendance: monthlyAttendanceSummary,
+    });
+  }, [summary, monthlyAttendanceData]);
+
   const summaryLevelDistribution = useMemo(
     () => normalizeDistributionEntriesFromSummary(summary, LEVEL_DISTRIBUTION_PATHS, 'level'),
     [summary],
