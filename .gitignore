@@ -15,6 +15,7 @@ backend/.env
 frontend/.expo/
 frontend/.expo-shared/
 frontend/dist/
+frontend/android/
 
 # Logs and temporary files
 *.log
