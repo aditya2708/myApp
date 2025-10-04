@@ -247,6 +247,38 @@ class AdminCabangLaporanAnakController extends Controller
             ];
         }
 
+        $monthlySummary = [];
+        foreach ($monthsInRange as $month) {
+            $attendedTotal = 0;
+            $opportunitiesTotal = 0;
+            $activitiesTotal = 0;
+
+            foreach ($childIds as $childId) {
+                $attendanceKey = $childId . '-' . $month['year'] . '-' . $month['month'];
+                $attendedTotal += $attendancePerChildPerMonth[$attendanceKey] ?? 0;
+                $opportunitiesTotal += $attendanceOpportunitiesPerChildPerMonth[$attendanceKey] ?? 0;
+            }
+
+            foreach ($childShelterIds as $shelterId) {
+                $activityKey = $shelterId . '-' . $month['year'] . '-' . $month['month'];
+                $activitiesTotal += $activitiesPerShelterPerMonth[$activityKey] ?? 0;
+            }
+
+            $averagePercentage = $opportunitiesTotal > 0
+                ? round(($attendedTotal / $opportunitiesTotal) * 100, 1)
+                : 0;
+
+            $monthlySummary[$month['key']] = [
+                'label' => $month['name'],
+                'month' => $month['month'],
+                'year' => $month['year'],
+                'total_activities' => $activitiesTotal,
+                'total_attended' => $attendedTotal,
+                'total_opportunities' => $opportunitiesTotal,
+                'average_percentage' => $averagePercentage,
+            ];
+        }
+
         $allChildren = (clone $childrenBaseQuery)->select('id_anak', 'id_shelter')->get();
         $allChildIds = $allChildren->pluck('id_anak')->all();
         $allShelterIds = $allChildren->pluck('id_shelter')->unique()->all();
@@ -353,6 +385,10 @@ class AdminCabangLaporanAnakController extends Controller
             'by_shelter' => $shelterSummary,
             'by_wilbin' => array_values($wilbinSummary),
         ];
+
+        if (!empty($monthlySummary)) {
+            $summary['monthly_data'] = array_values($monthlySummary);
+        }
 
         return response()->json([
             'message' => 'Laporan anak binaan berhasil diambil',

@@ -249,6 +249,11 @@ class AdminCabangLaporanAnakTest extends TestCase
             ->assertJsonPath('data.children.1.overall_percentage', 1.1)
             ->assertJsonPath('data.children.1.monthly_data.2024-01.attendance_opportunities_count', 31)
             ->assertJsonPath('data.children.1.monthly_data.2024-01.attended_count', 1);
+
+        $summaryMonthlyData = $response->json('data.summary.monthly_data');
+        $this->assertIsArray($summaryMonthlyData);
+        $this->assertGreaterThanOrEqual(2, count($summaryMonthlyData));
+        $this->assertNotEmpty($summaryMonthlyData[0]['label'] ?? null);
     }
 
     public function test_admin_cabang_can_filter_by_date_jenis_and_shelter(): void
@@ -344,7 +349,8 @@ class AdminCabangLaporanAnakTest extends TestCase
             ->assertJsonPath('data.children.0.monthly_data.2024-03.attended_count', 1)
             ->assertJsonPath('data.children.0.monthly_data.2024-03.attendance_opportunities_count', 1)
             ->assertJsonPath('data.children.0.total_attendance_opportunities', 1)
-            ->assertJsonPath('data.summary.total_attendance_opportunities', 1);
+            ->assertJsonPath('data.summary.total_attendance_opportunities', 1)
+            ->assertJsonCount(1, 'data.summary.monthly_data');
     }
 
     public function test_admin_cabang_without_profile_cannot_access_report(): void
