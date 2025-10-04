@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText, Circle, Path } from 'react-native-svg';
 
-const { width } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
 const parseNumericValue = (value) => {
   if (value === null || value === undefined) {
@@ -138,19 +138,47 @@ const normalizeMonthlyDataset = (monthlyData) => {
     .filter(Boolean);
 };
 
+const DEFAULT_TYPE_OPTIONS = [
+  { key: 'line', label: 'Garis' },
+  { key: 'bar', label: 'Batang' },
+];
+
 const ChildAttendanceTrendChart = ({
   monthlyData,
   type = 'line',
+  onTypeChange,
+  typeOptions = DEFAULT_TYPE_OPTIONS,
   height = 220,
   title = 'Tren Kehadiran Bulanan',
+  caption = 'Persentase kehadiran setiap bulan (0-100%).',
+  style,
 }) => {
   const dataset = useMemo(() => normalizeMonthlyDataset(monthlyData), [monthlyData]);
+  const [internalType, setInternalType] = useState(type);
+
+  useEffect(() => {
+    setInternalType(type);
+  }, [type]);
+
+  const activeType = internalType || 'line';
+
+  const handleTypePress = (nextType) => {
+    if (!nextType || nextType === activeType) {
+      return;
+    }
+
+    setInternalType(nextType);
+    onTypeChange?.(nextType);
+  };
 
   const hasSufficientData = dataset.length >= 2;
 
-  const chartWidth = width - 32;
-  const chartHeight = height;
   const padding = 24;
+  const baseChartWidth = screenWidth - 32;
+  const minPointGap = activeType === 'bar' ? 72 : 56;
+  const chartWidth =
+    dataset.length > 0 ? Math.max(baseChartWidth, padding * 2 + dataset.length * minPointGap) : baseChartWidth;
+  const chartHeight = height;
   const graphWidth = chartWidth - padding * 2;
   const graphHeight = chartHeight - padding * 2;
 
@@ -163,27 +191,17 @@ const ChildAttendanceTrendChart = ({
 
   const renderEmptyState = () => (
     <View style={[styles.chartWrapper, styles.emptyState]}>
-      <Text style={styles.emptyText}>
-        Data kehadiran bulanan belum mencukupi untuk menampilkan grafik.
-      </Text>
+      <Text style={styles.emptyText}>Data kehadiran bulanan belum mencukupi untuk menampilkan grafik.</Text>
     </View>
   );
 
   const renderBarChart = () => {
-    const barWidth = dataset.length > 0 ? (graphWidth / dataset.length) * 0.6 : 0;
-    const barSpacing = dataset.length > 0 ? (graphWidth / dataset.length) * 0.4 : 0;
+    const sectionWidth = graphWidth / Math.max(dataset.length, 1);
 
     return (
       <Svg width={chartWidth} height={chartHeight}>
         {/* Y-axis */}
-        <Line
-          x1={padding}
-          y1={padding}
-          x2={padding}
-          y2={chartHeight - padding}
-          stroke="#d5dfe5"
-          strokeWidth="1"
-        />
+        <Line x1={padding} y1={padding} x2={padding} y2={chartHeight - padding} stroke="#d5dfe5" strokeWidth="1" />
 
         {/* X-axis */}
         <Line
@@ -195,26 +213,13 @@ const ChildAttendanceTrendChart = ({
           strokeWidth="1"
         />
 
-        {/* Y-axis labels */}
+        {/* Y-axis labels & grid */}
         {yAxisValues.map((value, index) => {
           const y = chartHeight - padding - (value / yAxisMax) * graphHeight;
           return (
             <React.Fragment key={`y-label-${index}`}>
-              <Line
-                x1={padding}
-                y1={y}
-                x2={chartWidth - padding}
-                y2={y}
-                stroke="#eef2f5"
-                strokeWidth="1"
-              />
-              <SvgText
-                x={padding - 10}
-                y={y + 4}
-                fontSize="10"
-                fill="#7f8c8d"
-                textAnchor="end"
-              >
+              <Line x1={padding} y1={y} x2={chartWidth - padding} y2={y} stroke="#eef2f5" strokeWidth="1" />
+              <SvgText x={padding - 10} y={y + 4} fontSize="10" fill="#7f8c8d" textAnchor="end">
                 {value}
               </SvgText>
             </React.Fragment>
@@ -223,30 +228,16 @@ const ChildAttendanceTrendChart = ({
 
         {/* Bars */}
         {dataset.map((item, index) => {
+          const barWidth = Math.min(48, Math.max(20, sectionWidth * 0.6));
+          const x = padding + index * sectionWidth + (sectionWidth - barWidth) / 2;
           const barHeight = (item.value / yAxisMax) * graphHeight;
-          const x = padding + index * (barWidth + barSpacing) + barSpacing / 2;
           const y = chartHeight - padding - barHeight;
 
           return (
             <React.Fragment key={item.key || index}>
-              <Rect
-                x={x}
-                y={y}
-                width={barWidth}
-                height={barHeight}
-                fill="#3498db"
-                rx="6"
-                ry="6"
-              />
+              <Rect x={x} y={y} width={barWidth} height={barHeight} fill="#3498db" rx="6" ry="6" />
 
-              <SvgText
-                x={x + barWidth / 2}
-                y={y - 6}
-                fontSize="11"
-                fill="#2c3e50"
-                textAnchor="middle"
-                fontWeight="600"
-              >
+              <SvgText x={x + barWidth / 2} y={y - 6} fontSize="11" fill="#2c3e50" textAnchor="middle" fontWeight="600">
                 {item.value}%
               </SvgText>
 
@@ -267,9 +258,9 @@ const ChildAttendanceTrendChart = ({
   };
 
   const renderLineChart = () => {
+    const sectionWidth = graphWidth / Math.max(dataset.length - 1, 1);
     const points = dataset.map((item, index) => {
-      const denominator = Math.max(dataset.length - 1, 1);
-      const x = padding + (index / denominator) * graphWidth;
+      const x = padding + index * sectionWidth;
       const y = chartHeight - padding - (item.value / yAxisMax) * graphHeight;
       return { ...item, x, y };
     });
@@ -283,28 +274,11 @@ const ChildAttendanceTrendChart = ({
         {/* Grid lines */}
         {yAxisValues.map((value, index) => {
           const y = chartHeight - padding - (value / yAxisMax) * graphHeight;
-          return (
-            <Line
-              key={`grid-${index}`}
-              x1={padding}
-              y1={y}
-              x2={chartWidth - padding}
-              y2={y}
-              stroke="#eef2f5"
-              strokeWidth="1"
-            />
-          );
+          return <Line key={`grid-${index}`} x1={padding} y1={y} x2={chartWidth - padding} y2={y} stroke="#eef2f5" strokeWidth="1" />;
         })}
 
         {/* Y-axis */}
-        <Line
-          x1={padding}
-          y1={padding}
-          x2={padding}
-          y2={chartHeight - padding}
-          stroke="#d5dfe5"
-          strokeWidth="1"
-        />
+        <Line x1={padding} y1={padding} x2={padding} y2={chartHeight - padding} stroke="#d5dfe5" strokeWidth="1" />
 
         {/* X-axis */}
         <Line
@@ -320,14 +294,7 @@ const ChildAttendanceTrendChart = ({
         {yAxisValues.map((value, index) => {
           const y = chartHeight - padding - (value / yAxisMax) * graphHeight;
           return (
-            <SvgText
-              key={`y-axis-${index}`}
-              x={padding - 10}
-              y={y + 4}
-              fontSize="10"
-              fill="#7f8c8d"
-              textAnchor="end"
-            >
+            <SvgText key={`y-axis-${index}`} x={padding - 10} y={y + 4} fontSize="10" fill="#7f8c8d" textAnchor="end">
               {value}
             </SvgText>
           );
@@ -340,23 +307,10 @@ const ChildAttendanceTrendChart = ({
         {points.map((point) => (
           <React.Fragment key={point.key}>
             <Circle cx={point.x} cy={point.y} r={4} fill="#3498db" />
-            <SvgText
-              x={point.x}
-              y={point.y - 8}
-              fontSize="11"
-              fill="#2c3e50"
-              textAnchor="middle"
-              fontWeight="600"
-            >
+            <SvgText x={point.x} y={point.y - 8} fontSize="11" fill="#2c3e50" textAnchor="middle" fontWeight="600">
               {point.value}%
             </SvgText>
-            <SvgText
-              x={point.x}
-              y={chartHeight - padding + 14}
-              fontSize="10"
-              fill="#7f8c8d"
-              textAnchor="middle"
-            >
+            <SvgText x={point.x} y={chartHeight - padding + 14} fontSize="10" fill="#7f8c8d" textAnchor="middle">
               {point.label.length > 10 ? `${point.label.substring(0, 10)}…` : point.label}
             </SvgText>
           </React.Fragment>
@@ -365,19 +319,47 @@ const ChildAttendanceTrendChart = ({
     );
   };
 
+  const shouldRenderToggle = Array.isArray(typeOptions) && typeOptions.length > 1;
+
   return (
-    <View style={styles.container}>
-      {title ? <Text style={styles.title}>{title}</Text> : null}
+    <View style={[styles.container, style]}>
+      {(title || shouldRenderToggle) && (
+        <View style={styles.headerRow}>
+          {title ? <Text style={styles.title}>{title}</Text> : <View />}
+          {shouldRenderToggle ? (
+            <View style={styles.toggleGroup}>
+              {typeOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.toggleButton, option.key === activeType && styles.toggleButtonActive]}
+                  onPress={() => handleTypePress(option.key)}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tampilkan grafik ${option.label}`}
+                >
+                  <Text
+                    style={[styles.toggleButtonText, option.key === activeType && styles.toggleButtonTextActive]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      )}
+
       {!hasSufficientData ? (
         renderEmptyState()
       ) : (
         <View style={styles.chartWrapper}>
-          {type === 'bar' ? renderBarChart() : renderLineChart()}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartScrollContent}>
+            {activeType === 'bar' ? renderBarChart() : renderLineChart()}
+          </ScrollView>
         </View>
       )}
-      {hasSufficientData ? (
-        <Text style={styles.caption}>Persentase kehadiran setiap bulan (0-100%).</Text>
-      ) : null}
+
+      {hasSufficientData && caption ? <Text style={styles.caption}>{caption}</Text> : null}
     </View>
   );
 };
@@ -398,15 +380,51 @@ const styles = StyleSheet.create({
     elevation: 1,
     marginBottom: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   title: {
     fontSize: 16,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 12,
+  },
+  toggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: '#ecf0f1',
+    borderRadius: 999,
+    padding: 4,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontWeight: '500',
+  },
+  toggleButtonTextActive: {
+    color: '#2c3e50',
+    fontWeight: '600',
   },
   chartWrapper: {
     height: 220,
     justifyContent: 'center',
+  },
+  chartScrollContent: {
+    flexGrow: 1,
   },
   emptyState: {
     alignItems: 'center',
