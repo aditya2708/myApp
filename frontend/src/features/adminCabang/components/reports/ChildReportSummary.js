@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import CabangChildSummaryCard from './CabangChildSummaryCard';
 import ReportSummaryCard from './ReportSummaryCard';
 
@@ -87,23 +87,37 @@ const ChildReportSummary = ({ summary }) => {
     return cards;
   }, [summary]);
 
+  const { width } = useWindowDimensions();
+  const isMdUp = width >= 768;
+
+  const cardsGridStyle = useMemo(
+    () => [styles.cardsGrid, isMdUp ? styles.cardsGridMd : styles.cardsGridSm],
+    [isMdUp],
+  );
+
+  const summaryCardWrapperStyle = useMemo(
+    () => [styles.summaryCardWrapper, isMdUp ? styles.summaryCardWrapperMd : styles.summaryCardWrapperSm],
+    [isMdUp],
+  );
+
   if (!normalizedSummary) {
     return null;
   }
 
   return (
     <View style={styles.container}>
-      <CabangChildSummaryCard summary={normalizedSummary} />
+      <CabangChildSummaryCard summary={normalizedSummary} variant="compact" />
       {extraCards.length > 0 && (
-        <View style={styles.cardsGrid}>
+        <View style={cardsGridStyle}>
           {extraCards.map((card) => (
-            <View key={card.key} style={styles.summaryCardWrapper}>
+            <View key={card.key} style={summaryCardWrapperStyle}>
               <ReportSummaryCard
                 label={card.label}
                 value={card.value}
                 icon={card.icon}
                 color={card.color}
                 description={card.description}
+                variant="compact"
               />
             </View>
           ))}
@@ -115,14 +129,32 @@ const ChildReportSummary = ({ summary }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   cardsGrid: {
-    flexDirection: 'column',
-    marginTop: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'stretch',
+    marginTop: 8,
   },
   summaryCardWrapper: {
-    marginBottom: 12,
+    paddingBottom: 8,
+  },
+  cardsGridSm: {
+    marginHorizontal: -4,
+  },
+  cardsGridMd: {
+    marginHorizontal: -6,
+  },
+  summaryCardWrapperSm: {
+    flexBasis: '100%',
+    maxWidth: '100%',
+    paddingHorizontal: 4,
+  },
+  summaryCardWrapperMd: {
+    flexBasis: '50%',
+    maxWidth: '50%',
+    paddingHorizontal: 6,
   },
 });
 

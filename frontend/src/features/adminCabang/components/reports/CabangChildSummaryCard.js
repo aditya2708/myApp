@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import ReportSummaryCard from './ReportSummaryCard';
 import {
   calculateAttendancePercentage,
@@ -25,7 +25,10 @@ const normalizePercentageValue = (value) => {
   return Number.isNaN(numeric) ? null : numeric;
 };
 
-const CabangChildSummaryCard = ({ summary }) => {
+const CabangChildSummaryCard = ({ summary, variant = 'default' }) => {
+  const { width } = useWindowDimensions();
+  const isMdUp = width >= 768;
+
   const metrics = useMemo(() => {
     if (!summary) {
       return null;
@@ -138,19 +141,23 @@ const CabangChildSummaryCard = ({ summary }) => {
     return null;
   }
 
+  const cardsContainerStyle = [styles.cardsContainer, isMdUp ? styles.cardsContainerMd : styles.cardsContainerSm];
+  const cardWrapperStyle = [styles.cardWrapper, isMdUp ? styles.cardWrapperMd : styles.cardWrapperSm];
+
   return (
     <View style={styles.container}>
-      <View style={styles.cardsContainer}>
+      <View style={cardsContainerStyle}>
         {metrics.cards.map((card) => (
           <View
             key={card.key}
-            style={styles.cardWrapper}
+            style={cardWrapperStyle}
           >
             <ReportSummaryCard
               label={card.label}
               value={card.value}
               icon={card.icon}
               color={card.color}
+              variant={variant}
             />
           </View>
         ))}
@@ -161,17 +168,31 @@ const CabangChildSummaryCard = ({ summary }) => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 4,
-    marginBottom: 12,
+    paddingVertical: 2,
+    marginBottom: 8,
   },
   cardsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
+    alignItems: 'stretch',
   },
   cardWrapper: {
-    flexBasis: '33.3333%',
-    maxWidth: '33.3333%',
+    paddingBottom: 8,
+  },
+  cardsContainerSm: {
+    marginHorizontal: -4,
+  },
+  cardsContainerMd: {
+    marginHorizontal: -6,
+  },
+  cardWrapperSm: {
+    flexBasis: '100%',
+    maxWidth: '100%',
+    paddingHorizontal: 4,
+  },
+  cardWrapperMd: {
+    flexBasis: '50%',
+    maxWidth: '50%',
     paddingHorizontal: 6,
   },
 });
