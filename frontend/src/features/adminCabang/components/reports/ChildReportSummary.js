@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import ChildSummaryCard from '../../../adminShelter/components/ChildSummaryCard';
+import CabangChildSummaryCard from './CabangChildSummaryCard';
 import ReportSummaryCard from './ReportSummaryCard';
 
 const ChildReportSummary = ({ summary }) => {
@@ -10,6 +10,7 @@ const ChildReportSummary = ({ summary }) => {
     }
 
     return {
+      ...summary,
       total_children: summary.total_children ?? summary.children_total ?? summary.totalAnak ?? summary.total ?? 0,
       average_attendance: summary.average_attendance ?? summary.attendance_rate ?? summary.average ?? 0,
       total_activities: summary.total_activities ?? summary.activities_total ?? summary.totalActivities ?? 0,
@@ -92,7 +93,7 @@ const ChildReportSummary = ({ summary }) => {
 
   return (
     <View style={styles.container}>
-      <ChildSummaryCard summary={normalizedSummary} />
+      <CabangChildSummaryCard summary={normalizedSummary} />
       {extraCards.length > 0 && (
         <View style={styles.cardsGrid}>
           {extraCards.map((card) => (
