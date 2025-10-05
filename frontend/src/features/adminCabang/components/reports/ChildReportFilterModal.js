@@ -15,8 +15,9 @@ const DEFAULT_ACTIVITY = 'Bimbel';
 const DEFAULT_CHART_TYPE = 'bar';
 const DEFAULT_SHELTER = null;
 
-const buildInitialLocalFilters = (filters, defaultPeriodValue) => {
+const buildInitialLocalFilters = (filters, defaults = {}) => {
   const incomingFilters = filters ? { ...filters } : {};
+  const { defaultPeriodValue = null, defaultChartType = DEFAULT_CHART_TYPE } = defaults;
 
   if (typeof incomingFilters.wilayahBinaan === 'undefined') {
     incomingFilters.wilayahBinaan = null;
@@ -36,15 +37,16 @@ const buildInitialLocalFilters = (filters, defaultPeriodValue) => {
       typeof incomingFilters.shelter === 'undefined' ? DEFAULT_SHELTER : incomingFilters.shelter,
     chartType:
       typeof incomingFilters.chartType === 'undefined' || incomingFilters.chartType === null
-        ? DEFAULT_CHART_TYPE
+        ? defaultChartType ?? DEFAULT_CHART_TYPE
         : incomingFilters.chartType,
     start_date: null,
     end_date: null,
   };
 };
 
-const prepareFiltersForSubmit = (filters, defaultPeriodValue) => {
+const prepareFiltersForSubmit = (filters, defaults = {}) => {
   const nextFilters = filters ? { ...filters } : {};
+  const { defaultPeriodValue = null, defaultChartType = DEFAULT_CHART_TYPE } = defaults;
 
   if (typeof nextFilters.period === 'undefined' || nextFilters.period === null) {
     nextFilters.period = defaultPeriodValue ?? null;
@@ -59,7 +61,7 @@ const prepareFiltersForSubmit = (filters, defaultPeriodValue) => {
   }
 
   if (typeof nextFilters.chartType === 'undefined' || nextFilters.chartType === null) {
-    nextFilters.chartType = DEFAULT_CHART_TYPE;
+    nextFilters.chartType = defaultChartType ?? DEFAULT_CHART_TYPE;
   }
 
   if (typeof nextFilters.wilayahBinaan === 'undefined') {
@@ -111,6 +113,8 @@ const ChildReportFilterModal = ({
   onClose,
   filters,
   periodOptions = [],
+  defaultPeriod = null,
+  initialChartType = DEFAULT_CHART_TYPE,
   jenisOptions = [],
   wilayahOptions = [],
   shelterOptions = [],
@@ -146,27 +150,45 @@ const ChildReportFilterModal = ({
       .filter(Boolean);
   }, [periodOptions]);
 
-  const defaultPeriodValue = useMemo(() => {
+  const resolvedDefaultPeriod = useMemo(() => {
     if (normalizedPeriodOptions.length === 0) {
-      return null;
+      return defaultPeriod ?? null;
     }
 
-    const now = new Date();
-    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const matchingOption = normalizedPeriodOptions.find((option) => option.value === currentPeriod);
+    if (defaultPeriod) {
+      const defaultString = String(defaultPeriod);
+      const exists = normalizedPeriodOptions.some((option) => option.value === defaultString);
+      if (exists) {
+        return defaultString;
+      }
+    }
 
-    return matchingOption?.value ?? normalizedPeriodOptions[0]?.value ?? null;
-  }, [normalizedPeriodOptions]);
+    return normalizedPeriodOptions[0]?.value ?? null;
+  }, [defaultPeriod, normalizedPeriodOptions]);
+
+  const resolvedDefaultChartType = useMemo(() => {
+    return initialChartType === 'line' || initialChartType === 'bar'
+      ? initialChartType
+      : DEFAULT_CHART_TYPE;
+  }, [initialChartType]);
+
+  const defaultConfig = useMemo(
+    () => ({
+      defaultPeriodValue: resolvedDefaultPeriod,
+      defaultChartType: resolvedDefaultChartType,
+    }),
+    [resolvedDefaultPeriod, resolvedDefaultChartType],
+  );
 
   const [localFilters, setLocalFilters] = useState(() =>
-    buildInitialLocalFilters(filters, defaultPeriodValue),
+    buildInitialLocalFilters(filters, defaultConfig),
   );
 
   useEffect(() => {
     if (visible) {
-      setLocalFilters(buildInitialLocalFilters(filters, defaultPeriodValue));
+      setLocalFilters(buildInitialLocalFilters(filters, defaultConfig));
     }
-  }, [visible, filters, defaultPeriodValue]);
+  }, [visible, filters, defaultConfig]);
 
   const jenisItems = useMemo(() => {
     const normalized = (Array.isArray(jenisOptions) ? jenisOptions : [])
@@ -216,7 +238,7 @@ const ChildReportFilterModal = ({
   };
 
   const handleApply = () => {
-    const nextFilters = prepareFiltersForSubmit(localFilters, defaultPeriodValue);
+    const nextFilters = prepareFiltersForSubmit(localFilters, defaultConfig);
     onApply?.(nextFilters);
     onClose?.();
   };
@@ -225,17 +247,17 @@ const ChildReportFilterModal = ({
     const resetValues = prepareFiltersForSubmit(
       {
         ...filters,
-        period: defaultPeriodValue ?? null,
+        period: resolvedDefaultPeriod ?? null,
         jenisKegiatan: DEFAULT_ACTIVITY,
         wilayahBinaan: null,
         shelter: DEFAULT_SHELTER,
-        chartType: DEFAULT_CHART_TYPE,
+        chartType: resolvedDefaultChartType,
       },
-      defaultPeriodValue,
+      defaultConfig,
     );
 
     onClear?.(resetValues);
-    setLocalFilters(resetValues);
+    setLocalFilters(buildInitialLocalFilters(resetValues, defaultConfig));
   };
 
   const handleRetryShelterFetch = () => {

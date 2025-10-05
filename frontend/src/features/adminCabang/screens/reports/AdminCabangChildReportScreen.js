@@ -20,7 +20,6 @@ import ChildReportListItem from '../../components/reports/ChildReportListItem';
 import ChildReportFilterModal from '../../components/reports/ChildReportFilterModal';
 import ChildAttendanceLineChart from '../../components/reports/ChildAttendanceLineChart';
 import ChildAttendanceBarChart from '../../components/reports/ChildAttendanceBarChart';
-import PickerInput from '../../../../common/components/PickerInput';
 import {
   clearError,
   resetFilters,
@@ -50,11 +49,9 @@ import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
 const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SHELTER_NAMES = ['Shelter Menteng', 'Shelter Tebet', 'Shelter Cempaka Putih'];
-const DEFAULT_ACTIVITY_OPTIONS = [
-  { label: 'Bimbel', value: 'Bimbel' },
-  { label: 'Kegiatan Sosial', value: 'Kegiatan Sosial' },
-  { label: 'Pelatihan Keterampilan', value: 'Pelatihan Keterampilan' },
-];
+const DEFAULT_ACTIVITY = 'Bimbel';
+const DEFAULT_CHART_TYPE = 'bar';
+const DEFAULT_SHELTER = null;
 const RAW_ATTENDANCE_BY_YEAR = {
   '2021': [75, 78, 80, 82, 84, 83, 85, 86, 88, 87, 89, 90],
   '2022': [80, 82, 81, 83, 85, 84, 86, 87, 88, 90, 91, 92],
@@ -148,15 +145,20 @@ const AdminCabangChildReportScreen = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState(getDefaultPeriodKey);
-  const [selectedActivity, setSelectedActivity] = useState('Bimbel');
-  const [selectedShelter, setSelectedShelter] = useState('all');
-  const [chartType, setChartType] = useState('bar');
   const searchDebounceRef = useRef(null);
 
+  const defaultPeriod = useMemo(() => getDefaultPeriodKey(), []);
+  const activePeriod = filters.period ?? defaultPeriod;
+  const activeActivity = filters.jenisKegiatan ?? DEFAULT_ACTIVITY;
+  const activeShelter =
+    typeof filters.shelter === 'undefined' || filters.shelter === null
+      ? DEFAULT_SHELTER
+      : filters.shelter;
+  const activeChartType = filters.chartType ?? DEFAULT_CHART_TYPE;
+
   const selectedPeriodLabel = useMemo(
-    () => (selectedPeriod ? formatPeriodLabel(selectedPeriod) : ''),
-    [selectedPeriod],
+    () => (activePeriod ? formatPeriodLabel(activePeriod) : ''),
+    [activePeriod],
   );
 
   useEffect(() => {
@@ -176,102 +178,25 @@ const AdminCabangChildReportScreen = () => {
     return filterOptions.sheltersByWilayah?.[filters.wilayahBinaan] || [];
   }, [filterOptions.sheltersByWilayah, filters.wilayahBinaan]);
 
-  const activityPickerItems = useMemo(() => {
-    const items = Array.isArray(filterOptions.jenisKegiatan)
-      ? filterOptions.jenisKegiatan
-      : [];
-    const normalizedItems = items
-      .map((option) => {
-        const value = option?.value ?? option?.id ?? option?.slug ?? option;
-        const label = option?.label ?? option?.name ?? option;
-
-        if (!value || !label) {
-          return null;
-        }
-
-        return {
-          label: String(label),
-          value: String(value),
-        };
-      })
-      .filter(Boolean);
-
-    if (normalizedItems.length === 0) {
-      return [...DEFAULT_ACTIVITY_OPTIONS];
-    }
-
-    const hasBimbel = normalizedItems.some((item) => item.value === 'Bimbel');
-    if (!hasBimbel) {
-      normalizedItems.unshift({ label: 'Bimbel', value: 'Bimbel' });
-    }
-
-    return normalizedItems;
-  }, [filterOptions.jenisKegiatan]);
-
-  const shelterPickerItems = useMemo(() => {
-    const sheltersByWilayah = filterOptions.sheltersByWilayah || {};
-    const collectedOptions = Object.values(sheltersByWilayah).reduce((acc, shelterList) => {
-      if (Array.isArray(shelterList)) {
-        shelterList.forEach((option) => {
-          const value = option?.value ?? option?.id ?? option?.slug ?? option?.nama ?? option;
-          const label = option?.label ?? option?.name ?? option?.nama ?? option;
-          if (!value || !label) {
-            return;
-          }
-          const key = String(value);
-          if (!acc.has(key)) {
-            acc.set(key, { label: String(label), value: key });
-          }
-        });
-      }
-      return acc;
-    }, new Map());
-
-    if (collectedOptions.size === 0) {
-      SHELTER_NAMES.forEach((name) => {
-        if (!collectedOptions.has(name)) {
-          collectedOptions.set(name, { label: name, value: name });
-        }
-      });
-    }
-
-    return [
-      { label: 'Semua Shelter', value: 'all' },
-      ...Array.from(collectedOptions.values()),
-    ];
-  }, [filterOptions.sheltersByWilayah]);
-
-  useEffect(() => {
-    if (!activityPickerItems.some((item) => item.value === selectedActivity)) {
-      const fallbackValue = activityPickerItems[0]?.value ?? 'Bimbel';
-      setSelectedActivity(fallbackValue);
-    }
-  }, [activityPickerItems, selectedActivity]);
-
-  useEffect(() => {
-    if (!shelterPickerItems.some((item) => item.value === selectedShelter)) {
-      setSelectedShelter('all');
-    }
-  }, [shelterPickerItems, selectedShelter]);
-
   const filteredAttendanceData = useMemo(() => {
-    if (!selectedPeriod) {
+    if (!activePeriod) {
       return [];
     }
 
-    const periodData = MONTHLY_ATTENDANCE_BY_PERIOD[selectedPeriod] || [];
-    const normalizedShelter = selectedShelter && selectedShelter !== 'all' ? selectedShelter : null;
+    const periodData = MONTHLY_ATTENDANCE_BY_PERIOD[activePeriod] || [];
+    const normalizedShelter =
+      activeShelter && activeShelter !== 'all' ? activeShelter : DEFAULT_SHELTER;
     const shelterFilteredData = normalizedShelter
       ? periodData.filter((item) => String(item?.shelter) === String(normalizedShelter))
       : periodData;
 
-    const adjustment = calculateActivityAdjustment(selectedActivity);
+    const adjustment = calculateActivityAdjustment(activeActivity);
 
     return shelterFilteredData.map((item) => ({
       ...item,
       value: clampPercentage((Number(item?.value) || 0) + adjustment),
     }));
-  }, [selectedActivity, selectedPeriod, selectedShelter]);
+  }, [activeActivity, activePeriod, activeShelter]);
 
   const attendanceCategories = useMemo(
     () => filteredAttendanceData.map((item) => String(item?.shelter || '')),
@@ -280,13 +205,13 @@ const AdminCabangChildReportScreen = () => {
 
   const handleOpenChartFullScreen = useCallback(() => {
     navigation.navigate('ChartFullScreen', {
-      chartType,
+      chartType: activeChartType,
       periodLabel: selectedPeriodLabel,
       categories: attendanceCategories,
       data: filteredAttendanceData,
       year: selectedPeriodLabel,
     });
-  }, [attendanceCategories, chartType, filteredAttendanceData, navigation, selectedPeriodLabel]);
+  }, [activeChartType, attendanceCategories, filteredAttendanceData, navigation, selectedPeriodLabel]);
 
   const clearSearchDebounce = useCallback(() => {
     if (searchDebounceRef.current) {
@@ -365,13 +290,39 @@ const AdminCabangChildReportScreen = () => {
     setFiltersApplied(true);
   };
 
-  const handleClearFilters = () => {
+  const handleClearFilters = (resetValues) => {
     clearSearchDebounce();
     dispatch(resetFilters());
+
+    const fallbackFilters = {
+      period: defaultPeriod,
+      jenisKegiatan: DEFAULT_ACTIVITY,
+      shelter: DEFAULT_SHELTER,
+      chartType: DEFAULT_CHART_TYPE,
+      ...(resetValues || {}),
+    };
+
+    const sanitizedFilters = {
+      ...fallbackFilters,
+      period:
+        typeof fallbackFilters.period === 'undefined' || fallbackFilters.period === null
+          ? defaultPeriod
+          : fallbackFilters.period,
+      jenisKegiatan:
+        typeof fallbackFilters.jenisKegiatan === 'undefined'
+          ? DEFAULT_ACTIVITY
+          : fallbackFilters.jenisKegiatan,
+      shelter:
+        typeof fallbackFilters.shelter === 'undefined' ? DEFAULT_SHELTER : fallbackFilters.shelter,
+      chartType:
+        typeof fallbackFilters.chartType === 'undefined' || fallbackFilters.chartType === null
+          ? DEFAULT_CHART_TYPE
+          : fallbackFilters.chartType,
+    };
+
+    dispatch(setFilters(sanitizedFilters));
+    dispatch(setSearch(''));
     setSearchText('');
-    setSelectedActivity('Bimbel');
-    setSelectedShelter('all');
-    setSelectedPeriod(getDefaultPeriodKey());
     setFilterModalVisible(false);
     setFiltersApplied(false);
   };
@@ -614,54 +565,7 @@ const AdminCabangChildReportScreen = () => {
 
       {filtersApplied && (
         <View style={styles.chartContainer}>
-          <PickerInput
-            label="Periode"
-            value={selectedPeriod || ''}
-            onValueChange={(value) => setSelectedPeriod(value || null)}
-            items={PERIOD_OPTIONS}
-            placeholder="Pilih Bulan & Tahun"
-            style={styles.periodPicker}
-          />
-          <PickerInput
-            label="Jenis Aktivitas"
-            value={selectedActivity}
-            onValueChange={(value) => setSelectedActivity(value || 'Bimbel')}
-            items={activityPickerItems}
-            placeholder="Pilih Jenis Aktivitas"
-            style={styles.periodPicker}
-          />
-          <PickerInput
-            label="Shelter"
-            value={selectedShelter}
-            onValueChange={(value) => setSelectedShelter(value || 'all')}
-            items={shelterPickerItems}
-            placeholder="Pilih Shelter"
-            style={styles.periodPicker}
-          />
-          <View style={styles.chartToggleGroup}>
-            {[
-              { key: 'bar', label: 'Bar' },
-              { key: 'line', label: 'Line' },
-            ].map((item) => {
-              const isActive = chartType === item.key;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[styles.chartToggleButton, isActive && styles.chartToggleButtonActive]}
-                  onPress={() => setChartType(item.key)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Tampilkan grafik ${item.label}`}
-                >
-                  <Text
-                    style={[styles.chartToggleButtonText, isActive && styles.chartToggleButtonTextActive]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {!selectedPeriod && (
+          {!activePeriod && (
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>
                 Pilih periode untuk melihat tren kehadiran anak binaan.
@@ -669,7 +573,7 @@ const AdminCabangChildReportScreen = () => {
             </View>
           )}
 
-          {selectedPeriod && !filteredAttendanceData.length && (
+          {activePeriod && !filteredAttendanceData.length && (
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>
                 Data kehadiran belum tersedia untuk filter yang dipilih.
@@ -680,8 +584,8 @@ const AdminCabangChildReportScreen = () => {
             </View>
           )}
 
-          {selectedPeriod && filteredAttendanceData.length > 0 && (
-            chartType === 'line' ? (
+          {activePeriod && filteredAttendanceData.length > 0 && (
+            activeChartType === 'line' ? (
               <ChildAttendanceLineChart
                 mode="compact"
                 year={selectedPeriodLabel}
@@ -763,6 +667,8 @@ const AdminCabangChildReportScreen = () => {
         onClose={() => setFilterModalVisible(false)}
         filters={filters}
         periodOptions={PERIOD_OPTIONS}
+        defaultPeriod={defaultPeriod}
+        initialChartType={activeChartType}
         jenisOptions={filterOptions.jenisKegiatan}
         wilayahOptions={filterOptions.wilayahBinaan}
         shelterOptions={shelterOptions}
@@ -880,33 +786,6 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     marginTop: 8,
-  },
-  periodPicker: {
-    marginBottom: 16,
-  },
-  chartToggleGroup: {
-    flexDirection: 'row',
-    backgroundColor: '#ecf0f1',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 4,
-  },
-  chartToggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  chartToggleButtonActive: {
-    backgroundColor: '#4a90e2',
-  },
-  chartToggleButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#34495e',
-  },
-  chartToggleButtonTextActive: {
-    color: '#ffffff',
   },
   barChartCard: {
     padding: 20,
