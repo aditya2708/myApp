@@ -12,6 +12,7 @@ const initialState = {
   summary: null,
   pagination: null,
   hasMore: false,
+  hasFetched: false,
 
   filters: {
     start_date: null,
@@ -73,6 +74,11 @@ const reportAnakSlice = createSlice({
     },
     resetFilters: (state) => {
       state.filters = { ...initialState.filters };
+      state.children = [];
+      state.summary = null;
+      state.pagination = null;
+      state.hasMore = false;
+      state.hasFetched = false;
     },
     clearDetail: (state) => {
       state.detail = { ...initialState.detail };
@@ -89,22 +95,22 @@ const reportAnakSlice = createSlice({
       .addCase(initializeReportAnak.pending, (state) => {
         state.initializing = true;
         state.error = null;
+        state.children = [];
+        state.summary = null;
+        state.pagination = null;
+        state.hasMore = false;
+        state.hasFetched = false;
       })
       .addCase(initializeReportAnak.fulfilled, (state, action) => {
         state.initializing = false;
-        state.children = action.payload.children || [];
-        state.summary = action.payload.summary || null;
-        state.pagination = action.payload.pagination || null;
-        state.hasMore = Boolean(
-          action.payload.pagination &&
-          action.payload.pagination.current_page < action.payload.pagination.last_page
-        );
+        const incomingOptions = action.payload?.filterOptions || {};
+
         state.filterOptions = {
           ...state.filterOptions,
-          ...action.payload.filterOptions,
+          ...incomingOptions,
           sheltersByWilayah: {
             ...state.filterOptions.sheltersByWilayah,
-            ...(action.payload.filterOptions?.sheltersByWilayah || {}),
+            ...(incomingOptions.sheltersByWilayah || {}),
           },
           sheltersLoading: false,
           sheltersError: null,
@@ -123,10 +129,12 @@ const reportAnakSlice = createSlice({
           state.loadingMore = true;
         }
         state.error = null;
+        state.hasFetched = true;
       })
       .addCase(fetchReportAnakList.fulfilled, (state, action) => {
         state.loading = false;
         state.loadingMore = false;
+        state.hasFetched = true;
 
         const { append, children, summary, pagination, filterOptions } = action.payload;
 
@@ -160,6 +168,7 @@ const reportAnakSlice = createSlice({
         state.loading = false;
         state.loadingMore = false;
         state.error = action.payload || 'Gagal memuat daftar anak.';
+        state.hasFetched = true;
       })
 
       .addCase(fetchMoreReportAnak.pending, (state) => {
@@ -255,6 +264,11 @@ export const selectReportAnakPagination = createSelector(
 export const selectReportAnakHasMore = createSelector(
   selectReportAnakState,
   (state) => state.hasMore
+);
+
+export const selectReportAnakHasFetched = createSelector(
+  selectReportAnakState,
+  (state) => state.hasFetched
 );
 
 export const selectReportAnakFilters = createSelector(
