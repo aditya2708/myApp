@@ -10,14 +10,51 @@ const ChartFullScreenScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
 
-  const { data, contentInset, gradientId, ...chartProps } = route.params || {};
+  const {
+    year: routeYear,
+    data: routeData,
+    contentInset: routeContentInset,
+    gradientId: routeGradientId,
+    ...chartProps
+  } = route.params || {};
 
-  const chartData = useMemo(() => data || DEFAULT_DATA, [data]);
+  const year = routeYear ?? new Date().getFullYear();
+
+  const chartData = useMemo(() => routeData ?? DEFAULT_DATA, [routeData]);
+
+  const resolvedContentInset = useMemo(
+    () => routeContentInset ?? undefined,
+    [routeContentInset]
+  );
+
+  const resolvedGradientId = useMemo(
+    () => routeGradientId ?? undefined,
+    [routeGradientId]
+  );
+
+  const childChartProps = useMemo(() => {
+    const props = { ...chartProps };
+
+    if (resolvedContentInset) {
+      props.contentInset = resolvedContentInset;
+    }
+
+    if (resolvedGradientId) {
+      props.gradientId = resolvedGradientId;
+    }
+
+    props.year = year;
+
+    return props;
+  }, [chartProps, resolvedContentInset, resolvedGradientId, year]);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Detail Tren Kehadiran</Text>
+        <View>
+          <Text style={styles.title}>Detail Tren Kehadiran</Text>
+          <Text style={styles.subtitle}>{`Tahun ${year}`}</Text>
+        </View>
         <TouchableOpacity style={styles.closeButton} onPress={navigation.goBack}>
           <Text style={styles.closeButtonText}>Tutup</Text>
         </TouchableOpacity>
@@ -30,11 +67,11 @@ const ChartFullScreenScreen = () => {
         <View style={styles.chartWrapper}>
           <ChildAttendanceLineChart
             data={chartData}
-            contentInset={contentInset}
-            gradientId={gradientId}
             mode="fullscreen"
+            showAllMonthLabels
+            compactLabelStep={1}
             containerStyle={styles.chartContainer}
-            {...chartProps}
+            {...childChartProps}
           />
         </View>
       </ScrollView>
@@ -62,6 +99,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1f2937',
   },
+  subtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
   closeButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -75,6 +118,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
+    paddingBottom: 24,
   },
   chartWrapper: {
     flexGrow: 1,
