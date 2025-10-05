@@ -21,6 +21,8 @@ const initialState = {
     wilayahBinaan: null,
     shelter: null,
     search: '',
+    period: null,
+    chartType: 'bar',
   },
 
   filterOptions: {
@@ -52,7 +54,26 @@ const reportAnakSlice = createSlice({
   initialState,
   reducers: {
     setFilters: (state, action) => {
-      state.filters = { ...state.filters, ...action.payload };
+      const incomingFilters = action.payload || {};
+      const nextFilters = { ...state.filters, ...incomingFilters };
+
+      if (Object.prototype.hasOwnProperty.call(incomingFilters, 'period')) {
+        nextFilters.period = incomingFilters.period ?? null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(incomingFilters, 'chartType')) {
+        nextFilters.chartType =
+          incomingFilters.chartType ?? initialState.filters.chartType;
+      }
+
+      if (
+        typeof nextFilters.chartType === 'undefined' ||
+        nextFilters.chartType === null
+      ) {
+        nextFilters.chartType = initialState.filters.chartType;
+      }
+
+      state.filters = nextFilters;
     },
     setDateRange: (state, action) => {
       const { start_date = null, end_date = null } = action.payload || {};
@@ -68,6 +89,13 @@ const reportAnakSlice = createSlice({
     },
     setShelter: (state, action) => {
       state.filters.shelter = action.payload ?? null;
+    },
+    setPeriod: (state, action) => {
+      state.filters.period = action.payload ?? null;
+    },
+    setChartType: (state, action) => {
+      state.filters.chartType =
+        action.payload ?? initialState.filters.chartType;
     },
     setSearch: (state, action) => {
       state.filters.search = action.payload ?? '';
@@ -241,6 +269,8 @@ export const {
   setJenisKegiatan,
   setWilayahBinaan,
   setShelter,
+  setPeriod,
+  setChartType,
   setSearch,
   resetFilters,
   clearDetail,

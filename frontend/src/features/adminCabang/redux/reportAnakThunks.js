@@ -202,7 +202,8 @@ const resolveFilterValue = (value) => {
 };
 
 const buildRequestParams = (filters = {}, extras = {}) => {
-  const params = { ...(filters || {}) };
+  const { period: _period, chartType: _chartType, ...restFilters } = filters || {};
+  const params = { ...restFilters };
 
   const mapping = {
     jenisKegiatan: 'jenis_kegiatan',
