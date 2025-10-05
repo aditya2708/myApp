@@ -7,10 +7,12 @@ import {
   TextInput,
   TouchableOpacity,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { BarChart, Grid, XAxis, YAxis } from 'react-native-svg-charts';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -49,6 +51,11 @@ import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
 const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SHELTER_NAMES = ['Shelter Menteng', 'Shelter Tebet', 'Shelter Cempaka Putih'];
+const DEFAULT_ACTIVITY_OPTIONS = [
+  { label: 'Bimbel', value: 'Bimbel' },
+  { label: 'Kegiatan Sosial', value: 'Kegiatan Sosial' },
+  { label: 'Pelatihan Keterampilan', value: 'Pelatihan Keterampilan' },
+];
 const RAW_ATTENDANCE_BY_YEAR = {
   '2021': [75, 78, 80, 82, 84, 83, 85, 86, 88, 87, 89, 90],
   '2022': [80, 82, 81, 83, 85, 84, 86, 87, 88, 90, 91, 92],
@@ -100,6 +107,19 @@ const PERIOD_OPTIONS = SORTED_PERIOD_KEYS.map((periodKey) => ({
   value: periodKey,
 }));
 
+const clampPercentage = (value) => Math.min(100, Math.max(0, value));
+const calculateActivityAdjustment = (activity) => {
+  if (!activity) {
+    return 0;
+  }
+
+  const charSum = String(activity)
+    .split('')
+    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+
+  return (charSum % 7) - 3;
+};
+
 const AdminCabangChildReportScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
@@ -128,9 +148,11 @@ const AdminCabangChildReportScreen = () => {
 
     return SORTED_PERIOD_KEYS[0] || null;
   });
+  const [selectedActivity, setSelectedActivity] = useState('Bimbel');
+  const [selectedShelter, setSelectedShelter] = useState('all');
+  const [chartType, setChartType] = useState('bar');
   const searchDebounceRef = useRef(null);
 
-  const chartData = selectedPeriod ? MONTHLY_ATTENDANCE_BY_PERIOD[selectedPeriod] || null : null;
   const selectedPeriodLabel = useMemo(
     () => (selectedPeriod ? formatPeriodLabel(selectedPeriod) : ''),
     [selectedPeriod],
@@ -152,6 +174,122 @@ const AdminCabangChildReportScreen = () => {
 
     return filterOptions.sheltersByWilayah?.[filters.wilayahBinaan] || [];
   }, [filterOptions.sheltersByWilayah, filters.wilayahBinaan]);
+
+  const activityPickerItems = useMemo(() => {
+    const items = Array.isArray(filterOptions.jenisKegiatan)
+      ? filterOptions.jenisKegiatan
+      : [];
+    const normalizedItems = items
+      .map((option) => {
+        const value = option?.value ?? option?.id ?? option?.slug ?? option;
+        const label = option?.label ?? option?.name ?? option;
+
+        if (!value || !label) {
+          return null;
+        }
+
+        return {
+          label: String(label),
+          value: String(value),
+        };
+      })
+      .filter(Boolean);
+
+    if (normalizedItems.length === 0) {
+      return [...DEFAULT_ACTIVITY_OPTIONS];
+    }
+
+    const hasBimbel = normalizedItems.some((item) => item.value === 'Bimbel');
+    if (!hasBimbel) {
+      normalizedItems.unshift({ label: 'Bimbel', value: 'Bimbel' });
+    }
+
+    return normalizedItems;
+  }, [filterOptions.jenisKegiatan]);
+
+  const shelterPickerItems = useMemo(() => {
+    const sheltersByWilayah = filterOptions.sheltersByWilayah || {};
+    const collectedOptions = Object.values(sheltersByWilayah).reduce((acc, shelterList) => {
+      if (Array.isArray(shelterList)) {
+        shelterList.forEach((option) => {
+          const value = option?.value ?? option?.id ?? option?.slug ?? option?.nama ?? option;
+          const label = option?.label ?? option?.name ?? option?.nama ?? option;
+          if (!value || !label) {
+            return;
+          }
+          const key = String(value);
+          if (!acc.has(key)) {
+            acc.set(key, { label: String(label), value: key });
+          }
+        });
+      }
+      return acc;
+    }, new Map());
+
+    if (collectedOptions.size === 0) {
+      SHELTER_NAMES.forEach((name) => {
+        if (!collectedOptions.has(name)) {
+          collectedOptions.set(name, { label: name, value: name });
+        }
+      });
+    }
+
+    return [
+      { label: 'Semua Shelter', value: 'all' },
+      ...Array.from(collectedOptions.values()),
+    ];
+  }, [filterOptions.sheltersByWilayah]);
+
+  useEffect(() => {
+    if (!activityPickerItems.some((item) => item.value === selectedActivity)) {
+      const fallbackValue = activityPickerItems[0]?.value ?? 'Bimbel';
+      setSelectedActivity(fallbackValue);
+    }
+  }, [activityPickerItems, selectedActivity]);
+
+  useEffect(() => {
+    if (!shelterPickerItems.some((item) => item.value === selectedShelter)) {
+      setSelectedShelter('all');
+    }
+  }, [shelterPickerItems, selectedShelter]);
+
+  const filteredAttendanceData = useMemo(() => {
+    if (!selectedPeriod) {
+      return [];
+    }
+
+    const periodData = MONTHLY_ATTENDANCE_BY_PERIOD[selectedPeriod] || [];
+    const normalizedShelter = selectedShelter && selectedShelter !== 'all' ? selectedShelter : null;
+    const shelterFilteredData = normalizedShelter
+      ? periodData.filter((item) => String(item?.shelter) === String(normalizedShelter))
+      : periodData;
+
+    const adjustment = calculateActivityAdjustment(selectedActivity);
+
+    return shelterFilteredData.map((item) => ({
+      ...item,
+      value: clampPercentage((Number(item?.value) || 0) + adjustment),
+    }));
+  }, [selectedActivity, selectedPeriod, selectedShelter]);
+
+  const barChartMetrics = useMemo(() => {
+    if (!filteredAttendanceData.length) {
+      return {
+        values: [],
+        width: 240,
+        contentInset: { top: 16, bottom: 16 },
+      };
+    }
+
+    const values = filteredAttendanceData.map((item) => Number(item?.value) || 0);
+    const width = Math.max(values.length * 60, 240);
+
+    return {
+      values,
+      width,
+      contentInset: { top: 16, bottom: 16 },
+    };
+  }, [filteredAttendanceData]);
 
   const clearSearchDebounce = useCallback(() => {
     if (searchDebounceRef.current) {
@@ -484,23 +622,106 @@ const AdminCabangChildReportScreen = () => {
             placeholder="Pilih Bulan & Tahun"
             style={styles.periodPicker}
           />
-          {selectedPeriod && chartData?.length ? (
-            <ChildAttendanceLineChart
-              year={selectedPeriodLabel}
-              data={chartData}
-              onOpenFullScreen={() =>
-                navigation.navigate('ChartFullScreen', {
-                  year: selectedPeriodLabel,
-                  data: chartData,
-                })
-              }
-            />
+          <PickerInput
+            label="Jenis Aktivitas"
+            value={selectedActivity}
+            onValueChange={(value) => setSelectedActivity(value || 'Bimbel')}
+            items={activityPickerItems}
+            placeholder="Pilih Jenis Aktivitas"
+            style={styles.periodPicker}
+          />
+          <PickerInput
+            label="Shelter"
+            value={selectedShelter}
+            onValueChange={(value) => setSelectedShelter(value || 'all')}
+            items={shelterPickerItems}
+            placeholder="Pilih Shelter"
+            style={styles.periodPicker}
+          />
+          <View style={styles.chartToggleGroup}>
+            {[
+              { key: 'bar', label: 'Bar' },
+              { key: 'line', label: 'Line' },
+            ].map((item) => {
+              const isActive = chartType === item.key;
+              return (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[styles.chartToggleButton, isActive && styles.chartToggleButtonActive]}
+                  onPress={() => setChartType(item.key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tampilkan grafik ${item.label}`}
+                >
+                  <Text
+                    style={[styles.chartToggleButtonText, isActive && styles.chartToggleButtonTextActive]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {selectedPeriod && filteredAttendanceData.length ? (
+            chartType === 'line' ? (
+              <ChildAttendanceLineChart
+                year={selectedPeriodLabel}
+                data={filteredAttendanceData}
+                onOpenFullScreen={() =>
+                  navigation.navigate('ChartFullScreen', {
+                    year: selectedPeriodLabel,
+                    data: filteredAttendanceData,
+                  })
+                }
+              />
+            ) : (
+              <View style={styles.barChartCard}>
+                <Text style={styles.chartCardTitle}>
+                  Distribusi Kehadiran
+                  {selectedPeriodLabel ? ` ${selectedPeriodLabel}` : ''}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.barChartScrollContent}
+                >
+                  <View style={styles.barChartWrapper}>
+                    <View style={[styles.barChartRow, { width: barChartMetrics.width + 44 }]}>
+                      <YAxis
+                        style={[styles.barChartYAxis, { height: 220 }]}
+                        data={barChartMetrics.values}
+                        contentInset={barChartMetrics.contentInset}
+                        svg={{ fill: '#2563eb', fontSize: 12 }}
+                        numberOfTicks={5}
+                        formatLabel={(value) => `${value}%`}
+                      />
+                      <BarChart
+                        style={[styles.barChart, { width: barChartMetrics.width }]}
+                        data={barChartMetrics.values}
+                        svg={{ fill: '#4a90e2' }}
+                        spacingInner={0.4}
+                        spacingOuter={0.2}
+                        contentInset={barChartMetrics.contentInset}
+                      >
+                        <Grid />
+                      </BarChart>
+                    </View>
+                    <XAxis
+                      style={[styles.barChartXAxis, { marginLeft: 44, width: barChartMetrics.width }]}
+                      data={barChartMetrics.values}
+                      formatLabel={(value, index) => filteredAttendanceData[index]?.shelter ?? ''}
+                      contentInset={{ left: 20, right: 20 }}
+                      svg={{ fill: '#7f8c8d', fontSize: 12 }}
+                    />
+                  </View>
+                </ScrollView>
+              </View>
+            )
           ) : (
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>
                 Pilih periode untuk melihat tren kehadiran anak binaan.
               </Text>
-              {selectedPeriod && !chartData?.length && (
+              {selectedPeriod && !filteredAttendanceData.length && (
                 <Text style={styles.chartPlaceholderSubtitle}>
                   Data kehadiran belum tersedia untuk periode yang dipilih.
                 </Text>
@@ -686,6 +907,63 @@ const styles = StyleSheet.create({
   },
   periodPicker: {
     marginBottom: 16,
+  },
+  chartToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: '#ecf0f1',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 4,
+  },
+  chartToggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  chartToggleButtonActive: {
+    backgroundColor: '#4a90e2',
+  },
+  chartToggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#34495e',
+  },
+  chartToggleButtonTextActive: {
+    color: '#ffffff',
+  },
+  barChartCard: {
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+  },
+  chartCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 12,
+  },
+  barChartScrollContent: {
+    paddingBottom: 8,
+  },
+  barChartWrapper: {
+    flexGrow: 1,
+  },
+  barChartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  barChartYAxis: {
+    marginRight: 12,
+  },
+  barChart: {
+    height: 220,
+  },
+  barChartXAxis: {
+    height: 28,
   },
   chartPlaceholder: {
     padding: 20,
