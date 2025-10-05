@@ -350,7 +350,8 @@ export const initializeReportAnak = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await adminCabangReportApi.getLaporanAnakBinaan();
-      return extractListPayload(response);
+      const { filterOptions } = extractListPayload(response);
+      return { filterOptions };
     } catch (error) {
       return rejectWithValue(parseError(error, 'Gagal memuat laporan anak binaan.'));
     }
