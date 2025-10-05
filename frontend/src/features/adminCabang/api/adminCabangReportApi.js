@@ -4,6 +4,7 @@ import { ADMIN_CABANG_ENDPOINTS } from '../../../constants/endpoints';
 const {
   REPORTS: {
     SUMMARY: SUMMARY_ENDPOINT,
+    ATTENDANCE_SUMMARY: ATTENDANCE_SUMMARY_ENDPOINT,
     ANAK: {
       LIST: LIST_ENDPOINT,
       DETAIL: DETAIL_ENDPOINT,
@@ -32,5 +33,13 @@ export const adminCabangReportApi = {
 
   async getShelterOptionsByWilayah(wilbinId) {
     return api.get(FILTERS.SHELTER_BY_WILAYAH(wilbinId));
+  },
+
+  async getAttendanceSummary(cabangId, params = {}) {
+    if (!cabangId) {
+      throw new Error('Cabang ID is required to fetch attendance summary');
+    }
+
+    return api.get(ATTENDANCE_SUMMARY_ENDPOINT(cabangId), { params });
   }
 };

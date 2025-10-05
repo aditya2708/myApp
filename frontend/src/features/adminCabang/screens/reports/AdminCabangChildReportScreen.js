@@ -20,6 +20,7 @@ import ChildReportListItem from '../../components/reports/ChildReportListItem';
 import ChildReportFilterModal from '../../components/reports/ChildReportFilterModal';
 import ChildAttendanceLineChart from '../../components/reports/ChildAttendanceLineChart';
 import ChildAttendanceBarChart from '../../components/reports/ChildAttendanceBarChart';
+import { adminCabangReportApi } from '../../api/adminCabangReportApi';
 import {
   clearError,
   resetFilters,
@@ -48,36 +49,10 @@ import {
 import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
 const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const SHELTER_NAMES = ['Shelter Menteng', 'Shelter Tebet', 'Shelter Cempaka Putih'];
 const DEFAULT_ACTIVITY = 'Bimbel';
 const DEFAULT_CHART_TYPE = 'bar';
 const DEFAULT_SHELTER = null;
-const RAW_ATTENDANCE_BY_YEAR = {
-  '2021': [75, 78, 80, 82, 84, 83, 85, 86, 88, 87, 89, 90],
-  '2022': [80, 82, 81, 83, 85, 84, 86, 87, 88, 90, 91, 92],
-  '2023': [82, 84, 86, 88, 87, 89, 90, 92, 93, 95, 94, 96],
-  '2024': [85, 86, 88, 89, 90, 92, 93, 94, 95, 96, 97, 98],
-};
-
-const buildMonthlyAttendanceMap = () => {
-  const attendanceMap = {};
-
-  Object.entries(RAW_ATTENDANCE_BY_YEAR).forEach(([year, monthlyValues]) => {
-    monthlyValues.forEach((value, index) => {
-      const month = String(index + 1).padStart(2, '0');
-      const periodKey = `${year}-${month}`;
-
-      attendanceMap[periodKey] = SHELTER_NAMES.map((shelterName, shelterIndex) => {
-        const adjustment = shelterIndex === 0 ? 0 : shelterIndex === 1 ? -3 : 4;
-        const adjustedValue = Math.min(100, Math.max(0, value + adjustment));
-
-        return { shelter: shelterName, value: adjustedValue };
-      });
-    });
-  });
-
-  return attendanceMap;
-};
+const RECENT_PERIOD_COUNT = 12;
 
 const formatPeriodLabel = (periodKey) => {
   if (!periodKey || typeof periodKey !== 'string') {
@@ -121,26 +96,42 @@ const formatPeriodToIndonesian = (period) => {
   return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 };
 
-const MONTHLY_ATTENDANCE_BY_PERIOD = buildMonthlyAttendanceMap();
-const SORTED_PERIOD_KEYS = Object.keys(MONTHLY_ATTENDANCE_BY_PERIOD).sort(
-  (a, b) => new Date(`${b}-01`).getTime() - new Date(`${a}-01`).getTime(),
-);
-const PERIOD_OPTIONS = SORTED_PERIOD_KEYS.map((periodKey) => ({
-  label: formatPeriodLabel(periodKey),
-  value: periodKey,
-}));
+const buildRecentPeriodOptions = (count = RECENT_PERIOD_COUNT) => {
+  const now = new Date();
 
-const clampPercentage = (value) => Math.min(100, Math.max(0, value));
-const calculateActivityAdjustment = (activity) => {
-  if (!activity) {
-    return 0;
+  return Array.from({ length: count }, (_, index) => {
+    const periodDate = new Date(now.getFullYear(), now.getMonth() - index, 1);
+    const periodValue = `${periodDate.getFullYear()}-${String(periodDate.getMonth() + 1).padStart(2, '0')}`;
+
+    return {
+      label: formatPeriodLabel(periodValue),
+      value: periodValue,
+    };
+  });
+};
+
+const PERIOD_OPTIONS = buildRecentPeriodOptions();
+
+const clampPercentage = (value) => Math.min(100, Math.max(0, Number(value) || 0));
+
+const parsePeriodToMonthYear = (period) => {
+  if (!period || typeof period !== 'string') {
+    return { month: null, year: null };
   }
 
-  const charSum = String(activity)
-    .split('')
-    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const [yearString, monthString] = period.split('-');
+  const parsedYear = Number(yearString);
+  const parsedMonth = Number(monthString);
 
-  return (charSum % 7) - 3;
+  if (!Number.isInteger(parsedYear) || !Number.isInteger(parsedMonth)) {
+    return { month: null, year: null };
+  }
+
+  if (parsedMonth < 1 || parsedMonth > 12) {
+    return { month: null, year: null };
+  }
+
+  return { month: parsedMonth, year: parsedYear };
 };
 
 const formatDateISO = (date) =>
@@ -166,16 +157,7 @@ const getMonthDateRange = (periodKey) => {
   };
 };
 
-const getDefaultPeriodKey = () => {
-  const now = new Date();
-  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  if (MONTHLY_ATTENDANCE_BY_PERIOD[currentKey]) {
-    return currentKey;
-  }
-
-  return SORTED_PERIOD_KEYS[0] || null;
-};
+const getDefaultPeriodKey = () => PERIOD_OPTIONS[0]?.value ?? null;
 
 const AdminCabangChildReportScreen = () => {
   const dispatch = useDispatch();
@@ -191,10 +173,26 @@ const AdminCabangChildReportScreen = () => {
   const error = useSelector(selectReportAnakError);
   const hasFetched = useSelector(selectReportAnakHasFetched);
 
+  const cabangId = useMemo(() => {
+    if (!summary?.metadata) {
+      return null;
+    }
+
+    return (
+      summary.metadata?.kacab?.id ??
+      summary.metadata?.kacab?.id_kacab ??
+      summary.metadata?.kacab_id ??
+      null
+    );
+  }, [summary]);
+
   const [searchText, setSearchText] = useState(filters.search || '');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [attendanceSummaryData, setAttendanceSummaryData] = useState([]);
+  const [attendanceSummaryLoading, setAttendanceSummaryLoading] = useState(false);
+  const [attendanceSummaryError, setAttendanceSummaryError] = useState(null);
   const searchDebounceRef = useRef(null);
 
   const defaultPeriod = useMemo(() => getDefaultPeriodKey(), []);
@@ -213,7 +211,6 @@ const AdminCabangChildReportScreen = () => {
   }, [filters.start_date]);
 
   const activePeriod = filters.period ?? derivedPeriodFromStartDate ?? defaultPeriod;
-  const activeActivity = filters.jenisKegiatan ?? DEFAULT_ACTIVITY;
   const activeShelter =
     typeof filters.shelter === 'undefined' || filters.shelter === null
       ? DEFAULT_SHELTER
@@ -225,6 +222,11 @@ const AdminCabangChildReportScreen = () => {
     [activePeriod],
   );
 
+  const { month: activePeriodMonth, year: activePeriodYear } = useMemo(
+    () => parsePeriodToMonthYear(activePeriod),
+    [activePeriod],
+  );
+
   useEffect(() => {
     dispatch(clearError());
     dispatch(initializeReportAnak());
@@ -233,6 +235,58 @@ const AdminCabangChildReportScreen = () => {
   useEffect(() => {
     setSearchText(filters.search || '');
   }, [filters.search]);
+
+  useEffect(() => {
+    if (!cabangId || !activePeriodMonth || !activePeriodYear) {
+      setAttendanceSummaryData([]);
+      setAttendanceSummaryError(null);
+      setAttendanceSummaryLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchAttendanceSummary = async () => {
+      setAttendanceSummaryLoading(true);
+      setAttendanceSummaryError(null);
+
+      try {
+        const response = await adminCabangReportApi.getAttendanceSummary(cabangId, {
+          month: activePeriodMonth,
+          year: activePeriodYear,
+        });
+        const payload = response?.data?.data || response?.data || {};
+        const shelters = Array.isArray(payload.shelters) ? payload.shelters : [];
+        const normalizedShelters = shelters.map((item) => ({
+          id: item?.id ?? item?.shelter_id ?? null,
+          name: item?.name ?? item?.nama ?? item?.nama_shelter ?? '',
+          attendance_avg: clampPercentage(
+            item?.attendance_avg ?? item?.attendance_percentage ?? item?.value ?? 0,
+          ),
+        }));
+
+        if (isMounted) {
+          setAttendanceSummaryData(normalizedShelters);
+        }
+      } catch (err) {
+        console.error('Failed to fetch attendance summary:', err);
+        if (isMounted) {
+          setAttendanceSummaryError('Gagal memuat data');
+          setAttendanceSummaryData([]);
+        }
+      } finally {
+        if (isMounted) {
+          setAttendanceSummaryLoading(false);
+        }
+      }
+    };
+
+    fetchAttendanceSummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cabangId, activePeriodMonth, activePeriodYear]);
 
   const shelterOptions = useMemo(() => {
     if (!filters.wilayahBinaan) {
@@ -254,25 +308,42 @@ const AdminCabangChildReportScreen = () => {
     return matchingOption?.label ?? null;
   }, [activeShelter, shelterOptions]);
 
+  const attendanceByShelter = useMemo(() => {
+    if (!Array.isArray(attendanceSummaryData)) {
+      return [];
+    }
+
+    return attendanceSummaryData.map((item) => ({
+      ...item,
+      name: item?.name ?? item?.shelter ?? item?.nama_shelter ?? '',
+      attendance_avg: clampPercentage(item?.attendance_avg ?? item?.value ?? 0),
+    }));
+  }, [attendanceSummaryData]);
+
   const filteredAttendanceData = useMemo(() => {
     if (!activePeriod) {
       return [];
     }
 
-    const periodData = MONTHLY_ATTENDANCE_BY_PERIOD[activePeriod] || [];
     const hasShelterFilter = Boolean(activeShelter && activeShelter !== 'all');
-    const shelterFilteredData =
-      hasShelterFilter && selectedShelterLabel
-        ? periodData.filter((item) => String(item?.shelter) === String(selectedShelterLabel))
-        : periodData;
+    const normalizedShelterLabel = selectedShelterLabel
+      ? String(selectedShelterLabel).toLowerCase()
+      : null;
 
-    const adjustment = calculateActivityAdjustment(activeActivity);
+    const sourceData = attendanceByShelter.filter((item) => {
+      if (!hasShelterFilter || !normalizedShelterLabel) {
+        return true;
+      }
 
-    return shelterFilteredData.map((item) => ({
+      return String(item?.name ?? '').toLowerCase() === normalizedShelterLabel;
+    });
+
+    return sourceData.map((item) => ({
       ...item,
-      value: clampPercentage((Number(item?.value) || 0) + adjustment),
+      shelter: item?.name ?? '',
+      value: clampPercentage(item?.attendance_avg ?? item?.value ?? 0),
     }));
-  }, [activeActivity, activePeriod, activeShelter, selectedShelterLabel]);
+  }, [activePeriod, activeShelter, attendanceByShelter, selectedShelterLabel]);
 
   const attendanceCategories = useMemo(
     () => filteredAttendanceData.map((item) => String(item?.shelter || '')),
@@ -659,47 +730,44 @@ const AdminCabangChildReportScreen = () => {
 
       {filtersApplied && (
         <View style={styles.chartContainer}>
-          {!activePeriod && (
+          {!activePeriod ? (
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>
                 Pilih periode untuk melihat tren kehadiran anak binaan.
               </Text>
             </View>
-          )}
-
-          {activePeriod && !filteredAttendanceData.length && (
-            <View style={styles.chartPlaceholder}>
-              <Text style={styles.chartPlaceholderTitle}>
-                Data kehadiran belum tersedia untuk filter yang dipilih.
-              </Text>
-              <Text style={styles.chartPlaceholderSubtitle}>
-                Coba pilih periode atau filter lainnya untuk melihat grafik.
-              </Text>
+          ) : attendanceSummaryLoading ? (
+            <View style={styles.chartLoadingWrapper}>
+              <LoadingSpinner size="small" />
             </View>
-          )}
-
-          {activePeriod && filteredAttendanceData.length > 0 && (
-            activeChartType === 'line' ? (
-              <ChildAttendanceLineChart
+          ) : attendanceSummaryError ? (
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderTitle}>Gagal memuat data</Text>
+            </View>
+          ) : filteredAttendanceData.length === 0 ? (
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderTitle}>Data tidak tersedia untuk bulan ini</Text>
+            </View>
+          ) : activeChartType === 'line' ? (
+            <ChildAttendanceLineChart
+              mode="compact"
+              year={selectedPeriodLabel}
+              data={filteredAttendanceData}
+              categories={attendanceCategories}
+              onOpenFullScreen={handleOpenChartFullScreen}
+            />
+          ) : (
+            <View style={styles.barChartCard}>
+              <Text style={styles.chartCardTitle}>
+                Distribusi Kehadiran
+                {selectedPeriodLabel ? ` ${selectedPeriodLabel}` : ''}
+              </Text>
+              <ChildAttendanceBarChart
                 mode="compact"
-                year={selectedPeriodLabel}
                 data={filteredAttendanceData}
                 categories={attendanceCategories}
-                onOpenFullScreen={handleOpenChartFullScreen}
               />
-            ) : (
-              <View style={styles.barChartCard}>
-                <Text style={styles.chartCardTitle}>
-                  Distribusi Kehadiran
-                  {selectedPeriodLabel ? ` ${selectedPeriodLabel}` : ''}
-                </Text>
-                <ChildAttendanceBarChart
-                  mode="compact"
-                  data={filteredAttendanceData}
-                  categories={attendanceCategories}
-                />
-              </View>
-            )
+            </View>
           )}
         </View>
       )}
@@ -907,11 +975,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  chartPlaceholderSubtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#7f8c8d',
-    textAlign: 'center',
+  chartLoadingWrapper: {
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
