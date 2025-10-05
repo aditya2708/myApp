@@ -4,7 +4,12 @@ import { ADMIN_CABANG_ENDPOINTS } from '../../../constants/endpoints';
 const {
   REPORTS: {
     SUMMARY: SUMMARY_ENDPOINT,
-    ANAK: { LIST: LIST_ENDPOINT, DETAIL: DETAIL_ENDPOINT, FILTERS }
+    ANAK: {
+      LIST: LIST_ENDPOINT,
+      DETAIL: DETAIL_ENDPOINT,
+      FILTER_OPTIONS: FILTER_OPTIONS_ENDPOINT,
+      FILTERS
+    }
   }
 } = ADMIN_CABANG_ENDPOINTS;
 
@@ -15,6 +20,10 @@ export const adminCabangReportApi = {
 
   async getLaporanAnakBinaan(params = {}) {
     return api.get(LIST_ENDPOINT, { params });
+  },
+
+  async getLaporanAnakFilterOptions(params = {}) {
+    return api.get(FILTER_OPTIONS_ENDPOINT, { params });
   },
 
   async getChildDetailReport(childId, params = {}) {
