@@ -255,6 +255,7 @@ const AdminCabangChildReportScreen = () => {
           month: activePeriodMonth,
           year: activePeriodYear,
         });
+        console.log('Attendance summary API response:', response?.data);
         const payload = response?.data?.data || response?.data || {};
         const shelters = Array.isArray(payload.shelters) ? payload.shelters : [];
         const normalizedShelters = shelters.map((item) => ({
