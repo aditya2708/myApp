@@ -47,6 +47,7 @@ import {
   initializeReportAnak,
 } from '../../redux/reportAnakThunks';
 import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
+import { selectUserProfile } from '../../../auth/redux/authSlice';
 
 const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DEFAULT_ACTIVITY = 'Bimbel';
@@ -164,6 +165,7 @@ const AdminCabangChildReportScreen = () => {
   const navigation = useNavigation();
 
   const children = useSelector(selectReportAnakChildren);
+  const profile = useSelector(selectUserProfile);
   const summary = useSelector(selectReportAnakSummary);
   const pagination = useSelector(selectReportAnakPagination);
   const hasMore = useSelector(selectReportAnakHasMore);
@@ -174,6 +176,17 @@ const AdminCabangChildReportScreen = () => {
   const hasFetched = useSelector(selectReportAnakHasFetched);
 
   const cabangId = useMemo(() => {
+    const profileCabangId =
+      profile?.kacab?.id_kacab ??
+      profile?.kacab?.id ??
+      profile?.id_kacab ??
+      profile?.kacab_id ??
+      null;
+
+    if (profileCabangId) {
+      return profileCabangId;
+    }
+
     if (!summary?.metadata) {
       return null;
     }
@@ -184,7 +197,7 @@ const AdminCabangChildReportScreen = () => {
       summary.metadata?.kacab_id ??
       null
     );
-  }, [summary]);
+  }, [profile, summary]);
 
   const [searchText, setSearchText] = useState(filters.search || '');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
