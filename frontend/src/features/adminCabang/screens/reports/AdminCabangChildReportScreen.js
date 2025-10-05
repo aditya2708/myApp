@@ -18,6 +18,7 @@ import EmptyState from '../../../../common/components/EmptyState';
 import ChildReportSummary from '../../components/reports/ChildReportSummary';
 import ChildReportListItem from '../../components/reports/ChildReportListItem';
 import ChildReportFilterModal from '../../components/reports/ChildReportFilterModal';
+import ChildAttendanceLineChart from '../../components/reports/ChildAttendanceLineChart';
 import {
   clearError,
   resetFilters,
@@ -61,6 +62,7 @@ const AdminCabangChildReportScreen = () => {
 
   const [searchText, setSearchText] = useState(filters.search || '');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filtersApplied, setFiltersApplied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const searchDebounceRef = useRef(null);
 
@@ -155,6 +157,7 @@ const AdminCabangChildReportScreen = () => {
     dispatch(setFilters(nextFilters));
     dispatch(fetchReportAnakList({ filters: nextFilters, page: 1 }));
     setFilterModalVisible(false);
+    setFiltersApplied(true);
   };
 
   const handleClearFilters = () => {
@@ -162,7 +165,20 @@ const AdminCabangChildReportScreen = () => {
     dispatch(resetFilters());
     setSearchText('');
     setFilterModalVisible(false);
+    setFiltersApplied(false);
   };
+
+  const handleApplyFilterToggle = useCallback(() => {
+    setFiltersApplied((prev) => {
+      const nextState = !prev;
+
+      if (nextState && !hasFetched) {
+        dispatch(fetchReportAnakList({ filters, page: 1 }));
+      }
+
+      return nextState;
+    });
+  }, [dispatch, filters, hasFetched]);
 
   const handleRefresh = async () => {
     if (!hasFetched) {
@@ -357,6 +373,17 @@ const AdminCabangChildReportScreen = () => {
         )}
       </View>
 
+      <TouchableOpacity
+        onPress={handleApplyFilterToggle}
+        style={[styles.applyFilterButton, filtersApplied && styles.applyFilterButtonActive]}
+        accessibilityRole="button"
+        accessibilityLabel="Terapkan filter laporan"
+      >
+        <Text style={[styles.applyFilterButtonText, filtersApplied && styles.applyFilterButtonTextActive]}>
+          {filtersApplied ? 'Filter Diterapkan' : 'Terapkan Filter'}
+        </Text>
+      </TouchableOpacity>
+
       {activeFilterChips.length > 0 && (
         <View style={styles.activeFiltersContainer}>
           {activeFilterChips.map((chip) => (
@@ -376,6 +403,12 @@ const AdminCabangChildReportScreen = () => {
       )}
 
       {hasFetched && summary && <ChildReportSummary summary={summary} />}
+
+      {filtersApplied && (
+        <View style={styles.chartContainer}>
+          <ChildAttendanceLineChart />
+        </View>
+      )}
 
       {error && (
         <View style={styles.errorWrapper}>
@@ -409,13 +442,15 @@ const AdminCabangChildReportScreen = () => {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={
           !loading && !initializing ? (
-            hasFetched ? (
-              <EmptyState
-                title="Belum ada data laporan"
-                description="Silakan ubah filter atau segarkan halaman untuk melihat data terbaru."
-              />
+            filtersApplied ? (
+              hasFetched ? (
+                <EmptyState
+                  title="Belum ada data laporan"
+                  description="Silakan ubah filter atau segarkan halaman untuk melihat data terbaru."
+                />
+              ) : null
             ) : (
-              <EmptyState title="Pilih filter untuk menampilkan laporan" />
+              <EmptyState title="Terapkan filter untuk menampilkan laporan" />
             )
           ) : null
         }
@@ -502,6 +537,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2c3e50',
   },
+  applyFilterButton: {
+    marginBottom: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#ecf0f1',
+    alignItems: 'center',
+  },
+  applyFilterButtonActive: {
+    backgroundColor: '#4a90e2',
+  },
+  applyFilterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  applyFilterButtonTextActive: {
+    color: '#ffffff',
+  },
   activeFiltersContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -526,6 +579,9 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   errorWrapper: {
+    marginTop: 8,
+  },
+  chartContainer: {
     marginTop: 8,
   },
   loadingOverlay: {
