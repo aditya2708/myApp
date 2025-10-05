@@ -117,6 +117,7 @@ const ChartFullScreenScreen = () => {
               data={chartData}
               mode="fullscreen"
               containerStyle={styles.chartContainer}
+              categories={resolvedCategories}
               {...barChartProps}
             />
           ) : (
