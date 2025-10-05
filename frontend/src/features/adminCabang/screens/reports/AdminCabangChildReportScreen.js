@@ -116,6 +116,29 @@ const calculateActivityAdjustment = (activity) => {
   return (charSum % 7) - 3;
 };
 
+const formatDateISO = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const getMonthDateRange = (periodKey) => {
+  const now = new Date();
+  const [rawYear, rawMonth] = typeof periodKey === 'string' ? periodKey.split('-') : [];
+  const parsedYear = Number(rawYear);
+  const parsedMonth = Number(rawMonth) - 1;
+
+  const baseDate =
+    Number.isInteger(parsedYear) && Number.isInteger(parsedMonth) && parsedMonth >= 0 && parsedMonth <= 11
+      ? new Date(parsedYear, parsedMonth, 1)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  const endDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+
+  return {
+    start_date: formatDateISO(startDate),
+    end_date: formatDateISO(endDate),
+  };
+};
+
 const getDefaultPeriodKey = () => {
   const now = new Date();
   const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -148,7 +171,21 @@ const AdminCabangChildReportScreen = () => {
   const searchDebounceRef = useRef(null);
 
   const defaultPeriod = useMemo(() => getDefaultPeriodKey(), []);
-  const activePeriod = filters.period ?? defaultPeriod;
+  const derivedPeriodFromStartDate = useMemo(() => {
+    if (!filters.start_date) {
+      return null;
+    }
+
+    const startDate = new Date(filters.start_date);
+
+    if (Number.isNaN(startDate.getTime())) {
+      return null;
+    }
+
+    return `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+  }, [filters.start_date]);
+
+  const activePeriod = filters.period ?? derivedPeriodFromStartDate ?? defaultPeriod;
   const activeActivity = filters.jenisKegiatan ?? DEFAULT_ACTIVITY;
   const activeShelter =
     typeof filters.shelter === 'undefined' || filters.shelter === null
@@ -285,6 +322,7 @@ const AdminCabangChildReportScreen = () => {
     };
 
     dispatch(setFilters(nextFilters));
+    dispatch(setDateRange({ start_date: nextFilters.start_date, end_date: nextFilters.end_date }));
     dispatch(fetchReportAnakList({ filters: nextFilters, page: 1 }));
     setFilterModalVisible(false);
     setFiltersApplied(true);
@@ -294,11 +332,15 @@ const AdminCabangChildReportScreen = () => {
     clearSearchDebounce();
     dispatch(resetFilters());
 
+    const basePeriod = (resetValues && resetValues.period) || defaultPeriod;
+    const derivedDateRange = getMonthDateRange(basePeriod);
+
     const fallbackFilters = {
-      period: defaultPeriod,
+      period: basePeriod,
       jenisKegiatan: DEFAULT_ACTIVITY,
       shelter: DEFAULT_SHELTER,
       chartType: DEFAULT_CHART_TYPE,
+      ...derivedDateRange,
       ...(resetValues || {}),
     };
 
@@ -318,9 +360,18 @@ const AdminCabangChildReportScreen = () => {
         typeof fallbackFilters.chartType === 'undefined' || fallbackFilters.chartType === null
           ? DEFAULT_CHART_TYPE
           : fallbackFilters.chartType,
+      start_date:
+        typeof fallbackFilters.start_date === 'undefined' || fallbackFilters.start_date === null
+          ? getMonthDateRange(fallbackFilters.period ?? defaultPeriod).start_date
+          : fallbackFilters.start_date,
+      end_date:
+        typeof fallbackFilters.end_date === 'undefined' || fallbackFilters.end_date === null
+          ? getMonthDateRange(fallbackFilters.period ?? defaultPeriod).end_date
+          : fallbackFilters.end_date,
     };
 
     dispatch(setFilters(sanitizedFilters));
+    dispatch(setDateRange({ start_date: sanitizedFilters.start_date, end_date: sanitizedFilters.end_date }));
     dispatch(setSearch(''));
     setSearchText('');
     setFilterModalVisible(false);
