@@ -227,12 +227,24 @@ const buildRequestParams = (filters = {}, extras = {}) => {
 
 const extractListPayload = (response) => {
   const payload = response?.data?.data || response?.data || {};
-  const children =
+  const rawChildren =
     payload.children ||
     payload.data ||
     payload.items ||
     payload.results ||
     [];
+
+  const childrenSource = Array.isArray(rawChildren) ? rawChildren : ensureArray(rawChildren);
+
+  const children = childrenSource.map((child) => {
+    if (!child || typeof child !== 'object') {
+      return child;
+    }
+
+    const { monthly_data, monthlyData, ...rest } = child;
+
+    return rest;
+  });
 
   const summary =
     payload.summary ||
@@ -256,6 +268,21 @@ const extractListPayload = (response) => {
     summary,
     pagination,
     filterOptions,
+  };
+};
+
+const extractFilterOptionsPayload = (response) => {
+  const payload = response?.data?.data || response?.data || {};
+  const rawOptions =
+    payload.filter_options ||
+    payload.filterOptions ||
+    payload.filters ||
+    payload.options ||
+    payload.data ||
+    payload;
+
+  return {
+    filterOptions: normalizeFilterOptions(rawOptions),
   };
 };
 
@@ -349,11 +376,13 @@ export const initializeReportAnak = createAsyncThunk(
   'reportAnak/initialize',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await adminCabangReportApi.getLaporanAnakBinaan();
-      const { filterOptions } = extractListPayload(response);
+      const response = await adminCabangReportApi.getLaporanAnakFilterOptions();
+      const { filterOptions } = extractFilterOptionsPayload(response);
       return { filterOptions };
     } catch (error) {
-      return rejectWithValue(parseError(error, 'Gagal memuat laporan anak binaan.'));
+      return rejectWithValue(
+        parseError(error, 'Gagal memuat opsi filter laporan anak binaan.'),
+      );
     }
   }
 );
