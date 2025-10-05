@@ -19,6 +19,7 @@ import ChildReportSummary from '../../components/reports/ChildReportSummary';
 import ChildReportListItem from '../../components/reports/ChildReportListItem';
 import ChildReportFilterModal from '../../components/reports/ChildReportFilterModal';
 import ChildAttendanceLineChart from '../../components/reports/ChildAttendanceLineChart';
+import PickerInput from '../../../../common/components/PickerInput';
 import {
   clearError,
   resetFilters,
@@ -46,6 +47,15 @@ import {
 } from '../../redux/reportAnakThunks';
 import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
+const AVAILABLE_YEARS = ['2021', '2022', '2023', '2024'];
+
+const HARD_CODED_ATTENDANCE = {
+  '2021': [75, 78, 80, 82, 84, 83, 85, 86, 88, 87, 89, 90],
+  '2022': [80, 82, 81, 83, 85, 84, 86, 87, 88, 90, 91, 92],
+  '2023': [82, 84, 86, 88, 87, 89, 90, 92, 93, 95, 94, 96],
+  '2024': [85, 86, 88, 89, 90, 92, 93, 94, 95, 96, 97, 98],
+};
+
 const AdminCabangChildReportScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
@@ -64,7 +74,10 @@ const AdminCabangChildReportScreen = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(null);
   const searchDebounceRef = useRef(null);
+
+  const chartData = selectedYear ? HARD_CODED_ATTENDANCE[selectedYear] || null : null;
 
   useEffect(() => {
     dispatch(clearError());
@@ -406,7 +419,37 @@ const AdminCabangChildReportScreen = () => {
 
       {filtersApplied && (
         <View style={styles.chartContainer}>
-          <ChildAttendanceLineChart />
+          <PickerInput
+            label="Tahun"
+            value={selectedYear || ''}
+            onValueChange={(value) => setSelectedYear(value || null)}
+            items={AVAILABLE_YEARS.map((year) => ({ label: year, value: year }))}
+            placeholder="Pilih Tahun"
+            style={styles.yearPicker}
+          />
+          {selectedYear && chartData?.length ? (
+            <ChildAttendanceLineChart
+              year={selectedYear}
+              data={chartData}
+              onOpenFullScreen={() =>
+                navigation.navigate('ChartFullScreen', {
+                  year: selectedYear,
+                  data: chartData,
+                })
+              }
+            />
+          ) : (
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderTitle}>
+                Pilih tahun untuk melihat tren kehadiran anak binaan.
+              </Text>
+              {selectedYear && !chartData?.length && (
+                <Text style={styles.chartPlaceholderSubtitle}>
+                  Data kehadiran belum tersedia untuk tahun yang dipilih.
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       )}
 
@@ -583,6 +626,28 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     marginTop: 8,
+  },
+  yearPicker: {
+    marginBottom: 16,
+  },
+  chartPlaceholder: {
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+  },
+  chartPlaceholderTitle: {
+    fontSize: 14,
+    color: '#34495e',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  chartPlaceholderSubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#7f8c8d',
+    textAlign: 'center',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
