@@ -8,15 +8,68 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 import Button from '../../../../common/components/Button';
 
-const formatDate = (date) => {
-  if (!date) return null;
-  const instance = typeof date === 'string' ? new Date(date) : date;
-  if (Number.isNaN(instance.getTime())) return null;
-  return instance.toISOString().split('T')[0];
+const DEFAULT_ACTIVITY = 'Bimbel';
+const DEFAULT_CHART_TYPE = 'bar';
+const DEFAULT_SHELTER = null;
+
+const buildInitialLocalFilters = (filters, defaultPeriodValue) => {
+  const incomingFilters = filters ? { ...filters } : {};
+
+  if (typeof incomingFilters.wilayahBinaan === 'undefined') {
+    incomingFilters.wilayahBinaan = null;
+  }
+
+  return {
+    ...incomingFilters,
+    period:
+      typeof incomingFilters.period === 'undefined' || incomingFilters.period === null
+        ? defaultPeriodValue ?? null
+        : incomingFilters.period,
+    jenisKegiatan:
+      typeof incomingFilters.jenisKegiatan === 'undefined'
+        ? DEFAULT_ACTIVITY
+        : incomingFilters.jenisKegiatan,
+    shelter:
+      typeof incomingFilters.shelter === 'undefined' ? DEFAULT_SHELTER : incomingFilters.shelter,
+    chartType:
+      typeof incomingFilters.chartType === 'undefined' || incomingFilters.chartType === null
+        ? DEFAULT_CHART_TYPE
+        : incomingFilters.chartType,
+    start_date: null,
+    end_date: null,
+  };
+};
+
+const prepareFiltersForSubmit = (filters, defaultPeriodValue) => {
+  const nextFilters = filters ? { ...filters } : {};
+
+  if (typeof nextFilters.period === 'undefined' || nextFilters.period === null) {
+    nextFilters.period = defaultPeriodValue ?? null;
+  }
+
+  if (typeof nextFilters.jenisKegiatan === 'undefined') {
+    nextFilters.jenisKegiatan = DEFAULT_ACTIVITY;
+  }
+
+  if (typeof nextFilters.shelter === 'undefined') {
+    nextFilters.shelter = DEFAULT_SHELTER;
+  }
+
+  if (typeof nextFilters.chartType === 'undefined' || nextFilters.chartType === null) {
+    nextFilters.chartType = DEFAULT_CHART_TYPE;
+  }
+
+  if (typeof nextFilters.wilayahBinaan === 'undefined') {
+    nextFilters.wilayahBinaan = null;
+  }
+
+  nextFilters.start_date = null;
+  nextFilters.end_date = null;
+
+  return nextFilters;
 };
 
 const OptionRow = ({ label, selected, onPress, icon, disabled }) => (
@@ -57,6 +110,7 @@ const ChildReportFilterModal = ({
   visible,
   onClose,
   filters,
+  periodOptions = [],
   jenisOptions = [],
   wilayahOptions = [],
   shelterOptions = [],
@@ -66,24 +120,68 @@ const ChildReportFilterModal = ({
   onClear,
   onWilayahFetch,
 }) => {
-  const [localFilters, setLocalFilters] = useState(filters);
-  const [activeDatePicker, setActiveDatePicker] = useState(null);
-
-  useEffect(() => {
-    if (visible) {
-      setLocalFilters(filters);
-    }
-  }, [visible, filters]);
-
-  const jenisItems = useMemo(() => {
-    if (!jenisOptions || jenisOptions.length === 0) {
+  const normalizedPeriodOptions = useMemo(() => {
+    if (!Array.isArray(periodOptions) || periodOptions.length === 0) {
       return [];
     }
 
-    return jenisOptions.map((option) => ({
-      key: option.value ?? option.id ?? option.slug ?? option,
-      label: option.label ?? option.name ?? option,
-    }));
+    return periodOptions
+      .map((option) => {
+        if (!option) {
+          return null;
+        }
+
+        const value = option.value ?? option.id ?? option.slug ?? option;
+        const label = option.label ?? option.name ?? option;
+
+        if (!value || !label) {
+          return null;
+        }
+
+        return {
+          value: String(value),
+          label: String(label),
+        };
+      })
+      .filter(Boolean);
+  }, [periodOptions]);
+
+  const defaultPeriodValue = useMemo(() => {
+    if (normalizedPeriodOptions.length === 0) {
+      return null;
+    }
+
+    const now = new Date();
+    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const matchingOption = normalizedPeriodOptions.find((option) => option.value === currentPeriod);
+
+    return matchingOption?.value ?? normalizedPeriodOptions[0]?.value ?? null;
+  }, [normalizedPeriodOptions]);
+
+  const [localFilters, setLocalFilters] = useState(() =>
+    buildInitialLocalFilters(filters, defaultPeriodValue),
+  );
+
+  useEffect(() => {
+    if (visible) {
+      setLocalFilters(buildInitialLocalFilters(filters, defaultPeriodValue));
+    }
+  }, [visible, filters, defaultPeriodValue]);
+
+  const jenisItems = useMemo(() => {
+    const normalized = (Array.isArray(jenisOptions) ? jenisOptions : [])
+      .map((option) => ({
+        key: option.value ?? option.id ?? option.slug ?? option,
+        label: option.label ?? option.name ?? option,
+      }))
+      .filter((option) => option.key && option.label);
+
+    const hasDefaultActivity = normalized.some((option) => option.key === DEFAULT_ACTIVITY);
+    if (!hasDefaultActivity) {
+      normalized.unshift({ key: DEFAULT_ACTIVITY, label: DEFAULT_ACTIVITY });
+    }
+
+    return normalized;
   }, [jenisOptions]);
 
   const wilayahItems = useMemo(() => {
@@ -108,42 +206,36 @@ const ChildReportFilterModal = ({
     }));
   }, [shelterOptions]);
 
-  const handleDateChange = (_, selectedDate) => {
-    if (selectedDate) {
-      setLocalFilters((prev) => ({
-        ...prev,
-        [activeDatePicker]: formatDate(selectedDate),
-      }));
-    }
-    setActiveDatePicker(null);
-  };
-
   const handleWilayahSelect = (wilayahId) => {
     setLocalFilters((prev) => ({
       ...prev,
       wilayahBinaan: wilayahId,
-      shelter: null,
+      shelter: DEFAULT_SHELTER,
     }));
     onWilayahFetch?.(wilayahId);
   };
 
   const handleApply = () => {
-    onApply?.(localFilters);
+    const nextFilters = prepareFiltersForSubmit(localFilters, defaultPeriodValue);
+    onApply?.(nextFilters);
     onClose?.();
   };
 
   const handleClear = () => {
-    onClear?.();
-    setLocalFilters({
-      ...filters,
-      ...{
-        start_date: null,
-        end_date: null,
-        jenisKegiatan: null,
+    const resetValues = prepareFiltersForSubmit(
+      {
+        ...filters,
+        period: defaultPeriodValue ?? null,
+        jenisKegiatan: DEFAULT_ACTIVITY,
         wilayahBinaan: null,
-        shelter: null,
+        shelter: DEFAULT_SHELTER,
+        chartType: DEFAULT_CHART_TYPE,
       },
-    });
+      defaultPeriodValue,
+    );
+
+    onClear?.(resetValues);
+    setLocalFilters(resetValues);
   };
 
   const handleRetryShelterFetch = () => {
@@ -172,27 +264,27 @@ const ChildReportFilterModal = ({
 
           <ScrollView>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Rentang Tanggal</Text>
-              <View style={styles.dateRow}>
-                <TouchableOpacity
-                  style={[styles.dateButton, styles.dateButtonSpacing]}
-                  onPress={() => setActiveDatePicker('start_date')}
-                >
-                  <Ionicons name="calendar-outline" size={18} color="#7f8c8d" />
-                  <Text style={styles.dateText}>
-                    {localFilters.start_date || 'Tanggal Mulai'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setActiveDatePicker('end_date')}
-                >
-                  <Ionicons name="calendar-outline" size={18} color="#7f8c8d" />
-                  <Text style={styles.dateText}>
-                    {localFilters.end_date || 'Tanggal Selesai'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.sectionTitle}>Periode</Text>
+              {normalizedPeriodOptions.length === 0 ? (
+                <Text style={styles.helperText}>Belum ada periode yang tersedia.</Text>
+              ) : (
+                <View style={styles.optionList}>
+                  {normalizedPeriodOptions.map((option) => (
+                    <OptionRow
+                      key={option.value}
+                      label={option.label}
+                      selected={localFilters.period === option.value}
+                      onPress={() =>
+                        setLocalFilters((prev) => ({
+                          ...prev,
+                          period: option.value,
+                        }))
+                      }
+                      icon="calendar-outline"
+                    />
+                  ))}
+                </View>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -201,7 +293,9 @@ const ChildReportFilterModal = ({
                 <OptionRow
                   label="Semua"
                   selected={!localFilters.jenisKegiatan}
-                  onPress={() => setLocalFilters((prev) => ({ ...prev, jenisKegiatan: null }))}
+                  onPress={() =>
+                    setLocalFilters((prev) => ({ ...prev, jenisKegiatan: null }))
+                  }
                   icon="ellipse-outline"
                 />
                 {jenisItems.map((option) => (
@@ -276,6 +370,42 @@ const ChildReportFilterModal = ({
                 ))}
               </View>
             </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Tampilkan Sebagai</Text>
+              <View style={styles.chartTypeRow}>
+                {['bar', 'line'].map((type, index) => {
+                  const isSelected = localFilters.chartType === type;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.chartTypeButton,
+                        isSelected && styles.chartTypeButtonSelected,
+                        index === 1 && styles.chartTypeButtonLast,
+                      ]}
+                      onPress={() =>
+                        setLocalFilters((prev) => ({
+                          ...prev,
+                          chartType: type,
+                        }))
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={type === 'bar' ? 'bar-chart' : 'analytics'}
+                        size={18}
+                        color={isSelected ? '#ffffff' : '#7f8c8d'}
+                        style={styles.chartTypeIcon}
+                      />
+                      <Text style={[styles.chartTypeLabel, isSelected && styles.chartTypeLabelSelected]}>
+                        {type === 'bar' ? 'Bar' : 'Line'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </ScrollView>
 
           <View style={styles.footer}>
@@ -293,15 +423,6 @@ const ChildReportFilterModal = ({
           </View>
         </View>
       </View>
-
-      {activeDatePicker && (
-        <DateTimePicker
-          value={localFilters[activeDatePicker] ? new Date(localFilters[activeDatePicker]) : new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      )}
     </Modal>
   );
 };
@@ -340,29 +461,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 10,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dateButtonSpacing: {
-    marginRight: 12,
-  },
-  dateButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ecf0f1',
-    backgroundColor: '#f8f9fa',
-  },
-  dateText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#2c3e50',
   },
   optionList: {
     borderWidth: 1,
@@ -420,6 +518,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginBottom: 6,
+  },
+  chartTypeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  chartTypeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+    backgroundColor: '#ffffff',
+    marginRight: 12,
+  },
+  chartTypeButtonSelected: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
+  },
+  chartTypeLabel: {
+    fontSize: 14,
+    color: '#2c3e50',
+    fontWeight: '500',
+  },
+  chartTypeLabelSelected: {
+    color: '#ffffff',
+  },
+  chartTypeIcon: {
+    marginRight: 8,
+  },
+  chartTypeButtonLast: {
+    marginRight: 0,
   },
   errorContainer: {
     backgroundColor: '#fdecea',
