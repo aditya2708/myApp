@@ -762,6 +762,7 @@ const AdminCabangChildReportScreen = () => {
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
         filters={filters}
+        periodOptions={PERIOD_OPTIONS}
         jenisOptions={filterOptions.jenisKegiatan}
         wilayahOptions={filterOptions.wilayahBinaan}
         shelterOptions={shelterOptions}
