@@ -191,6 +191,8 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json(['message' => 'Semester routes are working!', 'time' => now()]);
         });
 
+        Route::get('{cabang}/attendance-summary', App\Http\Controllers\API\AdminCabang\Reports\AdminCabangAttendanceSummaryController::class);
+
         Route::prefix('laporan')->group(function () {
             Route::get('/summary', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangReportSummaryController::class, 'getSummary']);
             Route::get('/anak-binaan', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'index']);
