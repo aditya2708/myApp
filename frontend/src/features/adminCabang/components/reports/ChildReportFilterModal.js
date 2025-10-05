@@ -373,6 +373,7 @@ const ChildReportFilterModal = ({
 
   const handleApply = () => {
     const nextFilters = prepareFiltersForSubmit(localFilters, defaultConfig);
+    console.log('Applying child report filters:', nextFilters);
     onApply?.(nextFilters);
     setShowPeriodPicker(false);
     onClose?.();
