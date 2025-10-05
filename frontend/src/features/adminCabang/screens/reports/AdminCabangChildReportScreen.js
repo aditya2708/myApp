@@ -215,17 +215,29 @@ const AdminCabangChildReportScreen = () => {
     return filterOptions.sheltersByWilayah?.[filters.wilayahBinaan] || [];
   }, [filterOptions.sheltersByWilayah, filters.wilayahBinaan]);
 
+  const selectedShelterLabel = useMemo(() => {
+    if (!activeShelter || activeShelter === 'all') {
+      return null;
+    }
+
+    const matchingOption = shelterOptions.find(
+      (option) => String(option?.value) === String(activeShelter),
+    );
+
+    return matchingOption?.label ?? null;
+  }, [activeShelter, shelterOptions]);
+
   const filteredAttendanceData = useMemo(() => {
     if (!activePeriod) {
       return [];
     }
 
     const periodData = MONTHLY_ATTENDANCE_BY_PERIOD[activePeriod] || [];
-    const normalizedShelter =
-      activeShelter && activeShelter !== 'all' ? activeShelter : DEFAULT_SHELTER;
-    const shelterFilteredData = normalizedShelter
-      ? periodData.filter((item) => String(item?.shelter) === String(normalizedShelter))
-      : periodData;
+    const hasShelterFilter = Boolean(activeShelter && activeShelter !== 'all');
+    const shelterFilteredData =
+      hasShelterFilter && selectedShelterLabel
+        ? periodData.filter((item) => String(item?.shelter) === String(selectedShelterLabel))
+        : periodData;
 
     const adjustment = calculateActivityAdjustment(activeActivity);
 
@@ -233,7 +245,7 @@ const AdminCabangChildReportScreen = () => {
       ...item,
       value: clampPercentage((Number(item?.value) || 0) + adjustment),
     }));
-  }, [activeActivity, activePeriod, activeShelter]);
+  }, [activeActivity, activePeriod, activeShelter, selectedShelterLabel]);
 
   const attendanceCategories = useMemo(
     () => filteredAttendanceData.map((item) => String(item?.shelter || '')),
