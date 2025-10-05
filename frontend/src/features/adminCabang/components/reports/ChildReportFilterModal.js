@@ -6,14 +6,87 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import Button from '../../../../common/components/Button';
 
 const DEFAULT_ACTIVITY = 'Bimbel';
 const DEFAULT_CHART_TYPE = 'bar';
 const DEFAULT_SHELTER = null;
+
+const parsePeriodStringToDate = (periodString) => {
+  if (typeof periodString !== 'string') {
+    return null;
+  }
+
+  const [yearString, monthString] = periodString.split('-');
+  const year = Number(yearString);
+  const monthIndex = Number(monthString) - 1;
+
+  if (!year || Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return null;
+  }
+
+  return new Date(year, monthIndex, 1);
+};
+
+const getMonthStartFromDate = (dateValue) => {
+  if (!dateValue) {
+    return null;
+  }
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
+const resolvePeriodDate = (period, startDate, defaultPeriodValue) => {
+  return (
+    parsePeriodStringToDate(period) ||
+    getMonthStartFromDate(startDate) ||
+    parsePeriodStringToDate(defaultPeriodValue) ||
+    new Date()
+  );
+};
+
+const createPeriodPayloadFromDate = (date) => {
+  if (!date || Number.isNaN(date.getTime())) {
+    return {
+      period: null,
+      start_date: null,
+      end_date: null,
+    };
+  }
+
+  const year = date.getFullYear();
+  const monthIndex = date.getMonth();
+  const period = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+  const startDate = new Date(year, monthIndex, 1);
+  const endDate = new Date(year, monthIndex + 1, 0);
+
+  return {
+    period,
+    start_date: startDate.toISOString(),
+    end_date: endDate.toISOString(),
+  };
+};
+
+const formatMonthYearLabel = (date) => {
+  if (!date || Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleDateString('id-ID', {
+    month: 'long',
+    year: 'numeric',
+  });
+};
 
 const buildInitialLocalFilters = (filters, defaults = {}) => {
   const incomingFilters = filters ? { ...filters } : {};
@@ -23,12 +96,16 @@ const buildInitialLocalFilters = (filters, defaults = {}) => {
     incomingFilters.wilayahBinaan = null;
   }
 
+  const resolvedPeriodDate = resolvePeriodDate(
+    incomingFilters.period,
+    incomingFilters.start_date,
+    defaultPeriodValue,
+  );
+  const periodPayload = createPeriodPayloadFromDate(resolvedPeriodDate);
+
   return {
     ...incomingFilters,
-    period:
-      typeof incomingFilters.period === 'undefined' || incomingFilters.period === null
-        ? defaultPeriodValue ?? null
-        : incomingFilters.period,
+    period: periodPayload.period,
     jenisKegiatan:
       typeof incomingFilters.jenisKegiatan === 'undefined'
         ? DEFAULT_ACTIVITY
@@ -39,8 +116,8 @@ const buildInitialLocalFilters = (filters, defaults = {}) => {
       typeof incomingFilters.chartType === 'undefined' || incomingFilters.chartType === null
         ? defaultChartType ?? DEFAULT_CHART_TYPE
         : incomingFilters.chartType,
-    start_date: null,
-    end_date: null,
+    start_date: periodPayload.start_date,
+    end_date: periodPayload.end_date,
   };
 };
 
@@ -48,9 +125,16 @@ const prepareFiltersForSubmit = (filters, defaults = {}) => {
   const nextFilters = filters ? { ...filters } : {};
   const { defaultPeriodValue = null, defaultChartType = DEFAULT_CHART_TYPE } = defaults;
 
-  if (typeof nextFilters.period === 'undefined' || nextFilters.period === null) {
-    nextFilters.period = defaultPeriodValue ?? null;
-  }
+  const resolvedPeriodDate = resolvePeriodDate(
+    nextFilters.period,
+    nextFilters.start_date,
+    defaultPeriodValue,
+  );
+  const periodPayload = createPeriodPayloadFromDate(resolvedPeriodDate);
+
+  nextFilters.period = periodPayload.period;
+  nextFilters.start_date = periodPayload.start_date;
+  nextFilters.end_date = periodPayload.end_date;
 
   if (typeof nextFilters.jenisKegiatan === 'undefined') {
     nextFilters.jenisKegiatan = DEFAULT_ACTIVITY;
@@ -67,9 +151,6 @@ const prepareFiltersForSubmit = (filters, defaults = {}) => {
   if (typeof nextFilters.wilayahBinaan === 'undefined') {
     nextFilters.wilayahBinaan = null;
   }
-
-  nextFilters.start_date = null;
-  nextFilters.end_date = null;
 
   return nextFilters;
 };
@@ -180,13 +261,23 @@ const ChildReportFilterModal = ({
     [resolvedDefaultPeriod, resolvedDefaultChartType],
   );
 
-  const [localFilters, setLocalFilters] = useState(() =>
-    buildInitialLocalFilters(filters, defaultConfig),
-  );
+  const createInitialLocalFilters = () => buildInitialLocalFilters(filters, defaultConfig);
+
+  const [localFilters, setLocalFilters] = useState(createInitialLocalFilters);
+  const [periodDate, setPeriodDate] = useState(() => {
+    const initial = createInitialLocalFilters();
+    return resolvePeriodDate(initial.period, initial.start_date, defaultConfig.defaultPeriodValue);
+  });
+  const [showPeriodPicker, setShowPeriodPicker] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      setLocalFilters(buildInitialLocalFilters(filters, defaultConfig));
+      const nextLocal = buildInitialLocalFilters(filters, defaultConfig);
+      setLocalFilters(nextLocal);
+      setPeriodDate(
+        resolvePeriodDate(nextLocal.period, nextLocal.start_date, defaultConfig.defaultPeriodValue),
+      );
+      setShowPeriodPicker(false);
     }
   }, [visible, filters, defaultConfig]);
 
@@ -228,6 +319,49 @@ const ChildReportFilterModal = ({
     }));
   }, [shelterOptions]);
 
+  const currentPeriodLabel = useMemo(() => {
+    if (!localFilters.period && !periodDate) {
+      return 'Pilih bulan';
+    }
+
+    const matchedOption = normalizedPeriodOptions.find(
+      (option) => option.value === localFilters.period,
+    );
+    if (matchedOption) {
+      return matchedOption.label;
+    }
+
+    if (periodDate) {
+      return formatMonthYearLabel(periodDate);
+    }
+
+    return localFilters.period || 'Pilih bulan';
+  }, [localFilters.period, normalizedPeriodOptions, periodDate]);
+
+  const handlePeriodToggle = () => {
+    setShowPeriodPicker((prev) => !prev);
+  };
+
+  const handlePeriodChange = (event, selectedDate) => {
+    if (event?.type === 'dismissed') {
+      setShowPeriodPicker(false);
+      return;
+    }
+
+    const nextDate = selectedDate || periodDate || new Date();
+    const normalizedDate = new Date(nextDate.getFullYear(), nextDate.getMonth(), 1);
+    const periodPayload = createPeriodPayloadFromDate(normalizedDate);
+
+    setPeriodDate(normalizedDate);
+    setLocalFilters((prev) => ({
+      ...prev,
+      ...periodPayload,
+    }));
+    setShowPeriodPicker(false);
+  };
+
+  const periodPickerDisplay = Platform.OS === 'ios' ? 'spinner' : 'calendar';
+
   const handleWilayahSelect = (wilayahId) => {
     setLocalFilters((prev) => ({
       ...prev,
@@ -240,6 +374,7 @@ const ChildReportFilterModal = ({
   const handleApply = () => {
     const nextFilters = prepareFiltersForSubmit(localFilters, defaultConfig);
     onApply?.(nextFilters);
+    setShowPeriodPicker(false);
     onClose?.();
   };
 
@@ -256,8 +391,16 @@ const ChildReportFilterModal = ({
       defaultConfig,
     );
 
+    const resetLocal = buildInitialLocalFilters(resetValues, defaultConfig);
+    const resetPeriodDate = resolvePeriodDate(
+      resetLocal.period,
+      resetLocal.start_date,
+      defaultConfig.defaultPeriodValue,
+    );
+    setLocalFilters(resetLocal);
+    setPeriodDate(resetPeriodDate);
+    setShowPeriodPicker(false);
     onClear?.(resetValues);
-    setLocalFilters(buildInitialLocalFilters(resetValues, defaultConfig));
   };
 
   const handleRetryShelterFetch = () => {
@@ -287,24 +430,39 @@ const ChildReportFilterModal = ({
           <ScrollView>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Periode</Text>
-              {normalizedPeriodOptions.length === 0 ? (
+              {normalizedPeriodOptions.length === 0 && (
                 <Text style={styles.helperText}>Belum ada periode yang tersedia.</Text>
-              ) : (
-                <View style={styles.optionList}>
-                  {normalizedPeriodOptions.map((option) => (
-                    <OptionRow
-                      key={option.value}
-                      label={option.label}
-                      selected={localFilters.period === option.value}
-                      onPress={() =>
-                        setLocalFilters((prev) => ({
-                          ...prev,
-                          period: option.value,
-                        }))
-                      }
-                      icon="calendar-outline"
+              )}
+              <View style={styles.optionList}>
+                <TouchableOpacity
+                  style={styles.optionRow}
+                  onPress={handlePeriodToggle}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionLabelWrapper}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={16}
+                      color="#7f8c8d"
+                      style={styles.optionIcon}
                     />
-                  ))}
+                    <Text style={styles.optionLabel}>{currentPeriodLabel}</Text>
+                  </View>
+                  <Ionicons
+                    name={showPeriodPicker ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color="#7f8c8d"
+                  />
+                </TouchableOpacity>
+              </View>
+              {showPeriodPicker && (
+                <View style={styles.pickerContainer}>
+                  <DateTimePicker
+                    value={periodDate || new Date()}
+                    mode="date"
+                    display={periodPickerDisplay}
+                    onChange={handlePeriodChange}
+                  />
                 </View>
               )}
             </View>
@@ -524,6 +682,14 @@ const styles = StyleSheet.create({
   },
   optionLabelDisabled: {
     color: '#95a5a6',
+  },
+  pickerContainer: {
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
   },
   footer: {
     flexDirection: 'row',
