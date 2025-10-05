@@ -7,12 +7,10 @@ import {
   TextInput,
   TouchableOpacity,
   RefreshControl,
-  ScrollView,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { BarChart, Grid, XAxis, YAxis } from 'react-native-svg-charts';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -21,6 +19,7 @@ import ChildReportSummary from '../../components/reports/ChildReportSummary';
 import ChildReportListItem from '../../components/reports/ChildReportListItem';
 import ChildReportFilterModal from '../../components/reports/ChildReportFilterModal';
 import ChildAttendanceLineChart from '../../components/reports/ChildAttendanceLineChart';
+import ChildAttendanceBarChart from '../../components/reports/ChildAttendanceBarChart';
 import PickerInput from '../../../../common/components/PickerInput';
 import {
   clearError,
@@ -120,6 +119,17 @@ const calculateActivityAdjustment = (activity) => {
   return (charSum % 7) - 3;
 };
 
+const getDefaultPeriodKey = () => {
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  if (MONTHLY_ATTENDANCE_BY_PERIOD[currentKey]) {
+    return currentKey;
+  }
+
+  return SORTED_PERIOD_KEYS[0] || null;
+};
+
 const AdminCabangChildReportScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
@@ -138,16 +148,7 @@ const AdminCabangChildReportScreen = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState(() => {
-    const now = new Date();
-    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    if (MONTHLY_ATTENDANCE_BY_PERIOD[currentKey]) {
-      return currentKey;
-    }
-
-    return SORTED_PERIOD_KEYS[0] || null;
-  });
+  const [selectedPeriod, setSelectedPeriod] = useState(getDefaultPeriodKey);
   const [selectedActivity, setSelectedActivity] = useState('Bimbel');
   const [selectedShelter, setSelectedShelter] = useState('all');
   const [chartType, setChartType] = useState('bar');
@@ -272,24 +273,20 @@ const AdminCabangChildReportScreen = () => {
     }));
   }, [selectedActivity, selectedPeriod, selectedShelter]);
 
-  const barChartMetrics = useMemo(() => {
-    if (!filteredAttendanceData.length) {
-      return {
-        values: [],
-        width: 240,
-        contentInset: { top: 16, bottom: 16 },
-      };
-    }
+  const attendanceCategories = useMemo(
+    () => filteredAttendanceData.map((item) => String(item?.shelter || '')),
+    [filteredAttendanceData],
+  );
 
-    const values = filteredAttendanceData.map((item) => Number(item?.value) || 0);
-    const width = Math.max(values.length * 60, 240);
-
-    return {
-      values,
-      width,
-      contentInset: { top: 16, bottom: 16 },
-    };
-  }, [filteredAttendanceData]);
+  const handleOpenChartFullScreen = useCallback(() => {
+    navigation.navigate('ChartFullScreen', {
+      chartType,
+      periodLabel: selectedPeriodLabel,
+      categories: attendanceCategories,
+      data: filteredAttendanceData,
+      year: selectedPeriodLabel,
+    });
+  }, [attendanceCategories, chartType, filteredAttendanceData, navigation, selectedPeriodLabel]);
 
   const clearSearchDebounce = useCallback(() => {
     if (searchDebounceRef.current) {
@@ -372,6 +369,9 @@ const AdminCabangChildReportScreen = () => {
     clearSearchDebounce();
     dispatch(resetFilters());
     setSearchText('');
+    setSelectedActivity('Bimbel');
+    setSelectedShelter('all');
+    setSelectedPeriod(getDefaultPeriodKey());
     setFilterModalVisible(false);
     setFiltersApplied(false);
   };
@@ -661,17 +661,33 @@ const AdminCabangChildReportScreen = () => {
               );
             })}
           </View>
-          {selectedPeriod && filteredAttendanceData.length ? (
+          {!selectedPeriod && (
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderTitle}>
+                Pilih periode untuk melihat tren kehadiran anak binaan.
+              </Text>
+            </View>
+          )}
+
+          {selectedPeriod && !filteredAttendanceData.length && (
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderTitle}>
+                Data kehadiran belum tersedia untuk filter yang dipilih.
+              </Text>
+              <Text style={styles.chartPlaceholderSubtitle}>
+                Coba pilih periode atau filter lainnya untuk melihat grafik.
+              </Text>
+            </View>
+          )}
+
+          {selectedPeriod && filteredAttendanceData.length > 0 && (
             chartType === 'line' ? (
               <ChildAttendanceLineChart
+                mode="compact"
                 year={selectedPeriodLabel}
                 data={filteredAttendanceData}
-                onOpenFullScreen={() =>
-                  navigation.navigate('ChartFullScreen', {
-                    year: selectedPeriodLabel,
-                    data: filteredAttendanceData,
-                  })
-                }
+                categories={attendanceCategories}
+                onOpenFullScreen={handleOpenChartFullScreen}
               />
             ) : (
               <View style={styles.barChartCard}>
@@ -679,54 +695,13 @@ const AdminCabangChildReportScreen = () => {
                   Distribusi Kehadiran
                   {selectedPeriodLabel ? ` ${selectedPeriodLabel}` : ''}
                 </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.barChartScrollContent}
-                >
-                  <View style={styles.barChartWrapper}>
-                    <View style={[styles.barChartRow, { width: barChartMetrics.width + 44 }]}>
-                      <YAxis
-                        style={[styles.barChartYAxis, { height: 220 }]}
-                        data={barChartMetrics.values}
-                        contentInset={barChartMetrics.contentInset}
-                        svg={{ fill: '#2563eb', fontSize: 12 }}
-                        numberOfTicks={5}
-                        formatLabel={(value) => `${value}%`}
-                      />
-                      <BarChart
-                        style={[styles.barChart, { width: barChartMetrics.width }]}
-                        data={barChartMetrics.values}
-                        svg={{ fill: '#4a90e2' }}
-                        spacingInner={0.4}
-                        spacingOuter={0.2}
-                        contentInset={barChartMetrics.contentInset}
-                      >
-                        <Grid />
-                      </BarChart>
-                    </View>
-                    <XAxis
-                      style={[styles.barChartXAxis, { marginLeft: 44, width: barChartMetrics.width }]}
-                      data={barChartMetrics.values}
-                      formatLabel={(value, index) => filteredAttendanceData[index]?.shelter ?? ''}
-                      contentInset={{ left: 20, right: 20 }}
-                      svg={{ fill: '#7f8c8d', fontSize: 12 }}
-                    />
-                  </View>
-                </ScrollView>
+                <ChildAttendanceBarChart
+                  mode="compact"
+                  data={filteredAttendanceData}
+                  categories={attendanceCategories}
+                />
               </View>
             )
-          ) : (
-            <View style={styles.chartPlaceholder}>
-              <Text style={styles.chartPlaceholderTitle}>
-                Pilih periode untuk melihat tren kehadiran anak binaan.
-              </Text>
-              {selectedPeriod && !filteredAttendanceData.length && (
-                <Text style={styles.chartPlaceholderSubtitle}>
-                  Data kehadiran belum tersedia untuk periode yang dipilih.
-                </Text>
-              )}
-            </View>
           )}
         </View>
       )}
@@ -944,26 +919,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 12,
-  },
-  barChartScrollContent: {
-    paddingBottom: 8,
-  },
-  barChartWrapper: {
-    flexGrow: 1,
-  },
-  barChartRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  barChartYAxis: {
-    marginRight: 12,
-  },
-  barChart: {
-    height: 220,
-  },
-  barChartXAxis: {
-    height: 28,
   },
   chartPlaceholder: {
     padding: 20,

@@ -44,7 +44,13 @@ const Labels = ({ x, y, bandwidth, data }) =>
     );
   });
 
-const ChildAttendanceBarChart = ({ data = [], mode = 'compact', containerStyle, contentInset = DEFAULT_CONTENT_INSET }) => {
+const ChildAttendanceBarChart = ({
+  data = [],
+  mode = 'compact',
+  containerStyle,
+  contentInset = DEFAULT_CONTENT_INSET,
+  categories: categoriesProp,
+}) => {
   const normalizedData = useMemo(() => {
     if (!Array.isArray(data) || data.length === 0) {
       return [];
@@ -57,7 +63,13 @@ const ChildAttendanceBarChart = ({ data = [], mode = 'compact', containerStyle, 
   }, [data]);
 
   const values = useMemo(() => normalizedData.map((item) => item.value), [normalizedData]);
-  const categories = useMemo(() => normalizedData.map((item) => item.shelter || ''), [normalizedData]);
+  const categories = useMemo(() => {
+    if (Array.isArray(categoriesProp) && categoriesProp.length > 0) {
+      return categoriesProp.slice(0, normalizedData.length).map((category) => String(category ?? ''));
+    }
+
+    return normalizedData.map((item) => item.shelter || '');
+  }, [categoriesProp, normalizedData]);
 
   const chartData = useMemo(
     () =>
