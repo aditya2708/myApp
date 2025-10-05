@@ -73,6 +73,36 @@ const ChildAttendanceLineChart = ({
   ...rest
 }) => {
   const navigation = useNavigation();
+  const normalizedData = useMemo(() => {
+    if (!Array.isArray(data)) {
+      return DEFAULT_DATA;
+    }
+
+    if (data.length === 0) {
+      return [];
+    }
+
+    if (typeof data[0] === 'object' && data[0] !== null) {
+      return data.map((item) => Number(item?.value) || 0);
+    }
+
+    return data.map((value) => Number(value) || 0);
+  }, [data]);
+  const hasCustomLabels = useMemo(
+    () => Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && data[0] !== null,
+    [data],
+  );
+  const xAxisLabels = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return MONTH_LABELS;
+    }
+
+    if (typeof data[0] === 'object' && data[0] !== null) {
+      return data.map((item) => item?.shelter ?? '');
+    }
+
+    return MONTH_LABELS;
+  }, [data]);
   const { height, paddingHorizontal } = useMemo(
     () => MODE_STYLES[mode] || MODE_STYLES.compact,
     [mode]
@@ -105,9 +135,9 @@ const ChildAttendanceLineChart = ({
   }, [contentInset, data, gradientId, isPressable, mode, navigation, onOpenFullScreen, year]);
 
   const chartWidth = useMemo(() => {
-    const dataLength = Array.isArray(data) ? data.length : 0;
+    const dataLength = Array.isArray(normalizedData) ? normalizedData.length : 0;
     return Math.max(dataLength * 60, 240);
-  }, [data]);
+  }, [normalizedData]);
 
   const lineSvg = useMemo(
     () => ({ stroke: PRIMARY_BLUE, strokeWidth: 2, fill: `url(#${gradientId})`, ...(svgProps || {}) }),
@@ -119,7 +149,8 @@ const ChildAttendanceLineChart = ({
     return [{ height, width: chartWidth }, ...styleArray];
   }, [chartWidth, height, style]);
 
-  const shouldShowAllLabels = mode === 'fullscreen' || showAllMonthLabels;
+  const shouldShowAllLabels = mode === 'fullscreen' || showAllMonthLabels || hasCustomLabels;
+  const effectiveLabelStep = hasCustomLabels ? 1 : compactLabelStep;
 
   return (
     <View style={containerStyle}>
@@ -138,14 +169,14 @@ const ChildAttendanceLineChart = ({
           <View style={styles.chartRow}>
             <YAxis
               style={[styles.yAxis, { height }]}
-              data={data}
+              data={normalizedData}
               contentInset={contentInset}
               svg={{ fill: PRIMARY_BLUE, fontSize: 12 }}
               formatLabel={(value) => `${value}%`}
             />
             <LineChart
               style={combinedChartStyle}
-              data={data}
+              data={normalizedData}
               svg={lineSvg}
               contentInset={contentInset}
               curve={shape.curveMonotoneX}
@@ -165,13 +196,13 @@ const ChildAttendanceLineChart = ({
           </View>
           <XAxis
             style={[styles.xAxis, { marginLeft: Y_AXIS_WIDTH, width: chartWidth }]}
-            data={data}
+            data={normalizedData}
             formatLabel={(value, index) => {
-              const label = MONTH_LABELS[index] ?? '';
+              const label = xAxisLabels[index] ?? '';
               if (shouldShowAllLabels) {
                 return label;
               }
-              return index % compactLabelStep === 0 ? label : '';
+              return index % effectiveLabelStep === 0 ? label : '';
             }}
             contentInset={contentInset}
             svg={{ fontSize: 12, fill: '#4a4a4a' }}

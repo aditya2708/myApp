@@ -47,14 +47,58 @@ import {
 } from '../../redux/reportAnakThunks';
 import { formatDateToIndonesian } from '../../../../common/utils/dateFormatter';
 
-const AVAILABLE_YEARS = ['2021', '2022', '2023', '2024'];
-
-const HARD_CODED_ATTENDANCE = {
+const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SHELTER_NAMES = ['Shelter Menteng', 'Shelter Tebet', 'Shelter Cempaka Putih'];
+const RAW_ATTENDANCE_BY_YEAR = {
   '2021': [75, 78, 80, 82, 84, 83, 85, 86, 88, 87, 89, 90],
   '2022': [80, 82, 81, 83, 85, 84, 86, 87, 88, 90, 91, 92],
   '2023': [82, 84, 86, 88, 87, 89, 90, 92, 93, 95, 94, 96],
   '2024': [85, 86, 88, 89, 90, 92, 93, 94, 95, 96, 97, 98],
 };
+
+const buildMonthlyAttendanceMap = () => {
+  const attendanceMap = {};
+
+  Object.entries(RAW_ATTENDANCE_BY_YEAR).forEach(([year, monthlyValues]) => {
+    monthlyValues.forEach((value, index) => {
+      const month = String(index + 1).padStart(2, '0');
+      const periodKey = `${year}-${month}`;
+
+      attendanceMap[periodKey] = SHELTER_NAMES.map((shelterName, shelterIndex) => {
+        const adjustment = shelterIndex === 0 ? 0 : shelterIndex === 1 ? -3 : 4;
+        const adjustedValue = Math.min(100, Math.max(0, value + adjustment));
+
+        return { shelter: shelterName, value: adjustedValue };
+      });
+    });
+  });
+
+  return attendanceMap;
+};
+
+const formatPeriodLabel = (periodKey) => {
+  if (!periodKey || typeof periodKey !== 'string') {
+    return '';
+  }
+
+  const [year, month] = periodKey.split('-');
+  const monthIndex = Number(month) - 1;
+
+  if (Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex >= MONTH_SHORT_LABELS.length) {
+    return year || periodKey;
+  }
+
+  return `${MONTH_SHORT_LABELS[monthIndex]} ${year}`;
+};
+
+const MONTHLY_ATTENDANCE_BY_PERIOD = buildMonthlyAttendanceMap();
+const SORTED_PERIOD_KEYS = Object.keys(MONTHLY_ATTENDANCE_BY_PERIOD).sort(
+  (a, b) => new Date(`${b}-01`).getTime() - new Date(`${a}-01`).getTime(),
+);
+const PERIOD_OPTIONS = SORTED_PERIOD_KEYS.map((periodKey) => ({
+  label: formatPeriodLabel(periodKey),
+  value: periodKey,
+}));
 
 const AdminCabangChildReportScreen = () => {
   const dispatch = useDispatch();
@@ -74,10 +118,23 @@ const AdminCabangChildReportScreen = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    if (MONTHLY_ATTENDANCE_BY_PERIOD[currentKey]) {
+      return currentKey;
+    }
+
+    return SORTED_PERIOD_KEYS[0] || null;
+  });
   const searchDebounceRef = useRef(null);
 
-  const chartData = selectedYear ? HARD_CODED_ATTENDANCE[selectedYear] || null : null;
+  const chartData = selectedPeriod ? MONTHLY_ATTENDANCE_BY_PERIOD[selectedPeriod] || null : null;
+  const selectedPeriodLabel = useMemo(
+    () => (selectedPeriod ? formatPeriodLabel(selectedPeriod) : ''),
+    [selectedPeriod],
+  );
 
   useEffect(() => {
     dispatch(clearError());
@@ -420,20 +477,20 @@ const AdminCabangChildReportScreen = () => {
       {filtersApplied && (
         <View style={styles.chartContainer}>
           <PickerInput
-            label="Tahun"
-            value={selectedYear || ''}
-            onValueChange={(value) => setSelectedYear(value || null)}
-            items={AVAILABLE_YEARS.map((year) => ({ label: year, value: year }))}
-            placeholder="Pilih Tahun"
-            style={styles.yearPicker}
+            label="Periode"
+            value={selectedPeriod || ''}
+            onValueChange={(value) => setSelectedPeriod(value || null)}
+            items={PERIOD_OPTIONS}
+            placeholder="Pilih Bulan & Tahun"
+            style={styles.periodPicker}
           />
-          {selectedYear && chartData?.length ? (
+          {selectedPeriod && chartData?.length ? (
             <ChildAttendanceLineChart
-              year={selectedYear}
+              year={selectedPeriodLabel}
               data={chartData}
               onOpenFullScreen={() =>
                 navigation.navigate('ChartFullScreen', {
-                  year: selectedYear,
+                  year: selectedPeriodLabel,
                   data: chartData,
                 })
               }
@@ -441,11 +498,11 @@ const AdminCabangChildReportScreen = () => {
           ) : (
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>
-                Pilih tahun untuk melihat tren kehadiran anak binaan.
+                Pilih periode untuk melihat tren kehadiran anak binaan.
               </Text>
-              {selectedYear && !chartData?.length && (
+              {selectedPeriod && !chartData?.length && (
                 <Text style={styles.chartPlaceholderSubtitle}>
-                  Data kehadiran belum tersedia untuk tahun yang dipilih.
+                  Data kehadiran belum tersedia untuk periode yang dipilih.
                 </Text>
               )}
             </View>
@@ -627,7 +684,7 @@ const styles = StyleSheet.create({
   chartContainer: {
     marginTop: 8,
   },
-  yearPicker: {
+  periodPicker: {
     marginBottom: 16,
   },
   chartPlaceholder: {

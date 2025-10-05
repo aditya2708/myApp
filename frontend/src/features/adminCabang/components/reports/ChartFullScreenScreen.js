@@ -22,6 +22,14 @@ const ChartFullScreenScreen = () => {
 
   const chartData = useMemo(() => routeData ?? DEFAULT_DATA, [routeData]);
 
+  const subtitleText = useMemo(() => {
+    if (!year) {
+      return 'Tren Kehadiran';
+    }
+
+    return /^\d{4}$/.test(String(year)) ? `Tahun ${year}` : `Periode ${year}`;
+  }, [year]);
+
   const resolvedContentInset = useMemo(
     () => routeContentInset ?? undefined,
     [routeContentInset]
@@ -53,7 +61,7 @@ const ChartFullScreenScreen = () => {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Detail Tren Kehadiran</Text>
-          <Text style={styles.subtitle}>{`Tahun ${year}`}</Text>
+          <Text style={styles.subtitle}>{subtitleText}</Text>
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={navigation.goBack}>
           <Text style={styles.closeButtonText}>Tutup</Text>
