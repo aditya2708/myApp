@@ -78,6 +78,7 @@ const reportAnakSlice = createSlice({
       state.summary = null;
       state.pagination = null;
       state.hasMore = false;
+      state.error = null;
       state.hasFetched = false;
     },
     clearDetail: (state) => {
@@ -115,21 +116,24 @@ const reportAnakSlice = createSlice({
           sheltersLoading: false,
           sheltersError: null,
         };
+        state.hasFetched = false;
       })
       .addCase(initializeReportAnak.rejected, (state, action) => {
         state.initializing = false;
-        state.error = action.payload || 'Gagal memuat laporan anak binaan.';
+        state.error = action.payload || 'Gagal memuat opsi filter laporan anak.';
       })
 
       .addCase(fetchReportAnakList.pending, (state, action) => {
         const isFirstPage = !action.meta.arg || action.meta.arg.page === 1;
-        if (isFirstPage && !action.meta.arg?.append) {
+        const isAppend = Boolean(action.meta.arg?.append);
+
+        if (isFirstPage && !isAppend) {
           state.loading = true;
+          state.hasFetched = true;
         } else {
           state.loadingMore = true;
         }
         state.error = null;
-        state.hasFetched = true;
       })
       .addCase(fetchReportAnakList.fulfilled, (state, action) => {
         state.loading = false;
