@@ -94,6 +94,33 @@ const formatPeriodLabel = (periodKey) => {
   return `${MONTH_SHORT_LABELS[monthIndex]} ${year}`;
 };
 
+const formatPeriodToIndonesian = (period) => {
+  if (!period || typeof period !== 'string') {
+    return null;
+  }
+
+  const [year, month] = period.split('-');
+  const parsedYear = Number(year);
+  const parsedMonthIndex = Number(month) - 1;
+
+  if (
+    !Number.isInteger(parsedYear) ||
+    !Number.isInteger(parsedMonthIndex) ||
+    parsedMonthIndex < 0 ||
+    parsedMonthIndex > 11
+  ) {
+    return null;
+  }
+
+  const date = new Date(parsedYear, parsedMonthIndex, 1);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+};
+
 const MONTHLY_ATTENDANCE_BY_PERIOD = buildMonthlyAttendanceMap();
 const SORTED_PERIOD_KEYS = Object.keys(MONTHLY_ATTENDANCE_BY_PERIOD).sort(
   (a, b) => new Date(`${b}-01`).getTime() - new Date(`${a}-01`).getTime(),
@@ -479,7 +506,11 @@ const AdminCabangChildReportScreen = () => {
   const activeFilterChips = useMemo(() => {
     const chips = [];
 
-    if (filters.start_date || filters.end_date) {
+    const formattedPeriod = formatPeriodToIndonesian(filters.period);
+
+    if (formattedPeriod) {
+      chips.push({ key: 'date_range', label: formattedPeriod, onRemove: handleRemoveDateRange });
+    } else if (filters.start_date || filters.end_date) {
       const formattedStart = filters.start_date ? formatDateToIndonesian(filters.start_date) : null;
       const formattedEnd = filters.end_date ? formatDateToIndonesian(filters.end_date) : null;
 
