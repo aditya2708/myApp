@@ -1,16 +1,32 @@
 import React, { memo, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { LineChart, Grid, XAxis } from 'react-native-svg-charts';
+import { LineChart, Grid, XAxis, YAxis } from 'react-native-svg-charts';
 import { Defs, LinearGradient, Stop, Circle, Text as SvgText } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
+import * as shape from 'd3-shape';
 
-const DEFAULT_DATA = [50, 80, 45, 60, 70, 90, 100];
+const DEFAULT_DATA = [50, 80, 45, 60, 70, 90, 100, 85, 75, 65, 55, 95];
 const DEFAULT_CONTENT_INSET = { top: 20, bottom: 20 };
+const PRIMARY_BLUE = '#2563eb';
+const Y_AXIS_WIDTH = 44;
 const MODE_STYLES = {
   compact: { height: 180, paddingHorizontal: 16 },
   fullscreen: { height: 260, paddingHorizontal: 24 },
 };
-const LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul'];
+const MONTH_LABELS = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
 
 const Decorator = ({ x, y, data }) =>
   data.map((value, index) => (
@@ -19,7 +35,7 @@ const Decorator = ({ x, y, data }) =>
       cx={x(index)}
       cy={y(value)}
       r={4}
-      stroke="#4a90e2"
+      stroke={PRIMARY_BLUE}
       strokeWidth={2}
       fill="#ffffff"
     />
@@ -32,7 +48,7 @@ const Labels = ({ x, y, data }) =>
       x={x(index)}
       y={y(value) - 10}
       fontSize={12}
-      fill="#4a90e2"
+      fill={PRIMARY_BLUE}
       alignmentBaseline="middle"
       textAnchor="middle"
     >
@@ -50,6 +66,10 @@ const ChildAttendanceLineChart = ({
   gradientId = 'childAttendanceGradient',
   children,
   mode = 'compact',
+  year,
+  onOpenFullScreen,
+  showAllMonthLabels = false,
+  compactLabelStep = 3,
   ...rest
 }) => {
   const navigation = useNavigation();
@@ -60,8 +80,18 @@ const ChildAttendanceLineChart = ({
 
   const isPressable = mode === 'compact';
 
+  const chartTitle = useMemo(
+    () => `Tren Kehadiran Bulanan${year ? ` ${year}` : ''}`,
+    [year]
+  );
+
   const handlePress = useCallback(() => {
     if (!isPressable) {
+      return;
+    }
+
+    if (typeof onOpenFullScreen === 'function') {
+      onOpenFullScreen(data, year, contentInset);
       return;
     }
 
@@ -70,27 +100,30 @@ const ChildAttendanceLineChart = ({
       contentInset,
       gradientId,
       mode,
+      year,
     });
-  }, [contentInset, data, gradientId, isPressable, mode, navigation]);
-
-  const lineSvg = useMemo(
-    () => ({ stroke: '#4a90e2', strokeWidth: 2, fill: `url(#${gradientId})`, ...(svgProps || {}) }),
-    [gradientId, svgProps]
-  );
-
-  const combinedChartStyle = useMemo(() => {
-    const styleArray = Array.isArray(style) ? style : style ? [style] : [];
-    return [{ height }, ...styleArray];
-  }, [height, style]);
+  }, [contentInset, data, gradientId, isPressable, mode, navigation, onOpenFullScreen, year]);
 
   const chartWidth = useMemo(() => {
     const dataLength = Array.isArray(data) ? data.length : 0;
     return Math.max(dataLength * 60, 240);
   }, [data]);
 
+  const lineSvg = useMemo(
+    () => ({ stroke: PRIMARY_BLUE, strokeWidth: 2, fill: `url(#${gradientId})`, ...(svgProps || {}) }),
+    [gradientId, svgProps]
+  );
+
+  const combinedChartStyle = useMemo(() => {
+    const styleArray = Array.isArray(style) ? style : style ? [style] : [];
+    return [{ height, width: chartWidth }, ...styleArray];
+  }, [chartWidth, height, style]);
+
+  const shouldShowAllLabels = mode === 'fullscreen' || showAllMonthLabels;
+
   return (
     <View style={containerStyle}>
-      <Text style={styles.title}>Tren Kehadiran Bulanan</Text>
+      <Text style={styles.title}>{chartTitle}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -100,35 +133,45 @@ const ChildAttendanceLineChart = ({
           activeOpacity={isPressable ? 0.7 : 1}
           onPress={handlePress}
           disabled={!isPressable}
-          style={[styles.chartWrapper, { width: chartWidth }]}
+          style={[styles.chartWrapper, { width: chartWidth + Y_AXIS_WIDTH }]}
         >
-          <LineChart
-            style={combinedChartStyle}
-            data={data}
-            svg={lineSvg}
-            contentInset={contentInset}
-            {...rest}
-          >
-            <Defs key="gradient">
-              <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor="#4a90e2" stopOpacity={0.2} />
-                <Stop offset="100%" stopColor="#4a90e2" stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            <Grid {...gridProps} />
-            <Decorator />
-            <Labels />
-            {children}
-          </LineChart>
+          <View style={styles.chartRow}>
+            <YAxis
+              style={[styles.yAxis, { height }]}
+              data={data}
+              contentInset={contentInset}
+              svg={{ fill: PRIMARY_BLUE, fontSize: 12 }}
+              formatLabel={(value) => `${value}%`}
+            />
+            <LineChart
+              style={combinedChartStyle}
+              data={data}
+              svg={lineSvg}
+              contentInset={contentInset}
+              curve={shape.curveMonotoneX}
+              {...rest}
+            >
+              <Defs key="gradient">
+                <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0%" stopColor={PRIMARY_BLUE} stopOpacity={0.2} />
+                  <Stop offset="100%" stopColor={PRIMARY_BLUE} stopOpacity={0} />
+                </LinearGradient>
+              </Defs>
+              <Grid {...gridProps} />
+              <Decorator />
+              <Labels />
+              {children}
+            </LineChart>
+          </View>
           <XAxis
-            style={styles.xAxis}
+            style={[styles.xAxis, { marginLeft: Y_AXIS_WIDTH, width: chartWidth }]}
             data={data}
             formatLabel={(value, index) => {
-              const label = LABELS[index] ?? '';
-              if (mode === 'fullscreen') {
+              const label = MONTH_LABELS[index] ?? '';
+              if (shouldShowAllLabels) {
                 return label;
               }
-              return index % 3 === 0 ? label : '';
+              return index % compactLabelStep === 0 ? label : '';
             }}
             contentInset={contentInset}
             svg={{ fontSize: 12, fill: '#4a4a4a' }}
@@ -147,7 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
-    color: '#1f2937',
+    color: PRIMARY_BLUE,
   },
   scrollContent: {
     paddingBottom: 16,
@@ -155,7 +198,15 @@ const styles = StyleSheet.create({
   chartWrapper: {
     flexGrow: 1,
   },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
   xAxis: {
     marginTop: 12,
+  },
+  yAxis: {
+    width: Y_AXIS_WIDTH,
+    marginRight: 8,
   },
 });
