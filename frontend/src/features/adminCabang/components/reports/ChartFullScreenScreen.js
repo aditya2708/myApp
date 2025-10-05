@@ -5,6 +5,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ChildAttendanceLineChart, {
   DEFAULT_DATA,
 } from './ChildAttendanceLineChart';
+import ChildAttendanceBarChart from './ChildAttendanceBarChart';
 
 const ChartFullScreenScreen = () => {
   const navigation = useNavigation();
@@ -15,20 +16,41 @@ const ChartFullScreenScreen = () => {
     data: routeData,
     contentInset: routeContentInset,
     gradientId: routeGradientId,
+    chartType = 'line',
+    periodLabel,
+    categories: routeCategories,
     ...chartProps
   } = route.params || {};
 
   const year = routeYear ?? new Date().getFullYear();
 
-  const chartData = useMemo(() => routeData ?? DEFAULT_DATA, [routeData]);
+  const chartData = useMemo(() => {
+    if (Array.isArray(routeData)) {
+      return routeData;
+    }
 
-  const subtitleText = useMemo(() => {
+    if (chartType === 'bar') {
+      return [];
+    }
+
+    return DEFAULT_DATA;
+  }, [chartType, routeData]);
+
+  const fallbackTitle = useMemo(() => {
     if (!year) {
       return 'Tren Kehadiran';
     }
 
     return /^\d{4}$/.test(String(year)) ? `Tahun ${year}` : `Periode ${year}`;
   }, [year]);
+
+  const headerTitle = useMemo(() => {
+    if (typeof periodLabel === 'string' && periodLabel.trim().length > 0) {
+      return `Perbandingan Kehadiran per Shelter - ${periodLabel}`;
+    }
+
+    return fallbackTitle;
+  }, [fallbackTitle, periodLabel]);
 
   const resolvedContentInset = useMemo(
     () => routeContentInset ?? undefined,
@@ -40,7 +62,12 @@ const ChartFullScreenScreen = () => {
     [routeGradientId]
   );
 
-  const childChartProps = useMemo(() => {
+  const resolvedCategories = useMemo(
+    () => (Array.isArray(routeCategories) ? routeCategories : undefined),
+    [routeCategories]
+  );
+
+  const lineChartProps = useMemo(() => {
     const props = { ...chartProps };
 
     if (resolvedContentInset) {
@@ -56,12 +83,24 @@ const ChartFullScreenScreen = () => {
     return props;
   }, [chartProps, resolvedContentInset, resolvedGradientId, year]);
 
+  const barChartProps = useMemo(() => {
+    const props = { ...chartProps };
+
+    if (resolvedContentInset) {
+      props.contentInset = resolvedContentInset;
+    }
+
+    return props;
+  }, [chartProps, resolvedContentInset]);
+
+  const isBarChart = chartType === 'bar';
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Detail Tren Kehadiran</Text>
-          <Text style={styles.subtitle}>{subtitleText}</Text>
+          <Text style={styles.title}>{headerTitle}</Text>
+          <Text style={styles.subtitle}>Detail Tren Kehadiran</Text>
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={navigation.goBack}>
           <Text style={styles.closeButtonText}>Tutup</Text>
@@ -73,14 +112,24 @@ const ChartFullScreenScreen = () => {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.chartWrapper}>
-          <ChildAttendanceLineChart
-            data={chartData}
-            mode="fullscreen"
-            showAllMonthLabels
-            compactLabelStep={1}
-            containerStyle={styles.chartContainer}
-            {...childChartProps}
-          />
+          {isBarChart ? (
+            <ChildAttendanceBarChart
+              data={chartData}
+              mode="fullscreen"
+              containerStyle={styles.chartContainer}
+              {...barChartProps}
+            />
+          ) : (
+            <ChildAttendanceLineChart
+              data={chartData}
+              categories={resolvedCategories}
+              mode="fullscreen"
+              showAllMonthLabels
+              compactLabelStep={1}
+              containerStyle={styles.chartContainer}
+              {...lineChartProps}
+            />
+          )}
         </View>
       </ScrollView>
     </View>
