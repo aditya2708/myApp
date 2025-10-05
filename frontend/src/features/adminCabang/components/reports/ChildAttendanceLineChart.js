@@ -1,7 +1,8 @@
-import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { memo, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LineChart, Grid, XAxis } from 'react-native-svg-charts';
 import { Defs, LinearGradient, Stop, Circle, Text as SvgText } from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native';
 
 const DEFAULT_DATA = [50, 80, 45, 60, 70, 90, 100];
 const DEFAULT_CONTENT_INSET = { top: 20, bottom: 20 };
@@ -51,10 +52,26 @@ const ChildAttendanceLineChart = ({
   mode = 'compact',
   ...rest
 }) => {
+  const navigation = useNavigation();
   const { height, paddingHorizontal } = useMemo(
     () => MODE_STYLES[mode] || MODE_STYLES.compact,
     [mode]
   );
+
+  const isPressable = mode === 'compact';
+
+  const handlePress = useCallback(() => {
+    if (!isPressable) {
+      return;
+    }
+
+    navigation.navigate('ChartFullScreen', {
+      data,
+      contentInset,
+      gradientId,
+      mode,
+    });
+  }, [contentInset, data, gradientId, isPressable, mode, navigation]);
 
   const lineSvg = useMemo(
     () => ({ stroke: '#4a90e2', strokeWidth: 2, fill: `url(#${gradientId})`, ...(svgProps || {}) }),
@@ -79,7 +96,12 @@ const ChildAttendanceLineChart = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingHorizontal }]}
       >
-        <View style={[styles.chartWrapper, { width: chartWidth }]}>
+        <TouchableOpacity
+          activeOpacity={isPressable ? 0.7 : 1}
+          onPress={handlePress}
+          disabled={!isPressable}
+          style={[styles.chartWrapper, { width: chartWidth }]}
+        >
           <LineChart
             style={combinedChartStyle}
             data={data}
@@ -111,7 +133,7 @@ const ChildAttendanceLineChart = ({
             contentInset={contentInset}
             svg={{ fontSize: 12, fill: '#4a4a4a' }}
           />
-        </View>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
