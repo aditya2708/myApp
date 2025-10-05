@@ -186,41 +186,15 @@ class AdminCabangLaporanAnakController extends Controller
 
         $children = $childrenQuery->paginate($perPage);
 
-        $monthsInRange = $this->getMonthsInRange($startDate, $endDate);
         $childIds = $children->pluck('id_anak')->all();
         $childShelterIds = $children->pluck('id_shelter')->unique()->all();
 
-        $activitiesPerShelterPerMonth = $this->getActivitiesPerShelterPerMonth($childShelterIds, $startDate, $endDate, $jenisKegiatan);
         $totalActivitiesByShelter = $this->getTotalActivitiesByShelter($childShelterIds, $startDate, $endDate, $jenisKegiatan);
-        $attendancePerChildPerMonth = $this->getAttendancePerChildPerMonth($childIds, $startDate, $endDate, $jenisKegiatan);
         $totalAttendanceByChild = $this->getTotalAttendanceByChild($childIds, $startDate, $endDate, $jenisKegiatan);
-        $attendanceOpportunitiesPerChildPerMonth = $this->getAttendanceOpportunitiesPerChildPerMonth($childIds, $startDate, $endDate, $jenisKegiatan);
         $totalAttendanceOpportunitiesByChild = $this->getTotalAttendanceOpportunitiesByChild($childIds, $startDate, $endDate, $jenisKegiatan);
 
         $childrenData = [];
         foreach ($children as $child) {
-            $childMonthly = [];
-            foreach ($monthsInRange as $month) {
-                $activityKey = $child->id_shelter . '-' . $month['year'] . '-' . $month['month'];
-                $attendanceKey = $child->id_anak . '-' . $month['year'] . '-' . $month['month'];
-                $opportunityKey = $attendanceKey;
-
-                $activitiesCount = $activitiesPerShelterPerMonth[$activityKey] ?? 0;
-                $attendedCount = $attendancePerChildPerMonth[$attendanceKey] ?? 0;
-                $opportunitiesCount = $attendanceOpportunitiesPerChildPerMonth[$opportunityKey] ?? 0;
-                $percentage = $opportunitiesCount > 0 ? round(($attendedCount / $opportunitiesCount) * 100, 1) : 0;
-
-                $childMonthly[$month['key']] = [
-                    'month_name' => $month['name'],
-                    'month_number' => $month['month'],
-                    'year' => $month['year'],
-                    'activities_count' => $activitiesCount,
-                    'attended_count' => $attendedCount,
-                    'attendance_opportunities_count' => $opportunitiesCount,
-                    'percentage' => $percentage,
-                ];
-            }
-
             $totalActivities = $totalActivitiesByShelter[$child->id_shelter] ?? 0;
             $totalAttended = $totalAttendanceByChild[$child->id_anak] ?? 0;
             $totalOpportunities = $totalAttendanceOpportunitiesByChild[$child->id_anak] ?? 0;
@@ -239,7 +213,6 @@ class AdminCabangLaporanAnakController extends Controller
                         'name' => $child->shelter->wilbin->nama_wilbin,
                     ] : null,
                 ] : null,
-                'monthly_data' => $childMonthly,
                 'total_activities' => $totalActivities,
                 'total_attended' => $totalAttended,
                 'total_attendance_opportunities' => $totalOpportunities,
@@ -374,6 +347,39 @@ class AdminCabangLaporanAnakController extends Controller
                     $wilbinFilter,
                     $shelterFilter
                 ),
+            ],
+        ]);
+    }
+
+    /**
+     * Retrieve filter option metadata for Admin Cabang reports without applying specific filters.
+     */
+    public function filterOptions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+            ], 401);
+        }
+
+        $adminCabang = $user->adminCabang;
+
+        if (!$adminCabang || !$adminCabang->kacab) {
+            return response()->json([
+                'message' => 'Admin cabang tidak ditemukan',
+            ], 404);
+        }
+
+        $shelters = $adminCabang->kacab->shelters()->with('wilbin')->get();
+
+        $filterOptions = $this->buildFilterOptions($shelters, null, null, null, null);
+
+        return response()->json([
+            'message' => 'Filter options berhasil diambil',
+            'data' => [
+                'filter_options' => $filterOptions,
             ],
         ]);
     }
