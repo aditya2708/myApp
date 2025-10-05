@@ -7,7 +7,7 @@ const {
     ANAK: {
       LIST: LIST_ENDPOINT,
       DETAIL: DETAIL_ENDPOINT,
-      FILTER_OPTIONS: FILTER_OPTIONS_ENDPOINT,
+      FILTER_OPTIONS: ANAK_FILTER_OPTIONS_ENDPOINT,
       FILTERS
     }
   }
@@ -23,7 +23,7 @@ export const adminCabangReportApi = {
   },
 
   async getLaporanAnakFilterOptions(params = {}) {
-    return api.get(FILTER_OPTIONS_ENDPOINT, { params });
+    return api.get(ANAK_FILTER_OPTIONS_ENDPOINT, { params });
   },
 
   async getChildDetailReport(childId, params = {}) {
