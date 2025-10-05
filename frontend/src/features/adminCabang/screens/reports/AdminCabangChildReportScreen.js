@@ -321,6 +321,8 @@ const AdminCabangChildReportScreen = () => {
     }));
   }, [attendanceSummaryData]);
 
+  const hasShelterData = attendanceSummaryData.length > 0;
+
   const filteredAttendanceData = useMemo(() => {
     if (!activePeriod) {
       return [];
@@ -745,9 +747,13 @@ const AdminCabangChildReportScreen = () => {
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>Gagal memuat data</Text>
             </View>
-          ) : filteredAttendanceData.length === 0 ? (
+          ) : !hasShelterData ? (
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>Data tidak tersedia untuk bulan ini</Text>
+            </View>
+          ) : filteredAttendanceData.length === 0 ? (
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderTitle}>Tidak ada data untuk filter yang dipilih</Text>
             </View>
           ) : activeChartType === 'line' ? (
             <ChildAttendanceLineChart
