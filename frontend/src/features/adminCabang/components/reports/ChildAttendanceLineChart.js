@@ -70,6 +70,8 @@ const ChildAttendanceLineChart = ({
   onOpenFullScreen,
   showAllMonthLabels = false,
   compactLabelStep = 3,
+  categories: categoriesProp = MONTH_LABELS,
+  title,
   ...rest
 }) => {
   const navigation = useNavigation();
@@ -88,21 +90,21 @@ const ChildAttendanceLineChart = ({
 
     return data.map((value) => Number(value) || 0);
   }, [data]);
-  const hasCustomLabels = useMemo(
-    () => Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && data[0] !== null,
-    [data],
-  );
-  const xAxisLabels = useMemo(() => {
-    if (!Array.isArray(data) || data.length === 0) {
-      return MONTH_LABELS;
+  const categories = useMemo(() => {
+    const dataLength = Array.isArray(normalizedData) ? normalizedData.length : 0;
+    const hasProvidedCategories = Array.isArray(categoriesProp) && categoriesProp.length > 0;
+    const baseCategories = hasProvidedCategories ? categoriesProp : MONTH_LABELS;
+
+    if (dataLength === 0) {
+      return baseCategories;
     }
 
-    if (typeof data[0] === 'object' && data[0] !== null) {
-      return data.map((item) => item?.shelter ?? '');
+    if (baseCategories.length >= dataLength) {
+      return baseCategories.slice(0, dataLength);
     }
 
-    return MONTH_LABELS;
-  }, [data]);
+    return Array.from({ length: dataLength }, (_, index) => baseCategories[index] ?? `Data ${index + 1}`);
+  }, [categoriesProp, normalizedData]);
   const { height, paddingHorizontal } = useMemo(
     () => MODE_STYLES[mode] || MODE_STYLES.compact,
     [mode]
@@ -110,10 +112,13 @@ const ChildAttendanceLineChart = ({
 
   const isPressable = mode === 'compact';
 
-  const chartTitle = useMemo(
-    () => `Tren Kehadiran Bulanan${year ? ` ${year}` : ''}`,
-    [year]
-  );
+  const chartTitle = useMemo(() => {
+    if (typeof title === 'string' && title.trim().length > 0) {
+      return title;
+    }
+
+    return `Tren Kehadiran Bulanan${year ? ` ${year}` : ''}`;
+  }, [title, year]);
 
   const handlePress = useCallback(() => {
     if (!isPressable) {
@@ -149,8 +154,8 @@ const ChildAttendanceLineChart = ({
     return [{ height, width: chartWidth }, ...styleArray];
   }, [chartWidth, height, style]);
 
-  const shouldShowAllLabels = mode === 'fullscreen' || showAllMonthLabels || hasCustomLabels;
-  const effectiveLabelStep = hasCustomLabels ? 1 : compactLabelStep;
+  const shouldShowAllLabels = mode === 'fullscreen' || showAllMonthLabels;
+  const effectiveLabelStep = shouldShowAllLabels ? 1 : compactLabelStep;
 
   return (
     <View style={containerStyle}>
@@ -198,7 +203,7 @@ const ChildAttendanceLineChart = ({
             style={[styles.xAxis, { marginLeft: Y_AXIS_WIDTH, width: chartWidth }]}
             data={normalizedData}
             formatLabel={(value, index) => {
-              const label = xAxisLabels[index] ?? '';
+              const label = categories[index] ?? '';
               if (shouldShowAllLabels) {
                 return label;
               }
