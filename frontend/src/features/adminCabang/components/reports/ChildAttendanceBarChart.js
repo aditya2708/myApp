@@ -10,16 +10,20 @@ const MODE_STYLES = {
   fullscreen: { height: 280, paddingHorizontal: 24 },
 };
 
-export const getAttendanceColor = (value) => {
-  if (Number(value) > 90) {
-    return '#16a34a';
+const ATTENDANCE_ACTIVE_COLOR = '#2563eb';
+const ATTENDANCE_INACTIVE_COLOR = '#9ca3af';
+
+export const getAttendanceColor = (value) =>
+  Number(value) > 0 ? ATTENDANCE_ACTIVE_COLOR : ATTENDANCE_INACTIVE_COLOR;
+
+const formatPercentage = (value) => {
+  if (!Number.isFinite(value)) {
+    return '';
   }
 
-  if (Number(value) >= 80) {
-    return '#facc15';
-  }
+  const rounded = Number.parseFloat(Number(value).toFixed(1));
 
-  return '#dc2626';
+  return `${rounded}%`;
 };
 
 const Labels = ({ x, y, bandwidth, data }) =>
@@ -39,7 +43,7 @@ const Labels = ({ x, y, bandwidth, data }) =>
         alignmentBaseline="baseline"
         textAnchor="middle"
       >
-        {`${value}%`}
+        {formatPercentage(value)}
       </SvgText>
     );
   });
@@ -99,7 +103,7 @@ const ChildAttendanceBarChart = ({
               data={values.length > 0 ? values : [0]}
               contentInset={contentInset}
               svg={{ fill: '#2563eb', fontSize: 12 }}
-              formatLabel={(value) => `${value}%`}
+              formatLabel={formatPercentage}
             />
             <View>
               <BarChart
