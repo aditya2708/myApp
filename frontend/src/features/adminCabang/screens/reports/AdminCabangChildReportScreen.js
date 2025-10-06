@@ -379,12 +379,26 @@ const AdminCabangChildReportScreen = () => {
     });
   }, [activePeriod, activeShelter, attendanceByShelter, selectedShelterLabel]);
 
+  const hasPositiveAttendance = useMemo(
+    () =>
+      filteredAttendanceData.some((item) => {
+        const value = Number(item?.value ?? item?.attendance_avg ?? 0);
+
+        return Number.isFinite(value) && value > 0;
+      }),
+    [filteredAttendanceData],
+  );
+
   const attendanceCategories = useMemo(
     () => filteredAttendanceData.map((item) => String(item?.shelter || '')),
     [filteredAttendanceData],
   );
 
   const handleOpenChartFullScreen = useCallback(() => {
+    if (!hasPositiveAttendance) {
+      return;
+    }
+
     navigation.navigate('ChartFullScreen', {
       chartType: activeChartType,
       periodLabel: selectedPeriodLabel,
@@ -392,7 +406,14 @@ const AdminCabangChildReportScreen = () => {
       data: filteredAttendanceData,
       year: selectedPeriodLabel,
     });
-  }, [activeChartType, attendanceCategories, filteredAttendanceData, navigation, selectedPeriodLabel]);
+  }, [
+    activeChartType,
+    attendanceCategories,
+    filteredAttendanceData,
+    hasPositiveAttendance,
+    navigation,
+    selectedPeriodLabel,
+  ]);
 
   const clearSearchDebounce = useCallback(() => {
     if (searchDebounceRef.current) {
@@ -785,6 +806,12 @@ const AdminCabangChildReportScreen = () => {
           ) : filteredAttendanceData.length === 0 ? (
             <View style={styles.chartPlaceholder}>
               <Text style={styles.chartPlaceholderTitle}>Tidak ada data untuk filter yang dipilih</Text>
+            </View>
+          ) : !hasPositiveAttendance ? (
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderTitle}>
+                Belum ada data kehadiran untuk periode ini
+              </Text>
             </View>
           ) : activeChartType === 'line' ? (
             <ChildAttendanceLineChart
