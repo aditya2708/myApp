@@ -823,14 +823,27 @@ const AdminCabangChildReportScreen = () => {
             />
           ) : (
             <View style={styles.barChartCard}>
-              <Text style={styles.chartCardTitle}>
-                Distribusi Kehadiran
-                {selectedPeriodLabel ? ` ${selectedPeriodLabel}` : ''}
-              </Text>
+              <View style={styles.chartCardHeader}>
+                <Text style={styles.chartCardTitle}>
+                  Distribusi Kehadiran
+                  {selectedPeriodLabel ? ` ${selectedPeriodLabel}` : ''}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.chartCardAction,
+                    !hasPositiveAttendance && styles.chartCardActionDisabled,
+                  ]}
+                  onPress={handleOpenChartFullScreen}
+                  disabled={!hasPositiveAttendance}
+                >
+                  <Text style={styles.chartCardActionText}>Lihat Semua</Text>
+                </TouchableOpacity>
+              </View>
               <ChildAttendanceBarChart
                 mode="compact"
                 data={filteredAttendanceData}
                 categories={attendanceCategories}
+                onOpenFullScreen={handleOpenChartFullScreen}
               />
             </View>
           )}
@@ -1021,11 +1034,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ecf0f1',
   },
+  chartCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   chartCardTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 12,
+    flex: 1,
+  },
+  chartCardAction: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    marginLeft: 12,
+  },
+  chartCardActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+  chartCardActionDisabled: {
+    opacity: 0.5,
   },
   chartPlaceholder: {
     padding: 20,
