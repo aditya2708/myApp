@@ -6,8 +6,8 @@ import { Text as SvgText } from 'react-native-svg';
 const DEFAULT_CONTENT_INSET = { top: 16, bottom: 16 };
 const Y_AXIS_WIDTH = 44;
 const MODE_STYLES = {
-  compact: { height: 200, paddingHorizontal: 16 },
-  fullscreen: { height: 280, paddingHorizontal: 24 },
+  compact: { height: 200, paddingHorizontal: 16, xAxisHeight: 72, rotation: -40 },
+  fullscreen: { height: 280, paddingHorizontal: 24, xAxisHeight: 88, rotation: -28 },
 };
 
 const DEFAULT_MAX_ITEMS = 5;
@@ -137,11 +137,14 @@ const ChildAttendanceBarChart = ({
     [effectiveData]
   );
 
-  const { height, paddingHorizontal } = MODE_STYLES[mode] || MODE_STYLES.compact;
+  const { height, paddingHorizontal, xAxisHeight, rotation } =
+    MODE_STYLES[mode] || MODE_STYLES.compact;
   const itemWidth = isCompactMode ? 60 : 88;
   const minWidth = isCompactMode ? 240 : 360;
   const chartWidth = Math.max((effectiveData.length || 1) * itemWidth, minWidth);
-  const rotation = mode === 'fullscreen' ? -30 : -45;
+  const resolvedRotation = typeof rotation === 'number' ? rotation : isCompactMode ? -40 : -28;
+  const resolvedXAxisHeight = Number.isFinite(xAxisHeight) ? xAxisHeight : isCompactMode ? 72 : 88;
+  const labelYOffset = Math.max(24, resolvedXAxisHeight - 20);
 
   return (
     <View style={containerStyle}>
@@ -175,15 +178,15 @@ const ChildAttendanceBarChart = ({
                 <Labels />
               </BarChart>
               <XAxis
-                style={[styles.xAxis, { width: chartWidth }]}
+                style={[styles.xAxis, { width: chartWidth, height: resolvedXAxisHeight }]}
                 data={values.length > 0 ? values : [0]}
                 formatLabel={(value, index) => displayCategories[index] ?? ''}
                 svg={{
                   fontSize: 12,
                   fill: '#4b5563',
-                  rotation,
-                  originY: 12,
-                  y: 12,
+                  rotation: resolvedRotation,
+                  originY: labelYOffset,
+                  y: labelYOffset,
                   textAnchor: 'end',
                 }}
               />
@@ -203,6 +206,7 @@ const styles = StyleSheet.create({
   },
   chartWrapper: {
     flexGrow: 1,
+    paddingBottom: 12,
   },
   chartRow: {
     flexDirection: 'row',
