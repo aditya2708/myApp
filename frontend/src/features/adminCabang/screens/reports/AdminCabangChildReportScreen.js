@@ -113,7 +113,17 @@ const buildRecentPeriodOptions = (count = RECENT_PERIOD_COUNT) => {
 
 const PERIOD_OPTIONS = buildRecentPeriodOptions();
 
-const clampPercentage = (value) => Math.min(100, Math.max(0, Number(value) || 0));
+const clampPercentage = (value) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  const scaledValue = numericValue >= 0 && numericValue <= 1 ? numericValue * 100 : numericValue;
+
+  return Math.min(100, Math.max(0, scaledValue));
+};
 
 const parsePeriodToMonthYear = (period) => {
   if (!period || typeof period !== 'string') {
@@ -327,11 +337,15 @@ const AdminCabangChildReportScreen = () => {
       return [];
     }
 
-    return attendanceSummaryData.map((item) => ({
-      ...item,
-      name: item?.name ?? item?.shelter ?? item?.nama_shelter ?? '',
-      attendance_avg: clampPercentage(item?.attendance_avg ?? item?.value ?? 0),
-    }));
+    return attendanceSummaryData.map((item) => {
+      const attendanceAvg = clampPercentage(item?.attendance_avg ?? 0);
+
+      return {
+        ...item,
+        name: item?.name ?? item?.shelter ?? item?.nama_shelter ?? '',
+        attendance_avg: attendanceAvg,
+      };
+    });
   }, [attendanceSummaryData]);
 
   const hasShelterData = attendanceSummaryData.length > 0;
@@ -354,11 +368,15 @@ const AdminCabangChildReportScreen = () => {
       return String(item?.name ?? '').toLowerCase() === normalizedShelterLabel;
     });
 
-    return sourceData.map((item) => ({
-      ...item,
-      shelter: item?.name ?? '',
-      value: clampPercentage(item?.attendance_avg ?? item?.value ?? 0),
-    }));
+    return sourceData.map((item) => {
+      const attendanceAvg = clampPercentage(item?.attendance_avg ?? 0);
+
+      return {
+        ...item,
+        shelter: item?.name ?? '',
+        value: attendanceAvg,
+      };
+    });
   }, [activePeriod, activeShelter, attendanceByShelter, selectedShelterLabel]);
 
   const attendanceCategories = useMemo(
