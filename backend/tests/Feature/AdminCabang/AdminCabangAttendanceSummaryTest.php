@@ -218,14 +218,20 @@ class AdminCabangAttendanceSummaryTest extends TestCase
         $this->assertSame($shelterOne->id_shelter, $payload['shelters'][0]['id']);
         $this->assertSame('Shelter Alpha', $payload['shelters'][0]['name']);
         $this->assertSame(50.0, $payload['shelters'][0]['attendance_avg']);
+        $this->assertSame(1, $payload['shelters'][0]['present_count']);
+        $this->assertSame(2, $payload['shelters'][0]['total_count']);
 
         $this->assertSame($shelterTwo->id_shelter, $payload['shelters'][1]['id']);
         $this->assertSame('Shelter Beta', $payload['shelters'][1]['name']);
         $this->assertSame(100.0, $payload['shelters'][1]['attendance_avg']);
+        $this->assertSame(1, $payload['shelters'][1]['present_count']);
+        $this->assertSame(1, $payload['shelters'][1]['total_count']);
 
         $this->assertSame($shelterThree->id_shelter, $payload['shelters'][2]['id']);
         $this->assertSame('Shelter Gamma', $payload['shelters'][2]['name']);
         $this->assertSame(0.0, $payload['shelters'][2]['attendance_avg']);
+        $this->assertSame(0, $payload['shelters'][2]['present_count']);
+        $this->assertSame(0, $payload['shelters'][2]['total_count']);
     }
 
     public function test_it_returns_404_when_cabang_not_found(): void
