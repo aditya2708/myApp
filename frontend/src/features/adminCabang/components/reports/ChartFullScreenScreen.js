@@ -90,6 +90,10 @@ const ChartFullScreenScreen = () => {
       props.contentInset = resolvedContentInset;
     }
 
+    if (Object.prototype.hasOwnProperty.call(props, 'maxItems')) {
+      delete props.maxItems;
+    }
+
     return props;
   }, [chartProps, resolvedContentInset]);
 

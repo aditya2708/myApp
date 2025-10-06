@@ -10,11 +10,26 @@ const MODE_STYLES = {
   fullscreen: { height: 280, paddingHorizontal: 24 },
 };
 
+const DEFAULT_MAX_ITEMS = 5;
+const COMPACT_LABEL_MAX_LENGTH = 16;
+
 const ATTENDANCE_ACTIVE_COLOR = '#2563eb';
 const ATTENDANCE_INACTIVE_COLOR = '#9ca3af';
 
 export const getAttendanceColor = (value) =>
   Number(value) > 0 ? ATTENDANCE_ACTIVE_COLOR : ATTENDANCE_INACTIVE_COLOR;
+
+const truncateLabel = (label, maxLength) => {
+  if (typeof label !== 'string') {
+    return '';
+  }
+
+  if (label.length <= maxLength) {
+    return label;
+  }
+
+  return `${label.slice(0, Math.max(0, maxLength - 1))}…`;
+};
 
 const formatPercentage = (value) => {
   if (!Number.isFinite(value)) {
@@ -54,46 +69,89 @@ const ChildAttendanceBarChart = ({
   containerStyle,
   contentInset = DEFAULT_CONTENT_INSET,
   categories: categoriesProp,
+  maxItems = DEFAULT_MAX_ITEMS,
+  onOpenFullScreen,
 }) => {
   const normalizedData = useMemo(() => {
     if (!Array.isArray(data) || data.length === 0) {
       return [];
     }
 
-    return data.map((item) => ({
-      shelter: typeof item?.shelter === 'string' ? item.shelter : '',
-      value: Number(item?.value) || 0,
-    }));
-  }, [data]);
+    const resolvedCategories = Array.isArray(categoriesProp) ? categoriesProp : [];
 
-  const values = useMemo(() => normalizedData.map((item) => item.value), [normalizedData]);
-  const categories = useMemo(() => {
-    if (Array.isArray(categoriesProp) && categoriesProp.length > 0) {
-      return categoriesProp.slice(0, normalizedData.length).map((category) => String(category ?? ''));
+    return data.map((item, index) => {
+      const shelterName = typeof item?.shelter === 'string' ? item.shelter : '';
+      const resolvedCategory = resolvedCategories[index];
+      const categoryLabel =
+        typeof resolvedCategory === 'string' || typeof resolvedCategory === 'number'
+          ? String(resolvedCategory)
+          : shelterName;
+
+      return {
+        shelter: shelterName,
+        category: categoryLabel,
+        value: Number(item?.value) || 0,
+      };
+    });
+  }, [categoriesProp, data]);
+
+  const isCompactMode = mode === 'compact';
+  const canOpenFullScreen = typeof onOpenFullScreen === 'function';
+
+  const effectiveData = useMemo(() => {
+    if (!isCompactMode) {
+      return normalizedData;
     }
 
-    return normalizedData.map((item) => item.shelter || '');
-  }, [categoriesProp, normalizedData]);
+    const sorted = [...normalizedData].sort((a, b) => Number(b.value) - Number(a.value));
+    const limit = Number(maxItems);
+    const hasValidLimit = Number.isFinite(limit) && limit > 0;
+
+    if (!hasValidLimit) {
+      return sorted;
+    }
+
+    return sorted.slice(0, limit);
+  }, [isCompactMode, maxItems, normalizedData]);
+
+  const values = useMemo(() => effectiveData.map((item) => item.value), [effectiveData]);
+
+  const displayCategories = useMemo(() => {
+    return effectiveData.map((item) => {
+      const label = item.category || item.shelter || '';
+
+      if (!isCompactMode) {
+        return label;
+      }
+
+      return truncateLabel(label, COMPACT_LABEL_MAX_LENGTH);
+    });
+  }, [effectiveData, isCompactMode]);
 
   const chartData = useMemo(
     () =>
-      normalizedData.map((item) => ({
+      effectiveData.map((item) => ({
         value: item.value,
         svg: { fill: getAttendanceColor(item.value) },
       })),
-    [normalizedData]
+    [effectiveData]
   );
 
   const { height, paddingHorizontal } = MODE_STYLES[mode] || MODE_STYLES.compact;
-  const chartWidth = Math.max((normalizedData.length || 1) * 60, 240);
+  const itemWidth = isCompactMode ? 60 : 88;
+  const minWidth = isCompactMode ? 240 : 360;
+  const chartWidth = Math.max((effectiveData.length || 1) * itemWidth, minWidth);
   const rotation = mode === 'fullscreen' ? -30 : -45;
 
   return (
     <View style={containerStyle}>
       <ScrollView
         horizontal
-        showsHorizontalScrollIndicator={false}
+        showsHorizontalScrollIndicator={mode === 'fullscreen'}
         contentContainerStyle={[styles.scrollContent, { paddingHorizontal }]}
+        accessibilityRole={canOpenFullScreen ? 'button' : undefined}
+        accessibilityHint={canOpenFullScreen ? 'Buka tampilan grafik layar penuh' : undefined}
+        onAccessibilityTap={canOpenFullScreen ? onOpenFullScreen : undefined}
       >
         <View style={[styles.chartWrapper, { width: chartWidth + Y_AXIS_WIDTH }]}
         >
@@ -119,7 +177,7 @@ const ChildAttendanceBarChart = ({
               <XAxis
                 style={[styles.xAxis, { width: chartWidth }]}
                 data={values.length > 0 ? values : [0]}
-                formatLabel={(value, index) => categories[index] ?? ''}
+                formatLabel={(value, index) => displayCategories[index] ?? ''}
                 svg={{
                   fontSize: 12,
                   fill: '#4b5563',
