@@ -152,6 +152,11 @@ export const ADMIN_CABANG_ENDPOINTS = {
   REPORTS: {
     SUMMARY: '/admin-cabang/laporan/summary',
     ATTENDANCE_SUMMARY: (cabangId) => `/admin-cabang/${cabangId}/attendance-summary`,
+    ATTENDANCE: {
+      WEEKLY: '/admin-cabang/laporan/attendance/weekly',
+      MONTHLY_SHELTER: '/admin-cabang/laporan/attendance/monthly-shelter',
+      MONTHLY_BRANCH: '/admin-cabang/laporan/attendance/monthly-branch',
+    },
     ANAK: {
       LIST: '/admin-cabang/laporan/anak-binaan',
       DETAIL: (childId) => `/admin-cabang/laporan/anak-binaan/child/${childId}`,

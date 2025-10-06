@@ -25,6 +25,14 @@ const DEFAULT_LINKS = [
     route: 'AdminCabangChildReport',
   },
   {
+    key: 'attendance',
+    title: 'Laporan Kehadiran',
+    description: 'Analisis kehadiran mingguan dan bulanan untuk seluruh cabang dan shelter.',
+    icon: 'calendar',
+    color: '#16a085',
+    route: 'AdminCabangAttendanceReport',
+  },
+  {
     key: 'tutors',
     title: 'Laporan Tutor',
     description: 'Tinjau performa dan aktivitas tutor shelter di wilayah Anda.',
@@ -84,6 +92,7 @@ const AdminCabangReportHomeScreen = () => {
   const routeMap = useMemo(
     () => ({
       children: 'AdminCabangChildReport',
+      attendance: 'AdminCabangAttendanceReport',
       tutors: 'AdminCabangTutorReport',
     }),
     []
