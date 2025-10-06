@@ -6,13 +6,12 @@ import { Text as SvgText } from 'react-native-svg';
 const DEFAULT_CONTENT_INSET = { top: 16, bottom: 16 };
 const Y_AXIS_WIDTH = 44;
 const MODE_STYLES = {
-  compact: { height: 200, paddingHorizontal: 16, xAxisHeight: 120, rotation: -45 },
-  fullscreen: { height: 280, paddingHorizontal: 24, xAxisHeight: 140, rotation: -35 },
+  compact: { height: 200, paddingHorizontal: 16, xAxisHeight: 140, rotation: -45, chartPadding: 40 },
+  fullscreen: { height: 280, paddingHorizontal: 24, xAxisHeight: 160, rotation: -45, chartPadding: 60 },
 };
 
 const DEFAULT_MAX_ITEMS = 5;
 const COMPACT_LABEL_MAX_LENGTH = 12;
-
 
 const ATTENDANCE_ACTIVE_COLOR = '#2563eb';
 const ATTENDANCE_INACTIVE_COLOR = '#9ca3af';
@@ -100,10 +99,12 @@ const ChildAttendanceBarChart = ({
   const canOpenFullScreen = typeof onOpenFullScreen === 'function';
 
   const effectiveData = useMemo(() => {
+    // Di fullscreen mode, tampilkan SEMUA data tanpa batasan
     if (!isCompactMode) {
       return normalizedData;
     }
 
+    // Di compact mode, batasi dan urutkan
     const sorted = [...normalizedData].sort((a, b) => Number(b.value) - Number(a.value));
     const limit = Number(maxItems);
     const hasValidLimit = Number.isFinite(limit) && limit > 0;
@@ -138,14 +139,14 @@ const ChildAttendanceBarChart = ({
     [effectiveData]
   );
 
-  const { height, paddingHorizontal, xAxisHeight, rotation } =
+  const { height, paddingHorizontal, xAxisHeight, rotation, chartPadding } =
     MODE_STYLES[mode] || MODE_STYLES.compact;
   const itemWidth = isCompactMode ? 60 : 88;
   const minWidth = isCompactMode ? 240 : 360;
   const chartWidth = Math.max((effectiveData.length || 1) * itemWidth, minWidth);
-  const resolvedRotation = typeof rotation === 'number' ? rotation : isCompactMode ? -40 : -28;
-  const resolvedXAxisHeight = Number.isFinite(xAxisHeight) ? xAxisHeight : isCompactMode ? 72 : 88;
-  const labelYOffset = Math.max(24, resolvedXAxisHeight - 20);
+  const resolvedRotation = typeof rotation === 'number' ? rotation : -45;
+  const resolvedXAxisHeight = Number.isFinite(xAxisHeight) ? xAxisHeight : (isCompactMode ? 140 : 160);
+  const resolvedChartPadding = chartPadding || 40;
   const totalHeight = height + resolvedXAxisHeight + 40;
 
   return (
@@ -153,13 +154,19 @@ const ChildAttendanceBarChart = ({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={mode === 'fullscreen'}
-        contentContainerStyle={[styles.scrollContent, { paddingHorizontal }]}
+        contentContainerStyle={[
+          styles.scrollContent, 
+          { 
+            paddingHorizontal,
+            paddingLeft: paddingHorizontal + resolvedChartPadding,
+            paddingRight: paddingHorizontal + resolvedChartPadding,
+          }
+        ]}
         accessibilityRole={canOpenFullScreen ? 'button' : undefined}
         accessibilityHint={canOpenFullScreen ? 'Buka tampilan grafik layar penuh' : undefined}
         onAccessibilityTap={canOpenFullScreen ? onOpenFullScreen : undefined}
       >
-        <View style={[styles.chartWrapper, { width: chartWidth + Y_AXIS_WIDTH }]}
-        >
+        <View style={[styles.chartWrapper, { width: chartWidth + Y_AXIS_WIDTH }]}>
           <View style={styles.chartRow}>
             <YAxis
               style={[styles.yAxis, { height }]}
@@ -175,7 +182,7 @@ const ChildAttendanceBarChart = ({
                 yAccessor={({ item }) => item.value}
                 contentInset={contentInset}
                 spacingInner={0.3}
-                spacingOuter={0.2}
+                spacingOuter={0.4}
               >
                 <Labels />
               </BarChart>
@@ -184,11 +191,11 @@ const ChildAttendanceBarChart = ({
                 data={values.length > 0 ? values : [0]}
                 formatLabel={(value, index) => displayCategories[index] ?? ''}
                 svg={{
-                  fontSize: 12,
+                  fontSize: 11,
                   fill: '#4b5563',
                   rotation: resolvedRotation,
-                  originY: 12,  // Pivot point tetap dekat dengan chart
-                  y: 12,        // Posisi awal text dekat dengan chart
+                  originY: 0,
+                  y: 20,
                   textAnchor: 'end',
                 }}
               />
