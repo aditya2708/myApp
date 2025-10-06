@@ -6,12 +6,13 @@ import { Text as SvgText } from 'react-native-svg';
 const DEFAULT_CONTENT_INSET = { top: 16, bottom: 16 };
 const Y_AXIS_WIDTH = 44;
 const MODE_STYLES = {
-  compact: { height: 200, paddingHorizontal: 16, xAxisHeight: 72, rotation: -40 },
-  fullscreen: { height: 280, paddingHorizontal: 24, xAxisHeight: 88, rotation: -28 },
+  compact: { height: 200, paddingHorizontal: 16, xAxisHeight: 120, rotation: -45 },
+  fullscreen: { height: 280, paddingHorizontal: 24, xAxisHeight: 140, rotation: -35 },
 };
 
 const DEFAULT_MAX_ITEMS = 5;
-const COMPACT_LABEL_MAX_LENGTH = 16;
+const COMPACT_LABEL_MAX_LENGTH = 12;
+const FULLSCREEN_LABEL_MAX_LENGTH = 20;
 
 const ATTENDANCE_ACTIVE_COLOR = '#2563eb';
 const ATTENDANCE_INACTIVE_COLOR = '#9ca3af';
@@ -145,9 +146,10 @@ const ChildAttendanceBarChart = ({
   const resolvedRotation = typeof rotation === 'number' ? rotation : isCompactMode ? -40 : -28;
   const resolvedXAxisHeight = Number.isFinite(xAxisHeight) ? xAxisHeight : isCompactMode ? 72 : 88;
   const labelYOffset = Math.max(24, resolvedXAxisHeight - 20);
+  const totalHeight = height + resolvedXAxisHeight + 40;
 
   return (
-    <View style={containerStyle}>
+    <View style={[containerStyle, { minHeight: totalHeight }]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={mode === 'fullscreen'}
@@ -185,8 +187,8 @@ const ChildAttendanceBarChart = ({
                   fontSize: 12,
                   fill: '#4b5563',
                   rotation: resolvedRotation,
-                  originY: labelYOffset,
-                  y: labelYOffset,
+                  originY: 12,  // Pivot point tetap dekat dengan chart
+                  y: 12,        // Posisi awal text dekat dengan chart
                   textAnchor: 'end',
                 }}
               />
@@ -217,6 +219,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   xAxis: {
-    marginTop: 16,
+    marginTop: 8,
   },
 });
