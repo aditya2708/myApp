@@ -5,6 +5,7 @@ const {
   REPORTS: {
     SUMMARY: SUMMARY_ENDPOINT,
     ATTENDANCE_SUMMARY: ATTENDANCE_SUMMARY_ENDPOINT,
+    ATTENDANCE: ATTENDANCE_ENDPOINTS,
     ANAK: {
       LIST: LIST_ENDPOINT,
       DETAIL: DETAIL_ENDPOINT,
@@ -41,5 +42,17 @@ export const adminCabangReportApi = {
     }
 
     return api.get(ATTENDANCE_SUMMARY_ENDPOINT(cabangId), { params });
-  }
+  },
+
+  async getAttendanceWeekly(params = {}) {
+    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY, { params });
+  },
+
+  async getAttendanceMonthlyShelter(params = {}) {
+    return api.get(ATTENDANCE_ENDPOINTS.MONTHLY_SHELTER, { params });
+  },
+
+  async getAttendanceMonthlyBranch(params = {}) {
+    return api.get(ATTENDANCE_ENDPOINTS.MONTHLY_BRANCH, { params });
+  },
 };
