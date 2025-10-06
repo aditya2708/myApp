@@ -30,7 +30,10 @@ class AdminCabangAttendanceSummaryController extends Controller
         $year = (int) $validated['year'];
 
         $attendanceByShelter = Absen::query()
-            ->selectRaw('shelter.id_shelter as shelter_id, AVG(CASE WHEN absen.absen IN (\'Ya\', \'Terlambat\') THEN 1 ELSE 0 END) * 100 as attendance_avg')
+            ->selectRaw('shelter.id_shelter as shelter_id')
+            ->selectRaw("SUM(CASE WHEN absen.absen IN ('Ya', 'Terlambat') THEN 1 ELSE 0 END) as present_count")
+            ->selectRaw('COUNT(*) as total_count')
+            ->selectRaw("AVG(CASE WHEN absen.absen IN ('Ya', 'Terlambat') THEN 1 ELSE 0 END) * 100 as attendance_avg")
             ->join('aktivitas', 'aktivitas.id_aktivitas', '=', 'absen.id_aktivitas')
             ->join('shelter', 'shelter.id_shelter', '=', 'aktivitas.id_shelter')
             ->join('wilbin', 'wilbin.id_wilbin', '=', 'shelter.id_wilbin')
@@ -38,7 +41,8 @@ class AdminCabangAttendanceSummaryController extends Controller
             ->whereYear('aktivitas.tanggal', $year)
             ->whereMonth('aktivitas.tanggal', $month)
             ->groupBy('shelter.id_shelter')
-            ->pluck('attendance_avg', 'shelter_id');
+            ->get()
+            ->keyBy('shelter_id');
 
         $shelterCollection = Shelter::query()
             ->select('shelter.id_shelter', 'shelter.nama_shelter')
@@ -47,12 +51,20 @@ class AdminCabangAttendanceSummaryController extends Controller
             ->orderBy('shelter.nama_shelter')
             ->get()
             ->map(function ($shelter) use ($attendanceByShelter) {
-                $average = $attendanceByShelter[$shelter->id_shelter] ?? 0;
+                $attendance = $attendanceByShelter->get($shelter->id_shelter);
+
+                $presentCount = (int) ($attendance->present_count ?? 0);
+                $totalCount = (int) ($attendance->total_count ?? 0);
+                $average = $totalCount > 0
+                    ? round(($presentCount / $totalCount) * 100, 2)
+                    : 0.0;
 
                 return [
                     'id' => $shelter->id_shelter,
                     'name' => $shelter->nama_shelter,
-                    'attendance_avg' => round((float) $average, 2),
+                    'attendance_avg' => $average,
+                    'present_count' => $presentCount,
+                    'total_count' => $totalCount,
                 ];
             });
 
