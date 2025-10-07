@@ -6,6 +6,7 @@ import AttendanceSummarySection from '../../../components/reports/attendance/Att
 import WeeklyBreakdownList from '../../../components/reports/attendance/WeeklyBreakdownList';
 import ShelterAttendanceTable from '../../../components/reports/attendance/ShelterAttendanceTable';
 import AttendanceTrendChart from '../../../components/reports/attendance/AttendanceTrendChart';
+
 import useAttendanceSummary from '../../../hooks/reports/attendance/useAttendanceSummary';
 import useAttendanceWeekly from '../../../hooks/reports/attendance/useAttendanceWeekly';
 import useAttendanceMonthlyShelter from '../../../hooks/reports/attendance/useAttendanceMonthlyShelter';

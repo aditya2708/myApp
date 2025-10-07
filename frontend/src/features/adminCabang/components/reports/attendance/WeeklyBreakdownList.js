@@ -16,10 +16,14 @@ const WeeklyBreakdownList = ({ data }) => {
   return (
     <View>
       {data.map((item, index) => {
-        const attendanceRate = typeof item.attendanceRate === 'number' ? `${item.attendanceRate}%` : '-';
+        const attendanceRate =
+          typeof item.attendanceRate === 'number' ? `${item.attendanceRate}%` : '-';
 
         return (
-          <View key={item.id || index} style={[styles.item, index === data.length - 1 && styles.lastItem]}>
+          <View
+            key={item.id || index}
+            style={[styles.item, index === data.length - 1 && styles.lastItem]}
+          >
             <View style={styles.itemHeader}>
               <Text style={styles.itemTitle}>{item.weekLabel || `Minggu ${index + 1}`}</Text>
               <Text style={styles.itemRate}>{attendanceRate}</Text>
