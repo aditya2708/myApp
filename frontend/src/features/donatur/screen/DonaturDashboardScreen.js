@@ -47,9 +47,26 @@ const DonaturDashboardScreen = () => {
   };
 
   const fetchDonationAd = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
-      const response = await donaturApi.getDonationAds();
-      const ads = response?.data?.data || [];
+      const response = await fetch('https://home.kilauindonesia.org/api/iklandonasi', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Donation ads response:', result);
+
+      const ads = result?.data || [];
       const activeAd = Array.isArray(ads)
         ? ads.find((item) => item?.status === '1')
         : null;
@@ -57,7 +74,9 @@ const DonaturDashboardScreen = () => {
       setDonationAd(activeAd || null);
       setAdVisible(!adDismissed && !!activeAd);
     } catch (err) {
-      console.error('Error fetching donation ads:', err);
+      console.error('Error fetching donation ads:', err, err?.message);
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
