@@ -4,6 +4,7 @@ namespace App\Services\AdminCabang\Reports\Attendance;
 
 use App\Models\Absen;
 use App\Models\Aktivitas;
+use App\Models\Shelter;
 use Carbon\Carbon;
 
 class WeeklyAttendanceService
@@ -131,6 +132,163 @@ class WeeklyAttendanceService
                 'verification' => $overall['verification'],
             ],
             'weeks' => array_values($weeks),
+            'generated_at' => Carbon::now()->toIso8601String(),
+        ];
+    }
+
+    public function buildShelterReport($adminCabang, array $filters = []): array
+    {
+        $start = $this->resolveDate($filters['start_date'] ?? Carbon::now()->startOfMonth(), true);
+        $end = $this->resolveDate($filters['end_date'] ?? Carbon::now()->endOfMonth(), false)->endOfDay();
+
+        $requestedShelterIds = array_values($filters['shelter_ids'] ?? []);
+
+        $kacab = $adminCabang->loadMissing('kacab')->kacab;
+        $accessibleShelterIds = $kacab
+            ? $kacab->shelters()->select('shelter.id_shelter')->pluck('shelter.id_shelter')->all()
+            : [];
+
+        $shelterIds = !empty($requestedShelterIds)
+            ? array_values(array_intersect($requestedShelterIds, $accessibleShelterIds))
+            : $accessibleShelterIds;
+
+        $shelterSummaries = [];
+
+        $overall = [
+            'present' => 0,
+            'late' => 0,
+            'absent' => 0,
+            'total_sessions' => 0,
+            'total_activities' => 0,
+            'verification' => [
+                'pending' => 0,
+                'verified' => 0,
+                'rejected' => 0,
+                'manual' => 0,
+            ],
+            'unique_children' => [],
+        ];
+
+        if (!empty($shelterIds)) {
+            $shelters = Shelter::query()
+                ->whereIn('id_shelter', $shelterIds)
+                ->get(['id_shelter', 'nama_shelter']);
+
+            foreach ($shelters as $shelter) {
+                $shelterSummaries[$shelter->id_shelter] = [
+                    'id' => $shelter->id_shelter,
+                    'name' => $shelter->nama_shelter,
+                    'metrics' => [
+                        'present_count' => 0,
+                        'late_count' => 0,
+                        'absent_count' => 0,
+                        'attendance_rate' => 0.0,
+                        'late_rate' => 0.0,
+                        'total_sessions' => 0,
+                        'total_activities' => 0,
+                        'unique_children' => 0,
+                        'verification' => [
+                            'pending' => 0,
+                            'verified' => 0,
+                            'rejected' => 0,
+                            'manual' => 0,
+                        ],
+                    ],
+                    '_child_ids' => [],
+                ];
+            }
+
+            $activities = Aktivitas::query()
+                ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+                ->whereIn('id_shelter', $shelterIds)
+                ->with(['absen.absenUser'])
+                ->get();
+
+            foreach ($activities as $activity) {
+                $shelterId = $activity->id_shelter;
+
+                if (!isset($shelterSummaries[$shelterId])) {
+                    continue;
+                }
+
+                $shelterSummaries[$shelterId]['metrics']['total_activities']++;
+                $overall['total_activities']++;
+
+                $attendanceRecords = $activity->absen ?? collect();
+                $sessionCount = $attendanceRecords->count();
+
+                $shelterSummaries[$shelterId]['metrics']['total_sessions'] += $sessionCount;
+                $overall['total_sessions'] += $sessionCount;
+
+                foreach ($attendanceRecords as $attendance) {
+                    $status = strtolower($attendance->absen ?? '');
+
+                    if ($status === strtolower(Absen::TEXT_YA)) {
+                        $shelterSummaries[$shelterId]['metrics']['present_count']++;
+                        $overall['present']++;
+                    } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
+                        $shelterSummaries[$shelterId]['metrics']['late_count']++;
+                        $overall['late']++;
+                    } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
+                        $shelterSummaries[$shelterId]['metrics']['absent_count']++;
+                        $overall['absent']++;
+                    }
+
+                    $childId = $attendance->absenUser->id_anak ?? null;
+                    if ($childId) {
+                        $shelterSummaries[$shelterId]['_child_ids'][$childId] = true;
+                        $overall['unique_children'][$childId] = true;
+                    }
+
+                    $verification = $this->normalizeVerificationStatus($attendance->verification_status ?? null);
+                    $shelterSummaries[$shelterId]['metrics']['verification'][$verification]++;
+                    $overall['verification'][$verification]++;
+                }
+            }
+
+            foreach ($shelterSummaries as &$summary) {
+                $totalSessions = $summary['metrics']['total_sessions'];
+                $attendanceCount = $summary['metrics']['present_count'] + $summary['metrics']['late_count'];
+
+                $summary['metrics']['attendance_rate'] = $totalSessions > 0
+                    ? ($attendanceCount / $totalSessions) * 100
+                    : 0.0;
+
+                $summary['metrics']['late_rate'] = $totalSessions > 0
+                    ? ($summary['metrics']['late_count'] / $totalSessions) * 100
+                    : 0.0;
+
+                $summary['metrics']['unique_children'] = count($summary['_child_ids']);
+
+                unset($summary['_child_ids']);
+            }
+            unset($summary);
+
+            usort($shelterSummaries, static fn ($a, $b) => strcmp($a['name'], $b['name']));
+        }
+
+        $totalSessions = $overall['total_sessions'];
+        $overallAttendanceCount = $overall['present'] + $overall['late'];
+
+        return [
+            'filters' => [
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+                'shelter_ids' => $shelterIds,
+            ],
+            'metadata' => [
+                'total_shelters' => count($shelterIds),
+                'total_activities' => $overall['total_activities'],
+                'total_sessions' => $totalSessions,
+                'present_count' => $overall['present'],
+                'late_count' => $overall['late'],
+                'absent_count' => $overall['absent'],
+                'attendance_rate' => $totalSessions > 0 ? ($overallAttendanceCount / $totalSessions) * 100 : 0.0,
+                'late_rate' => $totalSessions > 0 ? ($overall['late'] / $totalSessions) * 100 : 0.0,
+                'unique_children' => count($overall['unique_children']),
+                'verification' => $overall['verification'],
+            ],
+            'shelters' => array_values($shelterSummaries),
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
     }

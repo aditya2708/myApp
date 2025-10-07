@@ -2,6 +2,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyController;
+use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyShelterController;
 
 
 Route::post('/auth/login', [App\Http\Controllers\API\AuthController::class, 'login']);
@@ -201,6 +202,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/anak-binaan/filter-options', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'filterOptions']);
             Route::prefix('attendance')->group(function () {
                 Route::get('/weekly', AttendanceWeeklyController::class);
+                Route::get('/weekly/shelters', AttendanceWeeklyShelterController::class);
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
                 Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
             });
