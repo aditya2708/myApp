@@ -62,7 +62,7 @@ const authSlice = createSlice({
 
     loginFailure: (state, action) => {
       state.loading = false;
-      state.error = action.payload?.message || 'Login failed. Please check your credentials.';
+      state.error = action.payload?.message || 'Email atau kata sandi tidak sesuai.';
       state.fieldErrors = action.payload?.fieldErrors || null;
     },
 
@@ -106,7 +106,7 @@ const authSlice = createSlice({
     fetchUserFailure: (state, action) => {
       state.loading = false;
       state.isAuthenticated = false;
-      state.error = action.payload?.message || 'Failed to fetch user data';
+      state.error = action.payload?.message || 'Gagal mengambil data pengguna';
       state.user = null;
       state.userLevel = null;
       state.profile = null;
