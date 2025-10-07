@@ -15,12 +15,26 @@ const WeeklyBreakdownList = ({ data }) => {
 
   return (
     <View>
-      {data.map((item, index) => (
-        <View key={item.id || index} style={[styles.item, index === data.length - 1 && styles.lastItem]}>
-          <Text style={styles.itemTitle}>{item.title || `Minggu ${index + 1}`}</Text>
-          <Text style={styles.itemDescription}>{item.description || 'Detail hadir/tidak hadir akan ditampilkan.'}</Text>
-        </View>
-      ))}
+      {data.map((item, index) => {
+        const attendanceRate =
+          typeof item.attendanceRate === 'number' ? `${item.attendanceRate}%` : '-';
+
+        return (
+          <View
+            key={item.id || index}
+            style={[styles.item, index === data.length - 1 && styles.lastItem]}
+          >
+            <View style={styles.itemHeader}>
+              <Text style={styles.itemTitle}>{item.weekLabel || `Minggu ${index + 1}`}</Text>
+              <Text style={styles.itemRate}>{attendanceRate}</Text>
+            </View>
+            <Text style={styles.itemDescription}>
+              {`${item.presentCount ?? '-'} hadir dari ${item.totalSessions ?? '-'} sesi`} ·
+              {` ${item.absentCount ?? '-'} absen`}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 };
@@ -35,6 +49,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#dfe6e9',
   },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   lastItem: {
     borderBottomWidth: 0,
   },
@@ -42,6 +61,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#2d3436',
+  },
+  itemRate: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#00b894',
   },
   itemDescription: {
     fontSize: 13,

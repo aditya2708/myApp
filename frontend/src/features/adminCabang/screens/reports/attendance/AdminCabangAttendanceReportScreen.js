@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Text } from 'react-native';
 
 import AttendanceFilterBar from '../../../components/reports/attendance/AttendanceFilterBar';
@@ -7,7 +7,42 @@ import WeeklyBreakdownList from '../../../components/reports/attendance/WeeklyBr
 import ShelterAttendanceTable from '../../../components/reports/attendance/ShelterAttendanceTable';
 import AttendanceTrendChart from '../../../components/reports/attendance/AttendanceTrendChart';
 
+import useAttendanceSummary from '../../../hooks/reports/attendance/useAttendanceSummary';
+import useAttendanceWeekly from '../../../hooks/reports/attendance/useAttendanceWeekly';
+import useAttendanceMonthlyShelter from '../../../hooks/reports/attendance/useAttendanceMonthlyShelter';
+import useAttendanceTrend from '../../../hooks/reports/attendance/useAttendanceTrend';
+
 const AdminCabangAttendanceReportScreen = () => {
+  const { data: summaryData } = useAttendanceSummary();
+  const { data: weeklyData } = useAttendanceWeekly();
+  const { data: shelterData } = useAttendanceMonthlyShelter();
+  const { data: trendData } = useAttendanceTrend();
+
+  const summaryMetrics = useMemo(() => {
+    if (!summaryData) {
+      return [];
+    }
+
+    return [
+      {
+        label: 'Total Kehadiran',
+        value: summaryData.presentCount.toLocaleString('id-ID'),
+      },
+      {
+        label: 'Rata-rata Kehadiran',
+        value: `${summaryData.attendanceRate}%`,
+      },
+      {
+        label: 'Anak Binaan Aktif',
+        value: summaryData.activeChildren.toLocaleString('id-ID'),
+      },
+      {
+        label: 'Total Absen',
+        value: summaryData.absentCount.toLocaleString('id-ID'),
+      },
+    ];
+  }, [summaryData]);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <AttendanceFilterBar />
@@ -15,23 +50,32 @@ const AdminCabangAttendanceReportScreen = () => {
       <View style={styles.section}>
         <AttendanceSummarySection
           title="Ringkasan Kehadiran"
-          description="Area ringkasan akan menampilkan metrik utama kehadiran."
-        />
+          description={summaryData ? `Periode laporan ${summaryData.periodLabel}` : undefined}
+        >
+          <View style={styles.summaryGrid}>
+            {summaryMetrics.map((metric) => (
+              <View key={metric.label} style={styles.summaryCard}>
+                <Text style={styles.summaryValue}>{metric.value}</Text>
+                <Text style={styles.summaryLabel}>{metric.label}</Text>
+              </View>
+            ))}
+          </View>
+        </AttendanceSummarySection>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Rekap Mingguan Cabang</Text>
-        <WeeklyBreakdownList data={[]} />
+        <WeeklyBreakdownList data={weeklyData} />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Rekap Bulanan per Shelter</Text>
-        <ShelterAttendanceTable data={[]} />
+        <ShelterAttendanceTable data={shelterData} />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tren Kehadiran</Text>
-        <AttendanceTrendChart data={[]} />
+        <AttendanceTrendChart data={trendData} />
       </View>
     </ScrollView>
   );
@@ -57,6 +101,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     color: '#2d3436',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -8,
+  },
+  summaryCard: {
+    width: '50%',
+    paddingHorizontal: 8,
+    marginBottom: 16,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0984e3',
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: '#636e72',
+    marginTop: 4,
   },
 });
 

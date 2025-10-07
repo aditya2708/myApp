@@ -22,14 +22,26 @@ const ShelterAttendanceTable = ({ data }) => {
         <Text style={[styles.cell, styles.headerCell]}>%</Text>
       </View>
 
-      {data.map((item, index) => (
-        <View key={item.id || index} style={styles.row}>
-          <Text style={[styles.cell, styles.flex2]}>{item.name || 'Nama Shelter'}</Text>
-          <Text style={styles.cell}>{item.present ?? '-'}</Text>
-          <Text style={styles.cell}>{item.total ?? '-'}</Text>
-          <Text style={styles.cell}>{item.rate ?? '-'}</Text>
-        </View>
-      ))}
+      {data.map((item, index) => {
+        const present = item.presentCount ?? item.present ?? '-';
+        const total = item.totalSessions ?? item.total ?? '-';
+        const rateValue =
+          typeof item.attendanceRate === 'number'
+            ? `${item.attendanceRate.toFixed(0)}%`
+            : item.rate ?? '-';
+
+        return (
+          <View key={item.id || index} style={styles.row}>
+            <View style={[styles.cell, styles.flex2]}>
+              <Text style={styles.shelterName}>{item.name || 'Nama Shelter'}</Text>
+              {item.wilbin ? <Text style={styles.shelterWilbin}>{item.wilbin}</Text> : null}
+            </View>
+            <Text style={[styles.cell, styles.boldText]}>{present}</Text>
+            <Text style={styles.cell}>{total}</Text>
+            <Text style={[styles.cell, styles.rate]}>{rateValue}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 };
@@ -62,11 +74,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2d3436',
   },
+  boldText: {
+    fontWeight: '600',
+  },
   headerCell: {
     fontWeight: '600',
   },
   flex2: {
     flex: 2,
+  },
+  shelterName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2d3436',
+  },
+  shelterWilbin: {
+    fontSize: 12,
+    color: '#636e72',
+    marginTop: 4,
+  },
+  rate: {
+    fontWeight: '600',
+    color: '#00b894',
   },
   emptyState: {
     paddingVertical: 12,
