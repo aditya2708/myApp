@@ -67,14 +67,20 @@ const DonaturDashboardScreen = () => {
       console.log('Donation ads response:', result);
 
       const ads = result?.data || [];
+      console.log('Donation ads data:', ads);
       const activeAd = Array.isArray(ads)
         ? ads.find((item) => item?.status === '1')
         : null;
+      console.log('Active donation ad:', activeAd);
 
       setDonationAd(activeAd || null);
       setAdVisible(!adDismissed && !!activeAd);
     } catch (err) {
-      console.error('Error fetching donation ads:', err, err?.message);
+      console.error('Donation ads request failed:', err);
+      const errorResponse = await err.response?.text?.();
+      if (errorResponse) {
+        console.log('Error response:', errorResponse);
+      }
     } finally {
       clearTimeout(timeoutId);
     }
