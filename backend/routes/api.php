@@ -198,10 +198,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/anak-binaan', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'index']);
             Route::get('/anak-binaan/child/{id}', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'showChild']);
             Route::get('/anak-binaan/filter-options', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'filterOptions']);
+            Route::prefix('attendance')->group(function () {
+                Route::get('/weekly', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyController::class);
+                Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
+                Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
+            });
         });
 
     });
-    
+
  Route::middleware('role:admin_shelter')->prefix('admin-shelter')->group(function () {
     Route::get('/dashboard', [App\Http\Controllers\API\AdminShelterController::class, 'dashboard']);
     Route::get('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'getProfile']);
