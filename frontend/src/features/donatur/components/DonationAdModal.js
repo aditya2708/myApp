@@ -32,7 +32,15 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
   };
 
   const imageUrl = getFullUrl(ad?.file_url);
-  const iconUrl = getFullUrl(ad?.icon_iklan);
+
+  const iconValue = ad?.icon_iklan?.trim?.();
+  const isFontAwesomeIcon =
+    typeof iconValue === 'string' && /^fa[sbrl]-/i.test(iconValue || '');
+  const fontAwesomeIconName = isFontAwesomeIcon ? iconValue.replace('fa-', '') : null;
+  const isImageIcon =
+    typeof iconValue === 'string' &&
+    (/^https?:\/\//i.test(iconValue) || /\.(png|jpe?g|gif|svg|webp)$/i.test(iconValue));
+  const iconUrl = isImageIcon ? getFullUrl(iconValue) : null;
 
   const handleActionPress = async () => {
     try {
@@ -88,8 +96,14 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
               onPress={handleActionPress}
               fullWidth
               leftIcon={
-                iconUrl ? (
-                  <Image source={{ uri: iconUrl }} style={styles.ctaIcon} resizeMode="contain" />
+                isFontAwesomeIcon && fontAwesomeIconName ? (
+                  <FontAwesome5 name={fontAwesomeIconName} size={18} color="#ffffff" />
+                ) : iconUrl ? (
+                  <Image
+                    source={{ uri: iconUrl }}
+                    style={styles.ctaIcon}
+                    resizeMode="contain"
+                  />
                 ) : (
                   <FontAwesome5 name="hands-helping" size={18} color="#ffffff" />
                 )
