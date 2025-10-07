@@ -82,9 +82,41 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
   const extraNote = getTextValue(ad?.keterangan);
 
   const iconValue = ad?.icon_iklan?.trim?.();
-  const isFontAwesomeIcon =
-    typeof iconValue === 'string' && /^fa[sbrl]-/i.test(iconValue || '');
-  const fontAwesomeIconName = isFontAwesomeIcon ? iconValue.replace('fa-', '') : null;
+
+  const parseFontAwesomeIcon = (value) => {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      return null;
+    }
+
+    const match = /^fa(?:(s|r|l|b))?-([a-z0-9-]+)$/i.exec(trimmedValue);
+
+    if (!match) {
+      return null;
+    }
+
+    const styleCode = (match[1] || 's').toLowerCase();
+    const styleMap = {
+      s: 'solid',
+      r: 'regular',
+      l: 'light',
+      b: 'brand',
+    };
+
+    return {
+      name: match[2].toLowerCase(),
+      style: styleMap[styleCode] || 'solid',
+    };
+  };
+
+  const parsedFontAwesomeIcon = parseFontAwesomeIcon(iconValue);
+  const isFontAwesomeIcon = Boolean(parsedFontAwesomeIcon);
+  const fontAwesomeIconName = parsedFontAwesomeIcon?.name;
+  const fontAwesomeIconStyle = parsedFontAwesomeIcon?.style;
   const isImageIcon =
     typeof iconValue === 'string' &&
     (/^https?:\/\//i.test(iconValue) || /\.(png|jpe?g|gif|svg|webp)$/i.test(iconValue));
@@ -152,7 +184,15 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
               fullWidth
               leftIcon={
                 isFontAwesomeIcon && fontAwesomeIconName ? (
-                  <FontAwesome5 name={fontAwesomeIconName} size={18} color="#ffffff" />
+                  <FontAwesome5
+                    name={fontAwesomeIconName}
+                    size={18}
+                    color="#ffffff"
+                    solid={fontAwesomeIconStyle === 'solid'}
+                    regular={fontAwesomeIconStyle === 'regular'}
+                    light={fontAwesomeIconStyle === 'light'}
+                    brand={fontAwesomeIconStyle === 'brand'}
+                  />
                 ) : iconUrl ? (
                   <Image
                     source={{ uri: iconUrl }}
