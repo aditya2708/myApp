@@ -12,10 +12,10 @@ import {
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
 import Button from '../../../common/components/Button';
-import { API_BASE_URL } from '../../../constants/config';
+import { DONATION_ASSET_BASE_URL } from '../../../constants/config';
 
 const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
-  const assetBase = API_BASE_URL.replace(/\/api\/?$/, '');
+  const assetBase = DONATION_ASSET_BASE_URL.replace(/\/$/, '');
 
   const getFullUrl = (path) => {
     if (!path) {
@@ -26,9 +26,8 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
       return path;
     }
 
-    const base = assetBase.replace(/\/$/, '');
     const cleanedPath = path.replace(/^\//, '');
-    return `${base}/${cleanedPath}`;
+    return `${assetBase}/${cleanedPath}`;
   };
 
   const imageUrl = getFullUrl(ad?.file_url);
