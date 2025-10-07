@@ -18,7 +18,6 @@ import EmptyState from '../../../../common/components/EmptyState';
 import ChildReportSummary from '../../components/reports/ChildReportSummary';
 import ChildReportListItem from '../../components/reports/ChildReportListItem';
 import ChildReportFilterModal from '../../components/reports/ChildReportFilterModal';
-import ChildAttendanceLineChart from '../../components/reports/ChildAttendanceLineChart';
 import ChildAttendanceBarChart from '../../components/reports/ChildAttendanceBarChart';
 import { adminCabangReportApi } from '../../api/adminCabangReportApi';
 import {
@@ -51,7 +50,6 @@ import { selectUserProfile } from '../../../auth/redux/authSlice';
 
 const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DEFAULT_ACTIVITY = 'Bimbel';
-const DEFAULT_CHART_TYPE = 'bar';
 const DEFAULT_SHELTER = null;
 const RECENT_PERIOD_COUNT = 12;
 
@@ -238,7 +236,6 @@ const AdminCabangChildReportScreen = () => {
     typeof filters.shelter === 'undefined' || filters.shelter === null
       ? DEFAULT_SHELTER
       : filters.shelter;
-  const activeChartType = filters.chartType ?? DEFAULT_CHART_TYPE;
 
   const selectedPeriodLabel = useMemo(
     () => (activePeriod ? formatPeriodLabel(activePeriod) : ''),
@@ -400,14 +397,12 @@ const AdminCabangChildReportScreen = () => {
     }
 
     navigation.navigate('ChartFullScreen', {
-      chartType: activeChartType,
       periodLabel: selectedPeriodLabel,
       categories: attendanceCategories,
       data: filteredAttendanceData,
       year: selectedPeriodLabel,
     });
   }, [
-    activeChartType,
     attendanceCategories,
     filteredAttendanceData,
     hasPositiveAttendance,
@@ -504,7 +499,6 @@ const AdminCabangChildReportScreen = () => {
       period: basePeriod,
       jenisKegiatan: DEFAULT_ACTIVITY,
       shelter: DEFAULT_SHELTER,
-      chartType: DEFAULT_CHART_TYPE,
       ...derivedDateRange,
       ...(resetValues || {}),
     };
@@ -521,10 +515,6 @@ const AdminCabangChildReportScreen = () => {
           : fallbackFilters.jenisKegiatan,
       shelter:
         typeof fallbackFilters.shelter === 'undefined' ? DEFAULT_SHELTER : fallbackFilters.shelter,
-      chartType:
-        typeof fallbackFilters.chartType === 'undefined' || fallbackFilters.chartType === null
-          ? DEFAULT_CHART_TYPE
-          : fallbackFilters.chartType,
       start_date:
         typeof fallbackFilters.start_date === 'undefined' || fallbackFilters.start_date === null
           ? getMonthDateRange(fallbackFilters.period ?? defaultPeriod).start_date
@@ -813,14 +803,6 @@ const AdminCabangChildReportScreen = () => {
                 Belum ada data kehadiran untuk periode ini
               </Text>
             </View>
-          ) : activeChartType === 'line' ? (
-            <ChildAttendanceLineChart
-              mode="compact"
-              year={selectedPeriodLabel}
-              data={filteredAttendanceData}
-              categories={attendanceCategories}
-              onOpenFullScreen={handleOpenChartFullScreen}
-            />
           ) : (
             <View style={styles.barChartCard}>
               <View style={styles.chartCardHeader}>
@@ -908,7 +890,6 @@ const AdminCabangChildReportScreen = () => {
         filters={filters}
         periodOptions={PERIOD_OPTIONS}
         defaultPeriod={defaultPeriod}
-        initialChartType={activeChartType}
         jenisOptions={filterOptions.jenisKegiatan}
         wilayahOptions={filterOptions.wilayahBinaan}
         shelterOptions={shelterOptions}

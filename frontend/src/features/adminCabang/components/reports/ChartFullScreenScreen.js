@@ -2,9 +2,6 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-import ChildAttendanceLineChart, {
-  DEFAULT_DATA,
-} from './ChildAttendanceLineChart';
 import ChildAttendanceBarChart from './ChildAttendanceBarChart';
 
 const ChartFullScreenScreen = () => {
@@ -15,8 +12,6 @@ const ChartFullScreenScreen = () => {
     year: routeYear,
     data: routeData,
     contentInset: routeContentInset,
-    gradientId: routeGradientId,
-    chartType = 'line',
     periodLabel,
     categories: routeCategories,
     ...chartProps
@@ -29,12 +24,8 @@ const ChartFullScreenScreen = () => {
       return routeData;
     }
 
-    if (chartType === 'bar') {
-      return [];
-    }
-
-    return DEFAULT_DATA;
-  }, [chartType, routeData]);
+    return [];
+  }, [routeData]);
 
   const fallbackTitle = useMemo(() => {
     if (!year) {
@@ -57,31 +48,10 @@ const ChartFullScreenScreen = () => {
     [routeContentInset]
   );
 
-  const resolvedGradientId = useMemo(
-    () => routeGradientId ?? undefined,
-    [routeGradientId]
-  );
-
   const resolvedCategories = useMemo(
     () => (Array.isArray(routeCategories) ? routeCategories : undefined),
     [routeCategories]
   );
-
-  const lineChartProps = useMemo(() => {
-    const props = { ...chartProps };
-
-    if (resolvedContentInset) {
-      props.contentInset = resolvedContentInset;
-    }
-
-    if (resolvedGradientId) {
-      props.gradientId = resolvedGradientId;
-    }
-
-    props.year = year;
-
-    return props;
-  }, [chartProps, resolvedContentInset, resolvedGradientId, year]);
 
   const barChartProps = useMemo(() => {
     const props = { ...chartProps };
@@ -96,8 +66,6 @@ const ChartFullScreenScreen = () => {
 
     return props;
   }, [chartProps, resolvedContentInset]);
-
-  const isBarChart = chartType === 'bar';
 
   return (
     <View style={styles.container}>
@@ -116,25 +84,13 @@ const ChartFullScreenScreen = () => {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.chartWrapper}>
-          {isBarChart ? (
-            <ChildAttendanceBarChart
-              data={chartData}
-              mode="fullscreen"
-              containerStyle={styles.chartContainer}
-              categories={resolvedCategories}
-              {...barChartProps}
-            />
-          ) : (
-            <ChildAttendanceLineChart
-              data={chartData}
-              categories={resolvedCategories}
-              mode="fullscreen"
-              showAllMonthLabels
-              compactLabelStep={1}
-              containerStyle={styles.chartContainer}
-              {...lineChartProps}
-            />
-          )}
+          <ChildAttendanceBarChart
+            data={chartData}
+            mode="fullscreen"
+            containerStyle={styles.chartContainer}
+            categories={resolvedCategories}
+            {...barChartProps}
+          />
         </View>
       </ScrollView>
     </View>
