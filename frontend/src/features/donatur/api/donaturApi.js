@@ -15,6 +15,14 @@ export const donaturApi = {
   },
 
   /**
+   * Get donation advertisements for donors
+   * @returns {Promise} - API response with donation ads
+   */
+  getDonationAds: async () => {
+    return await api.get(DONATUR_ENDPOINTS.IKLAN_DONASI);
+  },
+
+  /**
    * Get donatur profile
    * @returns {Promise} - API response with profile data
    */

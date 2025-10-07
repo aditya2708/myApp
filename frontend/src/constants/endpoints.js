@@ -396,7 +396,8 @@ export const DONATUR_ENDPOINTS = {
     SPONSOR_CHILD: (childId) => `/donatur/marketplace/children/${childId}/sponsor`,
     FILTERS: '/donatur/marketplace/filters',
     FEATURED_CHILDREN: '/donatur/marketplace/featured-children'
-  }
+  },
+  IKLAN_DONASI: '/iklandonasi'
 };
 
 export const MANAGEMENT_ENDPOINTS = {
