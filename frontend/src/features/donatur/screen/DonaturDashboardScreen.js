@@ -17,6 +17,7 @@ import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
 import { donaturApi } from '../api/donaturApi';
 import { useAuth } from '../../../common/hooks/useAuth';
+import DonationAdModal from '../components/DonationAdModal';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +28,9 @@ const DonaturDashboardScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [donationAd, setDonationAd] = useState(null);
+  const [adVisible, setAdVisible] = useState(false);
+  const [adDismissed, setAdDismissed] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
@@ -42,13 +46,35 @@ const DonaturDashboardScreen = () => {
     }
   };
 
+  const fetchDonationAd = async () => {
+    try {
+      const response = await donaturApi.getDonationAds();
+      const ads = response?.data?.data || [];
+      const activeAd = Array.isArray(ads)
+        ? ads.find((item) => item?.status === '1')
+        : null;
+
+      setDonationAd(activeAd || null);
+      setAdVisible(!adDismissed && !!activeAd);
+    } catch (err) {
+      console.error('Error fetching donation ads:', err);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchDonationAd();
   }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchDashboardData();
+    fetchDonationAd();
+  };
+
+  const handleCloseAd = () => {
+    setAdVisible(false);
+    setAdDismissed(true);
   };
 
   const navigateToMyChildren = () => navigation.navigate('Children', { screen: 'ChildList' });
@@ -75,6 +101,13 @@ const DonaturDashboardScreen = () => {
           onRetry={fetchDashboardData}
         />
       )}
+
+      <DonationAdModal
+        visible={adVisible}
+        ad={donationAd}
+        onClose={handleCloseAd}
+        onActionPress={() => setAdDismissed(true)}
+      />
 
       <View style={styles.headerCard}>
         <View style={styles.headerTop}>
