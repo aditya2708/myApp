@@ -15,6 +15,8 @@ import Button from '../../../common/components/Button';
 import { API_BASE_URL } from '../../../constants/config';
 
 const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
+  const assetBase = API_BASE_URL.replace(/\/api\/?$/, '');
+
   const getFullUrl = (path) => {
     if (!path) {
       return null;
@@ -24,7 +26,7 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
       return path;
     }
 
-    const base = API_BASE_URL.replace(/\/$/, '');
+    const base = assetBase.replace(/\/$/, '');
     const cleanedPath = path.replace(/^\//, '');
     return `${base}/${cleanedPath}`;
   };
