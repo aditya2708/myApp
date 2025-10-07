@@ -3,6 +3,20 @@ export const API_BASE_URL = 'http://10.132.12.166:8000/api';
 //export const API_BASE_URL = 'http://192.168.8.105:8000/api';
 //export const API_BASE_URL = 'https://bp.berbagipendidikan.org/api';
 
+// Asset URLs
+const resolveDonationAssetBaseUrl = () => {
+  const env =
+    (typeof process !== 'undefined' && process?.env) ?
+      process.env.EXPO_PUBLIC_DONATION_ASSET_BASE_URL ||
+      process.env.DONATION_ASSET_BASE_URL :
+      null;
+
+  const value = typeof env === 'string' ? env.trim() : '';
+  return value || 'https://home.kilauindonesia.org';
+};
+
+export const DONATION_ASSET_BASE_URL = resolveDonationAssetBaseUrl();
+
 // Storage keys
 export const STORAGE_TOKEN_KEY = 'berbagipendidikan_token';
 export const STORAGE_USER_KEY = 'berbagipendidikan_user';
