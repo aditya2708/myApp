@@ -73,17 +73,22 @@ export const loginUser = (credentials) => async (dispatch) => {
     return data;
   } catch (error) {
     // Extract error message for better UX
-    const errorMsg = error.response?.data?.message || 
-                     error.response?.data?.errors || 
-                     error.message || 
-                     'Login failed';
-    
-    const formattedError = { 
-      message: typeof errorMsg === 'object' 
-        ? Object.values(errorMsg).flat().join(', ') 
-        : errorMsg 
+    const fieldErrors = error.response?.data?.errors;
+    const rawMessage = error.response?.data?.message || error.message || 'Login failed';
+
+    const fallbackFieldMessage = fieldErrors && typeof fieldErrors === 'object'
+      ? Object.values(fieldErrors).flat().join(', ')
+      : null;
+
+    const message = typeof rawMessage === 'string'
+      ? rawMessage
+      : fallbackFieldMessage || 'Login failed';
+
+    const formattedError = {
+      message,
+      fieldErrors: fieldErrors || null
     };
-    
+
     dispatch(loginFailure(formattedError));
     throw formattedError;
   }

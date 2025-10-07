@@ -7,8 +7,9 @@ import {
   selectUserProfile,
   selectAuthLoading,
   selectAuthError,
+  selectAuthFieldErrors,
   selectIsInitializing,
-  resetAuthError 
+  resetAuthError
 } from '../../features/auth/redux/authSlice';
 import { 
   loginUser, 
@@ -31,6 +32,7 @@ export const useAuth = () => {
   const profile = useSelector(selectUserProfile);
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
+  const fieldErrors = useSelector(selectAuthFieldErrors);
   const initializing = useSelector(selectIsInitializing);
 
   // Initialize auth on first render
@@ -79,6 +81,7 @@ export const useAuth = () => {
     profile,
     loading,
     error,
+    fieldErrors,
     initializing,
     
     // Auth actions

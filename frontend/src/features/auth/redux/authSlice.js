@@ -11,7 +11,8 @@ const initialState = {
   profile: null,              // User profile data based on role
   loading: false,             // Loading state
   initializing: true,         // App initialization state
-  error: null                 // Error message if any
+  error: null,                // Error message if any
+  fieldErrors: null           // Field-level validation errors
 };
 
 /**
@@ -24,6 +25,7 @@ const authSlice = createSlice({
     // Reset error state
     resetAuthError: (state) => {
       state.error = null;
+      state.fieldErrors = null;
     },
     
     // Manually set auth token (for restoring from storage)
@@ -41,8 +43,9 @@ const authSlice = createSlice({
     loginStart: (state) => {
       state.loading = true;
       state.error = null;
+      state.fieldErrors = null;
     },
-    
+
     loginSuccess: (state, action) => {
       state.loading = false;
       state.isAuthenticated = true;
@@ -54,11 +57,13 @@ const authSlice = createSlice({
       };
       state.userLevel = action.payload.user.level;
       state.profile = action.payload.user.profile;
+      state.fieldErrors = null;
     },
-    
+
     loginFailure: (state, action) => {
       state.loading = false;
       state.error = action.payload?.message || 'Login failed. Please check your credentials.';
+      state.fieldErrors = action.payload?.fieldErrors || null;
     },
 
     // Logout actions
@@ -152,6 +157,7 @@ export const selectUser = (state) => state.auth.user;
 export const selectUserProfile = (state) => state.auth.profile;
 export const selectAuthLoading = (state) => state.auth.loading;
 export const selectAuthError = (state) => state.auth.error;
+export const selectAuthFieldErrors = (state) => state.auth.fieldErrors;
 
 // Export reducer
 export default authSlice.reducer;

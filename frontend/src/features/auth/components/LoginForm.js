@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../common/hooks/useAuth';
@@ -21,7 +21,40 @@ const LoginForm = ({ onLoginSuccess }) => {
   const [validationErrors, setValidationErrors] = useState({});
 
   // Get auth related functions and state from useAuth hook
-  const { login, loading, error, clearError } = useAuth();
+  const { login, loading, error, fieldErrors, clearError } = useAuth();
+
+  useEffect(() => {
+    if (!fieldErrors) {
+      setValidationErrors(prev => {
+        const updatedErrors = { ...prev };
+        ['email', 'password'].forEach((field) => {
+          if (field in updatedErrors) {
+            delete updatedErrors[field];
+          }
+        });
+        return updatedErrors;
+      });
+      return;
+    }
+
+    setValidationErrors(prev => {
+      const updatedErrors = { ...prev };
+
+      Object.entries(fieldErrors).forEach(([field, value]) => {
+        if (['email', 'password'].includes(field)) {
+          updatedErrors[field] = Array.isArray(value) ? value.join(' ') : value;
+        }
+      });
+
+      ['email', 'password'].forEach((field) => {
+        if (!Object.prototype.hasOwnProperty.call(fieldErrors, field) && field in updatedErrors) {
+          delete updatedErrors[field];
+        }
+      });
+
+      return updatedErrors;
+    });
+  }, [fieldErrors]);
 
   // Validate form inputs
   const validateForm = () => {
