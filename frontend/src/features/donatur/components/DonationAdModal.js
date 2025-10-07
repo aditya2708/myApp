@@ -32,6 +32,30 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
 
   const imageUrl = getFullUrl(ad?.file_url);
 
+  const getTextValue = (...values) => {
+    for (const value of values) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          return trimmed;
+        }
+      }
+    }
+
+    return '';
+  };
+
+  const mainTitle = getTextValue(ad?.nama, ad?.title, ad?.name, ad?.judul);
+  const descriptionText = getTextValue(
+    ad?.description,
+    ad?.deskripsi,
+    ad?.sub_title,
+    ad?.subTitle,
+    ad?.subjudul,
+    ad?.content
+  );
+  const extraNote = getTextValue(ad?.keterangan);
+
   const iconValue = ad?.icon_iklan?.trim?.();
   const isFontAwesomeIcon =
     typeof iconValue === 'string' && /^fa[sbrl]-/i.test(iconValue || '');
@@ -85,13 +109,14 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
           )}
 
           <View style={styles.content}>
-            {ad?.title ? <Text style={styles.title}>{ad.title}</Text> : null}
-            {ad?.description ? (
-              <Text style={styles.description}>{ad.description}</Text>
+            {mainTitle ? <Text style={styles.title}>{mainTitle}</Text> : null}
+            {descriptionText ? (
+              <Text style={styles.description}>{descriptionText}</Text>
             ) : null}
+            {extraNote ? <Text style={styles.note}>{extraNote}</Text> : null}
 
             <Button
-              title={ad?.cta_text || 'Lihat Selengkapnya'}
+              title={ad?.name_button_iklan || ad?.cta_text || 'Lihat Selengkapnya'}
               onPress={handleActionPress}
               fullWidth
               leftIcon={
@@ -168,6 +193,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  note: {
+    fontSize: 13,
+    color: '#95a5a6',
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   ctaIcon: {
     width: 20,
