@@ -233,7 +233,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   surface: {
-    backgroundColor: '#ffffff',
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
