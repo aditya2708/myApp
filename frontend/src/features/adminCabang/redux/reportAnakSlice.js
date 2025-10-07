@@ -22,7 +22,6 @@ const initialState = {
     shelter: null,
     search: '',
     period: null,
-    chartType: 'bar',
   },
 
   filterOptions: {
@@ -61,18 +60,6 @@ const reportAnakSlice = createSlice({
         nextFilters.period = incomingFilters.period ?? null;
       }
 
-      if (Object.prototype.hasOwnProperty.call(incomingFilters, 'chartType')) {
-        nextFilters.chartType =
-          incomingFilters.chartType ?? initialState.filters.chartType;
-      }
-
-      if (
-        typeof nextFilters.chartType === 'undefined' ||
-        nextFilters.chartType === null
-      ) {
-        nextFilters.chartType = initialState.filters.chartType;
-      }
-
       state.filters = nextFilters;
     },
     setDateRange: (state, action) => {
@@ -92,10 +79,6 @@ const reportAnakSlice = createSlice({
     },
     setPeriod: (state, action) => {
       state.filters.period = action.payload ?? null;
-    },
-    setChartType: (state, action) => {
-      state.filters.chartType =
-        action.payload ?? initialState.filters.chartType;
     },
     setSearch: (state, action) => {
       state.filters.search = action.payload ?? '';
@@ -270,7 +253,6 @@ export const {
   setWilayahBinaan,
   setShelter,
   setPeriod,
-  setChartType,
   setSearch,
   resetFilters,
   clearDetail,

@@ -14,7 +14,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Button from '../../../../common/components/Button';
 
 const DEFAULT_ACTIVITY = 'Bimbel';
-const DEFAULT_CHART_TYPE = 'bar';
 const DEFAULT_SHELTER = null;
 
 const parsePeriodStringToDate = (periodString) => {
@@ -90,7 +89,7 @@ const formatMonthYearLabel = (date) => {
 
 const buildInitialLocalFilters = (filters, defaults = {}) => {
   const incomingFilters = filters ? { ...filters } : {};
-  const { defaultPeriodValue = null, defaultChartType = DEFAULT_CHART_TYPE } = defaults;
+  const { defaultPeriodValue = null } = defaults;
 
   if (typeof incomingFilters.wilayahBinaan === 'undefined') {
     incomingFilters.wilayahBinaan = null;
@@ -112,10 +111,6 @@ const buildInitialLocalFilters = (filters, defaults = {}) => {
         : incomingFilters.jenisKegiatan,
     shelter:
       typeof incomingFilters.shelter === 'undefined' ? DEFAULT_SHELTER : incomingFilters.shelter,
-    chartType:
-      typeof incomingFilters.chartType === 'undefined' || incomingFilters.chartType === null
-        ? defaultChartType ?? DEFAULT_CHART_TYPE
-        : incomingFilters.chartType,
     start_date: periodPayload.start_date,
     end_date: periodPayload.end_date,
   };
@@ -123,7 +118,7 @@ const buildInitialLocalFilters = (filters, defaults = {}) => {
 
 const prepareFiltersForSubmit = (filters, defaults = {}) => {
   const nextFilters = filters ? { ...filters } : {};
-  const { defaultPeriodValue = null, defaultChartType = DEFAULT_CHART_TYPE } = defaults;
+  const { defaultPeriodValue = null } = defaults;
 
   const resolvedPeriodDate = resolvePeriodDate(
     nextFilters.period,
@@ -142,10 +137,6 @@ const prepareFiltersForSubmit = (filters, defaults = {}) => {
 
   if (typeof nextFilters.shelter === 'undefined') {
     nextFilters.shelter = DEFAULT_SHELTER;
-  }
-
-  if (typeof nextFilters.chartType === 'undefined' || nextFilters.chartType === null) {
-    nextFilters.chartType = defaultChartType ?? DEFAULT_CHART_TYPE;
   }
 
   if (typeof nextFilters.wilayahBinaan === 'undefined') {
@@ -195,7 +186,6 @@ const ChildReportFilterModal = ({
   filters,
   periodOptions = [],
   defaultPeriod = null,
-  initialChartType = DEFAULT_CHART_TYPE,
   jenisOptions = [],
   wilayahOptions = [],
   shelterOptions = [],
@@ -247,18 +237,11 @@ const ChildReportFilterModal = ({
     return normalizedPeriodOptions[0]?.value ?? null;
   }, [defaultPeriod, normalizedPeriodOptions]);
 
-  const resolvedDefaultChartType = useMemo(() => {
-    return initialChartType === 'line' || initialChartType === 'bar'
-      ? initialChartType
-      : DEFAULT_CHART_TYPE;
-  }, [initialChartType]);
-
   const defaultConfig = useMemo(
     () => ({
       defaultPeriodValue: resolvedDefaultPeriod,
-      defaultChartType: resolvedDefaultChartType,
     }),
-    [resolvedDefaultPeriod, resolvedDefaultChartType],
+    [resolvedDefaultPeriod],
   );
 
   const createInitialLocalFilters = () => buildInitialLocalFilters(filters, defaultConfig);
@@ -387,7 +370,6 @@ const ChildReportFilterModal = ({
         jenisKegiatan: DEFAULT_ACTIVITY,
         wilayahBinaan: null,
         shelter: DEFAULT_SHELTER,
-        chartType: resolvedDefaultChartType,
       },
       defaultConfig,
     );
@@ -552,41 +534,6 @@ const ChildReportFilterModal = ({
               </View>
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tampilkan Sebagai</Text>
-              <View style={styles.chartTypeRow}>
-                {['bar', 'line'].map((type, index) => {
-                  const isSelected = localFilters.chartType === type;
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.chartTypeButton,
-                        isSelected && styles.chartTypeButtonSelected,
-                        index === 1 && styles.chartTypeButtonLast,
-                      ]}
-                      onPress={() =>
-                        setLocalFilters((prev) => ({
-                          ...prev,
-                          chartType: type,
-                        }))
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={type === 'bar' ? 'bar-chart' : 'analytics'}
-                        size={18}
-                        color={isSelected ? '#ffffff' : '#7f8c8d'}
-                        style={styles.chartTypeIcon}
-                      />
-                      <Text style={[styles.chartTypeLabel, isSelected && styles.chartTypeLabelSelected]}>
-                        {type === 'bar' ? 'Bar' : 'Line'}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
           </ScrollView>
 
           <View style={styles.footer}>
@@ -707,40 +654,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginBottom: 6,
-  },
-  chartTypeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  chartTypeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ecf0f1',
-    backgroundColor: '#ffffff',
-    marginRight: 12,
-  },
-  chartTypeButtonSelected: {
-    backgroundColor: '#3498db',
-    borderColor: '#3498db',
-  },
-  chartTypeLabel: {
-    fontSize: 14,
-    color: '#2c3e50',
-    fontWeight: '500',
-  },
-  chartTypeLabelSelected: {
-    color: '#ffffff',
-  },
-  chartTypeIcon: {
-    marginRight: 8,
-  },
-  chartTypeButtonLast: {
-    marginRight: 0,
   },
   errorContainer: {
     backgroundColor: '#fdecea',

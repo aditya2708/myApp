@@ -202,7 +202,7 @@ const resolveFilterValue = (value) => {
 };
 
 const buildRequestParams = (filters = {}, extras = {}) => {
-  const { period: _period, chartType: _chartType, ...restFilters } = filters || {};
+  const { period: _period, ...restFilters } = filters || {};
   const params = { ...restFilters };
 
   const mapping = {
