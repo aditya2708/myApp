@@ -42,7 +42,7 @@ export const initializeAuth = () => async (dispatch) => {
         await removeToken();
         await removeUser();
         dispatch(setAuthToken(null));
-        dispatch(fetchUserFailure({ message: 'Session expired. Please login again.' }));
+        dispatch(fetchUserFailure({ message: 'Sesi berakhir. Silakan masuk kembali.' }));
       }
     }
     
@@ -74,7 +74,7 @@ export const loginUser = (credentials) => async (dispatch) => {
   } catch (error) {
     // Extract error message for better UX
     const fieldErrors = error.response?.data?.errors;
-    const rawMessage = error.response?.data?.message || error.message || 'Login failed';
+    const rawMessage = error.response?.data?.message || error.message || 'Email atau kata sandi tidak sesuai';
 
     const fallbackFieldMessage = fieldErrors && typeof fieldErrors === 'object'
       ? Object.values(fieldErrors).flat().join(', ')
@@ -82,7 +82,7 @@ export const loginUser = (credentials) => async (dispatch) => {
 
     const message = typeof rawMessage === 'string'
       ? rawMessage
-      : fallbackFieldMessage || 'Login failed';
+      : fallbackFieldMessage || 'Email atau kata sandi tidak sesuai';
 
     const formattedError = {
       message,
@@ -141,7 +141,7 @@ export const fetchCurrentUser = () => async (dispatch) => {
   } catch (error) {
     console.error('Error fetching current user:', error);
     
-    const errorMsg = error.response?.data?.message || 'Failed to fetch user data';
+    const errorMsg = error.response?.data?.message || 'Gagal mengambil data pengguna';
     dispatch(fetchUserFailure({ message: errorMsg }));
     throw error;
   }

@@ -163,11 +163,11 @@ const LoginForm = ({ onLoginSuccess }) => {
 
         {/* Error Message */}
         {error && (
-          <ErrorMessage 
-            message={error} 
+          <ErrorMessage
+            message={error}
             visible={!!error}
             onRetry={clearError}
-            retryText="Clear"
+            retryText="Tutup"
           />
         )}
 
