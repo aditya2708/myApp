@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import Button from '../../../common/components/Button';
 import { DONATION_ASSET_BASE_URL } from '../../../constants/config';
@@ -157,53 +158,60 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
     >
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <Ionicons name="close" size={20} color="#333" />
-          </TouchableOpacity>
+          <View style={styles.surface}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+              <Ionicons name="close" size={20} color="#333" />
+            </TouchableOpacity>
 
-          {imageUrl && (
-            <View style={[styles.imageContainer, { aspectRatio: imageAspectRatio }]}>
-              <Image
-                source={{ uri: imageUrl }}
-                style={styles.image}
-                resizeMode="contain"
+            {imageUrl && (
+              <View style={[styles.imageWrapper, { aspectRatio: imageAspectRatio }]}>
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.image}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["rgba(255,255,255,0)", '#ffffff']}
+                  style={styles.imageFade}
+                />
+              </View>
+            )}
+
+            <View style={styles.contentPanel}>
+              {mainTitle ? <Text style={styles.title}>{mainTitle}</Text> : null}
+              {descriptionText ? (
+                <Text style={styles.description}>{descriptionText}</Text>
+              ) : null}
+              {extraNote ? <Text style={styles.note}>{extraNote}</Text> : null}
+
+              <Button
+                title={ad?.name_button_iklan || ad?.cta_text || 'Lihat Selengkapnya'}
+                onPress={handleActionPress}
+                fullWidth
+                leftIcon={
+                  isFontAwesomeIcon && fontAwesomeIconName ? (
+                    <FontAwesome5
+                      name={fontAwesomeIconName}
+                      size={18}
+                      color="#ffffff"
+                      solid={fontAwesomeIconStyle === 'solid'}
+                      regular={fontAwesomeIconStyle === 'regular'}
+                      light={fontAwesomeIconStyle === 'light'}
+                      brand={fontAwesomeIconStyle === 'brand'}
+                    />
+                  ) : iconUrl ? (
+                    <Image
+                      source={{ uri: iconUrl }}
+                      style={styles.ctaIcon}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <FontAwesome5 name="hands-helping" size={18} color="#ffffff" />
+                  )
+                }
               />
             </View>
-          )}
-
-          <View style={styles.content}>
-            {mainTitle ? <Text style={styles.title}>{mainTitle}</Text> : null}
-            {descriptionText ? (
-              <Text style={styles.description}>{descriptionText}</Text>
-            ) : null}
-            {extraNote ? <Text style={styles.note}>{extraNote}</Text> : null}
-
-            <Button
-              title={ad?.name_button_iklan || ad?.cta_text || 'Lihat Selengkapnya'}
-              onPress={handleActionPress}
-              fullWidth
-              leftIcon={
-                isFontAwesomeIcon && fontAwesomeIconName ? (
-                  <FontAwesome5
-                    name={fontAwesomeIconName}
-                    size={18}
-                    color="#ffffff"
-                    solid={fontAwesomeIconStyle === 'solid'}
-                    regular={fontAwesomeIconStyle === 'regular'}
-                    light={fontAwesomeIconStyle === 'light'}
-                    brand={fontAwesomeIconStyle === 'brand'}
-                  />
-                ) : iconUrl ? (
-                  <Image
-                    source={{ uri: iconUrl }}
-                    style={styles.ctaIcon}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <FontAwesome5 name="hands-helping" size={18} color="#ffffff" />
-                )
-              }
-            />
           </View>
         </View>
       </View>
@@ -222,6 +230,9 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 400,
+    backgroundColor: 'transparent',
+  },
+  surface: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
     overflow: 'hidden',
@@ -244,17 +255,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
-  imageContainer: {
+  imageWrapper: {
     width: '100%',
-    overflow: 'hidden',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
   },
-  content: {
+  imageFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 120,
+  },
+  contentPanel: {
+    backgroundColor: '#ffffff',
     padding: 20,
   },
   title: {
