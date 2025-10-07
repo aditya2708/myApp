@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   View,
@@ -31,6 +31,31 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
   };
 
   const imageUrl = getFullUrl(ad?.file_url);
+  const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (imageUrl) {
+      Image.getSize(
+        imageUrl,
+        (width, height) => {
+          if (isMounted && width && height) {
+            setImageAspectRatio(width / height);
+          }
+        },
+        () => {
+          if (isMounted) {
+            setImageAspectRatio(16 / 9);
+          }
+        }
+      );
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [imageUrl]);
 
   const getTextValue = (...values) => {
     for (const value of values) {
@@ -105,7 +130,13 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
           </TouchableOpacity>
 
           {imageUrl && (
-            <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+            <View style={[styles.imageContainer, { aspectRatio: imageAspectRatio }]}>
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.image}
+                resizeMode="contain"
+              />
+            </View>
           )}
 
           <View style={styles.content}>
@@ -173,9 +204,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
+  imageContainer: {
+    width: '100%',
+    overflow: 'hidden',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
   image: {
     width: '100%',
-    height: 180,
+    height: '100%',
   },
   content: {
     padding: 20,
