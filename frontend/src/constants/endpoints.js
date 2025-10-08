@@ -157,6 +157,8 @@ export const ADMIN_CABANG_ENDPOINTS = {
       WEEKLY_SHELTERS: '/admin-cabang/laporan/attendance/weekly-shelters',
       WEEKLY_SHELTER_DETAIL: (shelterId) =>
         `/admin-cabang/laporan/attendance/weekly-shelters/${shelterId}`,
+      WEEKLY_GROUP_STUDENTS: (groupId) =>
+        `/admin-cabang/laporan/attendance/weekly-groups/${groupId}/students`,
       MONTHLY_SHELTER: '/admin-cabang/laporan/attendance/monthly-shelter',
       MONTHLY_BRANCH: '/admin-cabang/laporan/attendance/monthly-branch',
     },

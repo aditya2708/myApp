@@ -27,6 +27,7 @@ import AdminCabangTutorReportScreen from '../features/adminCabang/screens/report
 import AdminCabangAttendanceReportScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceReportScreen';
 import AdminCabangAttendanceWeeklyScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceWeeklyScreen';
 import AdminCabangAttendanceShelterScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceShelterScreen';
+import AdminCabangAttendanceGroupScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceGroupScreen';
 import ChartFullScreenScreen from '../features/adminCabang/components/reports/ChartFullScreenScreen';
 
 // Kurikulum screens
@@ -228,6 +229,11 @@ const ReportsStackNavigator = () => (
       name="AdminCabangAttendanceShelterDetail"
       component={AdminCabangAttendanceShelterScreen}
       options={{ headerTitle: 'Detail Kehadiran Shelter' }}
+    />
+    <ReportsStack.Screen
+      name="AdminCabangAttendanceGroup"
+      component={AdminCabangAttendanceGroupScreen}
+      options={{ headerTitle: 'Detail Kehadiran Kelompok' }}
     />
     <ReportsStack.Screen
       name="AdminCabangChildDetail"
