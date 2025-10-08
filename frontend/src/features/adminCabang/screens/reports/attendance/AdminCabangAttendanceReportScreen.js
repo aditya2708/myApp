@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View, Text } from 'react-native';
 
 import AttendanceFilterBar from '../../../components/reports/attendance/AttendanceFilterBar';
@@ -6,6 +6,7 @@ import AttendanceSummarySection from '../../../components/reports/attendance/Att
 import WeeklyBreakdownList from '../../../components/reports/attendance/WeeklyBreakdownList';
 import ShelterAttendanceTable from '../../../components/reports/attendance/ShelterAttendanceTable';
 import AttendanceTrendChart from '../../../components/reports/attendance/AttendanceTrendChart';
+import ShelterAttendanceDetailModal from '../../../components/reports/attendance/ShelterAttendanceDetailModal';
 
 import useAttendanceSummary from '../../../hooks/reports/attendance/useAttendanceSummary';
 import useAttendanceWeekly from '../../../hooks/reports/attendance/useAttendanceWeekly';
@@ -28,12 +29,66 @@ const AdminCabangAttendanceReportScreen = () => {
   } = useAttendanceWeeklyShelters();
   const { data: trendData } = useAttendanceTrend();
 
+  const [selectedShelter, setSelectedShelter] = useState(null);
+  const [isDetailVisible, setDetailVisible] = useState(false);
+
+  const activeFilters = useMemo(() => {
+    const weeks = Array.isArray(weeklyData) ? weeklyData : [];
+
+    const isValidDate = (value) => {
+      if (!value) {
+        return false;
+      }
+
+      const parsed = new Date(value);
+
+      return !Number.isNaN(parsed.getTime());
+    };
+
+    const startDates = weeks
+      .map((item) => item?.dates?.start)
+      .filter((value) => isValidDate(value));
+    const endDates = weeks
+      .map((item) => item?.dates?.end)
+      .filter((value) => isValidDate(value));
+
+    const earliestStart =
+      startDates.length > 0
+        ? startDates.reduce((earliest, current) => {
+            return new Date(current) < new Date(earliest) ? current : earliest;
+          }, startDates[0])
+        : undefined;
+
+    const latestEnd =
+      endDates.length > 0
+        ? endDates.reduce((latest, current) => {
+            return new Date(current) > new Date(latest) ? current : latest;
+          }, endDates[0])
+        : undefined;
+
+    return {
+      startDate: earliestStart,
+      endDate: latestEnd,
+      label: summaryData?.periodLabel ?? null,
+    };
+  }, [weeklyData, summaryData?.periodLabel]);
+
   const handleShelterRowPress = useCallback((shelter) => {
     if (!shelter) {
       return;
     }
 
-    console.log('Shelter attendance selected:', shelter.id || shelter.name, shelter);
+    setSelectedShelter({
+      id: shelter.id,
+      name: shelter.name,
+      wilbin: shelter.wilbin,
+    });
+    setDetailVisible(true);
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setDetailVisible(false);
+    setSelectedShelter(null);
   }, []);
 
   const summaryMetrics = useMemo(() => {
@@ -106,6 +161,15 @@ const AdminCabangAttendanceReportScreen = () => {
         <Text style={styles.sectionTitle}>Tren Kehadiran</Text>
         <AttendanceTrendChart data={trendData} />
       </View>
+
+      <ShelterAttendanceDetailModal
+        visible={isDetailVisible}
+        onClose={handleCloseDetail}
+        shelterId={selectedShelter?.id}
+        shelterName={selectedShelter?.name}
+        shelterWilbin={selectedShelter?.wilbin}
+        filters={activeFilters}
+      />
     </ScrollView>
   );
 };
