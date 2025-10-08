@@ -33,6 +33,37 @@ class AttendanceWeeklyResource extends JsonResource
             ];
         })->values()->all();
 
+        $weeks = collect($data['weeks'] ?? [])->map(function ($week) use ($formatPercentage) {
+            $metrics = (array) ($week['metrics'] ?? []);
+            $verification = (array) ($metrics['verification'] ?? []);
+            $dates = (array) ($week['dates'] ?? []);
+
+            return [
+                'id' => $week['id'] ?? null,
+                'label' => $week['label'] ?? null,
+                'dates' => [
+                    'start' => $dates['start'] ?? ($week['start_date'] ?? null),
+                    'end' => $dates['end'] ?? ($week['end_date'] ?? null),
+                ],
+                'metrics' => [
+                    'present_count' => (int) ($metrics['present_count'] ?? 0),
+                    'late_count' => (int) ($metrics['late_count'] ?? 0),
+                    'absent_count' => (int) ($metrics['absent_count'] ?? 0),
+                    'attendance_percentage' => $formatPercentage($metrics['attendance_rate'] ?? ($metrics['attendance_percentage'] ?? 0)),
+                    'late_percentage' => $formatPercentage($metrics['late_rate'] ?? ($metrics['late_percentage'] ?? 0)),
+                    'total_sessions' => (int) ($metrics['total_sessions'] ?? 0),
+                    'total_activities' => (int) ($metrics['total_activities'] ?? 0),
+                    'unique_children' => (int) ($metrics['unique_children'] ?? 0),
+                    'verification' => [
+                        'pending' => (int) ($verification['pending'] ?? 0),
+                        'verified' => (int) ($verification['verified'] ?? 0),
+                        'rejected' => (int) ($verification['rejected'] ?? 0),
+                        'manual' => (int) ($verification['manual'] ?? 0),
+                    ],
+                ],
+            ];
+        })->values()->all();
+
         return [
             'period' => [
                 'start_date' => $period['start_date'] ?? null,
@@ -48,12 +79,14 @@ class AttendanceWeeklyResource extends JsonResource
                 'attendance_percentage' => $formatPercentage($summary['attendance_percentage'] ?? 0),
             ],
             'shelters' => $shelters,
+            'weeks' => $weeks,
             'meta' => [
                 'filters' => [
                     'start_date' => $filters['start_date'] ?? null,
                     'end_date' => $filters['end_date'] ?? null,
                     'attendance_band' => $filters['attendance_band'] ?? null,
                     'search' => $filters['search'] ?? null,
+                    'week_id' => $filters['week_id'] ?? null,
                 ],
                 'last_refreshed_at' => $meta['last_refreshed_at'] ?? null,
             ],
