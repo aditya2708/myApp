@@ -26,6 +26,16 @@ class WeeklyAttendanceService
             $attendanceBandFilter = null;
         }
         $searchFilter = trim((string) ($filters['search'] ?? ''));
+        $selectedWeekId = isset($filters['week_id']) && is_string($filters['week_id']) && $filters['week_id'] !== ''
+            ? $filters['week_id']
+            : null;
+
+        $weeksRangeStart = isset($filters['weeks_range_start'])
+            ? $this->resolveDate($filters['weeks_range_start'], true)
+            : $start->copy();
+        $weeksRangeEnd = isset($filters['weeks_range_end'])
+            ? $this->resolveDate($filters['weeks_range_end'], false)->endOfDay()
+            : $end->copy();
 
         $kacab = $adminCabang->loadMissing('kacab')->kacab;
         $shelterRecords = $kacab
@@ -107,6 +117,8 @@ class WeeklyAttendanceService
             return true;
         })->sortBy(static fn ($payload) => $payload['name'] ?? '')->values();
 
+        $weeksCollection = $this->buildWeeksCollection($shelterIds, $weeksRangeStart, $weeksRangeEnd);
+
         $summaryPresent = (int) $sheltersCollection->sum('present_count');
         $summaryLate = (int) $sheltersCollection->sum('late_count');
         $summaryAbsent = (int) $sheltersCollection->sum('absent_count');
@@ -130,6 +142,7 @@ class WeeklyAttendanceService
             'end_date' => $end->toDateString(),
             'attendance_band' => $attendanceBandFilter,
             'search' => $searchFilter !== '' ? $searchFilter : null,
+            'week_id' => $selectedWeekId,
         ];
 
         return [
@@ -139,6 +152,7 @@ class WeeklyAttendanceService
             ],
             'summary' => $summary,
             'shelters' => $sheltersCollection->values()->all(),
+            'weeks' => $weeksCollection,
             'meta' => [
                 'filters' => $filtersPayload,
                 'last_refreshed_at' => Carbon::now()->toIso8601String(),
@@ -856,6 +870,87 @@ class WeeklyAttendanceService
         $metrics['late_rate'] = $totalSessions > 0
             ? ($metrics['late_count'] / $totalSessions) * 100
             : 0.0;
+    }
+
+    protected function buildWeeksCollection(array $shelterIds, Carbon $rangeStart, Carbon $rangeEnd): array
+    {
+        if ($rangeEnd->lt($rangeStart)) {
+            return [];
+        }
+
+        $weeks = $this->initialWeeks($rangeStart, $rangeEnd);
+
+        if (empty($weeks)) {
+            return [];
+        }
+
+        if (!empty($shelterIds)) {
+            $activities = Aktivitas::query()
+                ->whereBetween('tanggal', [$rangeStart->toDateString(), $rangeEnd->toDateString()])
+                ->whereIn('id_shelter', $shelterIds)
+                ->with(['absen.absenUser'])
+                ->get(['id_aktivitas', 'tanggal']);
+
+            foreach ($activities as $activity) {
+                $activityDate = Carbon::parse($activity->tanggal);
+                $weekKey = $this->formatWeekKey($activityDate);
+
+                if (!isset($weeks[$weekKey])) {
+                    continue;
+                }
+
+                $week = &$weeks[$weekKey];
+                $week['metrics']['total_activities']++;
+
+                $attendanceRecords = $activity->absen ?? collect();
+                $sessionCount = $attendanceRecords->count();
+                $week['metrics']['total_sessions'] += $sessionCount;
+
+                foreach ($attendanceRecords as $attendance) {
+                    $status = $this->normalizeAttendanceStatus($attendance->absen ?? null);
+
+                    if ($status === 'present') {
+                        $week['metrics']['present_count']++;
+                    } elseif ($status === 'late') {
+                        $week['metrics']['late_count']++;
+                    } else {
+                        $week['metrics']['absent_count']++;
+                    }
+
+                    $childId = $attendance->absenUser->id_anak ?? null;
+                    if ($childId) {
+                        $week['_child_ids'][$childId] = true;
+                    }
+
+                    $verification = $this->normalizeVerificationStatus($attendance->verification_status ?? null);
+                    $week['metrics']['verification'][$verification]++;
+                }
+
+                unset($week);
+            }
+        }
+
+        foreach ($weeks as &$weekPayload) {
+            $childIds = array_keys($weekPayload['_child_ids']);
+            $this->finalizeMetrics($weekPayload['metrics'], $childIds);
+            unset($weekPayload['_child_ids']);
+        }
+        unset($weekPayload);
+
+        return array_values(array_map(static function ($weekPayload) {
+            $startDate = Carbon::parse($weekPayload['start_date']);
+            $endDate = Carbon::parse($weekPayload['end_date']);
+
+            return [
+                'id' => $weekPayload['week'],
+                'label' => sprintf('%s - %s', $startDate->format('d M Y'), $endDate->format('d M Y')),
+                'dates' => [
+                    'start' => $weekPayload['start_date'],
+                    'end' => $weekPayload['end_date'],
+                ],
+                'metrics' => $weekPayload['metrics'],
+            ];
+        }, $weeks));
     }
 
     protected function initialWeeks(Carbon $start, Carbon $end): array
