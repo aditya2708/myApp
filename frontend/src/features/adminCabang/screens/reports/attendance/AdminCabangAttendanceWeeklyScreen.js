@@ -147,9 +147,16 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         shelterName: shelter.name,
         startDate: selectedWeek?.dates?.start || null,
         endDate: selectedWeek?.dates?.end || null,
+        periodLabel: selectedWeek?.dates?.label || selectedWeek?.label || null,
       });
     },
-    [navigation, selectedWeek?.dates?.end, selectedWeek?.dates?.start]
+    [
+      navigation,
+      selectedWeek?.dates?.end,
+      selectedWeek?.dates?.label,
+      selectedWeek?.dates?.start,
+      selectedWeek?.label,
+    ]
   );
 
   const filteredShelters = useMemo(() => {
