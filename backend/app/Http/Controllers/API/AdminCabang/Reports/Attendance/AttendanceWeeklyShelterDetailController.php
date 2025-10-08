@@ -105,8 +105,10 @@ class AttendanceWeeklyShelterDetailController extends Controller
             ]
         );
 
-        return AttendanceWeeklyShelterDetailResource::make($report)->additional([
-            'message' => __('Detail laporan kehadiran mingguan shelter berhasil diambil.'),
-        ]);
+        return AttendanceWeeklyShelterDetailResource::make($report)
+            ->additional([
+                'message' => __('Detail laporan kehadiran mingguan shelter berhasil diambil.'),
+            ])
+            ->toResponse($request);
     }
 }
