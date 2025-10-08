@@ -105,6 +105,8 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [isCustomRange, setIsCustomRange] = useState(false);
+  const [hasGeneratedReport, setHasGeneratedReport] = useState(false);
+  const [autoFetchEnabled, setAutoFetchEnabled] = useState(false);
 
   const updateDateRange = useCallback((nextStart, nextEnd) => {
     setStartDate((prev) => (prev === nextStart ? prev : nextStart));
@@ -131,6 +133,8 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     bands: selectedBands,
     startDate,
     endDate,
+    autoFetch: autoFetchEnabled,
+    autoSelectFirstWeek: false,
   });
   const { data: trendData, isLoading: isTrendLoading } = useAttendanceTrend();
 
@@ -141,19 +145,6 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     },
     [selectWeek],
   );
-
-  useEffect(() => {
-    if (isCustomRange) {
-      return;
-    }
-
-    if (Array.isArray(weeklyData) && weeklyData.length > 0 && !selectedWeek?.id) {
-      const firstWeek = weeklyData[0];
-      if (firstWeek?.id) {
-        handleSelectWeek(firstWeek.id);
-      }
-    }
-  }, [handleSelectWeek, isCustomRange, selectedWeek?.id, weeklyData]);
 
   const openFilterSheet = useCallback(() => setFilterVisible(true), []);
   const closeFilterSheet = useCallback(() => setFilterVisible(false), []);
@@ -209,6 +200,34 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     },
     [parseDateValue],
   );
+
+  const handleGenerateReport = useCallback(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const start = new Date(today);
+    start.setDate(start.getDate() - 6);
+
+    const toISODate = (value) => {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      const day = String(value.getDate()).padStart(2, '0');
+
+      return `${year}-${month}-${day}`;
+    };
+
+    const nextStart = toISODate(start);
+    const nextEnd = toISODate(today);
+
+    setIsCustomRange(true);
+    handleSelectWeek(null);
+    setSelectedYear(null);
+    setSelectedMonth(null);
+    updateDateRange(nextStart, nextEnd);
+    setFilterVisible(false);
+    setAutoFetchEnabled(true);
+    setHasGeneratedReport(true);
+  }, [handleSelectWeek, updateDateRange]);
 
   const periodOptions = useMemo(() => {
     if (!Array.isArray(weeklyData)) {
@@ -455,6 +474,10 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   }, [searchQuery, selectedBands, shelters]);
 
   const handleRefresh = useCallback(async () => {
+    if (!autoFetchEnabled) {
+      return;
+    }
+
     try {
       setRefreshing(true);
       await refresh();
@@ -463,7 +486,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     } finally {
       setRefreshing(false);
     }
-  }, [refresh]);
+  }, [autoFetchEnabled, refresh]);
 
   const renderShelterItem = useCallback(
     ({ item }) => (
@@ -818,15 +841,43 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     closeFilterSheet();
   }, [closeFilterSheet, handleMonthYearPick]);
 
+  useEffect(() => {
+    if (!hasGeneratedReport && isFilterVisible) {
+      setFilterVisible(false);
+    }
+  }, [hasGeneratedReport, isFilterVisible]);
+
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity style={styles.headerButton} onPress={openFilterSheet}>
-          <Ionicons name="filter-outline" size={22} color="#2d3436" />
-        </TouchableOpacity>
-      ),
+      headerRight: hasGeneratedReport
+        ? () => (
+            <TouchableOpacity style={styles.headerButton} onPress={openFilterSheet}>
+              <Ionicons name="filter-outline" size={22} color="#2d3436" />
+            </TouchableOpacity>
+          )
+        : undefined,
     });
-  }, [navigation, openFilterSheet]);
+  }, [hasGeneratedReport, navigation, openFilterSheet]);
+
+  if (!hasGeneratedReport) {
+    return (
+      <View style={styles.initialContainer}>
+        <View style={styles.initialContent}>
+          <View style={styles.initialIconWrapper}>
+            <Ionicons name="calendar-outline" size={48} color="#0984e3" />
+          </View>
+          <Text style={styles.initialTitle}>Laporan Mingguan Belum Dibuat</Text>
+          <Text style={styles.initialSubtitle}>
+            Klik tombol di bawah untuk menghitung laporan kehadiran 7 hari terakhir.
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.generateButton} onPress={handleGenerateReport}>
+          <Ionicons name="stats-chart" size={18} color="#ffffff" />
+          <Text style={styles.generateButtonLabel}>Generate Laporan Kehadiran Minggu Ini</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -958,6 +1009,53 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 20,
     backgroundColor: 'rgba(9, 132, 227, 0.12)',
+  },
+  initialContainer: {
+    flex: 1,
+    backgroundColor: '#f5f6fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  initialContent: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  initialIconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(9, 132, 227, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  initialTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2d3436',
+    textAlign: 'center',
+  },
+  initialSubtitle: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#636e72',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  generateButton: {
+    backgroundColor: '#0984e3',
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  generateButtonLabel: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 10,
   },
 });
 

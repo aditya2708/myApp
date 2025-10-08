@@ -22,7 +22,18 @@ const WeeklySummaryCard = ({
   onRetry,
   overview,
 }) => {
-  const weekOptions = useMemo(() => (Array.isArray(weeks) ? weeks : []), [weeks]);
+  const weekOptions = useMemo(() => {
+    const normalizedWeeks = Array.isArray(weeks) ? weeks.filter(Boolean) : [];
+
+    if (!normalizedWeeks.length) {
+      return normalizedWeeks;
+    }
+
+    return [
+      { id: '__ALL__', label: 'Semua Minggu' },
+      ...normalizedWeeks,
+    ];
+  }, [weeks]);
   const showWeekSelector = weekOptions.length > 1;
 
   const renderContent = () => {
@@ -92,12 +103,15 @@ const WeeklySummaryCard = ({
             contentContainerStyle={styles.weekSelectorContainer}
           >
             {weekOptions.map((week) => {
-              const isActive = week.id === selectedWeekId;
+              const isAllWeeks = week.id === '__ALL__';
+              const isActive = isAllWeeks ? !selectedWeekId : week.id === selectedWeekId;
 
               return (
                 <TouchableOpacity
                   key={week.id}
-                  onPress={() => (onSelectWeek ? onSelectWeek(week.id) : undefined)}
+                  onPress={() =>
+                    onSelectWeek ? onSelectWeek(isAllWeeks ? null : week.id) : undefined
+                  }
                   style={[styles.weekChip, isActive ? styles.weekChipActive : null]}
                 >
                   <Text style={[styles.weekChipLabel, isActive ? styles.weekChipLabelActive : null]}>
