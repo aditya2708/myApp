@@ -8,7 +8,9 @@ use App\Models\Anak;
 use App\Models\Kelompok;
 use App\Models\Shelter;
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class WeeklyAttendanceService
 {
@@ -476,6 +478,190 @@ class WeeklyAttendanceService
         ];
     }
 
+    public function buildGroupWeeklyStudents($adminCabang, Kelompok $group, Carbon $start, Carbon $end, array $options = []): array
+    {
+        $start = $this->resolveDate($start, true);
+        $end = $this->resolveDate($end, false)->endOfDay();
+
+        $group->loadMissing('shelter');
+
+        $statusFilter = isset($options['status']) ? strtolower((string) $options['status']) : null;
+        if (!in_array($statusFilter, ['present', 'late', 'absent'], true)) {
+            $statusFilter = null;
+        }
+
+        $searchFilter = trim((string) ($options['search'] ?? ''));
+
+        $perPage = isset($options['per_page']) ? (int) $options['per_page'] : 15;
+        if ($perPage < 1) {
+            $perPage = 15;
+        } elseif ($perPage > 100) {
+            $perPage = 100;
+        }
+
+        $page = isset($options['page']) ? (int) $options['page'] : 1;
+        if ($page < 1) {
+            $page = 1;
+        }
+
+        $students = Anak::query()
+            ->where('id_kelompok', $group->id_kelompok)
+            ->whereIn('status_validasi', Anak::STATUS_AKTIF)
+            ->orderBy('full_name')
+            ->get([
+                'id_anak',
+                'full_name',
+                'nick_name',
+                'jenis_kelamin',
+                'foto',
+            ]);
+
+        if ($searchFilter !== '') {
+            $students = $students->filter(function ($student) use ($searchFilter) {
+                $name = trim((string) $student->full_name);
+                $nickname = trim((string) $student->nick_name);
+
+                return stripos($name, $searchFilter) !== false
+                    || ($nickname !== '' && stripos($nickname, $searchFilter) !== false);
+            })->values();
+        }
+
+        $attendanceRecords = Absen::query()
+            ->select([
+                'absen_user.id_anak as anak_id',
+                'absen.id_absen',
+                'absen.absen as status',
+                'absen.time_arrived',
+                'absen.verification_status',
+                'absen.gps_validation_notes',
+                'absen.created_at',
+                'aktivitas.tanggal as activity_date',
+            ])
+            ->join('absen_user', 'absen_user.id_absen_user', '=', 'absen.id_absen_user')
+            ->join('aktivitas', 'aktivitas.id_aktivitas', '=', 'absen.id_aktivitas')
+            ->where('aktivitas.id_shelter', $group->id_shelter)
+            ->where('aktivitas.nama_kelompok', $group->nama_kelompok)
+            ->whereBetween('aktivitas.tanggal', [$start->toDateString(), $end->toDateString()])
+            ->orderByDesc('aktivitas.tanggal')
+            ->orderByDesc('absen.created_at')
+            ->get();
+
+        $attendanceByStudent = [];
+
+        foreach ($attendanceRecords as $record) {
+            $anakId = $record->anak_id;
+
+            if (isset($attendanceByStudent[$anakId])) {
+                continue;
+            }
+
+            $attendanceByStudent[$anakId] = [
+                'status' => strtolower((string) $record->status),
+                'time_arrived' => $record->time_arrived ? Carbon::parse($record->time_arrived) : null,
+                'activity_date' => $record->activity_date ? Carbon::parse($record->activity_date) : null,
+                'verification_status' => $record->verification_status ?? null,
+                'notes' => $record->gps_validation_notes ?? null,
+            ];
+        }
+
+        $statusCountsBase = [
+            'present' => 0,
+            'late' => 0,
+            'absent' => 0,
+        ];
+
+        $studentsPayload = $students->map(function (Anak $student) use ($attendanceByStudent, &$statusCountsBase) {
+            $attendance = $attendanceByStudent[$student->id_anak] ?? null;
+            $isRecorded = $attendance !== null;
+
+            $status = $attendance
+                ? $this->normalizeAttendanceStatus($attendance['status'])
+                : 'absent';
+
+            if (!isset($statusCountsBase[$status])) {
+                $statusCountsBase[$status] = 0;
+            }
+
+            $statusCountsBase[$status]++;
+
+            $statusMeta = $this->statusMeta($status);
+
+            $arrivalTime = $attendance['time_arrived'] ?? null;
+            $activityDate = $attendance['activity_date'] ?? null;
+
+            return [
+                'id' => $student->id_anak,
+                'name' => $student->full_name,
+                'nickname' => $student->nick_name,
+                'gender' => $student->jenis_kelamin,
+                'avatar_url' => $student->foto ? Storage::url($student->foto) : null,
+                'status' => array_merge(['code' => $status], $statusMeta),
+                'is_recorded' => $isRecorded,
+                'arrival_time' => $arrivalTime?->toIso8601String(),
+                'arrival_time_label' => $arrivalTime ? $arrivalTime->format('H:i') : null,
+                'activity_date' => $activityDate?->toDateString(),
+                'notes' => $attendance['notes'] ?? ($isRecorded ? null : __('Belum ada catatan kehadiran pada rentang ini.')),
+                'verification_status' => $attendance['verification_status'] ?? null,
+            ];
+        });
+
+        $statusCounts = $statusCountsBase;
+
+        if ($statusFilter) {
+            $studentsPayload = $studentsPayload
+                ->filter(fn ($student) => ($student['status']['code'] ?? null) === $statusFilter)
+                ->values();
+        }
+
+        $total = $studentsPayload->count();
+        $offset = ($page - 1) * $perPage;
+        $paginatedItems = $studentsPayload->slice($offset, $perPage)->values();
+
+        $paginator = new LengthAwarePaginator($paginatedItems, $total, $perPage, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath(),
+        ]);
+
+        $statusCountsPayload = [
+            'all' => array_merge(['code' => 'all'], $this->statusMeta('all'), ['count' => $students->count()]),
+            'present' => array_merge(['code' => 'present'], $this->statusMeta('present'), ['count' => $statusCounts['present'] ?? 0]),
+            'late' => array_merge(['code' => 'late'], $this->statusMeta('late'), ['count' => $statusCounts['late'] ?? 0]),
+            'absent' => array_merge(['code' => 'absent'], $this->statusMeta('absent'), ['count' => $statusCounts['absent'] ?? 0]),
+        ];
+
+        return [
+            'group' => [
+                'id' => $group->id_kelompok,
+                'name' => $group->nama_kelompok,
+                'description' => $this->buildGroupDescription($group),
+                'shelter' => [
+                    'id' => $group->shelter?->id_shelter,
+                    'name' => $group->shelter?->nama_shelter,
+                ],
+            ],
+            'period' => [
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+            ],
+            'status_counts' => $statusCountsPayload,
+            'students' => $paginatedItems->all(),
+            'pagination' => [
+                'total' => $paginator->total(),
+                'per_page' => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+            ],
+            'filters' => [
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+                'status' => $statusFilter,
+                'search' => $searchFilter !== '' ? $searchFilter : null,
+                'per_page' => $perPage,
+                'page' => $page,
+            ],
+            'generated_at' => Carbon::now()->toIso8601String(),
+        ];
+    }
+
     protected function collectGroupAttendanceForShelterWeek(int $shelterId, Carbon $start, Carbon $end): array
     {
         if ($end->lt($start)) {
@@ -739,5 +925,32 @@ class WeeklyAttendanceService
             strtolower(Absen::VERIFICATION_MANUAL) => 'manual',
             default => 'pending',
         };
+    }
+
+    protected function normalizeAttendanceStatus(?string $status): string
+    {
+        $normalized = strtolower($status ?? '');
+
+        return match ($normalized) {
+            strtolower(Absen::TEXT_YA) => 'present',
+            strtolower(Absen::TEXT_TERLAMBAT) => 'late',
+            strtolower(Absen::TEXT_TIDAK) => 'absent',
+            default => 'absent',
+        };
+    }
+
+    protected function statusMeta(string $status): array
+    {
+        $map = [
+            'all' => ['label' => __('Semua'), 'icon' => 'layers'],
+            'present' => ['label' => __('Hadir'), 'icon' => 'check-circle'],
+            'late' => ['label' => __('Terlambat'), 'icon' => 'clock'],
+            'absent' => ['label' => __('Tidak Hadir'), 'icon' => 'x-circle'],
+        ];
+
+        return $map[$status] ?? [
+            'label' => ucfirst($status),
+            'icon' => 'circle',
+        ];
     }
 }

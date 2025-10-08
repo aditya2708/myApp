@@ -3,6 +3,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyController;
 use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyShelterController;
+use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyGroupStudentController;
 use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyShelterDetailController;
 
 
@@ -211,6 +212,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 // Query params: start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), week (ISO-8601, e.g. 2024-W01)
                 // Future hooks: export (csv|xlsx), share_token
                 Route::get('/weekly/shelters/{shelter}', AttendanceWeeklyShelterDetailController::class);
+                Route::get('/weekly/groups/{group}/students', AttendanceWeeklyGroupStudentController::class);
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
                 Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
             });
