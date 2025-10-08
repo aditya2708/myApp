@@ -102,6 +102,10 @@ class AttendanceWeeklyShelterDetailController extends Controller
             $endDate,
             [
                 'week' => $weekKey,
+                'period_filters' => [
+                    'start_date' => $validated['start_date'] ?? null,
+                    'end_date' => $validated['end_date'] ?? null,
+                ],
             ]
         );
 

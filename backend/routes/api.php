@@ -207,6 +207,9 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/weekly', AttendanceWeeklyController::class)
                     ->name('admin-cabang.reports.attendance.weekly.index');
                 Route::get('/weekly/shelters', AttendanceWeeklyShelterController::class);
+                // Level 2 - Shelter weekly attendance detail
+                // Query params: start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), week (ISO-8601, e.g. 2024-W01)
+                // Future hooks: export (csv|xlsx), share_token
                 Route::get('/weekly/shelters/{shelter}', AttendanceWeeklyShelterDetailController::class);
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
                 Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
