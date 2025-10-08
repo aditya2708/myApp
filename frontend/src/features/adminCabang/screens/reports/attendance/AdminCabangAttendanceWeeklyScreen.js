@@ -260,12 +260,81 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       }));
   }, [formatRangeLabel, parseDateValue, weeklyData]);
 
+  const monthYearValue = useMemo(() => {
+    if (selectedMonth) {
+      const [yearPart, monthPart] = selectedMonth.split('-');
+      const yearNumber = Number(yearPart);
+      const monthNumber = Number(monthPart);
+
+      if (!Number.isNaN(yearNumber) && !Number.isNaN(monthNumber)) {
+        return new Date(yearNumber, monthNumber - 1, 1);
+      }
+    }
+
+    const rangeStart = parseDateValue(startDate);
+    if (rangeStart) {
+      return new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+    }
+
+    const rangeEnd = parseDateValue(endDate);
+    if (rangeEnd) {
+      return new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1);
+    }
+
+    return null;
+  }, [endDate, parseDateValue, selectedMonth, startDate]);
+
+  const monthYearLabel = useMemo(() => {
+    if (selectedMonth) {
+      const [yearPart, monthPart] = selectedMonth.split('-');
+      const monthIndex = Number(monthPart) - 1;
+      const monthName = MONTH_NAMES_ID[monthIndex] || '';
+
+      if (monthName) {
+        return `${monthName} ${yearPart}`;
+      }
+
+      if (yearPart) {
+        return `${monthPart}/${yearPart}`;
+      }
+    }
+
+    const baseDate = parseDateValue(startDate) || parseDateValue(endDate);
+
+    if (!baseDate) {
+      return 'Semua periode';
+    }
+
+    const monthName = MONTH_NAMES_ID[baseDate.getMonth()] || '';
+
+    if (!monthName) {
+      return `${baseDate.getMonth() + 1}/${baseDate.getFullYear()}`;
+    }
+
+    return `${monthName} ${baseDate.getFullYear()}`;
+  }, [endDate, parseDateValue, selectedMonth, startDate]);
+
   useEffect(() => {
     if (!selectedWeek?.id) {
-      if (startDate || endDate) {
-        setSelectedYear(null);
-        setSelectedMonth(null);
+      if (!startDate && !endDate) {
+        setSelectedYear((prev) => (prev === null ? prev : null));
+        setSelectedMonth((prev) => (prev === null ? prev : null));
+        return;
       }
+
+      const rangeStart = parseDateValue(startDate);
+      const rangeEnd = parseDateValue(endDate);
+      const primaryDate = rangeStart || rangeEnd;
+
+      if (!primaryDate) {
+        return;
+      }
+
+      const yearKey = primaryDate.getFullYear().toString();
+      const monthKey = `${yearKey}-${String(primaryDate.getMonth() + 1).padStart(2, '0')}`;
+
+      setSelectedYear((prev) => (prev === yearKey ? prev : yearKey));
+      setSelectedMonth((prev) => (prev === monthKey ? prev : monthKey));
       return;
     }
 
@@ -630,80 +699,98 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     [closeFilterSheet, periodOptions, selectWeek, updateDateRange]
   );
 
-  const handleStartDateChange = useCallback(
-    (value) => {
-      const normalized = value || null;
+  const handleMonthYearPick = useCallback(
+    (date) => {
+      if (!date) {
+        setSelectedYear((prev) => (prev === null ? prev : null));
+        setSelectedMonth((prev) => (prev === null ? prev : null));
+        selectWeek(null);
 
-      if (selectedWeekId) {
+        const periodRange = period?.dateRange ?? {};
+        const defaultStart = periodRange.start ?? null;
+        const defaultEnd = periodRange.end ?? null;
+
+        if (startDate !== defaultStart || endDate !== defaultEnd) {
+          updateDateRange(defaultStart, defaultEnd);
+        }
+
+        return;
+      }
+
+      const normalizedDate = date instanceof Date ? date : new Date(date);
+
+      if (Number.isNaN(normalizedDate.getTime())) {
+        return;
+      }
+
+      const year = normalizedDate.getFullYear();
+      const monthIndex = normalizedDate.getMonth();
+      const yearKey = year.toString();
+      const monthKey = `${yearKey}-${String(monthIndex + 1).padStart(2, '0')}`;
+
+      const monthStart = new Date(year, monthIndex, 1);
+      const monthEnd = new Date(year, monthIndex + 1, 0);
+
+      const toISODate = (value) => {
+        const isoYear = value.getFullYear();
+        const isoMonth = String(value.getMonth() + 1).padStart(2, '0');
+        const isoDay = String(value.getDate()).padStart(2, '0');
+
+        return `${isoYear}-${isoMonth}-${isoDay}`;
+      };
+
+      const nextStart = toISODate(monthStart);
+      const nextEnd = toISODate(monthEnd);
+
+      setSelectedYear((prev) => (prev === yearKey ? prev : yearKey));
+      setSelectedMonth((prev) => (prev === monthKey ? prev : monthKey));
+
+      let hasMatchingWeek = false;
+
+      periodOptions.some((yearGroup) => {
+        if (yearGroup.year !== yearKey) {
+          return false;
+        }
+
+        const monthGroup = yearGroup.months?.find((month) => month.id === monthKey);
+
+        if (!monthGroup) {
+          return false;
+        }
+
+        hasMatchingWeek = Array.isArray(monthGroup.weeks)
+          ? monthGroup.weeks.some((week) => {
+              const weekStart = week?.dates?.start ?? null;
+              const weekEnd = week?.dates?.end ?? null;
+
+              if (!weekStart || !weekEnd) {
+                return false;
+              }
+
+              return weekStart === nextStart && weekEnd === nextEnd;
+            })
+          : false;
+
+        return true;
+      });
+
+      if (!hasMatchingWeek || selectedWeekId) {
         selectWeek(null);
       }
 
-      setSelectedYear(null);
-      setSelectedMonth(null);
-      updateDateRange(normalized, endDate ?? null);
-    },
-    [endDate, selectWeek, selectedWeekId, updateDateRange]
-  );
-
-  const handleEndDateChange = useCallback(
-    (value) => {
-      const normalized = value || null;
-
-      if (selectedWeekId) {
-        selectWeek(null);
+      if (startDate !== nextStart || endDate !== nextEnd) {
+        updateDateRange(nextStart, nextEnd);
       }
-
-      setSelectedYear(null);
-      setSelectedMonth(null);
-      updateDateRange(startDate ?? null, normalized);
     },
-    [selectWeek, selectedWeekId, startDate, updateDateRange]
+    [endDate, period, periodOptions, selectWeek, selectedWeekId, startDate, updateDateRange]
   );
 
   const handleResetFilters = useCallback(() => {
     setSelectedBands([]);
     setSearchQuery('');
-    const defaultWeek = Array.isArray(weeklyData) ? weeklyData[0] : null;
-
-    if (defaultWeek?.id) {
-      const start = parseDateValue(defaultWeek?.dates?.start);
-      const end = parseDateValue(defaultWeek?.dates?.end);
-      const primaryDate = start || end;
-
-      if (primaryDate) {
-        const yearKey = primaryDate.getFullYear().toString();
-        const monthKey = `${yearKey}-${String(primaryDate.getMonth() + 1).padStart(2, '0')}`;
-
-        setSelectedYear(yearKey);
-        setSelectedMonth(monthKey);
-      }
-
-      const matchedWeek = selectWeek(defaultWeek.id);
-      const range = matchedWeek?.dates ?? {
-        start: defaultWeek?.dates?.start ?? null,
-        end: defaultWeek?.dates?.end ?? null,
-      };
-
-      updateDateRange(range?.start ?? null, range?.end ?? null);
-      closeFilterSheet();
-      return;
-    }
-
-    selectWeek(null);
-    setSelectedYear(null);
-    setSelectedMonth(null);
-
-    const periodRange = period?.dateRange ?? {};
-    updateDateRange(periodRange.start ?? null, periodRange.end ?? null);
+    handleMonthYearPick(null);
     closeFilterSheet();
-  }, [
-    closeFilterSheet,
-    parseDateValue,
-    period,
-    selectWeek,
-    updateDateRange,
-    weeklyData,
-  ]);
+  }, [closeFilterSheet, handleMonthYearPick]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -758,10 +845,9 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         onYearChange={handleYearChange}
         onMonthChange={handleMonthChange}
         onWeekChange={handleWeekChange}
-        startDate={startDate}
-        endDate={endDate}
-        onStartDateChange={handleStartDateChange}
-        onEndDateChange={handleEndDateChange}
+        onMonthYearPick={handleMonthYearPick}
+        monthYearLabel={monthYearLabel}
+        monthYearValue={monthYearValue}
       />
     </View>
   );
