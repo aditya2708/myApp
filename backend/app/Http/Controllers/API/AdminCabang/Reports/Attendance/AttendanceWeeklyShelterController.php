@@ -78,8 +78,10 @@ class AttendanceWeeklyShelterController extends Controller
             'shelter_ids' => $filteredShelterIds,
         ]);
 
-        return AttendanceWeeklyShelterResource::make($report)->additional([
-            'message' => __('Laporan kehadiran mingguan per shelter berhasil diambil.'),
-        ]);
+        return AttendanceWeeklyShelterResource::make($report)
+            ->additional([
+                'message' => __('Laporan kehadiran mingguan per shelter berhasil diambil.'),
+            ])
+            ->toResponse($request);
     }
 }
