@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class AttendanceWeeklyController extends Controller
 {
@@ -17,6 +18,8 @@ class AttendanceWeeklyController extends Controller
         $validator = Validator::make($request->all(), [
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
+            'attendance_band' => ['nullable', 'string', Rule::in(['high', 'medium', 'low'])],
+            'search' => ['nullable', 'string'],
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -50,11 +53,14 @@ class AttendanceWeeklyController extends Controller
         $report = $service->build($adminCabang, [
             'start_date' => $startDate,
             'end_date' => $endDate,
+            'attendance_band' => $validated['attendance_band'] ?? null,
+            'search' => $validated['search'] ?? null,
         ]);
 
         return AttendanceWeeklyResource::make($report)
             ->additional([
                 'message' => __('Laporan kehadiran mingguan berhasil diambil.'),
+                'last_refreshed_at' => $report['meta']['last_refreshed_at'] ?? null,
             ])
             ->toResponse($request);
     }
