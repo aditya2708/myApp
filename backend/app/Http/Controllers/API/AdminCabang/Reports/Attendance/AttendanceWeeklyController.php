@@ -52,8 +52,10 @@ class AttendanceWeeklyController extends Controller
             'end_date' => $endDate,
         ]);
 
-        return AttendanceWeeklyResource::make($report)->additional([
-            'message' => __('Laporan kehadiran mingguan berhasil diambil.'),
-        ]);
+        return AttendanceWeeklyResource::make($report)
+            ->additional([
+                'message' => __('Laporan kehadiran mingguan berhasil diambil.'),
+            ])
+            ->toResponse($request);
     }
 }
