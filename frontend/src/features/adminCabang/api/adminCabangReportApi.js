@@ -60,6 +60,14 @@ export const adminCabangReportApi = {
     return api.get(ATTENDANCE_ENDPOINTS.WEEKLY_SHELTER_DETAIL(shelterId), { params });
   },
 
+  async getAttendanceWeeklyGroupStudents(groupId, params = {}) {
+    if (!groupId) {
+      throw new Error('Group ID is required to fetch weekly attendance group students');
+    }
+
+    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY_GROUP_STUDENTS(groupId), { params });
+  },
+
   async getAttendanceMonthlyShelter(params = {}) {
     return api.get(ATTENDANCE_ENDPOINTS.MONTHLY_SHELTER, { params });
   },

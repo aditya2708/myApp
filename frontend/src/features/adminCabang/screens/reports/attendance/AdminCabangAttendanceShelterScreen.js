@@ -286,7 +286,49 @@ const AdminCabangAttendanceShelterScreen = () => {
     navigation,
   ]);
 
-  const renderGroupItem = useCallback(({ item }) => <ShelterGroupCard group={item} />, []);
+  const handleGroupPress = useCallback(
+    (group) => {
+      if (!group) {
+        return;
+      }
+
+      const periodStart = selectedWeek?.dateRange?.start || startDate;
+      const periodEnd = selectedWeek?.dateRange?.end || endDate;
+      const label =
+        selectedWeek?.dateRange?.label ||
+        periodLabel ||
+        formatDateRangeLabel(periodStart, periodEnd) ||
+        initialPeriodLabel;
+
+      navigation.navigate('AdminCabangAttendanceGroup', {
+        groupId: group?.id,
+        groupName: group?.name,
+        groupMentor: group?.mentor,
+        membersCount: group?.membersCount,
+        summary: group?.summary,
+        shelterId: derivedShelter?.id || shelterId,
+        shelterName: derivedShelter?.name || shelterName,
+        startDate: periodStart,
+        endDate: periodEnd,
+        periodLabel: label,
+      });
+    },
+    [
+      derivedShelter,
+      endDate,
+      initialPeriodLabel,
+      navigation,
+      periodLabel,
+      selectedWeek,
+      shelterId,
+      shelterName,
+      startDate,
+    ]
+  );
+
+  const renderGroupItem = useCallback(
+    ({ item }) => <ShelterGroupCard group={item} onPress={() => handleGroupPress(item)} />, [handleGroupPress]
+  );
 
   const listHeader = useMemo(() => {
     return (
