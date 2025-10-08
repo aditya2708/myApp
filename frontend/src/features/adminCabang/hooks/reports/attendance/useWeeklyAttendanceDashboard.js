@@ -394,6 +394,7 @@ const useWeeklyAttendanceDashboard = ({
   initialWeekId = null,
   startDate = null,
   endDate = null,
+  autoSelectFirstWeek = true,
 } = {}) => {
   const [state, setState] = useState({
     period: null,
@@ -513,7 +514,7 @@ const useWeeklyAttendanceDashboard = ({
         if (weekId !== undefined) {
           selectedWeekRef.current = weekId;
           setSelectedWeekId(weekId || null);
-        } else if (!selectedWeekRef.current && normalized.weeks.length) {
+        } else if (!selectedWeekRef.current && normalized.weeks.length && autoSelectFirstWeek) {
           const defaultWeekId = normalized.weeks[0]?.id ?? null;
           selectedWeekRef.current = defaultWeekId;
           setSelectedWeekId(defaultWeekId);
@@ -536,7 +537,7 @@ const useWeeklyAttendanceDashboard = ({
         setIsFetchingMore(false);
       }
     },
-    [autoFetch, buildParams, pageSize],
+    [autoFetch, autoSelectFirstWeek, buildParams, pageSize],
   );
 
   useEffect(() => {
@@ -653,8 +654,12 @@ const useWeeklyAttendanceDashboard = ({
       return null;
     }
 
+    if (!autoSelectFirstWeek) {
+      return null;
+    }
+
     return weeks[0];
-  }, [normalizedEndDate, normalizedStartDate, selectedWeekId, weeks]);
+  }, [autoSelectFirstWeek, normalizedEndDate, normalizedStartDate, selectedWeekId, weeks]);
 
   const hasNextPage = pagination?.hasNextPage ?? false;
 
