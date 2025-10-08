@@ -309,177 +309,139 @@ class WeeklyAttendanceService
         $shelter->loadMissing('wilbin');
 
         $weekKey = $options['week'] ?? $this->formatWeekKey($start);
+        $requestedPeriodFilters = array_filter(
+            $options['period_filters'] ?? [],
+            static fn ($value) => $value !== null && $value !== ''
+        );
 
         $groups = Kelompok::query()
             ->where('id_shelter', $shelter->id_shelter)
+            ->with('levelAnakBinaan')
             ->orderBy('nama_kelompok')
-            ->get(['id_kelompok', 'nama_kelompok', 'jumlah_anggota']);
+            ->get(['id_kelompok', 'id_shelter', 'nama_kelompok', 'jumlah_anggota', 'kelas_gabungan', 'id_level_anak_binaan']);
 
-        $groupSummaries = [];
+        $groupCards = [];
         $groupLookup = [];
 
         foreach ($groups as $group) {
-            $key = 'group:' . $group->id_kelompok;
+            $normalizedName = $this->normalizeGroupKey($group->nama_kelompok);
 
-            $groupSummaries[$key] = [
+            if ($normalizedName !== '') {
+                $groupLookup[$normalizedName] = $group->id_kelompok;
+            }
+
+            $groupCards[$group->id_kelompok] = [
                 'id' => $group->id_kelompok,
                 'name' => $group->nama_kelompok,
-                'member_count' => (int) ($group->jumlah_anggota ?? 0),
-                'metrics' => $this->initialMetrics(),
-                '_child_ids' => [],
-                'activities' => [],
+                'description' => $this->buildGroupDescription($group),
+                'member_count' => $group->jumlah_anggota !== null ? (int) $group->jumlah_anggota : null,
+                'present_count' => 0,
+                'late_count' => 0,
+                'absent_count' => 0,
+                'attendance_percentage' => 0.0,
             ];
-
-            $lookupKey = strtolower(trim($group->nama_kelompok ?? ''));
-            if ($lookupKey !== '') {
-                $groupLookup[$lookupKey] = $key;
-            }
         }
 
-        $activities = Aktivitas::query()
-            ->where('id_shelter', $shelter->id_shelter)
-            ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
-            ->with(['absen.absenUser'])
-            ->orderBy('tanggal')
-            ->orderBy('id_aktivitas')
-            ->get(['id_aktivitas', 'id_shelter', 'nama_kelompok', 'tanggal', 'jenis_kegiatan', 'materi']);
+        $attendanceAggregates = $this->collectGroupAttendanceForShelterWeek(
+            (int) $shelter->id_shelter,
+            $start,
+            $end
+        );
 
-        $overall = $this->initialMetrics();
-        $overall['_child_ids'] = [];
+        $unmappedGroups = [];
+        $overallPresent = 0;
+        $overallLate = 0;
+        $overallAbsent = 0;
 
-        $activityPayloads = [];
+        foreach ($attendanceAggregates as $normalizedName => $aggregate) {
+            $present = (int) ($aggregate['present'] ?? 0);
+            $late = (int) ($aggregate['late'] ?? 0);
+            $absent = (int) ($aggregate['absent'] ?? 0);
 
-        foreach ($activities as $activity) {
-            $activityMetrics = $this->initialMetrics();
-            $activityMetrics['total_activities'] = 1;
+            $overallPresent += $present;
+            $overallLate += $late;
+            $overallAbsent += $absent;
 
-            $attendanceRecords = $activity->absen ?? collect();
-            $sessionCount = $attendanceRecords->count();
-            $activityMetrics['total_sessions'] = $sessionCount;
+            if (isset($groupLookup[$normalizedName])) {
+                $groupId = $groupLookup[$normalizedName];
 
-            $activityChildIds = [];
+                $groupCards[$groupId]['present_count'] += $present;
+                $groupCards[$groupId]['late_count'] += $late;
+                $groupCards[$groupId]['absent_count'] += $absent;
 
-            foreach ($attendanceRecords as $attendance) {
-                $status = strtolower($attendance->absen ?? '');
+                $groupCards[$groupId]['attendance_percentage'] = $this->calculateAttendancePercentage(
+                    $groupCards[$groupId]['present_count'],
+                    $groupCards[$groupId]['late_count'],
+                    $groupCards[$groupId]['absent_count']
+                );
 
-                if ($status === strtolower(Absen::TEXT_YA)) {
-                    $activityMetrics['present_count']++;
-                    $overall['present_count'] = ($overall['present_count'] ?? 0) + 1;
-                } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
-                    $activityMetrics['late_count']++;
-                    $overall['late_count'] = ($overall['late_count'] ?? 0) + 1;
-                } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
-                    $activityMetrics['absent_count']++;
-                    $overall['absent_count'] = ($overall['absent_count'] ?? 0) + 1;
-                }
-
-                $childId = $attendance->absenUser->id_anak ?? null;
-                if ($childId) {
-                    $activityChildIds[$childId] = true;
-                    $overall['_child_ids'][$childId] = true;
-                }
-
-                $verification = $this->normalizeVerificationStatus($attendance->verification_status ?? null);
-                $activityMetrics['verification'][$verification]++;
-                $overall['verification'][$verification] = ($overall['verification'][$verification] ?? 0) + 1;
+                continue;
             }
 
-            $overall['total_sessions'] = ($overall['total_sessions'] ?? 0) + $sessionCount;
-            $overall['total_activities'] = ($overall['total_activities'] ?? 0) + 1;
+            $unmappedKey = 'unmapped:' . $normalizedName;
 
-            $this->finalizeMetrics($activityMetrics, array_keys($activityChildIds));
-
-            $activityDate = $activity->tanggal instanceof Carbon
-                ? $activity->tanggal->copy()
-                : Carbon::parse($activity->tanggal);
-
-            $activityPayload = [
-                'id' => $activity->id_aktivitas,
-                'date' => $activityDate->toDateString(),
-                'week' => $this->formatWeekKey($activityDate),
-                'group_name' => $activity->nama_kelompok ?? null,
-                'jenis_kegiatan' => $activity->jenis_kegiatan ?? null,
-                'materi' => $activity->materi ?? null,
-                'metrics' => $activityMetrics,
-            ];
-
-            $activityPayloads[] = $activityPayload;
-
-            $lookupKey = strtolower(trim($activity->nama_kelompok ?? ''));
-            $groupKey = $lookupKey !== '' && isset($groupLookup[$lookupKey])
-                ? $groupLookup[$lookupKey]
-                : 'unmapped:' . ($lookupKey !== '' ? $lookupKey : 'no-name');
-
-            if (!isset($groupSummaries[$groupKey])) {
-                $groupSummaries[$groupKey] = [
+            if (!isset($unmappedGroups[$unmappedKey])) {
+                $unmappedGroups[$unmappedKey] = [
                     'id' => null,
-                    'name' => $lookupKey !== '' ? $activity->nama_kelompok : __('Tanpa Kelompok'),
+                    'name' => $aggregate['name'] ?? __('Tanpa Kelompok'),
+                    'description' => null,
                     'member_count' => null,
-                    'metrics' => $this->initialMetrics(),
-                    '_child_ids' => [],
-                    'activities' => [],
+                    'present_count' => 0,
+                    'late_count' => 0,
+                    'absent_count' => 0,
+                    'attendance_percentage' => 0.0,
                 ];
             }
 
-            $groupSummaries[$groupKey]['metrics']['total_activities']++;
-            $groupSummaries[$groupKey]['metrics']['total_sessions'] += $sessionCount;
+            $unmappedGroups[$unmappedKey]['present_count'] += $present;
+            $unmappedGroups[$unmappedKey]['late_count'] += $late;
+            $unmappedGroups[$unmappedKey]['absent_count'] += $absent;
 
-            $groupSummaries[$groupKey]['metrics']['present_count'] += $activityMetrics['present_count'];
-            $groupSummaries[$groupKey]['metrics']['late_count'] += $activityMetrics['late_count'];
-            $groupSummaries[$groupKey]['metrics']['absent_count'] += $activityMetrics['absent_count'];
-
-            foreach ($activityMetrics['verification'] as $verificationKey => $value) {
-                $groupSummaries[$groupKey]['metrics']['verification'][$verificationKey] += $value;
-            }
-
-            foreach (array_keys($activityChildIds) as $childId) {
-                $groupSummaries[$groupKey]['_child_ids'][$childId] = true;
-            }
-
-            $groupSummaries[$groupKey]['activities'][] = $activityPayload;
+            $unmappedGroups[$unmappedKey]['attendance_percentage'] = $this->calculateAttendancePercentage(
+                $unmappedGroups[$unmappedKey]['present_count'],
+                $unmappedGroups[$unmappedKey]['late_count'],
+                $unmappedGroups[$unmappedKey]['absent_count']
+            );
         }
 
-        $overallMetrics = $this->initialMetrics();
-        $overallMetrics['present_count'] = (int) ($overall['present_count'] ?? 0);
-        $overallMetrics['late_count'] = (int) ($overall['late_count'] ?? 0);
-        $overallMetrics['absent_count'] = (int) ($overall['absent_count'] ?? 0);
-        $overallMetrics['total_sessions'] = (int) ($overall['total_sessions'] ?? 0);
-        $overallMetrics['total_activities'] = (int) ($overall['total_activities'] ?? 0);
-        $overallMetrics['verification'] = array_merge($overallMetrics['verification'], array_map('intval', $overall['verification'] ?? []));
-
-        $this->finalizeMetrics($overallMetrics, array_keys($overall['_child_ids'] ?? []));
-
-        foreach ($groupSummaries as &$groupSummary) {
-            $this->finalizeMetrics($groupSummary['metrics'], array_keys($groupSummary['_child_ids']));
-            unset($groupSummary['_child_ids']);
-            $groupSummary['activities'] = array_values($groupSummary['activities']);
+        foreach ($groupCards as &$groupCard) {
+            $groupCard['attendance_percentage'] = $this->calculateAttendancePercentage(
+                $groupCard['present_count'],
+                $groupCard['late_count'],
+                $groupCard['absent_count']
+            );
         }
-        unset($groupSummary);
+        unset($groupCard);
 
-        uasort($groupSummaries, static function ($a, $b) {
-            return strcmp($a['name'] ?? '', $b['name'] ?? '');
-        });
+        $groupCollection = collect($groupCards)
+            ->merge($unmappedGroups)
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
 
-        usort($activityPayloads, static function ($a, $b) {
-            return strcmp($a['date'] . ($a['id'] ?? ''), $b['date'] . ($b['id'] ?? ''));
-        });
+        $totalStudents = Anak::query()
+            ->where('id_shelter', $shelter->id_shelter)
+            ->aktif()
+            ->count();
+
+        $summaryAttendancePercentage = $this->calculateAttendancePercentage(
+            $overallPresent,
+            $overallLate,
+            $overallAbsent
+        );
 
         $notes = [];
 
-        if (empty($activityPayloads)) {
+        if (empty($attendanceAggregates)) {
             $notes[] = __('Tidak ada aktivitas yang tercatat pada rentang tanggal ini.');
         }
 
-        $unmappedGroups = collect($groupSummaries)
-            ->filter(static fn ($group) => empty($group['id']) && !empty($group['activities']))
-            ->pluck('name')
-            ->unique()
-            ->values()
-            ->all();
-
         if (!empty($unmappedGroups)) {
             $notes[] = __('Beberapa aktivitas tidak terhubung dengan kelompok terdaftar: :groups', [
-                'groups' => implode(', ', $unmappedGroups),
+                'groups' => collect($unmappedGroups)
+                    ->pluck('name')
+                    ->filter()
+                    ->unique()
+                    ->implode(', '),
             ]);
         }
 
@@ -490,17 +452,123 @@ class WeeklyAttendanceService
                 'wilbin' => $shelter->wilbin?->nama_wilbin,
                 'wilbin_id' => $shelter->wilbin?->id_wilbin,
             ],
-            'filters' => [
+            'period' => [
                 'week' => $weekKey,
                 'start_date' => $start->toDateString(),
                 'end_date' => $end->toDateString(),
             ],
-            'metrics' => $overallMetrics,
-            'groups' => array_values($groupSummaries),
-            'activities' => $activityPayloads,
+            'filters' => [
+                'start_date' => $requestedPeriodFilters['start_date'] ?? null,
+                'end_date' => $requestedPeriodFilters['end_date'] ?? null,
+                'week' => $weekKey,
+            ],
+            'summary' => [
+                'total_students' => (int) $totalStudents,
+                'present_count' => $overallPresent,
+                'late_count' => $overallLate,
+                'absent_count' => $overallAbsent,
+                'attendance_percentage' => $summaryAttendancePercentage,
+                'attendance_band' => $this->determineAttendanceBand($summaryAttendancePercentage),
+            ],
+            'groups' => $groupCollection->all(),
             'notes' => $notes,
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
+    }
+
+    protected function collectGroupAttendanceForShelterWeek(int $shelterId, Carbon $start, Carbon $end): array
+    {
+        if ($end->lt($start)) {
+            return [];
+        }
+
+        $activities = Aktivitas::query()
+            ->where('id_shelter', $shelterId)
+            ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+            ->with(['absen' => function ($query) {
+                $query->select('id_absen', 'id_aktivitas', 'absen');
+            }])
+            ->get(['id_aktivitas', 'nama_kelompok']);
+
+        $aggregates = [];
+
+        foreach ($activities as $activity) {
+            $normalizedName = $this->normalizeGroupKey($activity->nama_kelompok);
+
+            if (!isset($aggregates[$normalizedName])) {
+                $aggregates[$normalizedName] = [
+                    'name' => $activity->nama_kelompok ?? null,
+                    'present' => 0,
+                    'late' => 0,
+                    'absent' => 0,
+                ];
+            }
+
+            $attendanceRecords = $activity->absen ?? collect();
+
+            foreach ($attendanceRecords as $attendance) {
+                $status = strtolower($attendance->absen ?? '');
+
+                if ($status === strtolower(Absen::TEXT_YA)) {
+                    $aggregates[$normalizedName]['present']++;
+                } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
+                    $aggregates[$normalizedName]['late']++;
+                } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
+                    $aggregates[$normalizedName]['absent']++;
+                }
+            }
+        }
+
+        return $aggregates;
+    }
+
+    protected function normalizeGroupKey(?string $name): string
+    {
+        $normalized = trim(mb_strtolower((string) $name));
+
+        if ($normalized === '') {
+            return '__no_group__';
+        }
+
+        return $normalized;
+    }
+
+    protected function buildGroupDescription(Kelompok $group): ?string
+    {
+        $kelasGabungan = $group->kelas_gabungan;
+
+        if (is_array($kelasGabungan)) {
+            $labels = array_values(array_filter(array_map(static function ($value) {
+                if (is_array($value)) {
+                    return null;
+                }
+
+                $stringValue = is_scalar($value) ? (string) $value : null;
+
+                return $stringValue !== null ? trim($stringValue) : null;
+            }, $kelasGabungan)));
+
+            if (!empty($labels)) {
+                return implode(', ', $labels);
+            }
+        } elseif (is_string($kelasGabungan) && trim($kelasGabungan) !== '') {
+            return trim($kelasGabungan);
+        }
+
+        $levelName = $group->levelAnakBinaan?->nama_level_binaan;
+
+        return $levelName ? trim((string) $levelName) : null;
+    }
+
+    protected function calculateAttendancePercentage(int $present, int $late, int $absent): float
+    {
+        $totalSessions = $present + $late + $absent;
+
+        if ($totalSessions === 0) {
+            return 0.0;
+        }
+
+        return (($present + $late) / $totalSessions) * 100;
     }
 
     protected function collectShelterAttendanceMetrics(array $shelterIds, Carbon $start, Carbon $end): array
