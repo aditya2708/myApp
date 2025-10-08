@@ -3,6 +3,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyController;
 use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyShelterController;
+use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyShelterDetailController;
 
 
 Route::post('/auth/login', [App\Http\Controllers\API\AuthController::class, 'login']);
@@ -203,6 +204,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::prefix('attendance')->group(function () {
                 Route::get('/weekly', AttendanceWeeklyController::class);
                 Route::get('/weekly/shelters', AttendanceWeeklyShelterController::class);
+                Route::get('/weekly/shelters/{shelter}', AttendanceWeeklyShelterDetailController::class);
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
                 Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
             });
