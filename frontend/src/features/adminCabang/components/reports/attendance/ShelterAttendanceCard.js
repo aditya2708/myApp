@@ -1,0 +1,196 @@
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import AttendanceProgressBar from './AttendanceProgressBar';
+
+const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
+  if (!shelter) {
+    return null;
+  }
+
+  const { name, wilbin, attendanceRate, summary, verification, totalSessions } = shelter;
+  const safeSummary = summary || {};
+  const safeVerification = verification || {};
+  const badgeColor = band?.color || '#0984e3';
+  const badgeBackground = band?.backgroundColor || 'rgba(9, 132, 227, 0.12)';
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={[styles.card, { borderColor: badgeColor, backgroundColor: badgeBackground }]}
+      onPress={() => (onPress ? onPress(shelter) : undefined)}
+    >
+      <View style={styles.headerRow}>
+        <View style={styles.titleWrapper}>
+          <Text style={styles.name}>{name}</Text>
+          {wilbin ? (
+            <View style={styles.wilbinBadge}>
+              <Ionicons name="location-outline" size={14} color="#636e72" />
+              <Text style={styles.wilbinLabel} numberOfLines={1}>
+                {typeof wilbin === 'string' ? wilbin : wilbin?.name || wilbin?.label || 'Wilayah'}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={[styles.rateBadge, { backgroundColor: '#ffffff', borderColor: badgeColor }]}>
+          <Text style={[styles.rateLabel, { color: badgeColor }]}>Kehadiran</Text>
+          <Text style={[styles.rateValue, { color: badgeColor }]}>{`${Number(attendanceRate || 0).toFixed(1)}%`}</Text>
+          {band ? <Text style={styles.bandLabel}>{band.label}</Text> : null}
+        </View>
+      </View>
+
+      <View style={styles.progressGroup}>
+        <View style={styles.progressItem}>
+          <AttendanceProgressBar
+            label="Hadir"
+            count={safeSummary.present?.count}
+            percentage={safeSummary.present?.percentage}
+            color="#2ecc71"
+            icon="checkmark-circle"
+          />
+        </View>
+        <View style={styles.progressItem}>
+          <AttendanceProgressBar
+            label="Terlambat"
+            count={safeSummary.late?.count}
+            percentage={safeSummary.late?.percentage}
+            color="#f1c40f"
+            icon="time"
+          />
+        </View>
+        <View style={[styles.progressItem, styles.progressItemLast]}>
+          <AttendanceProgressBar
+            label="Tidak Hadir"
+            count={safeSummary.absent?.count}
+            percentage={safeSummary.absent?.percentage}
+            color="#e74c3c"
+            icon="close-circle"
+          />
+        </View>
+      </View>
+
+      <View style={styles.footerRow}>
+        <View style={styles.footerItem}>
+          <Ionicons name="layers-outline" size={16} color="#0984e3" />
+          <Text style={styles.footerLabel}>Total Sesi</Text>
+          <Text style={styles.footerValue}>{(totalSessions || 0).toLocaleString('id-ID')}</Text>
+        </View>
+        <View style={styles.footerItem}>
+          <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
+          <Text style={styles.footerLabel}>Terverifikasi</Text>
+          <Text style={styles.footerValue}>{(safeVerification.verified || 0).toLocaleString('id-ID')}</Text>
+        </View>
+        <View style={styles.footerItem}>
+          <Ionicons name="time" size={16} color="#f1c40f" />
+          <Text style={styles.footerLabel}>Menunggu</Text>
+          <Text style={styles.footerValue}>{(safeVerification.pending || 0).toLocaleString('id-ID')}</Text>
+        </View>
+        <View style={styles.footerItem}>
+          <Ionicons name="close-circle" size={16} color="#e74c3c" />
+          <Text style={styles.footerLabel}>Ditolak</Text>
+          <Text style={styles.footerValue}>{(safeVerification.rejected || 0).toLocaleString('id-ID')}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+ShelterAttendanceCard.defaultProps = {
+  shelter: null,
+  band: null,
+  onPress: undefined,
+};
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 18,
+    borderWidth: 2,
+    padding: 18,
+    marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  titleWrapper: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2d3436',
+  },
+  wilbinBadge: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(99, 110, 114, 0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    maxWidth: 220,
+  },
+  wilbinLabel: {
+    fontSize: 12,
+    color: '#636e72',
+    marginLeft: 6,
+  },
+  rateBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'flex-end',
+  },
+  rateLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  rateValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  bandLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#636e72',
+  },
+  progressGroup: {
+    marginTop: 4,
+  },
+  progressItem: {
+    marginBottom: 10,
+  },
+  progressItemLast: {
+    marginBottom: 0,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 18,
+    marginHorizontal: -8,
+  },
+  footerItem: {
+    minWidth: 70,
+    paddingHorizontal: 8,
+    marginBottom: 12,
+  },
+  footerLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#636e72',
+  },
+  footerValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2d3436',
+    marginTop: 2,
+  },
+});
+
+export default ShelterAttendanceCard;
