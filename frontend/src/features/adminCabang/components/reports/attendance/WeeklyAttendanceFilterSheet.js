@@ -19,9 +19,23 @@ const WeeklyAttendanceFilterSheet = ({
   searchQuery,
   onSearchChange,
   onReset,
+  periodOptions,
+  selectedYear,
+  selectedMonth,
+  selectedWeekId,
+  onYearChange,
+  onMonthChange,
+  onWeekChange,
 }) => {
   const safeBands = Array.isArray(bands) ? bands : [];
   const selectedSet = new Set(selectedBands || []);
+  const safePeriods = Array.isArray(periodOptions) ? periodOptions : [];
+
+  const activeYear = safePeriods.find((item) => item.year === selectedYear) || safePeriods[0];
+  const monthList = Array.isArray(activeYear?.months) ? activeYear.months : [];
+  const activeMonth =
+    monthList.find((month) => month.id === selectedMonth) || monthList[0] || null;
+  const weekList = Array.isArray(activeMonth?.weeks) ? activeMonth.weeks : [];
 
   const toggleBand = (bandId) => {
     if (!onBandsChange) {
@@ -69,6 +83,94 @@ const WeeklyAttendanceFilterSheet = ({
             </TouchableOpacity>
           ) : null}
         </View>
+
+        <Text style={styles.sectionLabel}>Periode Laporan</Text>
+        {safePeriods.length ? (
+          <View style={styles.periodWrapper}>
+            <Text style={styles.subSectionLabel}>Tahun</Text>
+            <View style={styles.yearList}>
+              {safePeriods.map((period) => {
+                const isActive = period.year === (selectedYear || activeYear?.year);
+
+                return (
+                  <TouchableOpacity
+                    key={period.year}
+                    style={[styles.yearItem, isActive ? styles.yearItemActive : null]}
+                    onPress={() => onYearChange?.(period.year)}
+                  >
+                    <Text style={[styles.yearLabel, isActive ? styles.yearLabelActive : null]}>
+                      {period.year}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.subSectionLabel}>Bulan</Text>
+            <View style={styles.monthList}>
+              {monthList.length ? (
+                monthList.map((month) => {
+                  const isActive = month.id === (selectedMonth || activeMonth?.id);
+
+                  return (
+                    <TouchableOpacity
+                      key={month.id}
+                      style={[styles.monthItem, isActive ? styles.monthItemActive : null]}
+                      onPress={() => onMonthChange?.(month.id)}
+                    >
+                      <Text
+                        style={[styles.monthLabel, isActive ? styles.monthLabelActive : null]}
+                      >
+                        {month.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyPeriodText}>Tidak ada bulan tersedia.</Text>
+              )}
+            </View>
+
+            <Text style={styles.subSectionLabel}>Minggu</Text>
+            {weekList.length ? (
+              <View style={styles.weekList}>
+                {weekList.map((week) => {
+                  const isActive = week.id === selectedWeekId;
+
+                  return (
+                    <TouchableOpacity
+                      key={week.id}
+                      style={[styles.weekItem, isActive ? styles.weekItemActive : null]}
+                      onPress={() => onWeekChange?.(week.id)}
+                    >
+                      <View style={styles.weekTextWrapper}>
+                        <Text style={[styles.weekName, isActive ? styles.weekNameActive : null]}>
+                          {week.name}
+                        </Text>
+                        {week.rangeLabel ? (
+                          <Text
+                            style={[styles.weekRange, isActive ? styles.weekRangeActive : null]}
+                          >
+                            {week.rangeLabel}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {isActive ? (
+                        <Ionicons name="checkmark-circle" size={22} color="#0984e3" />
+                      ) : (
+                        <Ionicons name="ellipse-outline" size={22} color="#dfe6e9" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.emptyPeriodText}>Tidak ada minggu pada bulan ini.</Text>
+            )}
+          </View>
+        ) : (
+          <Text style={styles.emptyPeriodText}>Belum ada periode laporan tersedia.</Text>
+        )}
 
         <Text style={styles.sectionLabel}>Kelompok Persentase Kehadiran</Text>
         <View style={styles.bandList}>
@@ -123,6 +225,13 @@ WeeklyAttendanceFilterSheet.defaultProps = {
   searchQuery: '',
   onSearchChange: undefined,
   onReset: undefined,
+  periodOptions: [],
+  selectedYear: null,
+  selectedMonth: null,
+  selectedWeekId: null,
+  onYearChange: undefined,
+  onMonthChange: undefined,
+  onWeekChange: undefined,
 };
 
 const styles = StyleSheet.create({
@@ -186,6 +295,117 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#2d3436',
+  },
+  subSectionLabel: {
+    marginTop: 12,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2d3436',
+  },
+  periodWrapper: {
+    marginTop: 12,
+    backgroundColor: '#f7f9fb',
+    borderRadius: 16,
+    padding: 16,
+  },
+  yearList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  yearItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
+  },
+  yearItemActive: {
+    borderColor: '#0984e3',
+    backgroundColor: 'rgba(9, 132, 227, 0.12)',
+  },
+  yearLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2d3436',
+  },
+  yearLabelActive: {
+    color: '#0984e3',
+  },
+  monthList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  monthItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
+  },
+  monthItemActive: {
+    borderColor: '#0984e3',
+    backgroundColor: 'rgba(9, 132, 227, 0.12)',
+  },
+  monthLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#2d3436',
+  },
+  monthLabelActive: {
+    color: '#0984e3',
+    fontWeight: '700',
+  },
+  weekList: {
+    marginTop: 8,
+  },
+  weekItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
+  },
+  weekItemActive: {
+    borderColor: '#0984e3',
+    backgroundColor: 'rgba(9, 132, 227, 0.12)',
+  },
+  weekTextWrapper: {
+    flex: 1,
+    marginRight: 12,
+  },
+  weekName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2d3436',
+  },
+  weekNameActive: {
+    color: '#0984e3',
+  },
+  weekRange: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#636e72',
+  },
+  weekRangeActive: {
+    color: '#0984e3',
+  },
+  emptyPeriodText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#636e72',
   },
   bandList: {
     marginTop: 12,

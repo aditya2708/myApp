@@ -26,6 +26,21 @@ import useAttendanceSummary from '../../../hooks/reports/attendance/useAttendanc
 import useAttendanceTrend from '../../../hooks/reports/attendance/useAttendanceTrend';
 import useWeeklyAttendanceDashboard from '../../../hooks/reports/attendance/useWeeklyAttendanceDashboard';
 
+const MONTH_NAMES_ID = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
 const ATTENDANCE_BANDS = [
   {
     id: 'excellent',
@@ -84,6 +99,8 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   const [isFilterVisible, setFilterVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBands, setSelectedBands] = useState([]);
+  const [selectedYear, setSelectedYear] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: summaryData } = useAttendanceSummary();
@@ -113,6 +130,138 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       }
     }
   }, [selectWeek, selectedWeek?.id, weeklyData]);
+
+  const openFilterSheet = useCallback(() => setFilterVisible(true), []);
+  const closeFilterSheet = useCallback(() => setFilterVisible(false), []);
+
+  const parseDateValue = useCallback((value) => {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return parsed;
+  }, []);
+
+  const periodOptions = useMemo(() => {
+    if (!Array.isArray(weeklyData)) {
+      return [];
+    }
+
+    const yearsMap = new Map();
+
+    const formatRange = (start, end) => {
+      if (start && end) {
+        const sameMonth =
+          start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
+
+        if (sameMonth) {
+          return `${start.getDate()} - ${end.getDate()} ${
+            MONTH_NAMES_ID[start.getMonth()] || ''
+          } ${start.getFullYear()}`;
+        }
+
+        const startLabel = `${start.getDate()} ${MONTH_NAMES_ID[start.getMonth()] || ''} ${
+          start.getFullYear()
+        }`;
+        const endLabel = `${end.getDate()} ${MONTH_NAMES_ID[end.getMonth()] || ''} ${
+          end.getFullYear()
+        }`;
+
+        return `${startLabel} - ${endLabel}`;
+      }
+
+      const date = start || end;
+
+      if (!date) {
+        return '';
+      }
+
+      return `${date.getDate()} ${MONTH_NAMES_ID[date.getMonth()] || ''} ${date.getFullYear()}`;
+    };
+
+    weeklyData.forEach((week) => {
+      const start = parseDateValue(week?.dates?.start);
+      const end = parseDateValue(week?.dates?.end);
+      const primaryDate = start || end;
+
+      if (!primaryDate) {
+        return;
+      }
+
+      const yearKey = primaryDate.getFullYear().toString();
+      const monthIndex = primaryDate.getMonth();
+      const monthKey = `${yearKey}-${String(monthIndex + 1).padStart(2, '0')}`;
+
+      if (!yearsMap.has(yearKey)) {
+        yearsMap.set(yearKey, { year: yearKey, months: new Map() });
+      }
+
+      const yearGroup = yearsMap.get(yearKey);
+
+      if (!yearGroup.months.has(monthKey)) {
+        yearGroup.months.set(monthKey, {
+          id: monthKey,
+          monthIndex,
+          label: MONTH_NAMES_ID[monthIndex] || '',
+          weeks: [],
+        });
+      }
+
+      const monthGroup = yearGroup.months.get(monthKey);
+      if (!week?.id) {
+        return;
+      }
+
+      const weekName =
+        week?.name || week?.label || week?.title || week?.dates?.label || 'Minggu';
+      const rangeLabel = formatRange(start, end);
+
+      monthGroup.weeks.push({
+        id: week.id,
+        name: weekName,
+        rangeLabel,
+      });
+    });
+
+    return Array.from(yearsMap.values())
+      .sort((a, b) => Number(b.year) - Number(a.year))
+      .map((yearGroup) => ({
+        year: yearGroup.year,
+        months: Array.from(yearGroup.months.values()).sort((a, b) => b.monthIndex - a.monthIndex),
+      }));
+  }, [parseDateValue, weeklyData]);
+
+  useEffect(() => {
+    const week = selectedWeek?.id
+      ? selectedWeek
+      : Array.isArray(weeklyData) && weeklyData.length > 0
+      ? weeklyData[0]
+      : null;
+
+    if (!week) {
+      return;
+    }
+
+    const start = parseDateValue(week?.dates?.start);
+    const end = parseDateValue(week?.dates?.end);
+    const primaryDate = start || end;
+
+    if (!primaryDate) {
+      return;
+    }
+
+    const yearKey = primaryDate.getFullYear().toString();
+    const monthKey = `${yearKey}-${String(primaryDate.getMonth() + 1).padStart(2, '0')}`;
+
+    setSelectedYear((prev) => (prev === yearKey ? prev : yearKey));
+    setSelectedMonth((prev) => (prev === monthKey ? prev : monthKey));
+  }, [parseDateValue, selectedWeek, weeklyData]);
 
   const handleShelterPress = useCallback(
     (shelter) => {
@@ -273,17 +422,138 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     weeklySummary,
   ]);
 
-  const openFilterSheet = useCallback(() => setFilterVisible(true), []);
-  const closeFilterSheet = useCallback(() => setFilterVisible(false), []);
-
   const handleBandChange = useCallback((nextBands) => {
     setSelectedBands(nextBands);
   }, []);
 
+  const handleYearChange = useCallback(
+    (yearKey) => {
+      if (!yearKey) {
+        return;
+      }
+
+      const yearGroup = periodOptions.find((group) => group.year === yearKey);
+
+      if (!yearGroup) {
+        setSelectedYear(yearKey);
+        setSelectedMonth(null);
+        closeFilterSheet();
+        return;
+      }
+
+      const firstMonth = yearGroup.months?.[0];
+      const firstWeek = firstMonth?.weeks?.[0];
+
+      setSelectedYear(yearKey);
+      setSelectedMonth(firstMonth?.id || null);
+
+      if (firstWeek?.id) {
+        selectWeek(firstWeek.id);
+      }
+
+      closeFilterSheet();
+    },
+    [closeFilterSheet, periodOptions, selectWeek]
+  );
+
+  const handleMonthChange = useCallback(
+    (monthKey) => {
+      if (!monthKey) {
+        return;
+      }
+
+      let targetYear = null;
+      let targetMonth = null;
+
+      periodOptions.forEach((yearGroup) => {
+        if (targetMonth) {
+          return;
+        }
+
+        const foundMonth = yearGroup.months?.find((month) => month.id === monthKey);
+
+        if (foundMonth) {
+          targetYear = yearGroup;
+          targetMonth = foundMonth;
+        }
+      });
+
+      if (!targetMonth) {
+        return;
+      }
+
+      const firstWeek = targetMonth.weeks?.[0];
+
+      setSelectedYear(targetYear?.year || null);
+      setSelectedMonth(targetMonth.id);
+
+      if (firstWeek?.id) {
+        selectWeek(firstWeek.id);
+      }
+
+      closeFilterSheet();
+    },
+    [closeFilterSheet, periodOptions, selectWeek]
+  );
+
+  const handleWeekChange = useCallback(
+    (weekId) => {
+      if (!weekId) {
+        return;
+      }
+
+      let targetYear = null;
+      let targetMonth = null;
+
+      periodOptions.some((yearGroup) => {
+        const monthMatch = yearGroup.months?.find((month) =>
+          month.weeks?.some((week) => week.id === weekId)
+        );
+
+        if (monthMatch) {
+          targetYear = yearGroup;
+          targetMonth = monthMatch;
+          return true;
+        }
+
+        return false;
+      });
+
+      if (!targetMonth) {
+        return;
+      }
+
+      setSelectedYear(targetYear?.year || null);
+      setSelectedMonth(targetMonth.id);
+      selectWeek(weekId);
+      closeFilterSheet();
+    },
+    [closeFilterSheet, periodOptions, selectWeek]
+  );
+
   const handleResetFilters = useCallback(() => {
     setSelectedBands([]);
     setSearchQuery('');
-  }, []);
+    const defaultWeek = Array.isArray(weeklyData) ? weeklyData[0] : null;
+
+    if (defaultWeek?.id) {
+      const start = parseDateValue(defaultWeek?.dates?.start);
+      const end = parseDateValue(defaultWeek?.dates?.end);
+      const primaryDate = start || end;
+
+      if (primaryDate) {
+        const yearKey = primaryDate.getFullYear().toString();
+        const monthKey = `${yearKey}-${String(primaryDate.getMonth() + 1).padStart(2, '0')}`;
+
+        setSelectedYear(yearKey);
+        setSelectedMonth(monthKey);
+      }
+
+      selectWeek(defaultWeek.id);
+    }
+
+    closeFilterSheet();
+  }, [closeFilterSheet, parseDateValue, selectWeek, weeklyData]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -331,6 +601,13 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onReset={handleResetFilters}
+        periodOptions={periodOptions}
+        selectedYear={selectedYear}
+        selectedMonth={selectedMonth}
+        selectedWeekId={selectedWeek?.id || null}
+        onYearChange={handleYearChange}
+        onMonthChange={handleMonthChange}
+        onWeekChange={handleWeekChange}
       />
     </View>
   );
