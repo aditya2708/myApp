@@ -104,6 +104,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   const updateDateRange = useCallback((nextStart, nextEnd) => {
     setStartDate((prev) => (prev === nextStart ? prev : nextStart));
@@ -133,14 +134,26 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   });
   const { data: trendData, isLoading: isTrendLoading } = useAttendanceTrend();
 
+  const handleSelectWeek = useCallback(
+    (weekId) => {
+      setIsCustomRange(false);
+      return selectWeek(weekId);
+    },
+    [selectWeek],
+  );
+
   useEffect(() => {
+    if (isCustomRange) {
+      return;
+    }
+
     if (Array.isArray(weeklyData) && weeklyData.length > 0 && !selectedWeek?.id) {
       const firstWeek = weeklyData[0];
       if (firstWeek?.id) {
-        selectWeek(firstWeek.id);
+        handleSelectWeek(firstWeek.id);
       }
     }
-  }, [selectWeek, selectedWeek?.id, weeklyData]);
+  }, [handleSelectWeek, isCustomRange, selectedWeek?.id, weeklyData]);
 
   const openFilterSheet = useCallback(() => setFilterVisible(true), []);
   const closeFilterSheet = useCallback(() => setFilterVisible(false), []);
@@ -530,7 +543,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
           summary={displaySummary}
           weeks={weeklyData}
           selectedWeekId={selectedWeekId}
-          onSelectWeek={selectWeek}
+          onSelectWeek={handleSelectWeek}
           band={weekBand}
           isLoading={isDashboardLoading}
           error={dashboardError}
@@ -557,7 +570,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     isDashboardLoading,
     isTrendLoading,
     refresh,
-    selectWeek,
+    handleSelectWeek,
     selectedWeekId,
     summaryData,
     trendData,
@@ -579,7 +592,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       if (!yearGroup) {
         setSelectedYear(yearKey);
         setSelectedMonth(null);
-        selectWeek(null);
+        handleSelectWeek(null);
         updateDateRange(null, null);
         closeFilterSheet();
         return;
@@ -592,20 +605,20 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       setSelectedMonth(firstMonth?.id || null);
 
       if (firstWeek?.id) {
-        const matchedWeek = selectWeek(firstWeek.id);
+        const matchedWeek = handleSelectWeek(firstWeek.id);
         const range = matchedWeek?.dates ?? {
           start: firstWeek?.dates?.start ?? null,
           end: firstWeek?.dates?.end ?? null,
         };
         updateDateRange(range?.start ?? null, range?.end ?? null);
       } else {
-        selectWeek(null);
+        handleSelectWeek(null);
         updateDateRange(firstWeek?.dates?.start ?? null, firstWeek?.dates?.end ?? null);
       }
 
       closeFilterSheet();
     },
-    [closeFilterSheet, periodOptions, selectWeek, updateDateRange]
+    [closeFilterSheet, handleSelectWeek, periodOptions, updateDateRange]
   );
 
   const handleMonthChange = useCallback(
@@ -632,7 +645,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
 
       if (!targetMonth) {
         setSelectedMonth(null);
-        selectWeek(null);
+        handleSelectWeek(null);
         updateDateRange(null, null);
         closeFilterSheet();
         return;
@@ -644,26 +657,26 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       setSelectedMonth(targetMonth.id);
 
       if (firstWeek?.id) {
-        const matchedWeek = selectWeek(firstWeek.id);
+        const matchedWeek = handleSelectWeek(firstWeek.id);
         const range = matchedWeek?.dates ?? {
           start: firstWeek?.dates?.start ?? null,
           end: firstWeek?.dates?.end ?? null,
         };
         updateDateRange(range?.start ?? null, range?.end ?? null);
       } else {
-        selectWeek(null);
+        handleSelectWeek(null);
         updateDateRange(firstWeek?.dates?.start ?? null, firstWeek?.dates?.end ?? null);
       }
 
       closeFilterSheet();
     },
-    [closeFilterSheet, periodOptions, selectWeek, updateDateRange]
+    [closeFilterSheet, handleSelectWeek, periodOptions, updateDateRange]
   );
 
   const handleWeekChange = useCallback(
     (weekId, weekRange) => {
       if (!weekId) {
-        selectWeek(null);
+        handleSelectWeek(null);
         setSelectedYear(null);
         setSelectedMonth(null);
         updateDateRange(weekRange?.start ?? null, weekRange?.end ?? null);
@@ -691,12 +704,12 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       setSelectedYear(targetYear?.year || null);
       setSelectedMonth(targetMonth?.id || null);
 
-      const matchedWeek = selectWeek(weekId);
+      const matchedWeek = handleSelectWeek(weekId);
       const range = weekRange ?? matchedWeek?.dates ?? null;
       updateDateRange(range?.start ?? null, range?.end ?? null);
       closeFilterSheet();
     },
-    [closeFilterSheet, periodOptions, selectWeek, updateDateRange]
+    [closeFilterSheet, handleSelectWeek, periodOptions, updateDateRange]
   );
 
   const handleMonthYearPick = useCallback(
@@ -704,7 +717,8 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       if (!date) {
         setSelectedYear((prev) => (prev === null ? prev : null));
         setSelectedMonth((prev) => (prev === null ? prev : null));
-        selectWeek(null);
+        setIsCustomRange(false);
+        handleSelectWeek(null);
 
         const periodRange = period?.dateRange ?? {};
         const defaultStart = periodRange.start ?? null;
@@ -745,7 +759,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       setSelectedYear((prev) => (prev === yearKey ? prev : yearKey));
       setSelectedMonth((prev) => (prev === monthKey ? prev : monthKey));
 
-      let hasMatchingWeek = false;
+      let matchedWeek = null;
 
       periodOptions.some((yearGroup) => {
         if (yearGroup.year !== yearKey) {
@@ -758,8 +772,8 @@ const AdminCabangAttendanceWeeklyScreen = () => {
           return false;
         }
 
-        hasMatchingWeek = Array.isArray(monthGroup.weeks)
-          ? monthGroup.weeks.some((week) => {
+        matchedWeek = Array.isArray(monthGroup.weeks)
+          ? monthGroup.weeks.find((week) => {
               const weekStart = week?.dates?.start ?? null;
               const weekEnd = week?.dates?.end ?? null;
 
@@ -768,21 +782,33 @@ const AdminCabangAttendanceWeeklyScreen = () => {
               }
 
               return weekStart === nextStart && weekEnd === nextEnd;
-            })
-          : false;
+            }) ?? null
+          : null;
 
         return true;
       });
 
-      if (!hasMatchingWeek || selectedWeekId) {
-        selectWeek(null);
+      const hasMatchedWeek = Boolean(matchedWeek?.id);
+
+      setIsCustomRange(!hasMatchedWeek);
+
+      if (hasMatchedWeek) {
+        const selected = handleSelectWeek(matchedWeek.id);
+        const range = selected?.dates ?? matchedWeek.dates ?? {
+          start: nextStart,
+          end: nextEnd,
+        };
+        updateDateRange(range?.start ?? nextStart, range?.end ?? nextEnd);
+        return;
       }
+
+      selectWeek(null);
 
       if (startDate !== nextStart || endDate !== nextEnd) {
         updateDateRange(nextStart, nextEnd);
       }
     },
-    [endDate, period, periodOptions, selectWeek, selectedWeekId, startDate, updateDateRange]
+    [endDate, handleSelectWeek, period, periodOptions, selectWeek, startDate, updateDateRange]
   );
 
   const handleResetFilters = useCallback(() => {
