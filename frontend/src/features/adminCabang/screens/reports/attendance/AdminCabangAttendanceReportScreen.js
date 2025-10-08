@@ -14,7 +14,12 @@ import useAttendanceTrend from '../../../hooks/reports/attendance/useAttendanceT
 
 const AdminCabangAttendanceReportScreen = () => {
   const { data: summaryData } = useAttendanceSummary();
-  const { data: weeklyData } = useAttendanceWeekly();
+  const {
+    data: weeklyData,
+    isLoading: isWeeklyLoading,
+    error: weeklyError,
+    refetch: refetchWeekly,
+  } = useAttendanceWeekly();
   const { data: shelterData } = useAttendanceMonthlyShelter();
   const { data: trendData } = useAttendanceTrend();
 
@@ -65,7 +70,12 @@ const AdminCabangAttendanceReportScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Rekap Mingguan Cabang</Text>
-        <WeeklyBreakdownList data={weeklyData} />
+        <WeeklyBreakdownList
+          data={weeklyData}
+          isLoading={isWeeklyLoading}
+          error={weeklyError}
+          onRetry={refetchWeekly}
+        />
       </View>
 
       <View style={styles.section}>
