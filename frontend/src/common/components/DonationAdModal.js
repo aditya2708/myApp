@@ -12,8 +12,8 @@ import {
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import Button from '../../../common/components/Button';
-import { DONATION_ASSET_BASE_URL } from '../../../constants/config';
+import Button from './Button';
+import { DONATION_ASSET_BASE_URL } from '../../constants/config';
 
 const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
   const assetBase = DONATION_ASSET_BASE_URL.replace(/\/$/, '');
@@ -32,7 +32,13 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
   };
 
   const imageUrl = getFullUrl(ad?.file_url);
-  const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
+  const [imageAspectRatio, setImageAspectRatio] = useState(
+    () => ad?.imageAspectRatio || 16 / 9
+  );
+
+  useEffect(() => {
+    setImageAspectRatio(ad?.imageAspectRatio || 16 / 9);
+  }, [ad]);
 
   useEffect(() => {
     let isMounted = true;
@@ -51,12 +57,14 @@ const DonationAdModal = ({ visible, ad, onClose, onActionPress }) => {
           }
         }
       );
+    } else if (isMounted) {
+      setImageAspectRatio(ad?.imageAspectRatio || 16 / 9);
     }
 
     return () => {
       isMounted = false;
     };
-  }, [imageUrl]);
+  }, [ad, imageUrl]);
 
   const getTextValue = (...values) => {
     for (const value of values) {
