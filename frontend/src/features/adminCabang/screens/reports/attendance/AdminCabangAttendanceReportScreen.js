@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Text } from 'react-native';
 
 import AttendanceFilterBar from '../../../components/reports/attendance/AttendanceFilterBar';
@@ -9,7 +9,7 @@ import AttendanceTrendChart from '../../../components/reports/attendance/Attenda
 
 import useAttendanceSummary from '../../../hooks/reports/attendance/useAttendanceSummary';
 import useAttendanceWeekly from '../../../hooks/reports/attendance/useAttendanceWeekly';
-import useAttendanceMonthlyShelter from '../../../hooks/reports/attendance/useAttendanceMonthlyShelter';
+import useAttendanceWeeklyShelters from '../../../hooks/reports/attendance/useAttendanceWeeklyShelters';
 import useAttendanceTrend from '../../../hooks/reports/attendance/useAttendanceTrend';
 
 const AdminCabangAttendanceReportScreen = () => {
@@ -20,8 +20,21 @@ const AdminCabangAttendanceReportScreen = () => {
     error: weeklyError,
     refetch: refetchWeekly,
   } = useAttendanceWeekly();
-  const { data: shelterData } = useAttendanceMonthlyShelter();
+  const {
+    data: shelterData,
+    isLoading: isShelterLoading,
+    error: shelterError,
+    refetch: refetchShelters,
+  } = useAttendanceWeeklyShelters();
   const { data: trendData } = useAttendanceTrend();
+
+  const handleShelterRowPress = useCallback((shelter) => {
+    if (!shelter) {
+      return;
+    }
+
+    console.log('Shelter attendance selected:', shelter.id || shelter.name, shelter);
+  }, []);
 
   const summaryMetrics = useMemo(() => {
     if (!summaryData) {
@@ -79,8 +92,14 @@ const AdminCabangAttendanceReportScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Rekap Bulanan per Shelter</Text>
-        <ShelterAttendanceTable data={shelterData} />
+        <Text style={styles.sectionTitle}>Rekap Mingguan per Shelter</Text>
+        <ShelterAttendanceTable
+          data={shelterData}
+          isLoading={isShelterLoading}
+          error={shelterError}
+          onRetry={refetchShelters}
+          onRowPress={handleShelterRowPress}
+        />
       </View>
 
       <View style={styles.section}>

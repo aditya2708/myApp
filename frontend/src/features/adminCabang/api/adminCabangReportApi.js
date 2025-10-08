@@ -48,6 +48,18 @@ export const adminCabangReportApi = {
     return api.get(ATTENDANCE_ENDPOINTS.WEEKLY, { params });
   },
 
+  async getAttendanceWeeklyShelters(params = {}) {
+    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY_SHELTERS, { params });
+  },
+
+  async getAttendanceWeeklyShelterDetail(shelterId, params = {}) {
+    if (!shelterId) {
+      throw new Error('Shelter ID is required to fetch weekly attendance detail');
+    }
+
+    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY_SHELTER_DETAIL(shelterId), { params });
+  },
+
   async getAttendanceMonthlyShelter(params = {}) {
     return api.get(ATTENDANCE_ENDPOINTS.MONTHLY_SHELTER, { params });
   },
