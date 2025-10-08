@@ -153,14 +153,14 @@ export const ADMIN_CABANG_ENDPOINTS = {
     SUMMARY: '/admin-cabang/laporan/summary',
     ATTENDANCE_SUMMARY: (cabangId) => `/admin-cabang/${cabangId}/attendance-summary`,
     ATTENDANCE: {
-      WEEKLY: '/admin-cabang/laporan/attendance/weekly',
-      WEEKLY_SHELTERS: '/admin-cabang/laporan/attendance/weekly-shelters',
-      WEEKLY_SHELTER_DETAIL: (shelterId) =>
-        `/admin-cabang/laporan/attendance/weekly-shelters/${shelterId}`,
-      WEEKLY_GROUP_STUDENTS: (groupId) =>
-        `/admin-cabang/laporan/attendance/weekly-groups/${groupId}/students`,
       MONTHLY_SHELTER: '/admin-cabang/laporan/attendance/monthly-shelter',
       MONTHLY_BRANCH: '/admin-cabang/laporan/attendance/monthly-branch',
+    },
+    WEEKLY_ATTENDANCE: {
+      DASHBOARD: '/admin-cabang/weekly-attendance',
+      SHELTER_DETAIL: (shelterId) => `/admin-cabang/weekly-attendance/shelters/${shelterId}`,
+      GROUP_STUDENTS: (groupId) =>
+        `/admin-cabang/weekly-attendance/groups/${groupId}/students`,
     },
     ANAK: {
       LIST: '/admin-cabang/laporan/anak-binaan',
