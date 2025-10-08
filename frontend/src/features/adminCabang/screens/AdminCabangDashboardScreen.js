@@ -19,6 +19,8 @@ import { adminCabangApi } from '../api/adminCabangApi';
 import { adminCabangSurveyApi } from '../api/adminCabangSurveyApi';
 import { adminCabangDonaturApi } from '../api/adminCabangDonaturApi';
 import { useAuth } from '../../../common/hooks/useAuth';
+import DonationAdModal from '../../../common/components/DonationAdModal';
+import { useDonationAd } from '../../../common/hooks/useDonationAd';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +33,13 @@ const AdminCabangDashboardScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const {
+    ad: donationAd,
+    visible: adVisible,
+    dismissAd,
+    markActionTaken,
+    refreshAd,
+  } = useDonationAd();
 
   const fetchDashboardData = async () => {
     try {
@@ -54,7 +63,11 @@ const AdminCabangDashboardScreen = () => {
 
   useEffect(() => { fetchDashboardData(); }, []);
 
-  const handleRefresh = () => { setRefreshing(true); fetchDashboardData(); };
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchDashboardData();
+    refreshAd();
+  };
   const navigateToSurveyManagement = () => navigation.navigate('SurveyStatusFilter');
   const navigateToDonaturManagement = () => navigation.navigate('DonaturList');
   const navigateToKurikulum = () => navigation.navigate('Kurikulum', { screen: 'KurikulumHome' });
@@ -141,6 +154,13 @@ const AdminCabangDashboardScreen = () => {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
       {error && <ErrorMessage message={error} onRetry={fetchDashboardData} />}
+
+      <DonationAdModal
+        visible={adVisible}
+        ad={donationAd}
+        onClose={dismissAd}
+        onActionPress={markActionTaken}
+      />
 
       <View style={styles.headerSection}>
         <View style={styles.headerContent}>
