@@ -1,6 +1,51 @@
 import api from '../../../api/axiosConfig';
 import { ADMIN_CABANG_ENDPOINTS } from '../../../constants/endpoints';
 
+const firstDefined = (...values) => {
+  return values.find((value) => value !== undefined && value !== null && value !== '');
+};
+
+const normalizeWeeklyAttendanceParams = (params = {}) => {
+  const normalized = {};
+
+  const assignIfDefined = (key, ...candidates) => {
+    const value = firstDefined(...candidates);
+
+    if (value !== undefined) {
+      normalized[key] = value;
+    }
+  };
+
+  assignIfDefined('page', params.page);
+  assignIfDefined('per_page', params.per_page, params.perPage, params.pageSize);
+  assignIfDefined('search', params.search, params.keyword, params.q);
+  assignIfDefined(
+    'attendance_band',
+    params.attendance_band,
+    params.attendanceBand,
+    params.band,
+    params.band_id,
+  );
+  assignIfDefined(
+    'attendance_bands',
+    params.attendance_bands,
+    params.attendanceBands,
+    params.band_ids,
+    params.bands,
+  );
+  assignIfDefined('attendance_status', params.attendance_status, params.attendanceStatus, params.status);
+  assignIfDefined('start_date', params.start_date, params.startDate);
+  assignIfDefined('end_date', params.end_date, params.endDate);
+  assignIfDefined('week_id', params.week_id, params.weekId);
+  assignIfDefined('shelter_id', params.shelter_id, params.shelterId);
+  assignIfDefined('group_id', params.group_id, params.groupId);
+  assignIfDefined('include_summary', params.include_summary, params.includeSummary);
+  assignIfDefined('sort_by', params.sort_by, params.sortBy);
+  assignIfDefined('sort_direction', params.sort_direction, params.sortDirection, params.order);
+
+  return normalized;
+};
+
 const {
   REPORTS: {
     SUMMARY: SUMMARY_ENDPOINT,
@@ -46,7 +91,8 @@ export const adminCabangReportApi = {
   },
 
   async getWeeklyAttendanceDashboard(params = {}) {
-    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.DASHBOARD, { params });
+    const normalizedParams = normalizeWeeklyAttendanceParams(params);
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.DASHBOARD, { params: normalizedParams });
   },
 
   async getWeeklyAttendanceShelter(shelterId, params = {}) {
@@ -54,7 +100,11 @@ export const adminCabangReportApi = {
       throw new Error('Shelter ID is required to fetch weekly attendance shelter detail');
     }
 
-    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.SHELTER_DETAIL(shelterId), { params });
+    const normalizedParams = normalizeWeeklyAttendanceParams({ shelterId, ...params });
+
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.SHELTER_DETAIL(shelterId), {
+      params: normalizedParams,
+    });
   },
 
   async getWeeklyAttendanceGroupStudents(groupId, params = {}) {
@@ -62,7 +112,11 @@ export const adminCabangReportApi = {
       throw new Error('Group ID is required to fetch weekly attendance group students');
     }
 
-    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.GROUP_STUDENTS(groupId), { params });
+    const normalizedParams = normalizeWeeklyAttendanceParams({ groupId, ...params });
+
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.GROUP_STUDENTS(groupId), {
+      params: normalizedParams,
+    });
   },
 
   async getAttendanceMonthlyShelter(params = {}) {

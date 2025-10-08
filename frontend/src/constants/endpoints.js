@@ -157,10 +157,11 @@ export const ADMIN_CABANG_ENDPOINTS = {
       MONTHLY_BRANCH: '/admin-cabang/laporan/attendance/monthly-branch',
     },
     WEEKLY_ATTENDANCE: {
-      DASHBOARD: '/admin-cabang/weekly-attendance',
-      SHELTER_DETAIL: (shelterId) => `/admin-cabang/weekly-attendance/shelters/${shelterId}`,
+      DASHBOARD: '/admin-cabang/laporan/attendance/weekly',
+      SHELTER_DETAIL: (shelterId) =>
+        `/admin-cabang/laporan/attendance/weekly/shelters/${shelterId}`,
       GROUP_STUDENTS: (groupId) =>
-        `/admin-cabang/weekly-attendance/groups/${groupId}/students`,
+        `/admin-cabang/laporan/attendance/weekly/groups/${groupId}/students`,
     },
     ANAK: {
       LIST: '/admin-cabang/laporan/anak-binaan',
