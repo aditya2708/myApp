@@ -212,7 +212,10 @@ class AttendanceWeeklyShelterReportTest extends TestCase
 
         $this->assertSame('2024-01-01', $payload['filters']['start_date']);
         $this->assertSame('2024-01-31', $payload['filters']['end_date']);
-        $this->assertCount(2, $payload['filters']['shelter_ids']);
+        $this->assertSameCanonicalizing([
+            $shelterAlpha->id_shelter,
+            $shelterBeta->id_shelter,
+        ], $payload['filters']['shelter_ids']);
 
         $this->assertSame(2, $payload['metadata']['total_shelters']);
         $this->assertSame(2, $payload['metadata']['total_activities']);
@@ -252,6 +255,8 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         $this->assertSame('50.00', $beta['metrics']['late_rate']);
         $this->assertSame(2, $beta['metrics']['unique_children']);
         $this->assertSame(2, $beta['metrics']['verification']['pending']);
+
+        $this->assertNotNull($payload['generated_at']);
     }
 
     public function test_it_rejects_requesting_shelters_outside_of_cabang(): void

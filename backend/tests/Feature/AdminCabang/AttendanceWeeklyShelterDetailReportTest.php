@@ -6,6 +6,7 @@ use App\Models\Absen;
 use App\Models\AbsenUser;
 use App\Models\AdminCabang;
 use App\Models\Aktivitas;
+use App\Models\Anak;
 use App\Models\Kacab;
 use App\Models\Kelompok;
 use App\Models\Shelter;
@@ -32,6 +33,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('anak');
         Schema::dropIfExists('kelompok');
         Schema::dropIfExists('shelter');
         Schema::dropIfExists('wilbin');
@@ -80,9 +82,21 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         Schema::create('kelompok', function (Blueprint $table) {
             $table->id('id_kelompok');
             $table->unsignedBigInteger('id_shelter');
-            $table->string('nama_kelompok');
             $table->unsignedBigInteger('id_level_anak_binaan')->nullable();
-            $table->unsignedInteger('jumlah_anggota')->default(0);
+            $table->string('nama_kelompok');
+            $table->unsignedInteger('jumlah_anggota')->nullable();
+            $table->json('kelas_gabungan')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('anak', function (Blueprint $table) {
+            $table->id('id_anak');
+            $table->unsignedBigInteger('id_shelter');
+            $table->unsignedBigInteger('id_kelompok')->nullable();
+            $table->string('full_name');
+            $table->string('nick_name')->nullable();
+            $table->string('jenis_kelamin')->nullable();
+            $table->string('status_validasi')->default('aktif');
             $table->timestamps();
         });
 
@@ -119,6 +133,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('anak');
         Schema::dropIfExists('kelompok');
         Schema::dropIfExists('shelter');
         Schema::dropIfExists('wilbin');
@@ -129,7 +144,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_it_returns_weekly_shelter_detail_report(): void
+    public function test_it_returns_weekly_shelter_detail_with_group_descriptors(): void
     {
         $user = User::create([
             'username' => 'admin-cabang',
@@ -163,12 +178,48 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
             'id_shelter' => $shelter->id_shelter,
             'nama_kelompok' => 'Kelompok Alpha',
             'jumlah_anggota' => 15,
+            'kelas_gabungan' => ['Gabungan A'],
         ]);
 
         $kelompokBeta = Kelompok::create([
             'id_shelter' => $shelter->id_shelter,
             'nama_kelompok' => 'Kelompok Beta',
             'jumlah_anggota' => 12,
+            'kelas_gabungan' => ['Gabungan B'],
+        ]);
+
+        $alphaOne = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $kelompokAlpha->id_kelompok,
+            'full_name' => 'Alpha One',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $alphaTwo = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $kelompokAlpha->id_kelompok,
+            'full_name' => 'Alpha Two',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $betaOne = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $kelompokBeta->id_kelompok,
+            'full_name' => 'Beta One',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $betaTwo = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $kelompokBeta->id_kelompok,
+            'full_name' => 'Beta Two',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $unmappedChild = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'full_name' => 'Unmapped Child',
+            'status_validasi' => 'aktif',
         ]);
 
         $activityAlpha = Aktivitas::create([
@@ -195,13 +246,13 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
             'tanggal' => '2024-01-05',
         ]);
 
-        $attendanceUsers = [
-            AbsenUser::create(['id_anak' => 501]),
-            AbsenUser::create(['id_anak' => 502]),
-            AbsenUser::create(['id_anak' => 503]),
-            AbsenUser::create(['id_anak' => 504]),
-            AbsenUser::create(['id_anak' => 505]),
-        ];
+        $attendanceUsers = collect([
+            $alphaOne,
+            $alphaTwo,
+            $betaOne,
+            $betaTwo,
+            $unmappedChild,
+        ])->map(fn (Anak $student) => AbsenUser::create(['id_anak' => $student->id_anak]))->values();
 
         Absen::create([
             'id_absen_user' => $attendanceUsers[0]->id_absen_user,
@@ -253,38 +304,55 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $payload = $response->json('data');
 
         $this->assertSame($shelter->id_shelter, $payload['shelter']['id']);
+        $this->assertSame('Shelter Alpha', $payload['shelter']['name']);
+        $this->assertSame('Wilbin 1', $payload['shelter']['wilbin']);
+
+        $this->assertSame('2024-W01', $payload['period']['week']);
+        $this->assertSame('2024-01-01', $payload['period']['start_date']);
+        $this->assertSame('2024-01-07', $payload['period']['end_date']);
+
         $this->assertSame('2024-W01', $payload['filters']['week']);
-        $this->assertSame(5, $payload['metrics']['total_sessions']);
-        $this->assertSame(3, $payload['metrics']['present_count']);
-        $this->assertSame(1, $payload['metrics']['late_count']);
-        $this->assertSame(1, $payload['metrics']['absent_count']);
-        $this->assertSame(3, $payload['metrics']['total_activities']);
-        $this->assertSame(4, $payload['metrics']['unique_children']);
 
-        $alphaGroup = collect($payload['groups'])->firstWhere('id', $kelompokAlpha->id_kelompok);
-        $this->assertNotNull($alphaGroup);
-        $this->assertSame(1, $alphaGroup['metrics']['total_activities']);
-        $this->assertSame(2, $alphaGroup['metrics']['total_sessions']);
-        $this->assertSame(1, $alphaGroup['metrics']['present_count']);
-        $this->assertSame(1, $alphaGroup['metrics']['late_count']);
-        $this->assertSame(0, $alphaGroup['metrics']['absent_count']);
+        $this->assertSame(5, $payload['summary']['total_students']);
+        $this->assertSame(3, $payload['summary']['present_count']);
+        $this->assertSame(1, $payload['summary']['late_count']);
+        $this->assertSame(1, $payload['summary']['absent_count']);
+        $this->assertSame('80.00', $payload['summary']['attendance_percentage']);
+        $this->assertSame('medium', $payload['summary']['attendance_band']);
 
-        $betaGroup = collect($payload['groups'])->firstWhere('id', $kelompokBeta->id_kelompok);
-        $this->assertNotNull($betaGroup);
-        $this->assertSame(1, $betaGroup['metrics']['total_activities']);
-        $this->assertSame(2, $betaGroup['metrics']['total_sessions']);
-        $this->assertSame(1, $betaGroup['metrics']['present_count']);
-        $this->assertSame(0, $betaGroup['metrics']['late_count']);
-        $this->assertSame(1, $betaGroup['metrics']['absent_count']);
+        $groups = collect($payload['groups']);
+        $this->assertCount(3, $groups);
 
-        $unmappedGroup = collect($payload['groups'])->firstWhere('name', 'Kelompok Gamma');
-        $this->assertNotNull($unmappedGroup);
-        $this->assertNull($unmappedGroup['id']);
-        $this->assertSame(1, $unmappedGroup['metrics']['total_sessions']);
-        $this->assertSame(1, $unmappedGroup['metrics']['present_count']);
+        $alphaGroup = $groups->firstWhere('id', $kelompokAlpha->id_kelompok);
+        $this->assertSame('Kelompok Alpha', $alphaGroup['name']);
+        $this->assertSame('Gabungan A', $alphaGroup['description']);
+        $this->assertSame(15, $alphaGroup['member_count']);
+        $this->assertSame(1, $alphaGroup['present_count']);
+        $this->assertSame(1, $alphaGroup['late_count']);
+        $this->assertSame(0, $alphaGroup['absent_count']);
+        $this->assertSame('100.00', $alphaGroup['attendance_percentage']);
 
-        $this->assertCount(3, $payload['activities']);
+        $betaGroup = $groups->firstWhere('id', $kelompokBeta->id_kelompok);
+        $this->assertSame('Kelompok Beta', $betaGroup['name']);
+        $this->assertSame('Gabungan B', $betaGroup['description']);
+        $this->assertSame(12, $betaGroup['member_count']);
+        $this->assertSame(1, $betaGroup['present_count']);
+        $this->assertSame(0, $betaGroup['late_count']);
+        $this->assertSame(1, $betaGroup['absent_count']);
+        $this->assertSame('50.00', $betaGroup['attendance_percentage']);
+
+        $unmappedGroup = $groups->firstWhere('id', null);
+        $this->assertSame('Kelompok Gamma', $unmappedGroup['name']);
+        $this->assertNull($unmappedGroup['description']);
+        $this->assertNull($unmappedGroup['member_count']);
+        $this->assertSame(1, $unmappedGroup['present_count']);
+        $this->assertSame(0, $unmappedGroup['late_count']);
+        $this->assertSame(0, $unmappedGroup['absent_count']);
+        $this->assertSame('100.00', $unmappedGroup['attendance_percentage']);
+
         $this->assertNotEmpty($payload['notes']);
+        $this->assertTrue(collect($payload['notes'])->contains(fn ($note) => str_contains($note, 'Beberapa aktivitas')));
+        $this->assertNotNull($payload['generated_at']);
     }
 
     public function test_it_denies_access_to_foreign_shelter(): void
@@ -423,12 +491,11 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $response->assertOk();
 
         $payload = $response->json('data');
-        $this->assertSame(0, $payload['metrics']['total_sessions']);
-        $this->assertSame(0, $payload['metrics']['total_activities']);
-        $this->assertSame(0, $payload['metrics']['present_count']);
-        $this->assertSame(0, $payload['metrics']['late_count']);
-        $this->assertSame(0, $payload['metrics']['absent_count']);
-        $this->assertEmpty($payload['activities']);
+        $this->assertSame('0.00', $payload['summary']['attendance_percentage']);
+        $this->assertSame(0, $payload['summary']['present_count']);
+        $this->assertSame(0, $payload['summary']['late_count']);
+        $this->assertSame(0, $payload['summary']['absent_count']);
+        $this->assertEmpty($payload['groups']);
         $this->assertContains('Tidak ada aktivitas yang tercatat pada rentang tanggal ini.', $payload['notes']);
     }
 }

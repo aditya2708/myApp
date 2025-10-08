@@ -6,7 +6,9 @@ use App\Models\Absen;
 use App\Models\AbsenUser;
 use App\Models\AdminCabang;
 use App\Models\Aktivitas;
+use App\Models\Anak;
 use App\Models\Kacab;
+use App\Models\Kelompok;
 use App\Models\Shelter;
 use App\Models\User;
 use App\Models\Wilbin;
@@ -31,6 +33,8 @@ class AttendanceWeeklyReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('anak');
+        Schema::dropIfExists('kelompok');
         Schema::dropIfExists('shelter');
         Schema::dropIfExists('wilbin');
         Schema::dropIfExists('admin_cabang');
@@ -75,9 +79,32 @@ class AttendanceWeeklyReportTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('kelompok', function (Blueprint $table) {
+            $table->id('id_kelompok');
+            $table->unsignedBigInteger('id_shelter');
+            $table->unsignedBigInteger('id_level_anak_binaan')->nullable();
+            $table->string('nama_kelompok');
+            $table->unsignedInteger('jumlah_anggota')->nullable();
+            $table->json('kelas_gabungan')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('anak', function (Blueprint $table) {
+            $table->id('id_anak');
+            $table->unsignedBigInteger('id_shelter');
+            $table->unsignedBigInteger('id_kelompok')->nullable();
+            $table->string('full_name');
+            $table->string('nick_name')->nullable();
+            $table->string('jenis_kelamin')->nullable();
+            $table->string('foto')->nullable();
+            $table->string('status_validasi')->default('aktif');
+            $table->timestamps();
+        });
+
         Schema::create('aktivitas', function (Blueprint $table) {
             $table->id('id_aktivitas');
             $table->unsignedBigInteger('id_shelter');
+            $table->string('nama_kelompok')->nullable();
             $table->date('tanggal');
             $table->timestamps();
         });
@@ -94,8 +121,9 @@ class AttendanceWeeklyReportTest extends TestCase
             $table->unsignedBigInteger('id_absen_user')->nullable();
             $table->unsignedBigInteger('id_aktivitas');
             $table->string('absen');
-            $table->boolean('is_verified')->default(false);
+            $table->time('time_arrived')->nullable();
             $table->string('verification_status')->nullable();
+            $table->string('gps_validation_notes')->nullable();
             $table->timestamps();
         });
     }
@@ -105,6 +133,8 @@ class AttendanceWeeklyReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('anak');
+        Schema::dropIfExists('kelompok');
         Schema::dropIfExists('shelter');
         Schema::dropIfExists('wilbin');
         Schema::dropIfExists('admin_cabang');
@@ -114,7 +144,7 @@ class AttendanceWeeklyReportTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_it_returns_weekly_attendance_report(): void
+    public function test_it_returns_weekly_overview_with_summary_and_attendance_bands(): void
     {
         $user = User::create([
             'username' => 'admin-cabang',
@@ -139,143 +169,190 @@ class AttendanceWeeklyReportTest extends TestCase
             'nama_wilbin' => 'Wilbin 1',
         ]);
 
-        $secondShelter = Shelter::create([
-            'id_wilbin' => $wilbin->id_wilbin,
-            'nama_shelter' => 'Shelter Beta',
-        ]);
-
-        $shelter = Shelter::create([
+        $shelterAlpha = Shelter::create([
             'id_wilbin' => $wilbin->id_wilbin,
             'nama_shelter' => 'Shelter Alpha',
         ]);
 
-        $activityWeekOne = Aktivitas::create([
-            'id_shelter' => $shelter->id_shelter,
-            'tanggal' => '2024-01-02',
+        $shelterBeta = Shelter::create([
+            'id_wilbin' => $wilbin->id_wilbin,
+            'nama_shelter' => 'Shelter Beta',
         ]);
 
-        $activityWeekThree = Aktivitas::create([
-            'id_shelter' => $shelter->id_shelter,
-            'tanggal' => '2024-01-15',
+        $kelompokAlpha = Kelompok::create([
+            'id_shelter' => $shelterAlpha->id_shelter,
+            'nama_kelompok' => 'Kelompok Alpha',
+            'jumlah_anggota' => 15,
         ]);
 
-        $attendanceUsers = [
-            AbsenUser::create(['id_anak' => 101]),
-            AbsenUser::create(['id_anak' => 102]),
-            AbsenUser::create(['id_anak' => 103]),
-            AbsenUser::create(['id_anak' => 104]),
-            AbsenUser::create(['id_anak' => 105]),
-        ];
+        $kelompokBeta = Kelompok::create([
+            'id_shelter' => $shelterAlpha->id_shelter,
+            'nama_kelompok' => 'Kelompok Beta',
+            'jumlah_anggota' => 12,
+            'kelas_gabungan' => ['A', 'B'],
+        ]);
 
+        $kelompokGamma = Kelompok::create([
+            'id_shelter' => $shelterBeta->id_shelter,
+            'nama_kelompok' => 'Kelompok Gamma',
+            'jumlah_anggota' => 10,
+        ]);
+
+        $alphaStudents = collect([
+            ['full_name' => 'Alpha One', 'nick_name' => 'A1', 'id_kelompok' => $kelompokAlpha->id_kelompok],
+            ['full_name' => 'Alpha Two', 'nick_name' => 'A2', 'id_kelompok' => $kelompokAlpha->id_kelompok],
+            ['full_name' => 'Alpha Three', 'nick_name' => 'A3', 'id_kelompok' => $kelompokBeta->id_kelompok],
+        ])->map(fn ($payload) => Anak::create(array_merge([
+            'id_shelter' => $shelterAlpha->id_shelter,
+            'jenis_kelamin' => 'L',
+            'status_validasi' => 'aktif',
+        ], $payload)));
+
+        $betaStudents = collect([
+            ['full_name' => 'Beta One', 'nick_name' => 'B1'],
+            ['full_name' => 'Beta Two', 'nick_name' => 'B2'],
+        ])->map(fn ($payload) => Anak::create(array_merge([
+            'id_shelter' => $shelterBeta->id_shelter,
+            'id_kelompok' => $kelompokGamma->id_kelompok,
+            'jenis_kelamin' => 'P',
+            'status_validasi' => 'aktif',
+        ], $payload)));
+
+        $activityAlphaWeekOne = Aktivitas::create([
+            'id_shelter' => $shelterAlpha->id_shelter,
+            'nama_kelompok' => $kelompokAlpha->nama_kelompok,
+            'tanggal' => '2024-01-03',
+        ]);
+
+        $activityAlphaWeekThree = Aktivitas::create([
+            'id_shelter' => $shelterAlpha->id_shelter,
+            'nama_kelompok' => $kelompokBeta->nama_kelompok,
+            'tanggal' => '2024-01-17',
+        ]);
+
+        $activityBeta = Aktivitas::create([
+            'id_shelter' => $shelterBeta->id_shelter,
+            'nama_kelompok' => $kelompokGamma->nama_kelompok,
+            'tanggal' => '2024-01-10',
+        ]);
+
+        $attendanceUsers = $alphaStudents
+            ->merge($betaStudents)
+            ->map(fn (Anak $student) => AbsenUser::create(['id_anak' => $student->id_anak]))
+            ->values();
+
+        // Shelter Alpha week one
         Absen::create([
             'id_absen_user' => $attendanceUsers[0]->id_absen_user,
-            'id_aktivitas' => $activityWeekOne->id_aktivitas,
+            'id_aktivitas' => $activityAlphaWeekOne->id_aktivitas,
             'absen' => Absen::TEXT_YA,
             'verification_status' => Absen::VERIFICATION_VERIFIED,
         ]);
 
         Absen::create([
             'id_absen_user' => $attendanceUsers[1]->id_absen_user,
-            'id_aktivitas' => $activityWeekOne->id_aktivitas,
+            'id_aktivitas' => $activityAlphaWeekOne->id_aktivitas,
             'absen' => Absen::TEXT_TERLAMBAT,
             'verification_status' => Absen::VERIFICATION_MANUAL,
         ]);
 
         Absen::create([
             'id_absen_user' => $attendanceUsers[2]->id_absen_user,
-            'id_aktivitas' => $activityWeekOne->id_aktivitas,
+            'id_aktivitas' => $activityAlphaWeekOne->id_aktivitas,
             'absen' => Absen::TEXT_TIDAK,
             'verification_status' => Absen::VERIFICATION_REJECTED,
         ]);
 
+        // Shelter Alpha week three
         Absen::create([
-            'id_absen_user' => $attendanceUsers[3]->id_absen_user,
-            'id_aktivitas' => $activityWeekThree->id_aktivitas,
+            'id_absen_user' => $attendanceUsers[0]->id_absen_user,
+            'id_aktivitas' => $activityAlphaWeekThree->id_aktivitas,
             'absen' => Absen::TEXT_YA,
             'verification_status' => Absen::VERIFICATION_PENDING,
         ]);
 
         Absen::create([
-            'id_absen_user' => $attendanceUsers[4]->id_absen_user,
-            'id_aktivitas' => $activityWeekThree->id_aktivitas,
+            'id_absen_user' => $attendanceUsers[1]->id_absen_user,
+            'id_aktivitas' => $activityAlphaWeekThree->id_aktivitas,
             'absen' => Absen::TEXT_YA,
+            'verification_status' => Absen::VERIFICATION_PENDING,
+        ]);
+
+        Absen::create([
+            'id_absen_user' => $attendanceUsers[2]->id_absen_user,
+            'id_aktivitas' => $activityAlphaWeekThree->id_aktivitas,
+            'absen' => Absen::TEXT_YA,
+            'verification_status' => Absen::VERIFICATION_PENDING,
+        ]);
+
+        // Shelter Beta
+        Absen::create([
+            'id_absen_user' => $attendanceUsers[3]->id_absen_user,
+            'id_aktivitas' => $activityBeta->id_aktivitas,
+            'absen' => Absen::TEXT_YA,
+            'verification_status' => Absen::VERIFICATION_VERIFIED,
+        ]);
+
+        Absen::create([
+            'id_absen_user' => $attendanceUsers[4]->id_absen_user,
+            'id_aktivitas' => $activityBeta->id_aktivitas,
+            'absen' => Absen::TEXT_TIDAK,
             'verification_status' => Absen::VERIFICATION_PENDING,
         ]);
 
         Sanctum::actingAs($user, ['*']);
 
         $response = $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=2024-01-01&end_date=2024-01-31');
-
         $response->assertOk();
 
         $payload = $response->json('data');
 
-        $this->assertSame('2024-01-01', $payload['filters']['start_date']);
-        $this->assertSame('2024-01-31', $payload['filters']['end_date']);
-        $this->assertCount(2, $payload['filters']['shelter_ids']);
+        $this->assertSame([
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-01-31',
+        ], $payload['period']);
 
-        $this->assertSame(2, $payload['metadata']['total_activities']);
-        $this->assertSame(5, $payload['metadata']['total_sessions']);
-        $this->assertSame(3, $payload['metadata']['present_count']);
-        $this->assertSame(1, $payload['metadata']['late_count']);
-        $this->assertSame(1, $payload['metadata']['absent_count']);
-        $this->assertSame('80.00', $payload['metadata']['attendance_rate']);
-        $this->assertSame('20.00', $payload['metadata']['late_rate']);
-        $this->assertSame(5, $payload['metadata']['unique_children']);
-        $this->assertSame(2, $payload['metadata']['verification']['pending']);
-        $this->assertSame(1, $payload['metadata']['verification']['verified']);
-        $this->assertSame(1, $payload['metadata']['verification']['manual']);
-        $this->assertSame(1, $payload['metadata']['verification']['rejected']);
+        $this->assertSame(2, $payload['summary']['total_shelters']);
+        $this->assertSame(3, $payload['summary']['total_groups']);
+        $this->assertSame(5, $payload['summary']['total_students']);
+        $this->assertSame(5, $payload['summary']['present_count']);
+        $this->assertSame(1, $payload['summary']['late_count']);
+        $this->assertSame(2, $payload['summary']['absent_count']);
+        $this->assertSame('75.00', $payload['summary']['attendance_percentage']);
 
-        $weeks = collect($payload['weeks']);
-        $this->assertCount(5, $weeks);
+        $this->assertSame('2024-01-01', $payload['meta']['filters']['start_date']);
+        $this->assertSame('2024-01-31', $payload['meta']['filters']['end_date']);
+        $this->assertNull($payload['meta']['filters']['attendance_band']);
+        $this->assertNull($payload['meta']['filters']['search']);
+        $this->assertNotNull($payload['meta']['last_refreshed_at']);
 
-        $weekOne = $weeks->firstWhere('week', '2024-W01');
-        $this->assertNotNull($weekOne);
-        $this->assertSame(1, $weekOne['metrics']['total_activities']);
-        $this->assertSame(3, $weekOne['metrics']['total_sessions']);
-        $this->assertSame(1, $weekOne['metrics']['present_count']);
-        $this->assertSame(1, $weekOne['metrics']['late_count']);
-        $this->assertSame(1, $weekOne['metrics']['absent_count']);
-        $this->assertSame('66.67', $weekOne['metrics']['attendance_rate']);
-        $this->assertSame('33.33', $weekOne['metrics']['late_rate']);
-        $this->assertSame(3, $weekOne['metrics']['unique_children']);
-        $this->assertSame(1, $weekOne['metrics']['verification']['verified']);
-        $this->assertSame(1, $weekOne['metrics']['verification']['manual']);
-        $this->assertSame(1, $weekOne['metrics']['verification']['rejected']);
+        $shelters = collect($payload['shelters']);
+        $this->assertCount(2, $shelters);
 
-        $weekThree = $weeks->firstWhere('week', '2024-W03');
-        $this->assertNotNull($weekThree);
-        $this->assertSame(1, $weekThree['metrics']['total_activities']);
-        $this->assertSame(2, $weekThree['metrics']['total_sessions']);
-        $this->assertSame(2, $weekThree['metrics']['present_count']);
-        $this->assertSame('100.00', $weekThree['metrics']['attendance_rate']);
-        $this->assertSame('0.00', $weekThree['metrics']['late_rate']);
-        $this->assertSame(2, $weekThree['metrics']['unique_children']);
-        $this->assertSame(2, $weekThree['metrics']['verification']['pending']);
+        $alphaPayload = $shelters->firstWhere('name', 'Shelter Alpha');
+        $this->assertSame($shelterAlpha->id_shelter, $alphaPayload['id']);
+        $this->assertSame(3, $alphaPayload['total_students']);
+        $this->assertSame(2, $alphaPayload['groups_count']);
+        $this->assertSame(4, $alphaPayload['present_count']);
+        $this->assertSame(1, $alphaPayload['late_count']);
+        $this->assertSame(1, $alphaPayload['absent_count']);
+        $this->assertSame('83.33', $alphaPayload['attendance_percentage']);
+        $this->assertSame('medium', $alphaPayload['attendance_band']);
+        $this->assertSame('83.33', $alphaPayload['trend_delta']);
+
+        $betaPayload = $shelters->firstWhere('name', 'Shelter Beta');
+        $this->assertSame($shelterBeta->id_shelter, $betaPayload['id']);
+        $this->assertSame(2, $betaPayload['total_students']);
+        $this->assertSame(1, $betaPayload['groups_count']);
+        $this->assertSame(1, $betaPayload['present_count']);
+        $this->assertSame(0, $betaPayload['late_count']);
+        $this->assertSame(1, $betaPayload['absent_count']);
+        $this->assertSame('50.00', $betaPayload['attendance_percentage']);
+        $this->assertSame('low', $betaPayload['attendance_band']);
+        $this->assertSame('50.00', $betaPayload['trend_delta']);
     }
 
-    public function test_it_validates_date_filters(): void
-    {
-        $user = User::create([
-            'username' => 'admin-cabang',
-            'email' => 'admin@example.com',
-            'password' => bcrypt('secret'),
-            'level' => 'admin_cabang',
-        ]);
-
-        Sanctum::actingAs($user, ['*']);
-
-        $response = $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=invalid&end_date=2024-01-01');
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['start_date']);
-
-        $response = $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=2024-02-01&end_date=2024-01-01');
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['end_date']);
-    }
-
-    public function test_it_returns_empty_dataset_when_no_activities_found(): void
+    public function test_it_can_filter_by_attendance_band_and_search_terms(): void
     {
         $user = User::create([
             'username' => 'admin-cabang',
@@ -285,7 +362,7 @@ class AttendanceWeeklyReportTest extends TestCase
         ]);
 
         $kacab = Kacab::create([
-            'nama_kacab' => 'Cabang A',
+            'nama_kacab' => 'Cabang B',
             'status' => 'aktif',
         ]);
 
@@ -297,29 +374,138 @@ class AttendanceWeeklyReportTest extends TestCase
 
         $wilbin = Wilbin::create([
             'id_kacab' => $kacab->id_kacab,
-            'nama_wilbin' => 'Wilbin 1',
+            'nama_wilbin' => 'Wilbin 2',
         ]);
 
-        Shelter::create([
+        $highShelter = Shelter::create([
             'id_wilbin' => $wilbin->id_wilbin,
-            'nama_shelter' => 'Shelter Alpha',
+            'nama_shelter' => 'Shelter High',
+        ]);
+
+        $lowShelter = Shelter::create([
+            'id_wilbin' => $wilbin->id_wilbin,
+            'nama_shelter' => 'Shelter Low',
+        ]);
+
+        $groupHigh = Kelompok::create([
+            'id_shelter' => $highShelter->id_shelter,
+            'nama_kelompok' => 'Kelompok High',
+        ]);
+
+        $groupLow = Kelompok::create([
+            'id_shelter' => $lowShelter->id_shelter,
+            'nama_kelompok' => 'Kelompok Low',
+        ]);
+
+        $highStudent = Anak::create([
+            'id_shelter' => $highShelter->id_shelter,
+            'id_kelompok' => $groupHigh->id_kelompok,
+            'full_name' => 'High Performer',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $lowStudent = Anak::create([
+            'id_shelter' => $lowShelter->id_shelter,
+            'id_kelompok' => $groupLow->id_kelompok,
+            'full_name' => 'Low Performer',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $highActivity = Aktivitas::create([
+            'id_shelter' => $highShelter->id_shelter,
+            'nama_kelompok' => $groupHigh->nama_kelompok,
+            'tanggal' => '2024-02-05',
+        ]);
+
+        $lowActivity = Aktivitas::create([
+            'id_shelter' => $lowShelter->id_shelter,
+            'nama_kelompok' => $groupLow->nama_kelompok,
+            'tanggal' => '2024-02-05',
+        ]);
+
+        $highAttendance = AbsenUser::create(['id_anak' => $highStudent->id_anak]);
+        $lowAttendance = AbsenUser::create(['id_anak' => $lowStudent->id_anak]);
+
+        Absen::create([
+            'id_absen_user' => $highAttendance->id_absen_user,
+            'id_aktivitas' => $highActivity->id_aktivitas,
+            'absen' => Absen::TEXT_YA,
+        ]);
+
+        Absen::create([
+            'id_absen_user' => $lowAttendance->id_absen_user,
+            'id_aktivitas' => $lowActivity->id_aktivitas,
+            'absen' => Absen::TEXT_TIDAK,
         ]);
 
         Sanctum::actingAs($user, ['*']);
 
-        $response = $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=2024-01-01&end_date=2024-01-31');
+        $response = $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=2024-02-01&end_date=2024-02-29&attendance_band=high&search=High');
         $response->assertOk();
 
         $payload = $response->json('data');
 
-        $this->assertSame(0, $payload['metadata']['total_activities']);
-        $this->assertSame(0, $payload['metadata']['total_sessions']);
-        $this->assertSame('0.00', $payload['metadata']['attendance_rate']);
-        $this->assertSame('0.00', $payload['metadata']['late_rate']);
+        $this->assertSame('high', $payload['meta']['filters']['attendance_band']);
+        $this->assertSame('High', $payload['meta']['filters']['search']);
+        $this->assertCount(1, $payload['shelters']);
+        $this->assertSame('Shelter High', $payload['shelters'][0]['name']);
+        $this->assertSame('100.00', $payload['summary']['attendance_percentage']);
+        $this->assertSame(1, $payload['summary']['total_shelters']);
+    }
 
-        foreach ($payload['weeks'] as $week) {
-            $this->assertSame(0, $week['metrics']['total_sessions']);
-            $this->assertSame('0.00', $week['metrics']['attendance_rate']);
-        }
+    public function test_it_validates_filters(): void
+    {
+        $user = User::create([
+            'username' => 'admin-cabang',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('secret'),
+            'level' => 'admin_cabang',
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=invalid&end_date=2024-01-01')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['start_date']);
+
+        $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=2024-02-01&end_date=2024-01-01')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['end_date']);
+
+        $this->getJson('/api/admin-cabang/laporan/attendance/weekly?attendance_band=extreme')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['attendance_band']);
+    }
+
+    public function test_it_returns_empty_dataset_when_no_shelter_found(): void
+    {
+        $user = User::create([
+            'username' => 'admin-cabang',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('secret'),
+            'level' => 'admin_cabang',
+        ]);
+
+        $kacab = Kacab::create([
+            'nama_kacab' => 'Cabang C',
+            'status' => 'aktif',
+        ]);
+
+        AdminCabang::create([
+            'user_id' => $user->id_users,
+            'id_kacab' => $kacab->id_kacab,
+            'nama_lengkap' => 'Admin Cabang',
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->getJson('/api/admin-cabang/laporan/attendance/weekly?start_date=2024-03-01&end_date=2024-03-31');
+        $response->assertOk();
+
+        $payload = $response->json('data');
+
+        $this->assertSame(0, $payload['summary']['total_shelters']);
+        $this->assertSame('0.00', $payload['summary']['attendance_percentage']);
+        $this->assertSame([], $payload['shelters']);
     }
 }
