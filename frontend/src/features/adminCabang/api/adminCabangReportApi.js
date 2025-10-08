@@ -6,6 +6,7 @@ const {
     SUMMARY: SUMMARY_ENDPOINT,
     ATTENDANCE_SUMMARY: ATTENDANCE_SUMMARY_ENDPOINT,
     ATTENDANCE: ATTENDANCE_ENDPOINTS,
+    WEEKLY_ATTENDANCE: WEEKLY_ATTENDANCE_ENDPOINTS,
     ANAK: {
       LIST: LIST_ENDPOINT,
       DETAIL: DETAIL_ENDPOINT,
@@ -44,28 +45,24 @@ export const adminCabangReportApi = {
     return api.get(ATTENDANCE_SUMMARY_ENDPOINT(cabangId), { params });
   },
 
-  async getAttendanceWeekly(params = {}) {
-    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY, { params });
+  async getWeeklyAttendanceDashboard(params = {}) {
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.DASHBOARD, { params });
   },
 
-  async getAttendanceWeeklyShelters(params = {}) {
-    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY_SHELTERS, { params });
-  },
-
-  async getAttendanceWeeklyShelterDetail(shelterId, params = {}) {
+  async getWeeklyAttendanceShelter(shelterId, params = {}) {
     if (!shelterId) {
-      throw new Error('Shelter ID is required to fetch weekly attendance detail');
+      throw new Error('Shelter ID is required to fetch weekly attendance shelter detail');
     }
 
-    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY_SHELTER_DETAIL(shelterId), { params });
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.SHELTER_DETAIL(shelterId), { params });
   },
 
-  async getAttendanceWeeklyGroupStudents(groupId, params = {}) {
+  async getWeeklyAttendanceGroupStudents(groupId, params = {}) {
     if (!groupId) {
       throw new Error('Group ID is required to fetch weekly attendance group students');
     }
 
-    return api.get(ATTENDANCE_ENDPOINTS.WEEKLY_GROUP_STUDENTS(groupId), { params });
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.GROUP_STUDENTS(groupId), { params });
   },
 
   async getAttendanceMonthlyShelter(params = {}) {

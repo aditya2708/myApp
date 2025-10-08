@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AttendanceStatusChip from '../../../components/reports/attendance/AttendanceStatusChip';
 import GroupAttendanceSummaryCard from '../../../components/reports/attendance/GroupAttendanceSummaryCard';
 import StudentAttendanceRow from '../../../components/reports/attendance/StudentAttendanceRow';
-import useAttendanceGroupStudents from '../../../hooks/reports/attendance/useAttendanceGroupStudents';
+import useWeeklyAttendanceGroupStudents from '../../../hooks/reports/attendance/useWeeklyAttendanceGroupStudents';
 
 const STATUS_OPTIONS = [
   { code: 'ALL', label: 'Semua', icon: 'layers-outline', color: '#0984e3' },
@@ -66,13 +66,12 @@ const AdminCabangAttendanceGroupScreen = () => {
     students,
     summary,
     isLoading,
-    isInitialLoading,
     isFetchingMore,
     error,
     refresh,
     loadMore,
     hasNextPage,
-  } = useAttendanceGroupStudents({
+  } = useWeeklyAttendanceGroupStudents({
     groupId,
     shelterId,
     startDate,
@@ -82,6 +81,7 @@ const AdminCabangAttendanceGroupScreen = () => {
     pageSize: 20,
   });
 
+  const isInitialLoading = useMemo(() => isLoading && students.length === 0, [isLoading, students.length]);
   const combinedSummary = useMemo(() => summary || initialSummary || null, [initialSummary, summary]);
 
   useLayoutEffect(() => {

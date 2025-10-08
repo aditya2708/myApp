@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import ShelterSummaryCard from '../../../components/reports/attendance/ShelterSummaryCard';
 import ShelterGroupCard from '../../../components/reports/attendance/ShelterGroupCard';
-import useAttendanceWeeklyShelterDetail from '../../../hooks/reports/attendance/useAttendanceWeeklyShelterDetail';
+import useWeeklyAttendanceShelter from '../../../hooks/reports/attendance/useWeeklyAttendanceShelter';
 
 const formatNumber = (value) => {
   if (typeof value === 'number') {
@@ -94,87 +94,71 @@ const AdminCabangAttendanceShelterScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 
-  const { data, isLoading, error, refetch } = useAttendanceWeeklyShelterDetail({
+  const {
+    shelter: shelterData,
+    summary,
+    selectedWeek,
+    groups,
+    periodLabel,
+    isLoading,
+    error,
+    refresh,
+  } = useWeeklyAttendanceShelter({
     shelterId,
     startDate,
     endDate,
   });
 
   const derivedShelter = useMemo(() => {
-    if (data?.shelter) {
-      return data.shelter;
-    }
+    const fallbackPeriodLabel = initialPeriodLabel || formatDateRangeLabel(startDate, endDate);
+    const period = shelterData?.period ?? {
+      start: startDate,
+      end: endDate,
+      label: periodLabel || fallbackPeriodLabel,
+    };
 
     return {
-      id: shelterId,
-      name: shelterName,
-      period: {
-        start: startDate,
-        end: endDate,
-        label: initialPeriodLabel || formatDateRangeLabel(startDate, endDate),
-      },
+      id: shelterData?.id ?? shelterId,
+      name: shelterData?.name ?? shelterName,
+      wilbin: shelterData?.wilbin ?? null,
+      code: shelterData?.code ?? null,
+      mentor: shelterData?.mentor ?? null,
+      leader: shelterData?.mentor ?? shelterData?.leader ?? null,
+      totalChildren: shelterData?.totalChildren ?? shelterData?.total_children ?? null,
+      address: shelterData?.address ?? null,
+      period,
     };
-  }, [data?.shelter, shelterId, shelterName, startDate, endDate, initialPeriodLabel]);
+  }, [
+    endDate,
+    initialPeriodLabel,
+    periodLabel,
+    shelterData?.address,
+    shelterData?.code,
+    shelterData?.id,
+    shelterData?.mentor,
+    shelterData?.name,
+    shelterData?.totalChildren,
+    shelterData?.total_children,
+    shelterData?.wilbin,
+    shelterId,
+    shelterName,
+    startDate,
+  ]);
 
-  const selectedWeek = useMemo(() => {
-    const weeks = Array.isArray(data?.weeks) ? data.weeks : [];
-
-    if (!weeks.length) {
-      return null;
-    }
-
-    if (startDate || endDate) {
-      const matchedWeek = weeks.find((week) => {
-        const weekStart = week?.dateRange?.start;
-        const weekEnd = week?.dateRange?.end;
-
-        const startMatches = startDate ? weekStart === startDate : true;
-        const endMatches = endDate ? weekEnd === endDate : true;
-
-        return startMatches && endMatches;
-      });
-
-      if (matchedWeek) {
-        return matchedWeek;
-      }
-    }
-
-    return weeks[0];
-  }, [data?.weeks, endDate, startDate]);
-
-  const periodLabel = useMemo(() => {
-    return (
-      selectedWeek?.dateRange?.label ||
-      derivedShelter?.period?.label ||
-      initialPeriodLabel ||
-      formatDateRangeLabel(startDate, endDate)
-    );
-  }, [derivedShelter?.period?.label, initialPeriodLabel, selectedWeek?.dateRange?.label, startDate, endDate]);
-
-  const groups = useMemo(() => {
-    if (!selectedWeek?.kelompok || !Array.isArray(selectedWeek.kelompok)) {
-      return [];
-    }
-
-    return selectedWeek.kelompok;
-  }, [selectedWeek?.kelompok]);
-
-  const handleRefetch = useCallback(() => {
-    if (typeof refetch === 'function') {
-      refetch({ shelterId, startDate, endDate });
-    }
-  }, [endDate, refetch, shelterId, startDate]);
+  const resolvedPeriodLabel = useMemo(() => {
+    return periodLabel || derivedShelter?.period?.label || initialPeriodLabel || formatDateRangeLabel(startDate, endDate);
+  }, [derivedShelter?.period?.label, initialPeriodLabel, periodLabel, startDate, endDate]);
 
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      await refetch({ shelterId, startDate, endDate });
+      await refresh();
     } catch (err) {
       // errors handled by hook state
     } finally {
       setRefreshing(false);
     }
-  }, [endDate, refetch, shelterId, startDate]);
+  }, [refresh]);
 
   const shareSummaryLine = useCallback((label, metric) => {
     if (!metric) {
@@ -213,15 +197,17 @@ const AdminCabangAttendanceShelterScreen = () => {
     try {
       setIsSharing(true);
 
-      const summary = selectedWeek?.summary ?? {};
+      const summaryData = selectedWeek?.summary ?? summary?.summary ?? {};
       const messageLines = [
         `Laporan Kehadiran Shelter ${derivedShelter.name || 'Tidak diketahui'}`,
-        periodLabel ? `Periode: ${periodLabel}` : null,
-        shareSummaryLine('Hadir', summary.present),
-        shareSummaryLine('Terlambat', summary.late),
-        shareSummaryLine('Tidak Hadir', summary.absent),
-        typeof summary.attendanceRate === 'number'
-          ? `Rata-rata Kehadiran: ${formatPercentage(summary.attendanceRate)}`
+        resolvedPeriodLabel ? `Periode: ${resolvedPeriodLabel}` : null,
+        shareSummaryLine('Hadir', summaryData.present),
+        shareSummaryLine('Terlambat', summaryData.late),
+        shareSummaryLine('Tidak Hadir', summaryData.absent),
+        typeof (summaryData.attendanceRate ?? selectedWeek?.attendanceRate) === 'number'
+          ? `Rata-rata Kehadiran: ${formatPercentage(
+              summaryData.attendanceRate ?? selectedWeek?.attendanceRate,
+            )}`
           : null,
         `Jumlah Kelompok: ${groups.length}`,
       ].filter(Boolean);
@@ -241,9 +227,11 @@ const AdminCabangAttendanceShelterScreen = () => {
     error,
     groups.length,
     isLoading,
-    periodLabel,
+    resolvedPeriodLabel,
+    selectedWeek?.attendanceRate,
     selectedWeek?.summary,
     shareSummaryLine,
+    summary?.summary,
   ]);
 
   useLayoutEffect(() => {
@@ -296,7 +284,7 @@ const AdminCabangAttendanceShelterScreen = () => {
       const periodEnd = selectedWeek?.dateRange?.end || endDate;
       const label =
         selectedWeek?.dateRange?.label ||
-        periodLabel ||
+        resolvedPeriodLabel ||
         formatDateRangeLabel(periodStart, periodEnd) ||
         initialPeriodLabel;
 
@@ -318,7 +306,7 @@ const AdminCabangAttendanceShelterScreen = () => {
       endDate,
       initialPeriodLabel,
       navigation,
-      periodLabel,
+      resolvedPeriodLabel,
       selectedWeek,
       shelterId,
       shelterName,
@@ -335,23 +323,24 @@ const AdminCabangAttendanceShelterScreen = () => {
       <View style={styles.listHeader}>
         <ShelterSummaryCard
           shelter={derivedShelter}
-          periodLabel={periodLabel}
-          summary={selectedWeek?.summary}
-          isLoading={isLoading && !data?.shelter}
+          periodLabel={resolvedPeriodLabel}
+          summary={selectedWeek?.summary ?? summary?.summary}
+          isLoading={isLoading && !shelterData}
           error={error}
-          onRetry={handleRefetch}
+          onRetry={refresh}
         />
         <Text style={styles.sectionTitle}>Rincian Kelompok</Text>
       </View>
     );
   }, [
-    data?.shelter,
     derivedShelter,
     error,
-    handleRefetch,
     isLoading,
-    periodLabel,
+    refresh,
+    resolvedPeriodLabel,
     selectedWeek?.summary,
+    summary?.summary,
+    shelterData,
   ]);
 
   const listEmptyComponent = useMemo(() => {
@@ -372,7 +361,7 @@ const AdminCabangAttendanceShelterScreen = () => {
           <Text style={styles.emptyText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={handleRefetch}
+            onPress={refresh}
             activeOpacity={0.85}
           >
             <Ionicons name="refresh" size={16} color="#ffffff" />
@@ -389,7 +378,7 @@ const AdminCabangAttendanceShelterScreen = () => {
         <Text style={styles.emptyText}>Kelompok binaan belum memiliki catatan kehadiran pada periode ini.</Text>
       </View>
     );
-  }, [error, handleRefetch, isLoading]);
+  }, [error, isLoading, refresh]);
 
   return (
     <View style={styles.container}>

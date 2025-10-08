@@ -23,9 +23,8 @@ import WeeklyAttendanceFilterSheet from '../../../components/reports/attendance/
 import WeeklySummaryCard from '../../../components/reports/attendance/WeeklySummaryCard';
 
 import useAttendanceSummary from '../../../hooks/reports/attendance/useAttendanceSummary';
-import useAttendanceWeekly from '../../../hooks/reports/attendance/useAttendanceWeekly';
-import useAttendanceWeeklyShelters from '../../../hooks/reports/attendance/useAttendanceWeeklyShelters';
 import useAttendanceTrend from '../../../hooks/reports/attendance/useAttendanceTrend';
+import useWeeklyAttendanceDashboard from '../../../hooks/reports/attendance/useWeeklyAttendanceDashboard';
 
 const ATTENDANCE_BANDS = [
   {
@@ -85,56 +84,35 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   const [isFilterVisible, setFilterVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBands, setSelectedBands] = useState([]);
-  const [selectedWeekId, setSelectedWeekId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: summaryData } = useAttendanceSummary();
   const {
-    data: weeklyData,
-    isLoading: isWeeklyLoading,
-    error: weeklyError,
-    refetch: refetchWeekly,
-  } = useAttendanceWeekly();
+    weeks: weeklyData,
+    shelters,
+    summary: weeklySummary,
+    selectedWeek,
+    selectWeek,
+    isLoading: isDashboardLoading,
+    isFetchingMore: isFetchingMoreShelters,
+    error: dashboardError,
+    refresh,
+    loadMore,
+    hasNextPage,
+  } = useWeeklyAttendanceDashboard({
+    search: searchQuery,
+    bands: selectedBands,
+  });
   const { data: trendData, isLoading: isTrendLoading } = useAttendanceTrend();
 
-  const selectedWeek = useMemo(() => {
-    if (!Array.isArray(weeklyData) || weeklyData.length === 0) {
-      return null;
-    }
-
-    if (selectedWeekId) {
-      return weeklyData.find((week) => week.id === selectedWeekId) || weeklyData[0];
-    }
-
-    return weeklyData[0];
-  }, [weeklyData, selectedWeekId]);
-
-  const weeklyParams = useMemo(() => {
-    const startDate = selectedWeek?.dates?.start;
-    const endDate = selectedWeek?.dates?.end;
-
-    if (startDate && endDate) {
-      return {
-        start_date: startDate,
-        end_date: endDate,
-      };
-    }
-
-    return {};
-  }, [selectedWeek]);
-
-  const {
-    data: shelterData,
-    isLoading: isShelterLoading,
-    error: shelterError,
-    refetch: refetchShelters,
-  } = useAttendanceWeeklyShelters(weeklyParams);
-
   useEffect(() => {
-    if (Array.isArray(weeklyData) && weeklyData.length > 0 && !selectedWeekId) {
-      setSelectedWeekId(weeklyData[0].id);
+    if (Array.isArray(weeklyData) && weeklyData.length > 0 && !selectedWeek?.id) {
+      const firstWeek = weeklyData[0];
+      if (firstWeek?.id) {
+        selectWeek(firstWeek.id);
+      }
     }
-  }, [weeklyData, selectedWeekId]);
+  }, [selectWeek, selectedWeek?.id, weeklyData]);
 
   const handleShelterPress = useCallback(
     (shelter) => {
@@ -160,7 +138,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   );
 
   const filteredShelters = useMemo(() => {
-    const list = Array.isArray(shelterData) ? shelterData : [];
+    const list = Array.isArray(shelters) ? shelters : [];
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     return list.filter((item) => {
@@ -195,18 +173,18 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         wilbinValue.includes(normalizedQuery)
       );
     });
-  }, [shelterData, searchQuery, selectedBands]);
+  }, [searchQuery, selectedBands, shelters]);
 
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      await Promise.all([refetchWeekly(), refetchShelters()]);
+      await refresh();
     } catch (error) {
       // noop: errors handled by hooks
     } finally {
       setRefreshing(false);
     }
-  }, [refetchShelters, refetchWeekly]);
+  }, [refresh]);
 
   const renderShelterItem = useCallback(
     ({ item }) => (
@@ -220,7 +198,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   );
 
   const renderEmptyState = useCallback(() => {
-    if (isShelterLoading) {
+    if (isDashboardLoading && !filteredShelters.length) {
       return (
         <View style={styles.emptyContainer}>
           <ActivityIndicator color="#0984e3" />
@@ -229,13 +207,13 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       );
     }
 
-    if (shelterError) {
+    if (dashboardError) {
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="alert-circle-outline" size={32} color="#e74c3c" />
           <Text style={styles.emptyTitle}>Gagal memuat data shelter</Text>
-          <Text style={styles.emptyText}>{shelterError}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refetchShelters}>
+          <Text style={styles.emptyText}>{dashboardError}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
             <Ionicons name="refresh" size={16} color="#ffffff" />
             <Text style={styles.retryLabel}>Coba Lagi</Text>
           </TouchableOpacity>
@@ -250,7 +228,7 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         <Text style={styles.emptyText}>Gunakan filter untuk menyesuaikan pencarian Anda.</Text>
       </View>
     );
-  }, [isShelterLoading, refetchShelters, shelterError]);
+  }, [dashboardError, filteredShelters.length, isDashboardLoading, refresh]);
 
   const listHeader = useMemo(() => {
     const weekBand = getAttendanceBand(selectedWeek?.attendanceRate);
@@ -258,14 +236,14 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     return (
       <View style={styles.headerContent}>
         <WeeklySummaryCard
-          summary={selectedWeek}
+          summary={selectedWeek ?? weeklySummary}
           weeks={weeklyData}
           selectedWeekId={selectedWeek?.id}
-          onSelectWeek={setSelectedWeekId}
+          onSelectWeek={selectWeek}
           band={weekBand}
-          isLoading={isWeeklyLoading}
-          error={weeklyError}
-          onRetry={refetchWeekly}
+          isLoading={isDashboardLoading}
+          error={dashboardError}
+          onRetry={refresh}
           overview={summaryData}
         />
         <View style={styles.chartSection}>
@@ -283,15 +261,16 @@ const AdminCabangAttendanceWeeklyScreen = () => {
       </View>
     );
   }, [
+    dashboardError,
+    isDashboardLoading,
     isTrendLoading,
-    isWeeklyLoading,
-    refetchWeekly,
+    refresh,
+    selectWeek,
     selectedWeek,
-    setSelectedWeekId,
     summaryData,
     trendData,
     weeklyData,
-    weeklyError,
+    weeklySummary,
   ]);
 
   const openFilterSheet = useCallback(() => setFilterVisible(true), []);
@@ -325,6 +304,19 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={styles.listContent}
+        onEndReached={() => {
+          if (hasNextPage) {
+            loadMore();
+          }
+        }}
+        onEndReachedThreshold={0.2}
+        ListFooterComponent={
+          isFetchingMoreShelters ? (
+            <View style={styles.footerLoading}>
+              <ActivityIndicator color="#0984e3" />
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={["#0984e3"]} />
         }
@@ -414,6 +406,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     marginLeft: 6,
+  },
+  footerLoading: {
+    paddingVertical: 16,
   },
   headerButton: {
     marginRight: 12,
