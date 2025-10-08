@@ -17,7 +17,8 @@ import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
 import { donaturApi } from '../api/donaturApi';
 import { useAuth } from '../../../common/hooks/useAuth';
-import DonationAdModal from '../components/DonationAdModal';
+import DonationAdModal from '../../../common/components/DonationAdModal';
+import { useDonationAd } from '../../../common/hooks/useDonationAd';
 
 const { width } = Dimensions.get('window');
 
@@ -28,9 +29,13 @@ const DonaturDashboardScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [donationAd, setDonationAd] = useState(null);
-  const [adVisible, setAdVisible] = useState(false);
-  const [adDismissed, setAdDismissed] = useState(false);
+  const {
+    ad: donationAd,
+    visible: adVisible,
+    dismissAd,
+    markActionTaken,
+    refreshAd,
+  } = useDonationAd();
 
   const fetchDashboardData = async () => {
     try {
@@ -46,60 +51,14 @@ const DonaturDashboardScreen = () => {
     }
   };
 
-  const fetchDonationAd = async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const response = await fetch('https://home.kilauindonesia.org/api/iklandonasi', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log('Donation ads response:', result);
-
-      const ads = result?.data || [];
-      console.log('Donation ads data:', ads);
-      const activeAd = Array.isArray(ads)
-        ? ads.find((item) => item?.status === '1')
-        : null;
-      console.log('Active donation ad:', activeAd);
-
-      setDonationAd(activeAd || null);
-      setAdVisible(!adDismissed && !!activeAd);
-    } catch (err) {
-      console.error('Donation ads request failed:', err);
-      const errorResponse = await err.response?.text?.();
-      if (errorResponse) {
-        console.log('Error response:', errorResponse);
-      }
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  };
-
   useEffect(() => {
     fetchDashboardData();
-    fetchDonationAd();
   }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchDashboardData();
-    fetchDonationAd();
-  };
-
-  const handleCloseAd = () => {
-    setAdVisible(false);
-    setAdDismissed(true);
+    refreshAd();
   };
 
   const navigateToMyChildren = () => navigation.navigate('Children', { screen: 'ChildList' });
@@ -130,8 +89,8 @@ const DonaturDashboardScreen = () => {
       <DonationAdModal
         visible={adVisible}
         ad={donationAd}
-        onClose={handleCloseAd}
-        onActionPress={() => setAdDismissed(true)}
+        onClose={dismissAd}
+        onActionPress={markActionTaken}
       />
 
       <View style={styles.headerCard}>
