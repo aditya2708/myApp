@@ -15,12 +15,14 @@ import { Ionicons } from '@expo/vector-icons';
 // Import components
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
+import DonationAdModal from '../../../common/components/DonationAdModal';
 
 // Import API
 import { adminPusatApi } from '../api/adminPusatApi';
 
 // Import hooks
 import { useAuth } from '../../../common/hooks/useAuth';
+import { useDonationAd } from '../../../common/hooks/useDonationAd';
 
 const AdminPusatDashboardScreen = () => {
   const navigation = useNavigation();
@@ -29,6 +31,13 @@ const AdminPusatDashboardScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const {
+    ad: donationAd,
+    visible: adVisible,
+    dismissAd,
+    markActionTaken,
+    refreshAd,
+  } = useDonationAd();
 
   // Fetch dashboard data
   const fetchDashboardData = async () => {
@@ -54,6 +63,7 @@ const AdminPusatDashboardScreen = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchDashboardData();
+    refreshAd();
   };
 
   // Navigation handlers
@@ -87,6 +97,13 @@ const AdminPusatDashboardScreen = () => {
           onRetry={fetchDashboardData}
         />
       )}
+
+      <DonationAdModal
+        visible={adVisible}
+        ad={donationAd}
+        onClose={dismissAd}
+        onActionPress={markActionTaken}
+      />
 
       {/* Welcome Section */}
       <View style={styles.welcomeSection}>
