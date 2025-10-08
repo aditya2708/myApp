@@ -4,9 +4,11 @@ namespace App\Services\AdminCabang\Reports\Attendance;
 
 use App\Models\Absen;
 use App\Models\Aktivitas;
+use App\Models\Anak;
 use App\Models\Kelompok;
 use App\Models\Shelter;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class WeeklyAttendanceService
 {
@@ -15,125 +17,130 @@ class WeeklyAttendanceService
         $start = $this->resolveDate($filters['start_date'] ?? Carbon::now()->startOfMonth(), true);
         $end = $this->resolveDate($filters['end_date'] ?? Carbon::now()->endOfMonth(), false)->endOfDay();
 
+        $attendanceBandFilter = isset($filters['attendance_band'])
+            ? strtolower((string) $filters['attendance_band'])
+            : null;
+        if ($attendanceBandFilter && !in_array($attendanceBandFilter, ['high', 'medium', 'low'], true)) {
+            $attendanceBandFilter = null;
+        }
+        $searchFilter = trim((string) ($filters['search'] ?? ''));
+
         $kacab = $adminCabang->loadMissing('kacab')->kacab;
-        $shelters = $kacab ? $kacab->shelters()->select('id_shelter')->get() : collect();
-        $shelterIds = $shelters->pluck('id_shelter')->all();
+        $shelterRecords = $kacab
+            ? $kacab->shelters()->select('shelter.id_shelter', 'shelter.nama_shelter')->get()
+            : collect();
+        $shelterIds = $shelterRecords->pluck('id_shelter')->all();
 
-        $weeks = $this->initialWeeks($start, $end);
+        $groupCounts = !empty($shelterIds)
+            ? Kelompok::query()
+                ->whereIn('id_shelter', $shelterIds)
+                ->select('id_shelter', DB::raw('COUNT(*) as aggregate'))
+                ->groupBy('id_shelter')
+                ->pluck('aggregate', 'id_shelter')
+                ->map(static fn ($value) => (int) $value)
+                ->all()
+            : [];
 
-        $overall = [
-            'present' => 0,
-            'late' => 0,
-            'absent' => 0,
-            'total_sessions' => 0,
-            'total_activities' => 0,
-            'verification' => [
-                'pending' => 0,
-                'verified' => 0,
-                'rejected' => 0,
-                'manual' => 0,
-            ],
-            '_child_ids' => [],
+        $studentCounts = !empty($shelterIds)
+            ? Anak::query()
+                ->whereIn('id_shelter', $shelterIds)
+                ->whereIn('status_validasi', Anak::STATUS_AKTIF)
+                ->select('id_shelter', DB::raw('COUNT(*) as aggregate'))
+                ->groupBy('id_shelter')
+                ->pluck('aggregate', 'id_shelter')
+                ->map(static fn ($value) => (int) $value)
+                ->all()
+            : [];
+
+        $currentMetrics = $this->collectShelterAttendanceMetrics($shelterIds, $start, $end);
+
+        $periodLength = $start->diffInDays($end) + 1;
+        $previousStart = $start->copy()->subDays($periodLength)->startOfDay();
+        $previousEnd = $start->copy()->subDay()->endOfDay();
+        $previousMetrics = $this->collectShelterAttendanceMetrics($shelterIds, $previousStart, $previousEnd);
+
+        $shelterPayloads = [];
+
+        foreach ($shelterRecords as $shelter) {
+            $shelterId = $shelter->id_shelter;
+            $present = $currentMetrics[$shelterId]['present'] ?? 0;
+            $late = $currentMetrics[$shelterId]['late'] ?? 0;
+            $absent = $currentMetrics[$shelterId]['absent'] ?? 0;
+            $totalSessions = $present + $late + $absent;
+            $attendancePercentage = $totalSessions > 0
+                ? (($present + $late) / $totalSessions) * 100
+                : 0.0;
+
+            $previousPresent = $previousMetrics[$shelterId]['present'] ?? 0;
+            $previousLate = $previousMetrics[$shelterId]['late'] ?? 0;
+            $previousAbsent = $previousMetrics[$shelterId]['absent'] ?? 0;
+            $previousSessions = $previousPresent + $previousLate + $previousAbsent;
+            $previousAttendancePercentage = $previousSessions > 0
+                ? (($previousPresent + $previousLate) / $previousSessions) * 100
+                : 0.0;
+
+            $shelterPayloads[] = [
+                'id' => $shelterId,
+                'name' => $shelter->nama_shelter,
+                'total_students' => $studentCounts[$shelterId] ?? 0,
+                'groups_count' => $groupCounts[$shelterId] ?? 0,
+                'present_count' => $present,
+                'late_count' => $late,
+                'absent_count' => $absent,
+                'attendance_percentage' => $attendancePercentage,
+                'attendance_band' => $this->determineAttendanceBand($attendancePercentage),
+                'trend_delta' => $attendancePercentage - $previousAttendancePercentage,
+            ];
+        }
+
+        $sheltersCollection = collect($shelterPayloads)->filter(function ($payload) use ($attendanceBandFilter, $searchFilter) {
+            if ($attendanceBandFilter && $payload['attendance_band'] !== $attendanceBandFilter) {
+                return false;
+            }
+
+            if ($searchFilter !== '' && stripos($payload['name'] ?? '', $searchFilter) === false) {
+                return false;
+            }
+
+            return true;
+        })->sortBy(static fn ($payload) => $payload['name'] ?? '')->values();
+
+        $summaryPresent = (int) $sheltersCollection->sum('present_count');
+        $summaryLate = (int) $sheltersCollection->sum('late_count');
+        $summaryAbsent = (int) $sheltersCollection->sum('absent_count');
+        $summarySessions = $summaryPresent + $summaryLate + $summaryAbsent;
+        $summaryAttendancePercentage = $summarySessions > 0
+            ? (($summaryPresent + $summaryLate) / $summarySessions) * 100
+            : 0.0;
+
+        $summary = [
+            'total_shelters' => $sheltersCollection->count(),
+            'total_groups' => (int) $sheltersCollection->sum('groups_count'),
+            'total_students' => (int) $sheltersCollection->sum('total_students'),
+            'present_count' => $summaryPresent,
+            'late_count' => $summaryLate,
+            'absent_count' => $summaryAbsent,
+            'attendance_percentage' => $summaryAttendancePercentage,
         ];
 
-        if (!empty($shelterIds)) {
-            $activities = Aktivitas::query()
-                ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
-                ->whereIn('id_shelter', $shelterIds)
-                ->with(['absen.absenUser'])
-                ->get();
-
-            foreach ($activities as $activity) {
-                $overall['total_activities']++;
-
-                $activityDate = $activity->tanggal instanceof Carbon
-                    ? $activity->tanggal->copy()
-                    : Carbon::parse($activity->tanggal);
-
-                $weekKey = $this->formatWeekKey($activityDate);
-
-                if (!isset($weeks[$weekKey])) {
-                    $weeks[$weekKey] = $this->initialWeekPayload($activityDate->copy()->startOfWeek(Carbon::MONDAY), $start, $end);
-                }
-
-                $weeks[$weekKey]['metrics']['total_activities']++;
-
-                $attendanceRecords = $activity->absen ?? collect();
-                $sessionCount = $attendanceRecords->count();
-                $weeks[$weekKey]['metrics']['total_sessions'] += $sessionCount;
-                $overall['total_sessions'] += $sessionCount;
-
-                foreach ($attendanceRecords as $attendance) {
-                    $status = $attendance->absen;
-                    $normalizedStatus = $status ? strtolower($status) : null;
-
-                    if ($normalizedStatus === strtolower(Absen::TEXT_YA)) {
-                        $weeks[$weekKey]['metrics']['present_count']++;
-                        $overall['present']++;
-                    } elseif ($normalizedStatus === strtolower(Absen::TEXT_TERLAMBAT)) {
-                        $weeks[$weekKey]['metrics']['late_count']++;
-                        $overall['late']++;
-                    } elseif ($normalizedStatus === strtolower(Absen::TEXT_TIDAK)) {
-                        $weeks[$weekKey]['metrics']['absent_count']++;
-                        $overall['absent']++;
-                    }
-
-                    $childId = $attendance->absenUser->id_anak ?? null;
-                    if ($childId) {
-                        $weeks[$weekKey]['_child_ids'][$childId] = true;
-                        $overall['_child_ids'][$childId] = true;
-                    }
-
-                    $verification = $this->normalizeVerificationStatus($attendance->verification_status ?? null);
-                    $weeks[$weekKey]['metrics']['verification'][$verification]++;
-                    $overall['verification'][$verification]++;
-                }
-            }
-        }
-
-        foreach ($weeks as &$week) {
-            $week['metrics']['unique_children'] = count($week['_child_ids']);
-
-            $totalSessions = $week['metrics']['total_sessions'];
-            $attendanceCount = $week['metrics']['present_count'] + $week['metrics']['late_count'];
-
-            $week['metrics']['attendance_rate'] = $totalSessions > 0
-                ? ($attendanceCount / $totalSessions) * 100
-                : 0.0;
-
-            $week['metrics']['late_rate'] = $totalSessions > 0
-                ? ($week['metrics']['late_count'] / $totalSessions) * 100
-                : 0.0;
-
-            unset($week['_child_ids']);
-        }
-        unset($week);
-
-        ksort($weeks);
-
-        $totalSessions = $overall['total_sessions'];
-        $overallAttendanceCount = $overall['present'] + $overall['late'];
+        $filtersPayload = [
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
+            'attendance_band' => $attendanceBandFilter,
+            'search' => $searchFilter !== '' ? $searchFilter : null,
+        ];
 
         return [
-            'filters' => [
+            'period' => [
                 'start_date' => $start->toDateString(),
                 'end_date' => $end->toDateString(),
-                'shelter_ids' => $shelterIds,
             ],
-            'metadata' => [
-                'shelter_count' => count($shelterIds),
-                'total_activities' => $overall['total_activities'],
-                'total_sessions' => $totalSessions,
-                'present_count' => $overall['present'],
-                'late_count' => $overall['late'],
-                'absent_count' => $overall['absent'],
-                'attendance_rate' => $totalSessions > 0 ? ($overallAttendanceCount / $totalSessions) * 100 : 0.0,
-                'late_rate' => $totalSessions > 0 ? ($overall['late'] / $totalSessions) * 100 : 0.0,
-                'unique_children' => count($overall['_child_ids']),
-                'verification' => $overall['verification'],
+            'summary' => $summary,
+            'shelters' => $sheltersCollection->values()->all(),
+            'meta' => [
+                'filters' => $filtersPayload,
+                'last_refreshed_at' => Carbon::now()->toIso8601String(),
             ],
-            'weeks' => array_values($weeks),
-            'generated_at' => Carbon::now()->toIso8601String(),
         ];
     }
 
@@ -494,6 +501,64 @@ class WeeklyAttendanceService
             'notes' => $notes,
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
+    }
+
+    protected function collectShelterAttendanceMetrics(array $shelterIds, Carbon $start, Carbon $end): array
+    {
+        if (empty($shelterIds) || $end->lt($start)) {
+            return [];
+        }
+
+        $activities = Aktivitas::query()
+            ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+            ->whereIn('id_shelter', $shelterIds)
+            ->with(['absen' => function ($query) {
+                $query->select('id_absen', 'id_aktivitas', 'absen');
+            }])
+            ->get(['id_aktivitas', 'id_shelter', 'tanggal']);
+
+        $metrics = [];
+
+        foreach ($activities as $activity) {
+            $shelterId = $activity->id_shelter;
+
+            if (!isset($metrics[$shelterId])) {
+                $metrics[$shelterId] = [
+                    'present' => 0,
+                    'late' => 0,
+                    'absent' => 0,
+                ];
+            }
+
+            $attendanceRecords = $activity->absen ?? collect();
+
+            foreach ($attendanceRecords as $attendance) {
+                $status = strtolower($attendance->absen ?? '');
+
+                if ($status === strtolower(Absen::TEXT_YA)) {
+                    $metrics[$shelterId]['present']++;
+                } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
+                    $metrics[$shelterId]['late']++;
+                } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
+                    $metrics[$shelterId]['absent']++;
+                }
+            }
+        }
+
+        return $metrics;
+    }
+
+    protected function determineAttendanceBand(float $attendancePercentage): string
+    {
+        if ($attendancePercentage > 85.0) {
+            return 'high';
+        }
+
+        if ($attendancePercentage >= 75.0) {
+            return 'medium';
+        }
+
+        return 'low';
     }
 
     protected function resolveDate($value, bool $startOfDay = false): Carbon

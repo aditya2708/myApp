@@ -10,59 +10,53 @@ class AttendanceWeeklyResource extends JsonResource
     {
         $data = (array) $this->resource;
 
-        $formatRate = static fn ($value): string => number_format((float) ($value ?? 0), 2, '.', '');
+        $formatPercentage = static fn ($value): string => number_format((float) ($value ?? 0), 2, '.', '');
+        $formatDelta = static fn ($value): string => number_format((float) ($value ?? 0), 2, '.', '');
 
-        $formatVerification = static fn (array $verification): array => [
-            'pending' => (int) ($verification['pending'] ?? 0),
-            'verified' => (int) ($verification['verified'] ?? 0),
-            'rejected' => (int) ($verification['rejected'] ?? 0),
-            'manual' => (int) ($verification['manual'] ?? 0),
-        ];
+        $period = (array) ($data['period'] ?? []);
+        $summary = (array) ($data['summary'] ?? []);
+        $meta = (array) ($data['meta'] ?? []);
+        $filters = (array) ($meta['filters'] ?? []);
 
-        $weeks = collect($data['weeks'] ?? [])->map(function ($week) use ($formatRate, $formatVerification) {
-            $metrics = $week['metrics'] ?? [];
-
+        $shelters = collect($data['shelters'] ?? [])->map(function ($shelter) use ($formatPercentage, $formatDelta) {
             return [
-                'week' => $week['week'] ?? null,
-                'start_date' => $week['start_date'] ?? null,
-                'end_date' => $week['end_date'] ?? null,
-                'metrics' => [
-                    'present_count' => (int) ($metrics['present_count'] ?? 0),
-                    'late_count' => (int) ($metrics['late_count'] ?? 0),
-                    'absent_count' => (int) ($metrics['absent_count'] ?? 0),
-                    'attendance_rate' => $formatRate($metrics['attendance_rate'] ?? 0),
-                    'late_rate' => $formatRate($metrics['late_rate'] ?? 0),
-                    'total_activities' => (int) ($metrics['total_activities'] ?? 0),
-                    'total_sessions' => (int) ($metrics['total_sessions'] ?? 0),
-                    'unique_children' => (int) ($metrics['unique_children'] ?? 0),
-                    'verification' => $formatVerification($metrics['verification'] ?? []),
-                ],
+                'id' => $shelter['id'] ?? null,
+                'name' => $shelter['name'] ?? null,
+                'total_students' => (int) ($shelter['total_students'] ?? 0),
+                'present_count' => (int) ($shelter['present_count'] ?? 0),
+                'late_count' => (int) ($shelter['late_count'] ?? 0),
+                'absent_count' => (int) ($shelter['absent_count'] ?? 0),
+                'attendance_percentage' => $formatPercentage($shelter['attendance_percentage'] ?? 0),
+                'attendance_band' => $shelter['attendance_band'] ?? null,
+                'trend_delta' => $formatDelta($shelter['trend_delta'] ?? 0),
+                'groups_count' => (int) ($shelter['groups_count'] ?? 0),
             ];
         })->values()->all();
 
-        $filters = $data['filters'] ?? [];
-        $metadata = $data['metadata'] ?? [];
-
         return [
-            'filters' => [
-                'start_date' => $filters['start_date'] ?? null,
-                'end_date' => $filters['end_date'] ?? null,
-                'shelter_ids' => array_values($filters['shelter_ids'] ?? []),
+            'period' => [
+                'start_date' => $period['start_date'] ?? null,
+                'end_date' => $period['end_date'] ?? null,
             ],
-            'metadata' => [
-                'shelter_count' => (int) ($metadata['shelter_count'] ?? 0),
-                'total_activities' => (int) ($metadata['total_activities'] ?? 0),
-                'total_sessions' => (int) ($metadata['total_sessions'] ?? 0),
-                'present_count' => (int) ($metadata['present_count'] ?? 0),
-                'late_count' => (int) ($metadata['late_count'] ?? 0),
-                'absent_count' => (int) ($metadata['absent_count'] ?? 0),
-                'attendance_rate' => $formatRate($metadata['attendance_rate'] ?? 0),
-                'late_rate' => $formatRate($metadata['late_rate'] ?? 0),
-                'unique_children' => (int) ($metadata['unique_children'] ?? 0),
-                'verification' => $formatVerification($metadata['verification'] ?? []),
+            'summary' => [
+                'total_shelters' => (int) ($summary['total_shelters'] ?? 0),
+                'total_groups' => (int) ($summary['total_groups'] ?? 0),
+                'total_students' => (int) ($summary['total_students'] ?? 0),
+                'present_count' => (int) ($summary['present_count'] ?? 0),
+                'late_count' => (int) ($summary['late_count'] ?? 0),
+                'absent_count' => (int) ($summary['absent_count'] ?? 0),
+                'attendance_percentage' => $formatPercentage($summary['attendance_percentage'] ?? 0),
             ],
-            'weeks' => $weeks,
-            'generated_at' => $data['generated_at'] ?? null,
+            'shelters' => $shelters,
+            'meta' => [
+                'filters' => [
+                    'start_date' => $filters['start_date'] ?? null,
+                    'end_date' => $filters['end_date'] ?? null,
+                    'attendance_band' => $filters['attendance_band'] ?? null,
+                    'search' => $filters['search'] ?? null,
+                ],
+                'last_refreshed_at' => $meta['last_refreshed_at'] ?? null,
+            ],
         ];
     }
 }

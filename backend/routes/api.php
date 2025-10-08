@@ -202,7 +202,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/anak-binaan/child/{id}', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'showChild']);
             Route::get('/anak-binaan/filter-options', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'filterOptions']);
             Route::prefix('attendance')->group(function () {
-                Route::get('/weekly', AttendanceWeeklyController::class);
+                // Level 1 - Branch weekly attendance summary
+                // Query params: start_date, end_date, attendance_band (high|medium|low), search
+                Route::get('/weekly', AttendanceWeeklyController::class)
+                    ->name('admin-cabang.reports.attendance.weekly.index');
                 Route::get('/weekly/shelters', AttendanceWeeklyShelterController::class);
                 Route::get('/weekly/shelters/{shelter}', AttendanceWeeklyShelterDetailController::class);
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
