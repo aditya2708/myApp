@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminCabangReportApi } from '../../../api/adminCabangReportApi';
 
 const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_ERROR_MESSAGE = 'Gagal memuat data kehadiran mingguan cabang.';
 
 const ensureArray = (value) => {
   if (Array.isArray(value)) {
@@ -479,8 +480,15 @@ const useWeeklyAttendanceDashboard = ({
 
         return normalized;
       } catch (err) {
-        const message = err?.message || 'Gagal memuat data kehadiran mingguan cabang.';
-        setError(message);
+        console.error('Failed to fetch weekly attendance dashboard', {
+          params,
+          status: err?.response?.status,
+          data: err?.response?.data,
+          error: err,
+        });
+
+        const message = err?.message;
+        setError(message || DEFAULT_ERROR_MESSAGE);
         throw err;
       } finally {
         setIsLoading(false);
