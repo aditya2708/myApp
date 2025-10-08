@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Modal,
   StyleSheet,
@@ -9,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import DatePicker from '../../../../../common/components/DatePicker';
 
 const WeeklyAttendanceFilterSheet = ({
   visible,
@@ -26,6 +28,10 @@ const WeeklyAttendanceFilterSheet = ({
   onYearChange,
   onMonthChange,
   onWeekChange,
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange,
 }) => {
   const safeBands = Array.isArray(bands) ? bands : [];
   const selectedSet = new Set(selectedBands || []);
@@ -36,6 +42,107 @@ const WeeklyAttendanceFilterSheet = ({
   const activeMonth =
     monthList.find((month) => month.id === selectedMonth) || monthList[0] || null;
   const weekList = Array.isArray(activeMonth?.weeks) ? activeMonth.weeks : [];
+
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
+  const parseDateValue = useCallback((value) => {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return parsed;
+  }, []);
+
+  const toISODate = useCallback((date) => {
+    if (!date) {
+      return null;
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const parsedStartDate = useMemo(() => parseDateValue(startDate), [parseDateValue, startDate]);
+  const parsedEndDate = useMemo(() => parseDateValue(endDate), [parseDateValue, endDate]);
+
+  const startPickerValue = parsedStartDate ?? new Date();
+  const endPickerValue = parsedEndDate ?? new Date();
+
+  const startDateLabel = parsedStartDate
+    ? parsedStartDate.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : 'Pilih tanggal';
+
+  const endDateLabel = parsedEndDate
+    ? parsedEndDate.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : 'Pilih tanggal';
+
+  const openStartPicker = useCallback(() => {
+    setShowStartPicker(true);
+  }, []);
+
+  const openEndPicker = useCallback(() => {
+    setShowEndPicker(true);
+  }, []);
+
+  const handleStartPickerCancel = useCallback(() => {
+    setShowStartPicker(false);
+  }, []);
+
+  const handleEndPickerCancel = useCallback(() => {
+    setShowEndPicker(false);
+  }, []);
+
+  const handleStartPickerChange = useCallback(
+    (date) => {
+      setShowStartPicker(false);
+
+      if (!date) {
+        return;
+      }
+
+      const isoDate = toISODate(date);
+
+      onWeekChange?.(null, { start: isoDate, end: endDate || null });
+      onStartDateChange?.(isoDate);
+      onClose?.();
+    },
+    [endDate, onClose, onStartDateChange, onWeekChange, toISODate],
+  );
+
+  const handleEndPickerChange = useCallback(
+    (date) => {
+      setShowEndPicker(false);
+
+      if (!date) {
+        return;
+      }
+
+      const isoDate = toISODate(date);
+
+      onWeekChange?.(null, { start: startDate || null, end: isoDate });
+      onEndDateChange?.(isoDate);
+      onClose?.();
+    },
+    [onClose, onEndDateChange, onWeekChange, startDate, toISODate],
+  );
 
   const toggleBand = (bandId) => {
     if (!onBandsChange) {
@@ -141,7 +248,7 @@ const WeeklyAttendanceFilterSheet = ({
                     <TouchableOpacity
                       key={week.id}
                       style={[styles.weekItem, isActive ? styles.weekItemActive : null]}
-                      onPress={() => onWeekChange?.(week.id)}
+                      onPress={() => onWeekChange?.(week.id, week.dates)}
                     >
                       <View style={styles.weekTextWrapper}>
                         <Text style={[styles.weekName, isActive ? styles.weekNameActive : null]}>
@@ -167,6 +274,58 @@ const WeeklyAttendanceFilterSheet = ({
             ) : (
               <Text style={styles.emptyPeriodText}>Tidak ada minggu pada bulan ini.</Text>
             )}
+
+            <Text style={styles.subSectionLabel}>Rentang Tanggal Manual</Text>
+            <View style={styles.dateRangeRow}>
+              <TouchableOpacity
+                style={[
+                  styles.dateInput,
+                  styles.dateInputStart,
+                  parsedStartDate ? styles.dateInputActive : null,
+                ]}
+                onPress={openStartPicker}
+              >
+                <View style={styles.dateTextWrapper}>
+                  <Text style={styles.dateLabel}>Mulai</Text>
+                  <Text
+                    style={[
+                      styles.dateValue,
+                      !parsedStartDate ? styles.datePlaceholder : null,
+                    ]}
+                  >
+                    {startDateLabel}
+                  </Text>
+                </View>
+                <Ionicons name="calendar-outline" size={18} color="#0984e3" />
+              </TouchableOpacity>
+
+              <Text style={styles.dateSeparatorText}>s/d</Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.dateInput,
+                  styles.dateInputEnd,
+                  parsedEndDate ? styles.dateInputActive : null,
+                ]}
+                onPress={openEndPicker}
+              >
+                <View style={styles.dateTextWrapper}>
+                  <Text style={styles.dateLabel}>Selesai</Text>
+                  <Text
+                    style={[
+                      styles.dateValue,
+                      !parsedEndDate ? styles.datePlaceholder : null,
+                    ]}
+                  >
+                    {endDateLabel}
+                  </Text>
+                </View>
+                <Ionicons name="calendar-outline" size={18} color="#0984e3" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.dateHelperText}>
+              Memilih tanggal manual akan menghapus pilihan minggu.
+            </Text>
           </View>
         ) : (
           <Text style={styles.emptyPeriodText}>Belum ada periode laporan tersedia.</Text>
@@ -212,6 +371,26 @@ const WeeklyAttendanceFilterSheet = ({
           </TouchableOpacity>
         </View>
       </View>
+
+      {showStartPicker ? (
+        <DatePicker
+          value={startPickerValue}
+          onChange={handleStartPickerChange}
+          onCancel={handleStartPickerCancel}
+          maximumDate={parsedEndDate || undefined}
+          title="Pilih Tanggal Mulai"
+        />
+      ) : null}
+
+      {showEndPicker ? (
+        <DatePicker
+          value={endPickerValue}
+          onChange={handleEndPickerChange}
+          onCancel={handleEndPickerCancel}
+          minimumDate={parsedStartDate || undefined}
+          title="Pilih Tanggal Selesai"
+        />
+      ) : null}
     </Modal>
   );
 };
@@ -232,6 +411,10 @@ WeeklyAttendanceFilterSheet.defaultProps = {
   onYearChange: undefined,
   onMonthChange: undefined,
   onWeekChange: undefined,
+  startDate: null,
+  endDate: null,
+  onStartDateChange: undefined,
+  onEndDateChange: undefined,
 };
 
 const styles = StyleSheet.create({
@@ -401,6 +584,61 @@ const styles = StyleSheet.create({
   },
   weekRangeActive: {
     color: '#0984e3',
+  },
+  dateRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  dateInput: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
+  },
+  dateInputStart: {
+    marginRight: 12,
+  },
+  dateInputEnd: {
+    marginLeft: 12,
+  },
+  dateInputActive: {
+    borderColor: '#0984e3',
+    backgroundColor: 'rgba(9, 132, 227, 0.12)',
+  },
+  dateTextWrapper: {
+    flex: 1,
+    marginRight: 12,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: '#636e72',
+    marginBottom: 2,
+  },
+  dateValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2d3436',
+  },
+  datePlaceholder: {
+    color: '#b2bec3',
+    fontWeight: '500',
+  },
+  dateSeparatorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#636e72',
+  },
+  dateHelperText: {
+    marginTop: 8,
+    fontSize: 11,
+    color: '#636e72',
   },
   emptyPeriodText: {
     marginTop: 8,

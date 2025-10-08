@@ -142,6 +142,28 @@ const buildBreakdown = ({ present, late, absent }, totalSessions) => ({
   },
 });
 
+const normalizeDateInput = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return null;
+    }
+
+    return value.toISOString().split('T')[0];
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().split('T')[0];
+};
+
 const normalizeSummary = (payload = {}) => {
   const presentCount = toNumber(
     payload?.presentCount ?? payload?.present_count ?? payload?.present ?? payload?.hadir,
@@ -370,6 +392,8 @@ const useWeeklyAttendanceDashboard = ({
   pageSize = DEFAULT_PAGE_SIZE,
   autoFetch = true,
   initialWeekId = null,
+  startDate = null,
+  endDate = null,
 } = {}) => {
   const [state, setState] = useState({
     period: null,
@@ -392,6 +416,11 @@ const useWeeklyAttendanceDashboard = ({
 
   const normalizedSearch = useMemo(() => search?.toString().trim(), [search]);
   const normalizedBands = useMemo(() => (Array.isArray(bands) ? bands.filter(Boolean) : []), [bands]);
+  const normalizedStartDate = useMemo(() => normalizeDateInput(startDate), [startDate]);
+  const normalizedEndDate = useMemo(() => normalizeDateInput(endDate), [endDate]);
+
+  const weeksRef = useRef(state.weeks);
+  const rangeKeyRef = useRef(`${normalizedStartDate || ''}|${normalizedEndDate || ''}`);
 
   const buildParams = useCallback(
     ({ page = 1, week } = {}) => {
@@ -420,9 +449,21 @@ const useWeeklyAttendanceDashboard = ({
         params.band_ids = normalizedBands;
       }
 
+      if (normalizedStartDate) {
+        params.start_date = normalizedStartDate;
+        params.startDate = normalizedStartDate;
+        params.date_start = normalizedStartDate;
+      }
+
+      if (normalizedEndDate) {
+        params.end_date = normalizedEndDate;
+        params.endDate = normalizedEndDate;
+        params.date_end = normalizedEndDate;
+      }
+
       return params;
     },
-    [normalizedBands, normalizedSearch, pageSize],
+    [normalizedBands, normalizedEndDate, normalizedSearch, normalizedStartDate, pageSize],
   );
 
   const fetchData = useCallback(
@@ -499,6 +540,10 @@ const useWeeklyAttendanceDashboard = ({
   );
 
   useEffect(() => {
+    weeksRef.current = state.weeks;
+  }, [state.weeks]);
+
+  useEffect(() => {
     if (!autoFetch) {
       return undefined;
     }
@@ -515,6 +560,37 @@ const useWeeklyAttendanceDashboard = ({
       isMounted = false;
     };
   }, [autoFetch, fetchData, normalizedBands, normalizedSearch]);
+
+  useEffect(() => {
+    const nextRangeKey = `${normalizedStartDate || ''}|${normalizedEndDate || ''}`;
+
+    if (!autoFetch) {
+      rangeKeyRef.current = nextRangeKey;
+      return undefined;
+    }
+
+    if (rangeKeyRef.current === nextRangeKey) {
+      return undefined;
+    }
+
+    rangeKeyRef.current = nextRangeKey;
+
+    if (selectedWeekRef.current) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    fetchData({ append: false, page: 1, weekId: null }).catch(() => {
+      if (!isMounted) {
+        return;
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [autoFetch, fetchData, normalizedEndDate, normalizedStartDate]);
 
   const refresh = useCallback(async () => {
     return fetchData({ append: false, page: 1, weekId: selectedWeekRef.current });
@@ -536,13 +612,23 @@ const useWeeklyAttendanceDashboard = ({
 
   const selectWeek = useCallback(
     (weekId) => {
-      if (weekId === selectedWeekRef.current) {
-        return;
+      const nextWeekId = weekId || null;
+      const matchedWeek = nextWeekId
+        ? (weeksRef.current || []).find((week) => week.id === nextWeekId) || null
+        : null;
+
+      if (nextWeekId === selectedWeekRef.current) {
+        return matchedWeek;
       }
 
-      selectedWeekRef.current = weekId || null;
-      setSelectedWeekId(weekId || null);
-      fetchData({ append: false, page: 1, weekId: weekId || null }).catch(() => {});
+      selectedWeekRef.current = nextWeekId;
+      setSelectedWeekId(nextWeekId);
+
+      if (nextWeekId) {
+        fetchData({ append: false, page: 1, weekId: nextWeekId }).catch(() => {});
+      }
+
+      return matchedWeek;
     },
     [fetchData],
   );
@@ -563,8 +649,12 @@ const useWeeklyAttendanceDashboard = ({
       return weeks.find((week) => week.id === selectedWeekId) || weeks[0];
     }
 
+    if (normalizedStartDate || normalizedEndDate) {
+      return null;
+    }
+
     return weeks[0];
-  }, [selectedWeekId, weeks]);
+  }, [normalizedEndDate, normalizedStartDate, selectedWeekId, weeks]);
 
   const hasNextPage = pagination?.hasNextPage ?? false;
 
