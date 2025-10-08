@@ -4,6 +4,7 @@ namespace App\Services\AdminCabang\Reports\Attendance;
 
 use App\Models\Absen;
 use App\Models\Aktivitas;
+use App\Models\Kelompok;
 use App\Models\Shelter;
 use Carbon\Carbon;
 
@@ -293,11 +294,249 @@ class WeeklyAttendanceService
         ];
     }
 
+    public function buildShelterWeeklyDetail($adminCabang, Shelter $shelter, Carbon $start, Carbon $end, array $options = []): array
+    {
+        $start = $this->resolveDate($start, true);
+        $end = $this->resolveDate($end, false)->endOfDay();
+
+        $shelter->loadMissing('wilbin');
+
+        $weekKey = $options['week'] ?? $this->formatWeekKey($start);
+
+        $groups = Kelompok::query()
+            ->where('id_shelter', $shelter->id_shelter)
+            ->orderBy('nama_kelompok')
+            ->get(['id_kelompok', 'nama_kelompok', 'jumlah_anggota']);
+
+        $groupSummaries = [];
+        $groupLookup = [];
+
+        foreach ($groups as $group) {
+            $key = 'group:' . $group->id_kelompok;
+
+            $groupSummaries[$key] = [
+                'id' => $group->id_kelompok,
+                'name' => $group->nama_kelompok,
+                'member_count' => (int) ($group->jumlah_anggota ?? 0),
+                'metrics' => $this->initialMetrics(),
+                '_child_ids' => [],
+                'activities' => [],
+            ];
+
+            $lookupKey = strtolower(trim($group->nama_kelompok ?? ''));
+            if ($lookupKey !== '') {
+                $groupLookup[$lookupKey] = $key;
+            }
+        }
+
+        $activities = Aktivitas::query()
+            ->where('id_shelter', $shelter->id_shelter)
+            ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+            ->with(['absen.absenUser'])
+            ->orderBy('tanggal')
+            ->orderBy('id_aktivitas')
+            ->get(['id_aktivitas', 'id_shelter', 'nama_kelompok', 'tanggal', 'jenis_kegiatan', 'materi']);
+
+        $overall = $this->initialMetrics();
+        $overall['_child_ids'] = [];
+
+        $activityPayloads = [];
+
+        foreach ($activities as $activity) {
+            $activityMetrics = $this->initialMetrics();
+            $activityMetrics['total_activities'] = 1;
+
+            $attendanceRecords = $activity->absen ?? collect();
+            $sessionCount = $attendanceRecords->count();
+            $activityMetrics['total_sessions'] = $sessionCount;
+
+            $activityChildIds = [];
+
+            foreach ($attendanceRecords as $attendance) {
+                $status = strtolower($attendance->absen ?? '');
+
+                if ($status === strtolower(Absen::TEXT_YA)) {
+                    $activityMetrics['present_count']++;
+                    $overall['present_count'] = ($overall['present_count'] ?? 0) + 1;
+                } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
+                    $activityMetrics['late_count']++;
+                    $overall['late_count'] = ($overall['late_count'] ?? 0) + 1;
+                } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
+                    $activityMetrics['absent_count']++;
+                    $overall['absent_count'] = ($overall['absent_count'] ?? 0) + 1;
+                }
+
+                $childId = $attendance->absenUser->id_anak ?? null;
+                if ($childId) {
+                    $activityChildIds[$childId] = true;
+                    $overall['_child_ids'][$childId] = true;
+                }
+
+                $verification = $this->normalizeVerificationStatus($attendance->verification_status ?? null);
+                $activityMetrics['verification'][$verification]++;
+                $overall['verification'][$verification] = ($overall['verification'][$verification] ?? 0) + 1;
+            }
+
+            $overall['total_sessions'] = ($overall['total_sessions'] ?? 0) + $sessionCount;
+            $overall['total_activities'] = ($overall['total_activities'] ?? 0) + 1;
+
+            $this->finalizeMetrics($activityMetrics, array_keys($activityChildIds));
+
+            $activityDate = $activity->tanggal instanceof Carbon
+                ? $activity->tanggal->copy()
+                : Carbon::parse($activity->tanggal);
+
+            $activityPayload = [
+                'id' => $activity->id_aktivitas,
+                'date' => $activityDate->toDateString(),
+                'week' => $this->formatWeekKey($activityDate),
+                'group_name' => $activity->nama_kelompok ?? null,
+                'jenis_kegiatan' => $activity->jenis_kegiatan ?? null,
+                'materi' => $activity->materi ?? null,
+                'metrics' => $activityMetrics,
+            ];
+
+            $activityPayloads[] = $activityPayload;
+
+            $lookupKey = strtolower(trim($activity->nama_kelompok ?? ''));
+            $groupKey = $lookupKey !== '' && isset($groupLookup[$lookupKey])
+                ? $groupLookup[$lookupKey]
+                : 'unmapped:' . ($lookupKey !== '' ? $lookupKey : 'no-name');
+
+            if (!isset($groupSummaries[$groupKey])) {
+                $groupSummaries[$groupKey] = [
+                    'id' => null,
+                    'name' => $lookupKey !== '' ? $activity->nama_kelompok : __('Tanpa Kelompok'),
+                    'member_count' => null,
+                    'metrics' => $this->initialMetrics(),
+                    '_child_ids' => [],
+                    'activities' => [],
+                ];
+            }
+
+            $groupSummaries[$groupKey]['metrics']['total_activities']++;
+            $groupSummaries[$groupKey]['metrics']['total_sessions'] += $sessionCount;
+
+            $groupSummaries[$groupKey]['metrics']['present_count'] += $activityMetrics['present_count'];
+            $groupSummaries[$groupKey]['metrics']['late_count'] += $activityMetrics['late_count'];
+            $groupSummaries[$groupKey]['metrics']['absent_count'] += $activityMetrics['absent_count'];
+
+            foreach ($activityMetrics['verification'] as $verificationKey => $value) {
+                $groupSummaries[$groupKey]['metrics']['verification'][$verificationKey] += $value;
+            }
+
+            foreach (array_keys($activityChildIds) as $childId) {
+                $groupSummaries[$groupKey]['_child_ids'][$childId] = true;
+            }
+
+            $groupSummaries[$groupKey]['activities'][] = $activityPayload;
+        }
+
+        $overallMetrics = $this->initialMetrics();
+        $overallMetrics['present_count'] = (int) ($overall['present_count'] ?? 0);
+        $overallMetrics['late_count'] = (int) ($overall['late_count'] ?? 0);
+        $overallMetrics['absent_count'] = (int) ($overall['absent_count'] ?? 0);
+        $overallMetrics['total_sessions'] = (int) ($overall['total_sessions'] ?? 0);
+        $overallMetrics['total_activities'] = (int) ($overall['total_activities'] ?? 0);
+        $overallMetrics['verification'] = array_merge($overallMetrics['verification'], array_map('intval', $overall['verification'] ?? []));
+
+        $this->finalizeMetrics($overallMetrics, array_keys($overall['_child_ids'] ?? []));
+
+        foreach ($groupSummaries as &$groupSummary) {
+            $this->finalizeMetrics($groupSummary['metrics'], array_keys($groupSummary['_child_ids']));
+            unset($groupSummary['_child_ids']);
+            $groupSummary['activities'] = array_values($groupSummary['activities']);
+        }
+        unset($groupSummary);
+
+        uasort($groupSummaries, static function ($a, $b) {
+            return strcmp($a['name'] ?? '', $b['name'] ?? '');
+        });
+
+        usort($activityPayloads, static function ($a, $b) {
+            return strcmp($a['date'] . ($a['id'] ?? ''), $b['date'] . ($b['id'] ?? ''));
+        });
+
+        $notes = [];
+
+        if (empty($activityPayloads)) {
+            $notes[] = __('Tidak ada aktivitas yang tercatat pada rentang tanggal ini.');
+        }
+
+        $unmappedGroups = collect($groupSummaries)
+            ->filter(static fn ($group) => empty($group['id']) && !empty($group['activities']))
+            ->pluck('name')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (!empty($unmappedGroups)) {
+            $notes[] = __('Beberapa aktivitas tidak terhubung dengan kelompok terdaftar: :groups', [
+                'groups' => implode(', ', $unmappedGroups),
+            ]);
+        }
+
+        return [
+            'shelter' => [
+                'id' => $shelter->id_shelter,
+                'name' => $shelter->nama_shelter,
+                'wilbin' => $shelter->wilbin?->nama_wilbin,
+                'wilbin_id' => $shelter->wilbin?->id_wilbin,
+            ],
+            'filters' => [
+                'week' => $weekKey,
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+            ],
+            'metrics' => $overallMetrics,
+            'groups' => array_values($groupSummaries),
+            'activities' => $activityPayloads,
+            'notes' => $notes,
+            'generated_at' => Carbon::now()->toIso8601String(),
+        ];
+    }
+
     protected function resolveDate($value, bool $startOfDay = false): Carbon
     {
         $date = $value instanceof Carbon ? $value->copy() : Carbon::parse($value);
 
         return $startOfDay ? $date->startOfDay() : $date;
+    }
+
+    protected function initialMetrics(): array
+    {
+        return [
+            'present_count' => 0,
+            'late_count' => 0,
+            'absent_count' => 0,
+            'attendance_rate' => 0.0,
+            'late_rate' => 0.0,
+            'total_activities' => 0,
+            'total_sessions' => 0,
+            'unique_children' => 0,
+            'verification' => [
+                'pending' => 0,
+                'verified' => 0,
+                'rejected' => 0,
+                'manual' => 0,
+            ],
+        ];
+    }
+
+    protected function finalizeMetrics(array &$metrics, array $childIds): void
+    {
+        $metrics['unique_children'] = count($childIds);
+
+        $totalSessions = $metrics['total_sessions'];
+        $attendanceCount = $metrics['present_count'] + $metrics['late_count'];
+
+        $metrics['attendance_rate'] = $totalSessions > 0
+            ? ($attendanceCount / $totalSessions) * 100
+            : 0.0;
+
+        $metrics['late_rate'] = $totalSessions > 0
+            ? ($metrics['late_count'] / $totalSessions) * 100
+            : 0.0;
     }
 
     protected function initialWeeks(Carbon $start, Carbon $end): array
