@@ -416,6 +416,33 @@ class WeeklyAttendanceService
             static fn ($value) => $value !== null && $value !== ''
         );
 
+        $page = isset($options['page']) ? (int) $options['page'] : 1;
+        if ($page < 1) {
+            $page = 1;
+        }
+
+        $perPage = isset($options['per_page']) ? (int) $options['per_page'] : 15;
+        if ($perPage < 1) {
+            $perPage = 15;
+        } elseif ($perPage > 100) {
+            $perPage = 100;
+        }
+
+        $searchFilter = trim((string) ($options['search'] ?? ''));
+        $searchFilter = $searchFilter !== '' ? $searchFilter : null;
+
+        $activityIdFilter = isset($options['activity_id']) ? (int) $options['activity_id'] : null;
+        if ($activityIdFilter !== null && $activityIdFilter <= 0) {
+            $activityIdFilter = null;
+        }
+
+        $scheduleDateRaw = $options['schedule_date'] ?? null;
+        $scheduleDateFilter = null;
+
+        if ($scheduleDateRaw !== null && $scheduleDateRaw !== '') {
+            $scheduleDateFilter = Carbon::parse($scheduleDateRaw)->toDateString();
+        }
+
         $groups = Kelompok::query()
             ->where('id_shelter', $shelter->id_shelter)
             ->with('levelAnakBinaan')
@@ -427,21 +454,21 @@ class WeeklyAttendanceService
 
         foreach ($groups as $group) {
             $normalizedName = $this->normalizeGroupKey($group->nama_kelompok);
-
-            if ($normalizedName !== '') {
-                $groupLookup[$normalizedName] = $group->id_kelompok;
-            }
-
-            $groupCards[$group->id_kelompok] = [
+            $groupInfo = [
                 'id' => $group->id_kelompok,
                 'name' => $group->nama_kelompok,
                 'description' => $this->buildGroupDescription($group),
                 'member_count' => $group->jumlah_anggota !== null ? (int) $group->jumlah_anggota : null,
+            ];
+
+            $groupLookup[$normalizedName] = $groupInfo;
+
+            $groupCards[$group->id_kelompok] = array_merge($groupInfo, [
                 'present_count' => 0,
                 'late_count' => 0,
                 'absent_count' => 0,
                 'attendance_percentage' => 0.0,
-            ];
+            ]);
         }
 
         $attendanceAggregates = $this->collectGroupAttendanceForShelterWeek(
@@ -465,7 +492,7 @@ class WeeklyAttendanceService
             $overallAbsent += $absent;
 
             if (isset($groupLookup[$normalizedName])) {
-                $groupId = $groupLookup[$normalizedName];
+                $groupId = $groupLookup[$normalizedName]['id'];
 
                 $groupCards[$groupId]['present_count'] += $present;
                 $groupCards[$groupId]['late_count'] += $late;
@@ -520,6 +547,163 @@ class WeeklyAttendanceService
             ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
+        $activityQuery = Aktivitas::query()
+            ->where('id_shelter', $shelter->id_shelter)
+            ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+            ->with([
+                'tutor:id_tutor,full_name,nama',
+                'absen' => function ($query) {
+                    $query->select('id_absen', 'id_absen_user', 'id_aktivitas', 'absen', 'verification_status');
+                },
+                'absen.absenUser' => function ($query) {
+                    $query->select('id_absen_user', 'id_anak', 'id_tutor');
+                },
+            ])
+            ->orderBy('tanggal')
+            ->orderBy('start_time')
+            ->orderBy('id_aktivitas');
+
+        if ($activityIdFilter !== null) {
+            $activityQuery->where('id_aktivitas', $activityIdFilter);
+        }
+
+        if ($scheduleDateFilter !== null) {
+            $activityQuery->whereDate('tanggal', $scheduleDateFilter);
+        }
+
+        if ($searchFilter !== null) {
+            $activityQuery->where(function ($query) use ($searchFilter) {
+                $query->where('jenis_kegiatan', 'like', "%{$searchFilter}%")
+                    ->orWhere('materi', 'like', "%{$searchFilter}%")
+                    ->orWhere('nama_kelompok', 'like', "%{$searchFilter}%");
+            });
+        }
+
+        $totalActivities = (clone $activityQuery)->count();
+
+        $activityModels = (clone $activityQuery)
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get([
+                'id_aktivitas',
+                'id_shelter',
+                'id_tutor',
+                'nama_kelompok',
+                'jenis_kegiatan',
+                'materi',
+                'tanggal',
+                'start_time',
+                'end_time',
+            ]);
+
+        $activityPayloads = [];
+        $activitiesWithoutAttendance = false;
+
+        foreach ($activityModels as $activity) {
+            $attendanceRecords = $activity->absen ?? collect();
+
+            $presentCount = 0;
+            $lateCount = 0;
+            $absentCount = 0;
+            $participantLookup = [];
+
+            $verificationCounts = [
+                'pending' => 0,
+                'verified' => 0,
+                'rejected' => 0,
+                'manual' => 0,
+            ];
+
+            foreach ($attendanceRecords as $attendance) {
+                $status = strtolower($attendance->absen ?? '');
+
+                if ($status === strtolower(Absen::TEXT_YA)) {
+                    $presentCount++;
+                } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
+                    $lateCount++;
+                } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
+                    $absentCount++;
+                }
+
+                $verification = $this->normalizeVerificationStatus($attendance->verification_status ?? null);
+                $verificationCounts[$verification]++;
+
+                $participantId = $attendance->absenUser?->id_anak;
+
+                if ($participantId) {
+                    $participantLookup[$participantId] = true;
+                }
+            }
+
+            if ($attendanceRecords->isEmpty()) {
+                $activitiesWithoutAttendance = true;
+            }
+
+            $totalSessions = $presentCount + $lateCount + $absentCount;
+            $attendanceRate = $totalSessions > 0
+                ? (($presentCount + $lateCount) / $totalSessions) * 100
+                : 0.0;
+
+            $normalizedGroupName = $this->normalizeGroupKey($activity->nama_kelompok);
+            $groupInfo = $groupLookup[$normalizedGroupName] ?? null;
+
+            $groupDetails = [
+                'id' => $groupInfo['id'] ?? null,
+                'name' => $activity->nama_kelompok !== ''
+                    ? $activity->nama_kelompok
+                    : ($groupInfo['name'] ?? ($attendanceAggregates[$normalizedGroupName]['name'] ?? null)),
+                'description' => $groupInfo['description'] ?? null,
+                'member_count' => $groupInfo['member_count'] ?? null,
+            ];
+
+            if ($groupDetails['name'] === null) {
+                $groupDetails['name'] = __('Tanpa Kelompok');
+            }
+
+            $participantCount = count($participantLookup);
+            if ($participantCount === 0) {
+                $participantCount = $attendanceRecords->count();
+            }
+
+            $activityNotes = [];
+
+            if ($attendanceRecords->isEmpty()) {
+                $activityNotes[] = __('Belum ada absensi yang tercatat. Sistem akan otomatis menandai ketidakhadiran.');
+            }
+
+            $activityPayloads[] = [
+                'id' => $activity->id_aktivitas,
+                'name' => $activity->jenis_kegiatan ?? null,
+                'material' => $activity->materi ?? null,
+                'tutor' => $activity->tutor?->full_name ?? $activity->tutor?->nama ?? null,
+                'group' => $groupDetails,
+                'participant_count' => $participantCount,
+                'schedules' => [[
+                    'date' => $activity->tanggal ? $activity->tanggal->toDateString() : null,
+                    'start_time' => $activity->start_time ?? null,
+                    'end_time' => $activity->end_time ?? null,
+                ]],
+                'metrics' => [
+                    'present_count' => $presentCount,
+                    'late_count' => $lateCount,
+                    'absent_count' => $absentCount,
+                    'attendance_rate' => $attendanceRate,
+                    'verification' => $verificationCounts,
+                ],
+                'notes' => $activityNotes,
+            ];
+        }
+
+        $paginator = new LengthAwarePaginator(
+            collect($activityPayloads),
+            $totalActivities,
+            $perPage,
+            $page,
+            [
+                'path' => LengthAwarePaginator::resolveCurrentPath(),
+            ]
+        );
+
         $totalStudents = Anak::query()
             ->where('id_shelter', $shelter->id_shelter)
             ->aktif()
@@ -531,9 +715,11 @@ class WeeklyAttendanceService
             $overallAbsent
         );
 
+        $totalActivitiesCount = $paginator->total();
+
         $notes = [];
 
-        if (empty($attendanceAggregates)) {
+        if ($totalActivitiesCount === 0) {
             $notes[] = __('Tidak ada aktivitas yang tercatat pada rentang tanggal ini.');
         }
 
@@ -545,6 +731,10 @@ class WeeklyAttendanceService
                     ->unique()
                     ->implode(', '),
             ]);
+        }
+
+        if ($totalActivitiesCount > 0 && $activitiesWithoutAttendance) {
+            $notes[] = __('Beberapa aktivitas belum memiliki absensi; status otomatis akan menandai ketidakhadiran.');
         }
 
         return [
@@ -563,6 +753,11 @@ class WeeklyAttendanceService
                 'start_date' => $requestedPeriodFilters['start_date'] ?? null,
                 'end_date' => $requestedPeriodFilters['end_date'] ?? null,
                 'week' => $weekKey,
+                'page' => $page,
+                'per_page' => $perPage,
+                'search' => $searchFilter,
+                'activity_id' => $activityIdFilter,
+                'schedule_date' => $scheduleDateFilter,
             ],
             'summary' => [
                 'total_students' => (int) $totalStudents,
@@ -573,6 +768,15 @@ class WeeklyAttendanceService
                 'attendance_band' => $this->determineAttendanceBand($summaryAttendancePercentage),
             ],
             'groups' => $groupCollection->all(),
+            'activities' => array_values($paginator->items()),
+            'pagination' => [
+                'total' => $paginator->total(),
+                'per_page' => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
             'notes' => $notes,
             'generated_at' => Carbon::now()->toIso8601String(),
         ];

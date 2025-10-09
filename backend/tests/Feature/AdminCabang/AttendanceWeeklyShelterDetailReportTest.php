@@ -312,6 +312,11 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $this->assertSame('2024-01-07', $payload['period']['end_date']);
 
         $this->assertSame('2024-W01', $payload['filters']['week']);
+        $this->assertSame(1, $payload['filters']['page']);
+        $this->assertSame(15, $payload['filters']['per_page']);
+        $this->assertNull($payload['filters']['search']);
+        $this->assertNull($payload['filters']['activity_id']);
+        $this->assertNull($payload['filters']['schedule_date']);
 
         $this->assertSame(5, $payload['summary']['total_students']);
         $this->assertSame(3, $payload['summary']['present_count']);
@@ -350,9 +355,235 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $this->assertSame(0, $unmappedGroup['absent_count']);
         $this->assertSame('100.00', $unmappedGroup['attendance_percentage']);
 
+        $activities = collect($payload['activities']);
+        $this->assertCount(3, $activities);
+
+        $alphaActivity = $activities->firstWhere('id', $activityAlpha->id_aktivitas);
+        $this->assertSame('Pertemuan Rutin', $alphaActivity['name']);
+        $this->assertSame($kelompokAlpha->id_kelompok, $alphaActivity['group']['id']);
+        $this->assertSame('Kelompok Alpha', $alphaActivity['group']['name']);
+        $this->assertSame('Gabungan A', $alphaActivity['group']['description']);
+        $this->assertSame(15, $alphaActivity['group']['member_count']);
+        $this->assertSame(2, $alphaActivity['participant_count']);
+        $this->assertCount(1, $alphaActivity['schedules']);
+        $this->assertSame('2024-01-03', $alphaActivity['schedules'][0]['date']);
+        $this->assertNull($alphaActivity['schedules'][0]['start_time']);
+        $this->assertNull($alphaActivity['schedules'][0]['end_time']);
+        $this->assertSame(1, $alphaActivity['metrics']['present_count']);
+        $this->assertSame(1, $alphaActivity['metrics']['late_count']);
+        $this->assertSame(0, $alphaActivity['metrics']['absent_count']);
+        $this->assertSame('100.00', $alphaActivity['metrics']['attendance_rate']);
+        $this->assertSame(1, $alphaActivity['metrics']['verification']['verified']);
+        $this->assertSame(1, $alphaActivity['metrics']['verification']['manual']);
+
+        $betaActivity = $activities->firstWhere('id', $activityBeta->id_aktivitas);
+        $this->assertSame('Kelas Tambahan', $betaActivity['name']);
+        $this->assertSame(2, $betaActivity['participant_count']);
+        $this->assertSame('2024-01-04', $betaActivity['schedules'][0]['date']);
+        $this->assertSame(1, $betaActivity['metrics']['present_count']);
+        $this->assertSame(0, $betaActivity['metrics']['late_count']);
+        $this->assertSame(1, $betaActivity['metrics']['absent_count']);
+        $this->assertSame('50.00', $betaActivity['metrics']['attendance_rate']);
+        $this->assertSame(1, $betaActivity['metrics']['verification']['pending']);
+        $this->assertSame(1, $betaActivity['metrics']['verification']['rejected']);
+
+        $gammaActivity = $activities->firstWhere('id', $activityOther->id_aktivitas);
+        $this->assertSame('Sesi Khusus', $gammaActivity['name']);
+        $this->assertSame('Kelompok Gamma', $gammaActivity['group']['name']);
+        $this->assertSame(1, $gammaActivity['participant_count']);
+        $this->assertSame('2024-01-05', $gammaActivity['schedules'][0]['date']);
+        $this->assertSame('100.00', $gammaActivity['metrics']['attendance_rate']);
+        $this->assertArrayNotHasKey('notes', $gammaActivity);
+
+        $pagination = $payload['pagination'];
+        $this->assertSame(3, $pagination['total']);
+        $this->assertSame(15, $pagination['per_page']);
+        $this->assertSame(1, $pagination['current_page']);
+        $this->assertSame(1, $pagination['last_page']);
+        $this->assertSame(1, $pagination['from']);
+        $this->assertSame(3, $pagination['to']);
+
         $this->assertNotEmpty($payload['notes']);
         $this->assertTrue(collect($payload['notes'])->contains(fn ($note) => str_contains($note, 'Beberapa aktivitas')));
+        $this->assertFalse(collect($payload['notes'])->contains(fn ($note) => str_contains($note, 'belum memiliki absensi')));
         $this->assertNotNull($payload['generated_at']);
+    }
+
+    public function test_it_supports_activity_filters_and_pagination(): void
+    {
+        $user = User::create([
+            'username' => 'admin-cabang-filter',
+            'email' => 'admin-filter@example.com',
+            'password' => bcrypt('secret'),
+            'level' => 'admin_cabang',
+        ]);
+
+        $kacab = Kacab::create([
+            'nama_kacab' => 'Cabang Filter',
+            'status' => 'aktif',
+        ]);
+
+        AdminCabang::create([
+            'user_id' => $user->id_users,
+            'id_kacab' => $kacab->id_kacab,
+            'nama_lengkap' => 'Admin Cabang Filter',
+        ]);
+
+        $wilbin = Wilbin::create([
+            'id_kacab' => $kacab->id_kacab,
+            'nama_wilbin' => 'Wilbin Filter',
+        ]);
+
+        $shelter = Shelter::create([
+            'id_wilbin' => $wilbin->id_wilbin,
+            'nama_shelter' => 'Shelter Filter',
+        ]);
+
+        $group = Kelompok::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => 'Kelompok Filter',
+            'jumlah_anggota' => 20,
+            'kelas_gabungan' => ['Filter'],
+        ]);
+
+        $studentOne = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $group->id_kelompok,
+            'full_name' => 'Student One',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $studentTwo = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $group->id_kelompok,
+            'full_name' => 'Student Two',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $studentThree = Anak::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $group->id_kelompok,
+            'full_name' => 'Student Three',
+            'status_validasi' => 'aktif',
+        ]);
+
+        $activityA = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => $group->nama_kelompok,
+            'jenis_kegiatan' => 'Sesi Matematika',
+            'materi' => 'Aljabar',
+            'tanggal' => '2024-01-02',
+            'start_time' => '08:00:00',
+            'end_time' => '10:00:00',
+        ]);
+
+        $activityB = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => $group->nama_kelompok,
+            'jenis_kegiatan' => 'Sesi Bahasa',
+            'materi' => 'Gramatika',
+            'tanggal' => '2024-01-03',
+            'start_time' => '09:00:00',
+            'end_time' => '11:00:00',
+        ]);
+
+        $activityC = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => $group->nama_kelompok,
+            'jenis_kegiatan' => 'Sesi Sains',
+            'materi' => 'Fisika',
+            'tanggal' => '2024-01-04',
+            'start_time' => '07:30:00',
+            'end_time' => '09:30:00',
+        ]);
+
+        $activityD = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => $group->nama_kelompok,
+            'jenis_kegiatan' => 'Sesi Seni',
+            'materi' => 'Melukis',
+            'tanggal' => '2024-01-05',
+            'start_time' => '13:00:00',
+            'end_time' => '15:00:00',
+        ]);
+
+        $attendanceRecords = [
+            [$studentOne, $activityA, Absen::TEXT_YA, Absen::VERIFICATION_VERIFIED],
+            [$studentTwo, $activityA, Absen::TEXT_TERLAMBAT, Absen::VERIFICATION_MANUAL],
+            [$studentOne, $activityB, Absen::TEXT_TIDAK, Absen::VERIFICATION_REJECTED],
+            [$studentThree, $activityB, Absen::TEXT_YA, Absen::VERIFICATION_PENDING],
+            [$studentTwo, $activityC, Absen::TEXT_YA, Absen::VERIFICATION_VERIFIED],
+        ];
+
+        foreach ($attendanceRecords as [$student, $activity, $status, $verification]) {
+            $absenUser = AbsenUser::create(['id_anak' => $student->id_anak]);
+
+            Absen::create([
+                'id_absen_user' => $absenUser->id_absen_user,
+                'id_aktivitas' => $activity->id_aktivitas,
+                'absen' => $status,
+                'verification_status' => $verification,
+            ]);
+        }
+
+        Sanctum::actingAs($user, ['*']);
+
+        $baseUrl = sprintf('/api/admin-cabang/laporan/attendance/weekly/shelters/%d', $shelter->id_shelter);
+
+        $responsePage1 = $this->getJson($baseUrl . '?week=2024-W01&per_page=2&page=1');
+        $responsePage1->assertOk();
+
+        $page1Data = $responsePage1->json('data');
+        $this->assertCount(2, $page1Data['activities']);
+        $this->assertSame(4, $page1Data['pagination']['total']);
+        $this->assertSame(2, $page1Data['pagination']['per_page']);
+        $this->assertSame(1, $page1Data['pagination']['current_page']);
+        $this->assertSame(2, $page1Data['pagination']['last_page']);
+        $this->assertSame($activityA->id_aktivitas, $page1Data['activities'][0]['id']);
+        $this->assertSame($activityB->id_aktivitas, $page1Data['activities'][1]['id']);
+
+        $responsePage2 = $this->getJson($baseUrl . '?week=2024-W01&per_page=2&page=2');
+        $responsePage2->assertOk();
+
+        $page2Data = $responsePage2->json('data');
+        $this->assertCount(2, $page2Data['activities']);
+        $this->assertSame(2, $page2Data['pagination']['current_page']);
+        $this->assertSame($activityC->id_aktivitas, $page2Data['activities'][0]['id']);
+        $this->assertSame($activityD->id_aktivitas, $page2Data['activities'][1]['id']);
+
+        $responseSearch = $this->getJson($baseUrl . '?week=2024-W01&search=Sains');
+        $responseSearch->assertOk();
+
+        $searchData = $responseSearch->json('data');
+        $this->assertCount(1, $searchData['activities']);
+        $this->assertSame($activityC->id_aktivitas, $searchData['activities'][0]['id']);
+        $this->assertSame('Sesi Sains', $searchData['activities'][0]['name']);
+        $this->assertSame(1, $searchData['pagination']['total']);
+        $this->assertSame('Sains', $searchData['filters']['search']);
+
+        $responseSchedule = $this->getJson($baseUrl . '?week=2024-W01&schedule_date=2024-01-03');
+        $responseSchedule->assertOk();
+
+        $scheduleData = $responseSchedule->json('data');
+        $this->assertCount(1, $scheduleData['activities']);
+        $this->assertSame($activityB->id_aktivitas, $scheduleData['activities'][0]['id']);
+        $this->assertSame('2024-01-03', $scheduleData['activities'][0]['schedules'][0]['date']);
+        $this->assertSame('2024-01-03', $scheduleData['filters']['schedule_date']);
+
+        $responseById = $this->getJson($baseUrl . '?week=2024-W01&activity_id=' . $activityD->id_aktivitas);
+        $responseById->assertOk();
+
+        $byIdData = $responseById->json('data');
+        $this->assertCount(1, $byIdData['activities']);
+        $this->assertSame($activityD->id_aktivitas, $byIdData['activities'][0]['id']);
+        $this->assertSame(0, $byIdData['activities'][0]['participant_count']);
+        $this->assertSame(0, $byIdData['activities'][0]['metrics']['present_count']);
+        $this->assertSame(0, $byIdData['activities'][0]['metrics']['late_count']);
+        $this->assertSame(0, $byIdData['activities'][0]['metrics']['absent_count']);
+        $this->assertSame('0.00', $byIdData['activities'][0]['metrics']['attendance_rate']);
+        $this->assertNotEmpty($byIdData['activities'][0]['notes']);
+        $this->assertSame($activityD->id_aktivitas, $byIdData['filters']['activity_id']);
+        $this->assertTrue(collect($byIdData['notes'])->contains(fn ($note) => str_contains($note, 'belum memiliki absensi')));
     }
 
     public function test_it_denies_access_to_foreign_shelter(): void
