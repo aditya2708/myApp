@@ -8,6 +8,7 @@ import React, {
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
@@ -21,10 +22,12 @@ import AttendanceTrendChart from '../../../components/reports/attendance/Attenda
 import ShelterAttendanceCard from '../../../components/reports/attendance/ShelterAttendanceCard';
 import WeeklyAttendanceFilterSheet from '../../../components/reports/attendance/WeeklyAttendanceFilterSheet';
 import WeeklySummaryCard from '../../../components/reports/attendance/WeeklySummaryCard';
+import WeeklyActivityList from '../../../components/reports/attendance/WeeklyActivityList';
 
 import useAttendanceSummary from '../../../hooks/reports/attendance/useAttendanceSummary';
 import useAttendanceTrend from '../../../hooks/reports/attendance/useAttendanceTrend';
 import useWeeklyAttendanceDashboard from '../../../hooks/reports/attendance/useWeeklyAttendanceDashboard';
+import useWeeklyAttendanceShelter from '../../../hooks/reports/attendance/useWeeklyAttendanceShelter';
 
 const MONTH_NAMES_ID = [
   'Januari',
@@ -107,6 +110,9 @@ const AdminCabangAttendanceWeeklyScreen = () => {
   const [isCustomRange, setIsCustomRange] = useState(false);
   const [hasGeneratedReport, setHasGeneratedReport] = useState(false);
   const [autoFetchEnabled, setAutoFetchEnabled] = useState(false);
+  const [selectedShelterForActivities, setSelectedShelterForActivities] = useState(null);
+  const [isActivitiesModalVisible, setActivitiesModalVisible] = useState(false);
+  const [isModalRefreshing, setModalRefreshing] = useState(false);
 
   const updateDateRange = useCallback((nextStart, nextEnd) => {
     setStartDate((prev) => (prev === nextStart ? prev : nextStart));
@@ -137,6 +143,25 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     autoSelectFirstWeek: false,
   });
   const { data: trendData, isLoading: isTrendLoading } = useAttendanceTrend();
+
+  const {
+    shelter: modalShelterInfo,
+    activities: modalActivities,
+    activitiesPagination: modalActivitiesPagination,
+    periodLabel: modalPeriodLabel,
+    isLoading: isModalLoading,
+    isLoadingActivities: isModalActivitiesLoading,
+    isFetchingMoreActivities: isModalFetchingMore,
+    fetchNextActivities: fetchModalNextActivities,
+    refresh: refreshModalActivities,
+    error: modalError,
+  } = useWeeklyAttendanceShelter({
+    shelterId: selectedShelterForActivities?.id,
+    startDate,
+    endDate,
+    weekId: selectedWeek?.id ?? null,
+    autoFetch: isActivitiesModalVisible && !!selectedShelterForActivities?.id,
+  });
 
   const handleSelectWeek = useCallback(
     (weekId) => {
@@ -449,6 +474,146 @@ const AdminCabangAttendanceWeeklyScreen = () => {
     ]
   );
 
+  const handleOpenActivitiesModal = useCallback((shelter) => {
+    if (!shelter) {
+      return;
+    }
+
+    setSelectedShelterForActivities(shelter);
+    setActivitiesModalVisible(true);
+  }, []);
+
+  const handleCloseActivitiesModal = useCallback(() => {
+    setActivitiesModalVisible(false);
+    setSelectedShelterForActivities(null);
+    setModalRefreshing(false);
+  }, []);
+
+  const handleActivityPress = useCallback(
+    (activity) => {
+      if (!activity || !activity.groupId) {
+        return;
+      }
+
+      const periodStart = selectedWeek?.dates?.start || startDate;
+      const periodEnd = selectedWeek?.dates?.end || endDate;
+      const label =
+        selectedWeek?.dates?.label ||
+        selectedWeek?.label ||
+        formatRangeLabel(startDate, endDate) ||
+        null;
+
+      handleCloseActivitiesModal();
+
+      navigation.navigate('AdminCabangAttendanceGroup', {
+        groupId: activity.groupId,
+        groupName: activity.groupName || activity.name,
+        groupMentor: activity.groupMentor ?? activity.tutor ?? null,
+        membersCount: activity.participantsCount ?? null,
+        summary: activity.summary,
+        shelterId: selectedShelterForActivities?.id || null,
+        shelterName: selectedShelterForActivities?.name || null,
+        startDate: periodStart,
+        endDate: periodEnd,
+        periodLabel: label,
+      });
+    },
+    [
+      endDate,
+      formatRangeLabel,
+      handleCloseActivitiesModal,
+      navigation,
+      selectedShelterForActivities?.id,
+      selectedShelterForActivities?.name,
+      selectedWeek?.dates?.end,
+      selectedWeek?.dates?.label,
+      selectedWeek?.dates?.start,
+      selectedWeek?.label,
+      startDate,
+    ],
+  );
+
+  const handleModalRefresh = useCallback(async () => {
+    try {
+      setModalRefreshing(true);
+      await refreshModalActivities();
+    } catch (error) {
+      // noop: handled by hook
+    } finally {
+      setModalRefreshing(false);
+    }
+  }, [refreshModalActivities]);
+
+  const modalShelterName = useMemo(() => {
+    return (
+      modalShelterInfo?.name || selectedShelterForActivities?.name || 'Aktivitas Shelter'
+    );
+  }, [modalShelterInfo?.name, selectedShelterForActivities?.name]);
+
+  const modalWilbinLabel = useMemo(() => {
+    const source = modalShelterInfo?.wilbin ?? selectedShelterForActivities?.wilbin;
+
+    if (!source) {
+      return null;
+    }
+
+    if (typeof source === 'string') {
+      return source;
+    }
+
+    return source.name || source.label || source.title || null;
+  }, [modalShelterInfo?.wilbin, selectedShelterForActivities?.wilbin]);
+
+  const modalPeriodLabelText = useMemo(() => {
+    return (
+      modalPeriodLabel ||
+      selectedWeek?.dates?.label ||
+      selectedWeek?.label ||
+      formatRangeLabel(startDate, endDate)
+    );
+  }, [modalPeriodLabel, formatRangeLabel, selectedWeek?.dates?.label, selectedWeek?.label, startDate, endDate]);
+
+  const modalIsInitialLoading = useMemo(() => {
+    return (isModalLoading || isModalActivitiesLoading) && modalActivities.length === 0;
+  }, [isModalActivitiesLoading, isModalLoading, modalActivities.length]);
+
+  const modalEmptyComponent = useMemo(() => {
+    if (modalIsInitialLoading) {
+      return (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color="#0984e3" />
+          <Text style={styles.emptyText}>Memuat aktivitas...</Text>
+        </View>
+      );
+    }
+
+    if (modalError) {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="alert-circle" size={28} color="#e74c3c" />
+          <Text style={styles.emptyTitle}>Gagal memuat aktivitas</Text>
+          <Text style={styles.emptyText}>{modalError}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={refreshModalActivities}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="refresh" size={16} color="#ffffff" />
+            <Text style={styles.retryLabel}>Coba Lagi</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="calendar-outline" size={32} color="#b2bec3" />
+        <Text style={styles.emptyTitle}>Belum ada aktivitas</Text>
+        <Text style={styles.emptyText}>Aktivitas belum tersedia untuk shelter ini.</Text>
+      </View>
+    );
+  }, [modalError, modalIsInitialLoading, refreshModalActivities]);
+
   const filteredShelters = useMemo(() => {
     const list = Array.isArray(shelters) ? shelters : [];
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -504,13 +669,24 @@ const AdminCabangAttendanceWeeklyScreen = () => {
 
   const renderShelterItem = useCallback(
     ({ item }) => (
-      <ShelterAttendanceCard
-        shelter={item}
-        band={getAttendanceBand(item.attendanceRate)}
-        onPress={handleShelterPress}
-      />
+      <View style={styles.shelterItemContainer}>
+        <ShelterAttendanceCard
+          shelter={item}
+          band={getAttendanceBand(item.attendanceRate)}
+          onPress={handleShelterPress}
+        />
+        <TouchableOpacity
+          style={styles.viewActivitiesButton}
+          onPress={() => handleOpenActivitiesModal(item)}
+          accessibilityRole="button"
+          activeOpacity={0.85}
+        >
+          <Ionicons name="calendar-outline" size={16} color="#0984e3" />
+          <Text style={styles.viewActivitiesButtonText}>Lihat Aktivitas</Text>
+        </TouchableOpacity>
+      </View>
     ),
-    [handleShelterPress]
+    [handleOpenActivitiesModal, handleShelterPress]
   );
 
   const renderEmptyState = useCallback(() => {
@@ -920,6 +1096,51 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         }
       />
 
+      <Modal
+        visible={isActivitiesModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseActivitiesModal}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTextGroup}>
+                <Text style={styles.modalTitle}>{modalShelterName}</Text>
+                {modalWilbinLabel ? <Text style={styles.modalSubtitle}>{modalWilbinLabel}</Text> : null}
+                {modalPeriodLabelText ? (
+                  <Text style={styles.modalPeriodText}>{modalPeriodLabelText}</Text>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={handleCloseActivitiesModal}
+                accessibilityRole="button"
+              >
+                <Ionicons name="close" size={22} color="#2d3436" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalListWrapper}>
+              <WeeklyActivityList
+                activities={modalActivities}
+                onActivityPress={handleActivityPress}
+                onLoadMore={fetchModalNextActivities}
+                isLoading={modalIsInitialLoading}
+                isFetchingMore={isModalFetchingMore}
+                pagination={modalActivitiesPagination}
+                ListEmptyComponent={modalEmptyComponent}
+                refreshing={isModalRefreshing}
+                onRefresh={handleModalRefresh}
+                contentContainerStyle={
+                  modalActivities.length ? styles.modalListContent : styles.modalEmptyListContent
+                }
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <WeeklyAttendanceFilterSheet
         visible={isFilterVisible}
         onClose={closeFilterSheet}
@@ -953,6 +1174,31 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
+  shelterItemContainer: {
+    marginBottom: 8,
+  },
+  viewActivitiesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  viewActivitiesButtonText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0984e3',
+  },
   headerContent: {
     marginBottom: 16,
   },
@@ -981,6 +1227,63 @@ const styles = StyleSheet.create({
     height: 180,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+    maxHeight: '85%',
+    width: '100%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  modalHeaderTextGroup: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2d3436',
+  },
+  modalSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#636e72',
+  },
+  modalPeriodText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#0984e3',
+    fontWeight: '600',
+  },
+  modalCloseButton: {
+    padding: 6,
+    borderRadius: 18,
+    backgroundColor: 'rgba(9, 132, 227, 0.08)',
+  },
+  modalListWrapper: {
+    marginTop: 20,
+    flexGrow: 1,
+    flex: 1,
+  },
+  modalListContent: {
+    paddingBottom: 24,
+  },
+  modalEmptyListContent: {
+    paddingBottom: 24,
+    flexGrow: 1,
   },
   emptyContainer: {
     alignItems: 'center',

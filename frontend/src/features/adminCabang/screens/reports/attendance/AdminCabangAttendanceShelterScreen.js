@@ -3,23 +3,24 @@ import React, {
   useLayoutEffect,
   useMemo,
   useState,
+  useEffect,
 } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
-  RefreshControl,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import ShelterSummaryCard from '../../../components/reports/attendance/ShelterSummaryCard';
-import ShelterGroupCard from '../../../components/reports/attendance/ShelterGroupCard';
+import WeeklyActivityList from '../../../components/reports/attendance/WeeklyActivityList';
 import useWeeklyAttendanceShelter from '../../../hooks/reports/attendance/useWeeklyAttendanceShelter';
 
 const formatNumber = (value) => {
@@ -100,22 +101,65 @@ const AdminCabangAttendanceShelterScreen = () => {
 
   const [refreshing, setRefreshing] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [activitySearch, setActivitySearch] = useState('');
+  const [scheduleDateFilter, setScheduleDateFilter] = useState(null);
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
 
   const {
     shelter: shelterData,
     summary,
     selectedWeek,
-    groups,
+    activities,
+    activitiesPagination,
+    activityFilters,
     periodLabel,
     isLoading,
+    isLoadingActivities,
+    isFetchingMoreActivities,
     error,
     refresh,
+    fetchNextActivities,
+    applyActivityFilters,
   } = useWeeklyAttendanceShelter({
     shelterId,
     startDate,
     endDate,
     weekId,
   });
+
+  useEffect(() => {
+    if (typeof activityFilters?.search === 'string' && activityFilters.search !== activitySearch) {
+      setActivitySearch(activityFilters.search);
+    }
+  }, [activityFilters?.search, activitySearch]);
+
+  useEffect(() => {
+    const filterValue = activityFilters?.scheduleDate ?? null;
+
+    if (!filterValue) {
+      if (scheduleDateFilter) {
+        setScheduleDateFilter(null);
+      }
+      return;
+    }
+
+    const parsed = new Date(filterValue);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return;
+    }
+
+    if (!scheduleDateFilter) {
+      setScheduleDateFilter(parsed);
+      return;
+    }
+
+    const currentISO = scheduleDateFilter.toISOString().split('T')[0];
+
+    if (currentISO !== filterValue) {
+      setScheduleDateFilter(parsed);
+    }
+  }, [activityFilters?.scheduleDate, scheduleDateFilter]);
 
   const derivedShelter = useMemo(() => {
     const fallbackPeriodLabel =
@@ -232,7 +276,7 @@ const AdminCabangAttendanceShelterScreen = () => {
               summaryData.attendanceRate ?? selectedWeek?.attendanceRate,
             )}`
           : null,
-        `Jumlah Kelompok: ${groups.length}`,
+        `Jumlah Aktivitas: ${activities.length}`,
       ].filter(Boolean);
 
       if (!messageLines.length) {
@@ -246,9 +290,9 @@ const AdminCabangAttendanceShelterScreen = () => {
       setIsSharing(false);
     }
   }, [
+    activities.length,
     derivedShelter,
     error,
-    groups.length,
     isLoading,
     resolvedPeriodLabel,
     selectedWeek?.attendanceRate,
@@ -297,9 +341,9 @@ const AdminCabangAttendanceShelterScreen = () => {
     navigation,
   ]);
 
-  const handleGroupPress = useCallback(
-    (group) => {
-      if (!group) {
+  const handleActivityPress = useCallback(
+    (activity) => {
+      if (!activity || !activity.groupId) {
         return;
       }
 
@@ -312,16 +356,18 @@ const AdminCabangAttendanceShelterScreen = () => {
         initialPeriodLabel;
 
       navigation.navigate('AdminCabangAttendanceGroup', {
-        groupId: group?.id,
-        groupName: group?.name,
-        groupMentor: group?.mentor,
-        membersCount: group?.membersCount,
-        summary: group?.summary,
+        groupId: activity.groupId,
+        groupName: activity.groupName || activity.name,
+        groupMentor: activity.groupMentor ?? activity.tutor ?? null,
+        membersCount: activity.participantsCount ?? null,
+        summary: activity.summary,
         shelterId: derivedShelter?.id || shelterId,
         shelterName: derivedShelter?.name || shelterName,
         startDate: periodStart,
         endDate: periodEnd,
         periodLabel: label,
+        activityId: activity.id,
+        activityName: activity.name,
       });
     },
     [
@@ -337,9 +383,73 @@ const AdminCabangAttendanceShelterScreen = () => {
     ]
   );
 
-  const renderGroupItem = useCallback(
-    ({ item }) => <ShelterGroupCard group={item} onPress={() => handleGroupPress(item)} />, [handleGroupPress]
+  const handleSearchSubmit = useCallback(() => {
+    applyActivityFilters({
+      search: activitySearch,
+      scheduleDate: scheduleDateFilter,
+    }).catch(() => {});
+  }, [activitySearch, applyActivityFilters, scheduleDateFilter]);
+
+  const handleClearSearch = useCallback(() => {
+    if (!activitySearch) {
+      return;
+    }
+
+    setActivitySearch('');
+    applyActivityFilters({
+      search: '',
+      scheduleDate: scheduleDateFilter,
+    }).catch(() => {});
+  }, [activitySearch, applyActivityFilters, scheduleDateFilter]);
+
+  const handleScheduleDatePress = useCallback(() => {
+    setDatePickerVisible(true);
+  }, []);
+
+  const handleScheduleDateChange = useCallback(
+    (event, selectedDate) => {
+      setDatePickerVisible(false);
+
+      if (event?.type === 'dismissed' || !selectedDate) {
+        return;
+      }
+
+      setScheduleDateFilter(selectedDate);
+      applyActivityFilters({
+        search: activitySearch,
+        scheduleDate: selectedDate,
+      }).catch(() => {});
+    },
+    [activitySearch, applyActivityFilters],
   );
+
+  const handleResetScheduleDate = useCallback(() => {
+    setScheduleDateFilter(null);
+    applyActivityFilters({
+      search: activitySearch,
+      scheduleDate: null,
+    }).catch(() => {});
+  }, [activitySearch, applyActivityFilters]);
+
+  const scheduleDateLabel = useMemo(() => {
+    if (!scheduleDateFilter) {
+      return 'Tanggal jadwal';
+    }
+
+    try {
+      return new Intl.DateTimeFormat('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }).format(scheduleDateFilter);
+    } catch (err) {
+      return scheduleDateFilter.toISOString().split('T')[0];
+    }
+  }, [scheduleDateFilter]);
+
+  const isInitialLoading = useMemo(() => {
+    return (isLoading || isLoadingActivities) && activities.length === 0;
+  }, [activities.length, isLoading, isLoadingActivities]);
 
   const listHeader = useMemo(() => {
     return (
@@ -352,26 +462,92 @@ const AdminCabangAttendanceShelterScreen = () => {
           error={error}
           onRetry={refresh}
         />
-        <Text style={styles.sectionTitle}>Rincian Kelompok</Text>
+
+        <View style={styles.filtersContainer}>
+          <View style={styles.searchInputWrapper}>
+            <Ionicons name="search" size={18} color="#636e72" style={styles.searchIcon} />
+            <TextInput
+              value={activitySearch}
+              onChangeText={setActivitySearch}
+              onSubmitEditing={handleSearchSubmit}
+              placeholder="Cari aktivitas atau tutor"
+              placeholderTextColor="#b2bec3"
+              autoCorrect={false}
+              style={styles.searchInput}
+              returnKeyType="search"
+            />
+            {activitySearch ? (
+              <TouchableOpacity
+                onPress={handleClearSearch}
+                style={styles.clearButton}
+                accessibilityRole="button"
+                activeOpacity={0.85}
+              >
+                <Ionicons name="close-circle" size={18} color="#b2bec3" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={handleSearchSubmit}
+                style={styles.clearButton}
+                accessibilityRole="button"
+                activeOpacity={0.85}
+              >
+                <Ionicons name="search" size={18} color="#0984e3" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={handleScheduleDatePress}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+            >
+              <Ionicons name="calendar-outline" size={16} color="#0984e3" />
+              <Text style={styles.filterText}>{scheduleDateFilter ? scheduleDateLabel : 'Tanggal jadwal'}</Text>
+            </TouchableOpacity>
+            {scheduleDateFilter ? (
+              <TouchableOpacity
+                style={styles.resetFilterButton}
+                onPress={handleResetScheduleDate}
+                accessibilityRole="button"
+                activeOpacity={0.85}
+              >
+                <Ionicons name="close-circle" size={16} color="#e74c3c" />
+                <Text style={styles.resetFilterText}>Hapus</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Daftar Aktivitas</Text>
       </View>
     );
   }, [
+    activitySearch,
     derivedShelter,
     error,
+    handleClearSearch,
+    handleResetScheduleDate,
+    handleScheduleDatePress,
+    handleSearchSubmit,
     isLoading,
     refresh,
     resolvedPeriodLabel,
+    scheduleDateFilter,
+    scheduleDateLabel,
     selectedWeek?.summary,
     summary?.summary,
     shelterData,
   ]);
 
-  const listEmptyComponent = useMemo(() => {
-    if (isLoading) {
+  const activityEmptyComponent = useMemo(() => {
+    if (isInitialLoading) {
       return (
         <View style={styles.emptyState}>
           <ActivityIndicator color="#0984e3" />
-          <Text style={styles.emptyText}>Memuat data kelompok...</Text>
+          <Text style={styles.emptyText}>Memuat aktivitas...</Text>
         </View>
       );
     }
@@ -380,13 +556,9 @@ const AdminCabangAttendanceShelterScreen = () => {
       return (
         <View style={styles.emptyState}>
           <Ionicons name="alert-circle" size={28} color="#e74c3c" />
-          <Text style={styles.emptyTitle}>Gagal memuat data kelompok</Text>
+          <Text style={styles.emptyTitle}>Gagal memuat aktivitas</Text>
           <Text style={styles.emptyText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={refresh}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={styles.retryButton} onPress={refresh} activeOpacity={0.85}>
             <Ionicons name="refresh" size={16} color="#ffffff" />
             <Text style={styles.retryLabel}>Coba Lagi</Text>
           </TouchableOpacity>
@@ -396,30 +568,39 @@ const AdminCabangAttendanceShelterScreen = () => {
 
     return (
       <View style={styles.emptyState}>
-        <Ionicons name="people-circle-outline" size={32} color="#b2bec3" />
-        <Text style={styles.emptyTitle}>Belum ada data kelompok</Text>
-        <Text style={styles.emptyText}>Kelompok binaan belum memiliki catatan kehadiran pada periode ini.</Text>
+        <Ionicons name="calendar-outline" size={32} color="#b2bec3" />
+        <Text style={styles.emptyTitle}>Belum ada aktivitas</Text>
+        <Text style={styles.emptyText}>
+          Aktivitas belum tersedia untuk filter atau periode ini.
+        </Text>
       </View>
     );
-  }, [error, isLoading, refresh]);
+  }, [error, isInitialLoading, refresh]);
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={groups}
-        keyExtractor={(item, index) => item?.id?.toString() || item?.name || `group-${index}`}
-        renderItem={renderGroupItem}
+      <WeeklyActivityList
+        activities={activities}
+        onActivityPress={handleActivityPress}
+        onLoadMore={fetchNextActivities}
+        isLoading={isInitialLoading}
+        isFetchingMore={isFetchingMoreActivities}
+        pagination={activitiesPagination}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmptyComponent}
-        contentContainerStyle={groups.length ? styles.listContent : styles.emptyListContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={["#0984e3"]}
-          />
-        }
+        ListEmptyComponent={activityEmptyComponent}
+        contentContainerStyle={activities.length ? styles.listContent : styles.emptyListContent}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
       />
+
+      {isDatePickerVisible ? (
+        <DateTimePicker
+          value={scheduleDateFilter ?? new Date()}
+          mode="date"
+          display="calendar"
+          onChange={handleScheduleDateChange}
+        />
+      ) : null}
     </View>
   );
 };
@@ -440,6 +621,59 @@ const styles = StyleSheet.create({
   },
   listHeader: {
     marginBottom: 20,
+  },
+  filtersContainer: {
+    marginTop: 24,
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f2f6',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2d3436',
+    paddingVertical: 4,
+  },
+  clearButton: {
+    marginLeft: 8,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dfe6e9',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterText: {
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2d3436',
+  },
+  resetFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  resetFilterText: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#e74c3c',
   },
   sectionTitle: {
     marginTop: 24,
