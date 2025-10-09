@@ -5,6 +5,18 @@ const firstDefined = (...values) => {
   return values.find((value) => value !== undefined && value !== null && value !== '');
 };
 
+const ensureArray = (value) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  return [value];
+};
+
 const normalizeWeeklyAttendanceParams = (params = {}) => {
   const normalized = {};
 
@@ -42,8 +54,66 @@ const normalizeWeeklyAttendanceParams = (params = {}) => {
   assignIfDefined('include_summary', params.include_summary, params.includeSummary);
   assignIfDefined('sort_by', params.sort_by, params.sortBy);
   assignIfDefined('sort_direction', params.sort_direction, params.sortDirection, params.order);
+  assignIfDefined('schedule_date', params.schedule_date, params.scheduleDate);
 
   return normalized;
+};
+
+const adaptAttendanceActivitiesResponse = (response) => {
+  const rawPayload = response?.data ?? response ?? {};
+  const dataPayload = rawPayload?.data ?? rawPayload ?? {};
+
+  const activitiesSource =
+    dataPayload?.activities ??
+    dataPayload?.activity_list ??
+    dataPayload?.activityList ??
+    rawPayload?.activities ??
+    rawPayload?.activity_list ??
+    rawPayload?.activityList ??
+    null;
+
+  if (!activitiesSource) {
+    return response;
+  }
+
+  const activities = ensureArray(
+    activitiesSource?.data ??
+      activitiesSource?.items ??
+      activitiesSource?.list ??
+      activitiesSource?.records ??
+      activitiesSource,
+  ).filter(Boolean);
+
+  const pagination =
+    activitiesSource?.pagination ??
+    activitiesSource?.meta ??
+    activitiesSource?.paging ??
+    activitiesSource?.pageInfo ??
+    activitiesSource?.page_info ??
+    dataPayload?.pagination ??
+    rawPayload?.pagination ??
+    dataPayload?.meta ??
+    rawPayload?.meta ??
+    null;
+
+  const adaptedData = {
+    ...dataPayload,
+    activities,
+    activitiesPagination: pagination ?? dataPayload?.activitiesPagination ?? rawPayload?.activitiesPagination,
+  };
+
+  if (adaptedData.pagination === undefined && pagination !== undefined) {
+    adaptedData.pagination = pagination;
+  }
+
+  if (response?.data) {
+    return {
+      ...response,
+      data: adaptedData,
+    };
+  }
+
+  return adaptedData;
 };
 
 const {
@@ -102,9 +172,11 @@ export const adminCabangReportApi = {
 
     const normalizedParams = normalizeWeeklyAttendanceParams({ shelterId, ...params });
 
-    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.SHELTER_DETAIL(shelterId), {
-      params: normalizedParams,
-    });
+    return api
+      .get(WEEKLY_ATTENDANCE_ENDPOINTS.SHELTER_DETAIL(shelterId), {
+        params: normalizedParams,
+      })
+      .then(adaptAttendanceActivitiesResponse);
   },
 
   async getWeeklyAttendanceGroupStudents(groupId, params = {}) {
@@ -114,9 +186,11 @@ export const adminCabangReportApi = {
 
     const normalizedParams = normalizeWeeklyAttendanceParams({ groupId, ...params });
 
-    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.GROUP_STUDENTS(groupId), {
-      params: normalizedParams,
-    });
+    return api
+      .get(WEEKLY_ATTENDANCE_ENDPOINTS.GROUP_STUDENTS(groupId), {
+        params: normalizedParams,
+      })
+      .then(adaptAttendanceActivitiesResponse);
   },
 
   async getAttendanceMonthlyShelter(params = {}) {

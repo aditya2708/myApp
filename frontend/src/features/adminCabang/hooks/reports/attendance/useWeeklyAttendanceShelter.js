@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { adminCabangReportApi } from '../../../api/adminCabangReportApi';
 
+const DEFAULT_ACTIVITY_PAGE_SIZE = 10;
+
 const ensureArray = (value) => {
   if (Array.isArray(value)) {
     return value;
@@ -12,6 +14,40 @@ const ensureArray = (value) => {
   }
 
   return [value];
+};
+
+const normalizeDateInput = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return null;
+    }
+
+    return value.toISOString().split('T')[0];
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().split('T')[0];
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -242,6 +278,144 @@ const normalizeGroup = (item, index = 0) => {
   };
 };
 
+const normalizeScheduleEntry = (entry) => {
+  if (!entry) {
+    return null;
+  }
+
+  if (typeof entry === 'string') {
+    const trimmed = entry.trim();
+
+    return trimmed || null;
+  }
+
+  const day =
+    entry?.day ??
+    entry?.day_name ??
+    entry?.dayName ??
+    entry?.weekday ??
+    entry?.hari ??
+    entry?.label ??
+    entry?.name ??
+    null;
+
+  const start =
+    entry?.time ??
+    entry?.start_time ??
+    entry?.startTime ??
+    entry?.start ??
+    entry?.jam_mulai ??
+    entry?.begin ??
+    null;
+
+  const end =
+    entry?.end_time ??
+    entry?.endTime ??
+    entry?.end ??
+    entry?.jam_selesai ??
+    entry?.finish ??
+    null;
+
+  if (day && start && end) {
+    return `${day} ${start} - ${end}`;
+  }
+
+  if (day && start) {
+    return `${day} ${start}`;
+  }
+
+  if (day && end) {
+    return `${day} ${end}`;
+  }
+
+  if (start && end) {
+    return `${start} - ${end}`;
+  }
+
+  return day || start || end || null;
+};
+
+const normalizeActivity = (item, index = 0) => {
+  if (!item) {
+    return null;
+  }
+
+  const summaryPayload = item?.summary ?? item?.metrics ?? item;
+  const summary = normalizeSummary(summaryPayload);
+  const schedule = ensureArray(
+    item?.schedule ??
+      item?.schedules ??
+      item?.timeSlots ??
+      item?.time_slots ??
+      item?.schedule_list ??
+      item?.scheduleItems ??
+      item?.schedule_items ??
+      item?.jadwal ??
+      summaryPayload?.schedule ??
+      summaryPayload?.schedules ??
+      [],
+  )
+    .map((entry) => normalizeScheduleEntry(entry))
+    .filter(Boolean);
+
+  const participantsCandidate =
+    item?.participantsCount ??
+    item?.participants_count ??
+    item?.participants ??
+    item?.totalParticipants ??
+    item?.total_participants ??
+    item?.totalChildren ??
+    item?.total_children ??
+    summaryPayload?.participantsCount ??
+    summaryPayload?.participants_count ??
+    null;
+
+  const participantsCount =
+    participantsCandidate === null || participantsCandidate === undefined
+      ? null
+      : toNumber(participantsCandidate, null);
+
+  const groupPayload = item?.group ?? item?.kelompok ?? {};
+
+  return {
+    id:
+      item?.id ??
+      item?.activityId ??
+      item?.activity_id ??
+      item?.kode_aktivitas ??
+      item?.code ??
+      `activity-${index + 1}`,
+    name: item?.name ?? item?.activityName ?? item?.activity_name ?? 'Aktivitas',
+    tutor:
+      item?.tutor ??
+      item?.mentor ??
+      item?.coach ??
+      item?.pengajar ??
+      item?.teacher ??
+      item?.fasilitator ??
+      groupPayload?.mentor ??
+      null,
+    schedule,
+    participantsCount,
+    summary: summary.summary,
+    attendanceRate:
+      clampPercentage(
+        item?.attendanceRate ??
+          item?.attendance_rate ??
+          item?.percentage ??
+          summary.attendanceRate,
+      ) ?? null,
+    groupId: item?.groupId ?? item?.group_id ?? groupPayload?.id ?? null,
+    groupName:
+      item?.groupName ??
+      item?.group_name ??
+      groupPayload?.name ??
+      groupPayload?.title ??
+      null,
+    groupMentor: groupPayload?.mentor ?? groupPayload?.tutor ?? groupPayload?.coach ?? null,
+  };
+};
+
 const normalizeWeek = (item, index = 0) => {
   if (!item) {
     return null;
@@ -320,6 +494,56 @@ const normalizeShelterInfo = (payload = {}, fallbackId = null) => {
   };
 };
 
+const normalizePagination = (
+  payload = {},
+  pageSize = DEFAULT_ACTIVITY_PAGE_SIZE,
+  listLength = 0,
+) => {
+  const perPage = toNumber(
+    payload?.per_page ?? payload?.perPage ?? payload?.limit ?? payload?.pageSize ?? payload?.per,
+    pageSize,
+  );
+  const currentPage = toNumber(
+    payload?.current_page ?? payload?.currentPage ?? payload?.page ?? payload?.index,
+    1,
+  );
+  const totalItems = toNumber(
+    payload?.total ?? payload?.total_items ?? payload?.totalItems ?? payload?.total_records ?? payload?.count,
+    listLength,
+  );
+  const totalPagesCandidate =
+    payload?.total_pages ??
+    payload?.totalPages ??
+    payload?.last_page ??
+    payload?.lastPage ??
+    (perPage > 0 ? Math.ceil(totalItems / perPage) : 1);
+  const totalPages = toNumber(totalPagesCandidate, 1) || 1;
+
+  const hasNextPage = (() => {
+    if (payload?.hasNextPage !== undefined) {
+      return Boolean(payload?.hasNextPage);
+    }
+
+    if (payload?.next_page_url !== undefined) {
+      return payload?.next_page_url !== null;
+    }
+
+    if (payload?.nextPage !== undefined) {
+      return Boolean(payload?.nextPage);
+    }
+
+    return currentPage < totalPages;
+  })();
+
+  return {
+    page: currentPage,
+    perPage,
+    totalItems,
+    totalPages,
+    hasNextPage,
+  };
+};
+
 const useWeeklyAttendanceShelter = ({
   shelterId,
   startDate = null,
@@ -333,19 +557,64 @@ const useWeeklyAttendanceShelter = ({
     summary: null,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [isFetchingMoreActivities, setIsFetchingMoreActivities] = useState(false);
   const [error, setError] = useState(null);
   const [selectedWeekId, setSelectedWeekId] = useState(initialWeekId);
+  const [activities, setActivities] = useState([]);
+  const [activitiesPagination, setActivitiesPagination] = useState({
+    page: 1,
+    perPage: DEFAULT_ACTIVITY_PAGE_SIZE,
+    totalItems: 0,
+    totalPages: 1,
+    hasNextPage: false,
+  });
+  const [activityFilters, setActivityFilters] = useState({
+    search: '',
+    scheduleDate: null,
+    perPage: DEFAULT_ACTIVITY_PAGE_SIZE,
+  });
 
   const selectedWeekRef = useRef(initialWeekId);
+  const activitiesRef = useRef(activities);
+  const activitiesPaginationRef = useRef(activitiesPagination);
+  const activityFiltersRef = useRef(activityFilters);
 
   useEffect(() => {
     selectedWeekRef.current = selectedWeekId;
   }, [selectedWeekId]);
 
+  useEffect(() => {
+    activitiesRef.current = activities;
+  }, [activities]);
+
+  useEffect(() => {
+    activitiesPaginationRef.current = activitiesPagination;
+  }, [activitiesPagination]);
+
+  useEffect(() => {
+    activityFiltersRef.current = activityFilters;
+  }, [activityFilters]);
+
   const buildParams = useCallback(
-    ({ week } = {}) => {
+    ({ week, page = 1, perPage = DEFAULT_ACTIVITY_PAGE_SIZE, filtersOverride } = {}) => {
       const params = {};
       const resolvedWeek = week !== undefined ? week : selectedWeekRef.current;
+
+      if (page !== undefined && page !== null) {
+        params.page = page;
+      }
+
+      const combinedFilters = { ...activityFiltersRef.current, ...(filtersOverride || {}) };
+      const effectivePerPage = toNumber(
+        combinedFilters?.perPage ?? combinedFilters?.per_page ?? perPage,
+        perPage,
+      );
+
+      if (effectivePerPage !== undefined && effectivePerPage !== null) {
+        params.per_page = effectivePerPage;
+        params.perPage = effectivePerPage;
+      }
 
       if (resolvedWeek) {
         params.week_id = resolvedWeek;
@@ -362,25 +631,57 @@ const useWeeklyAttendanceShelter = ({
         params.endDate = endDate;
       }
 
+      const searchValue =
+        combinedFilters?.search ?? combinedFilters?.keyword ?? combinedFilters?.q ?? '';
+
+      if (searchValue) {
+        const trimmed = searchValue.toString().trim();
+
+        if (trimmed) {
+          params.search = trimmed;
+          params.keyword = trimmed;
+          params.q = trimmed;
+        }
+      }
+
+      const scheduleDateValue =
+        combinedFilters?.scheduleDate ?? combinedFilters?.schedule_date ?? null;
+      const normalizedScheduleDate = normalizeDateInput(scheduleDateValue);
+
+      if (normalizedScheduleDate) {
+        params.schedule_date = normalizedScheduleDate;
+        params.scheduleDate = normalizedScheduleDate;
+      }
+
       return params;
     },
     [endDate, startDate],
   );
 
   const fetchData = useCallback(
-    async ({ weekId } = {}) => {
-      if (!autoFetch || !shelterId) {
-        if (!shelterId) {
-          setError('Shelter ID wajib diisi.');
-        }
-
+    async ({ weekId, page = 1, append = false, filtersOverride } = {}) => {
+      if (!shelterId) {
+        setError('Shelter ID wajib diisi.');
         return null;
       }
 
-      const params = buildParams({ week: weekId });
+      const params = buildParams({
+        week: weekId,
+        page,
+        perPage: DEFAULT_ACTIVITY_PAGE_SIZE,
+        filtersOverride,
+      });
+
+      const previousLength = append ? activitiesRef.current.length : 0;
 
       try {
-        setIsLoading(true);
+        if (append) {
+          setIsFetchingMoreActivities(true);
+        } else {
+          setIsLoading(true);
+          setIsLoadingActivities(true);
+        }
+
         setError(null);
 
         const response = await adminCabangReportApi.getWeeklyAttendanceShelter(shelterId, params);
@@ -457,7 +758,7 @@ const useWeeklyAttendanceShelter = ({
         });
 
         if (weekId !== undefined) {
-          selectedWeekRef.current = weekId;
+          selectedWeekRef.current = weekId || null;
           setSelectedWeekId(weekId || null);
         } else if (!selectedWeekRef.current && weeks.length) {
           const defaultWeekId = weeks[0]?.id ?? null;
@@ -465,21 +766,92 @@ const useWeeklyAttendanceShelter = ({
           setSelectedWeekId(defaultWeekId);
         }
 
-        return { shelter: shelterInfo, weeks };
+        const activitiesPayload =
+          payload?.activities ??
+          payload?.data?.activities ??
+          payload?.activity_list ??
+          payload?.activityList ??
+          [];
+
+        const normalizedActivities = ensureArray(activitiesPayload)
+          .map((item, index) => normalizeActivity(item, index))
+          .filter(Boolean);
+
+        setActivities((prev) => {
+          const base = append ? prev : [];
+          const merged = [...base, ...normalizedActivities];
+          const unique = [];
+          const seen = new Set();
+
+          merged.forEach((activity, activityIndex) => {
+            const key =
+              activity?.id !== undefined && activity?.id !== null
+                ? String(activity.id)
+                : `${activity?.name || 'activity'}-${activityIndex}`;
+
+            if (key && seen.has(key)) {
+              return;
+            }
+
+            if (key) {
+              seen.add(key);
+            }
+
+            unique.push(activity);
+          });
+
+          return unique;
+        });
+
+        const paginationPayload =
+          payload?.activitiesPagination ??
+          payload?.data?.activitiesPagination ??
+          payload?.pagination ??
+          payload?.meta ??
+          {};
+
+        const resolvedPerPage = toNumber(
+          params?.per_page ?? params?.perPage ?? activityFiltersRef.current?.perPage,
+          DEFAULT_ACTIVITY_PAGE_SIZE,
+        );
+
+        const normalizedPagination = normalizePagination(
+          paginationPayload,
+          resolvedPerPage,
+          append ? previousLength + normalizedActivities.length : normalizedActivities.length,
+        );
+
+        setActivitiesPagination(normalizedPagination);
+
+        return {
+          shelter: shelterInfo,
+          weeks,
+          activities: normalizedActivities,
+          pagination: normalizedPagination,
+        };
       } catch (err) {
         const message = err?.message || 'Gagal memuat detail kehadiran shelter.';
         setError(message);
         throw err;
       } finally {
-        setIsLoading(false);
+        if (append) {
+          setIsFetchingMoreActivities(false);
+        } else {
+          setIsLoading(false);
+          setIsLoadingActivities(false);
+        }
       }
     },
-    [autoFetch, buildParams, shelterId],
+    [buildParams, shelterId],
   );
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!autoFetch) {
+      return;
+    }
+
+    fetchData({ weekId: initialWeekId ?? selectedWeekRef.current ?? null }).catch(() => {});
+  }, [autoFetch, fetchData, initialWeekId]);
 
   const refresh = useCallback(async () => {
     return fetchData({ weekId: selectedWeekRef.current });
@@ -519,6 +891,52 @@ const useWeeklyAttendanceShelter = ({
     state.shelter?.period?.label,
   ]);
 
+  const fetchNextActivities = useCallback(() => {
+    const pagination = activitiesPaginationRef.current || {};
+    const currentPage = pagination.page || 1;
+
+    if (!pagination.hasNextPage || isFetchingMoreActivities) {
+      return;
+    }
+
+    fetchData({
+      weekId: selectedWeekRef.current,
+      page: currentPage + 1,
+      append: true,
+    }).catch(() => {});
+  }, [fetchData, isFetchingMoreActivities]);
+
+  const applyActivityFilters = useCallback(
+    (filters = {}) => {
+      const searchValue =
+        filters.search ?? filters.keyword ?? filters.q ?? activityFiltersRef.current?.search ?? '';
+      const normalizedSearch = searchValue ? searchValue.toString().trim() : '';
+      const scheduleInput =
+        filters.scheduleDate ?? filters.schedule_date ?? filters.date ?? activityFiltersRef.current?.scheduleDate ?? null;
+      const normalizedSchedule = normalizeDateInput(scheduleInput);
+      const perPageCandidate = toNumber(
+        filters.perPage ?? filters.per_page ?? activityFiltersRef.current?.perPage,
+        DEFAULT_ACTIVITY_PAGE_SIZE,
+      );
+
+      const nextFilters = {
+        search: normalizedSearch,
+        scheduleDate: normalizedSchedule,
+        perPage: perPageCandidate,
+      };
+
+      setActivityFilters(nextFilters);
+
+      return fetchData({
+        weekId: filters.weekId ?? filters.week_id ?? selectedWeekRef.current,
+        page: 1,
+        append: false,
+        filtersOverride: nextFilters,
+      });
+    },
+    [fetchData],
+  );
+
   return {
     shelter: state.shelter,
     weeks,
@@ -526,11 +944,18 @@ const useWeeklyAttendanceShelter = ({
     selectedWeek,
     selectedWeekId,
     groups,
+    activities,
+    activitiesPagination,
+    activityFilters,
     periodLabel,
     isLoading,
+    isLoadingActivities,
+    isFetchingMoreActivities,
     error,
     refresh,
     selectWeek,
+    fetchNextActivities,
+    applyActivityFilters,
   };
 };
 
