@@ -122,6 +122,17 @@ const formatDateTimeLabel = (timestamp) => {
 };
 
 const normalizeStatus = (value, label) => {
+  if (value && typeof value === 'object') {
+    const code = value?.code ?? value?.status ?? value?.value ?? null;
+    const fallback = code ? STATUS_MAP[code.toString().trim().toUpperCase()] : null;
+    return {
+      status: code ?? fallback?.status ?? null,
+      label: value?.label ?? label ?? fallback?.label ?? code ?? 'Tidak diketahui',
+      icon: value?.icon ?? fallback?.icon ?? 'help-circle',
+      color: value?.color ?? fallback?.color ?? '#b2bec3',
+    };
+  }
+
   if (!value) {
     return {
       status: null,
@@ -156,6 +167,7 @@ const normalizeStudent = (item, index = 0, page = 1) => {
     item?.kode_status;
 
   const statusLabel =
+    (typeof item?.status === 'object' ? item?.status?.label : null) ??
     item?.statusLabel ??
     item?.status_label ??
     item?.attendanceStatusLabel ??
@@ -165,7 +177,9 @@ const normalizeStudent = (item, index = 0, page = 1) => {
 
   const statusMeta = normalizeStatus(statusValue, statusLabel);
 
-  const timestamp =
+  const arrivalTimestamp =
+    item?.arrival_time ??
+    item?.arrivalTime ??
     item?.timestamp ??
     item?.time ??
     item?.attendanceTime ??
@@ -173,6 +187,11 @@ const normalizeStudent = (item, index = 0, page = 1) => {
     item?.checkedInAt ??
     item?.checked_in_at ??
     item?.waktu ??
+    null;
+
+  const arrivalLabel =
+    item?.arrival_time_label ??
+    item?.arrivalTimeLabel ??
     null;
 
   const fallbackId = `student-${page}-${index + 1}`;
@@ -215,9 +234,22 @@ const normalizeStudent = (item, index = 0, page = 1) => {
     statusLabel: statusMeta.label,
     statusIcon: statusMeta.icon,
     statusColor: statusMeta.color,
-    timeLabel: formatTimeLabel(timestamp),
-    timestampLabel: formatDateTimeLabel(timestamp),
-    note: item?.note ?? item?.catatan ?? item?.remark ?? null,
+    timeLabel:
+      arrivalLabel ??
+      formatTimeLabel(arrivalTimestamp) ??
+      formatTimeLabel(item?.status?.timestamp ?? item?.status?.time),
+    timestampLabel:
+      formatDateTimeLabel(arrivalTimestamp) ??
+      item?.arrival_time_label ??
+      formatDateTimeLabel(item?.status?.timestamp ?? item?.status?.time),
+    note:
+      item?.notes ??
+      item?.note ??
+      item?.catatan ??
+      item?.remark ??
+      item?.status?.notes ??
+      null,
+    activityDate: item?.activity_date ?? item?.activityDate ?? null,
   };
 };
 
@@ -408,13 +440,13 @@ const useWeeklyAttendanceGroupStudents = ({
 
         const response = await adminCabangReportApi.getWeeklyAttendanceGroupStudents(groupId, params);
         const payload = response?.data ?? response ?? {};
+        const dataRoot = payload?.data ?? payload ?? {};
 
         const listPayload =
-          payload?.data ??
-          payload?.items ??
-          payload?.records ??
-          payload?.list ??
-          payload?.students ??
+          dataRoot?.students ??
+          dataRoot?.items ??
+          dataRoot?.records ??
+          dataRoot?.list ??
           [];
 
         const normalizedStudents = ensureArray(listPayload).map((item, index) =>
@@ -423,11 +455,16 @@ const useWeeklyAttendanceGroupStudents = ({
 
         setStudents((prev) => (append ? [...prev, ...normalizedStudents] : normalizedStudents));
 
-        const summaryPayload = payload?.summary ?? payload?.overview ?? payload?.aggregates ?? {};
+        const summaryPayload =
+          dataRoot?.summary ?? dataRoot?.overview ?? dataRoot?.aggregates ?? payload?.summary ?? {};
         setSummary(normalizeSummary(summaryPayload));
 
-        const paginationPayload = payload?.pagination ?? payload?.meta ?? {};
-        const normalizedPagination = normalizePagination(paginationPayload, pageSize, normalizedStudents.length);
+        const paginationPayload = dataRoot?.pagination ?? dataRoot?.meta ?? payload?.pagination ?? payload?.meta ?? {};
+        const normalizedPagination = normalizePagination(
+          paginationPayload,
+          pageSize,
+          normalizedStudents.length,
+        );
         setPagination({ ...normalizedPagination, page });
         pageRef.current = page;
 
