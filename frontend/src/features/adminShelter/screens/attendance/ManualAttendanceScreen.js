@@ -37,7 +37,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const loading = useSelector(selectAttendanceLoading);
   const error = useSelector(selectAttendanceError);
   const duplicateError = useSelector(selectDuplicateError);
-  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedStudents, setSelectedStudents] = useState([]);
   const [notes, setNotes] = useState('');
   const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -213,17 +213,17 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     if (selectedTime) setArrivalTime(selectedTime);
   };
 
-  const requestGpsLocationForSubmit = async (attendanceData) => {
+  const requestGpsLocationForSubmit = async (attendanceRecords) => {
     // For Bimbel activities, GPS is always required if shelter has GPS config
     const isGpsRequired = activityDetails?.require_gps || (isBimbel && activityDetails);
 
     if (!isGpsRequired) {
       // GPS not required, proceed directly
-      return proceedWithSubmit(attendanceData, null);
+      return proceedWithSubmit(attendanceRecords, null);
     }
 
     // GPS required, show modal to get location
-    setPendingSubmitData(attendanceData);
+    setPendingSubmitData(attendanceRecords);
     setShowGpsModal(true);
   };
 
@@ -260,32 +260,44 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     Alert.alert('Kesalahan GPS', error);
   };
 
-  const proceedWithSubmit = async (attendanceData, gpsData) => submitStudentAttendance(attendanceData, gpsData);
+  const proceedWithSubmit = async (attendanceRecords, gpsData) => submitStudentAttendance(attendanceRecords, gpsData);
   
   const filteredStudents = students.filter(student => 
     (student.full_name || student.nick_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
   
-  const renderStudentItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.item, selectedStudent?.id_anak === item.id_anak && styles.selectedItem]}
-      onPress={() => setSelectedStudent(item)}
-      disabled={dateStatus !== 'valid'}
-    >
-      <View style={styles.avatar}>
-        <Ionicons name="person" size={24} color="#95a5a6" />
-      </View>
-      <View style={styles.info}>
-        <Text style={styles.name}>
-          {item.full_name || item.nick_name || `Siswa ${item.id_anak}`}
-        </Text>
-        {item.id_anak && <Text style={styles.id}>ID: {item.id_anak}</Text>}
-      </View>
-      {selectedStudent?.id_anak === item.id_anak && (
-        <Ionicons name="checkmark-circle" size={24} color="#3498db" />
-      )}
-    </TouchableOpacity>
-  );
+  const renderStudentItem = ({ item }) => {
+    const isSelected = selectedStudents.includes(item.id_anak);
+
+    const toggleSelection = () => {
+      setSelectedStudents(prev => (
+        prev.includes(item.id_anak)
+          ? prev.filter(id => id !== item.id_anak)
+          : [...prev, item.id_anak]
+      ));
+    };
+
+    return (
+      <TouchableOpacity
+        style={[styles.item, isSelected && styles.selectedItem]}
+        onPress={toggleSelection}
+        disabled={dateStatus !== 'valid'}
+      >
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={24} color="#95a5a6" />
+        </View>
+        <View style={styles.info}>
+          <Text style={styles.name}>
+            {item.full_name || item.nick_name || `Siswa ${item.id_anak}`}
+          </Text>
+          {item.id_anak && <Text style={styles.id}>ID: {item.id_anak}</Text>}
+        </View>
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={24} color="#3498db" />
+        )}
+      </TouchableOpacity>
+    );
+  };
   
   const handleSubmit = async () => {
     if (dateStatus === 'future') {
@@ -293,8 +305,8 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (!selectedStudent) {
-      Alert.alert('Error', 'Silakan pilih siswa');
+    if (!selectedStudents.length) {
+      Alert.alert('Error', 'Silakan pilih minimal satu siswa');
       return;
     }
 
@@ -305,14 +317,15 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
 
     const proceed = () => {
       const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
-      const attendanceData = {
-        id_anak: selectedStudent.id_anak,
+      const attendanceRecords = selectedStudents.map(id_anak => ({
+        id_anak,
         id_aktivitas,
         status: null,
         notes,
         arrival_time: formattedTime
-      };
-      requestGpsLocationForSubmit(attendanceData);
+      }));
+
+      requestGpsLocationForSubmit(attendanceRecords);
     };
 
     if (dateStatus === 'past') {
@@ -330,28 +343,75 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     proceed();
   };
   
-  const submitStudentAttendance = async (attendanceData, gpsData = null) => {
-    // Add GPS data to the attendance data if provided
-    if (gpsData) {
-      attendanceData.gps_data = gpsData;
+  const submitStudentAttendance = async (attendanceRecords, gpsData = null) => {
+    const recordsWithGps = attendanceRecords.map(record => (
+      gpsData ? { ...record, gps_data: gpsData } : record
+    ));
+
+    if (isConnected) {
+      const successful = [];
+      const duplicates = [];
+      const failures = [];
+
+      for (const record of recordsWithGps) {
+        try {
+          await dispatch(recordAttendanceManually(record)).unwrap();
+          successful.push(record.id_anak);
+        } catch (err) {
+          if (err?.isDuplicate) {
+            duplicates.push({ id: record.id_anak, message: err.message });
+          } else {
+            failures.push({ id: record.id_anak, message: err?.message });
+          }
+        }
+      }
+
+      if (successful.length && !duplicates.length && !failures.length) {
+        Alert.alert('Berhasil', `Kehadiran ${successful.length} siswa berhasil dicatat`, [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+        setSelectedStudents([]);
+        return;
+      }
+
+      const summaryMessages = [];
+      if (successful.length) {
+        summaryMessages.push(`${successful.length} siswa berhasil dicatat.`);
+      }
+      if (duplicates.length) {
+        summaryMessages.push(`${duplicates.length} catatan terdeteksi duplikat.`);
+      }
+      if (failures.length) {
+        summaryMessages.push(`${failures.length} siswa gagal dicatat.${failures.some(item => item.message) ? `\n${failures.map(item => `ID ${item.id}: ${item.message || 'Gagal mencatat kehadiran'}`).join('\n')}` : ''}`);
+      }
+
+      Alert.alert('Hasil Pencatatan', summaryMessages.join('\n')); 
+      if (!failures.length) {
+        setSelectedStudents(prev => prev.filter(id => !successful.includes(id)));
+      }
+      return;
     }
-    
-    try {
-      if (isConnected) {
-        await dispatch(recordAttendanceManually(attendanceData)).unwrap();
-        Alert.alert('Berhasil', 'Kehadiran siswa berhasil dicatat', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
-      } else {
-        const result = await OfflineSync.processAttendance(attendanceData, 'manual');
-        Alert.alert('Mode Offline', result.message || 'Disimpan untuk sinkronisasi saat online', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
+
+    let queuedCount = 0;
+    let errorCount = 0;
+    for (const record of recordsWithGps) {
+      try {
+        const result = await OfflineSync.processAttendance(record, 'manual');
+        if (result?.queued || result?.offline) {
+          queuedCount += 1;
+        }
+      } catch (err) {
+        errorCount += 1;
       }
-    } catch (err) {
-      if (!err.isDuplicate) {
-        Alert.alert('Error', err.message || 'Gagal mencatat kehadiran');
-      }
+    }
+
+    if (queuedCount && !errorCount) {
+      Alert.alert('Mode Offline', `Data kehadiran ${queuedCount} siswa disimpan untuk sinkronisasi saat online`, [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+      setSelectedStudents([]);
+    } else if (queuedCount || errorCount) {
+      Alert.alert('Mode Offline', `${queuedCount} catatan disimpan untuk sinkronisasi.${errorCount ? `\n${errorCount} catatan gagal diproses.` : ''}`);
     }
   };
   
