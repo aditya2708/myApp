@@ -23,6 +23,12 @@ import GroupAttendanceSummaryCard from '../../../components/reports/attendance/G
 import StudentAttendanceRow from '../../../components/reports/attendance/StudentAttendanceRow';
 import useWeeklyAttendanceGroupStudents from '../../../hooks/reports/attendance/useWeeklyAttendanceGroupStudents';
 
+const STATUS_CODE_TO_API_STATUS = {
+  H: 'present',
+  A: 'absent',
+  T: 'late',
+};
+
 const STATUS_OPTIONS = [
   { code: 'ALL', label: 'Semua', icon: 'layers-outline', color: '#0984e3' },
   { code: 'H', label: 'Hadir', icon: 'checkmark-circle', color: '#2ecc71' },
@@ -77,7 +83,10 @@ const AdminCabangAttendanceGroupScreen = () => {
     startDate,
     endDate,
     search: debouncedSearch,
-    status: statusFilter === 'ALL' ? null : statusFilter,
+    status:
+      statusFilter === 'ALL'
+        ? null
+        : STATUS_CODE_TO_API_STATUS[statusFilter] ?? statusFilter,
     pageSize: 20,
   });
 
