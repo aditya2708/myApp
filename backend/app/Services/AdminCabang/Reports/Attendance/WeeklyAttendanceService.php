@@ -178,6 +178,9 @@ class WeeklyAttendanceService
 
         $shelterSummaries = [];
 
+        $groupLookups = [];
+        $allActivities = [];
+
         $overall = [
             'present' => 0,
             'late' => 0,
@@ -198,10 +201,34 @@ class WeeklyAttendanceService
                 ->whereIn('id_shelter', $shelterIds)
                 ->get(['id_shelter', 'nama_shelter']);
 
+            if ($shelters->isNotEmpty()) {
+                $groups = Kelompok::query()
+                    ->whereIn('id_shelter', $shelterIds)
+                    ->with('levelAnakBinaan')
+                    ->get([
+                        'id_kelompok',
+                        'id_shelter',
+                        'nama_kelompok',
+                        'jumlah_anggota',
+                        'kelas_gabungan',
+                        'id_level_anak_binaan',
+                    ]);
+
+                foreach ($groups as $group) {
+                    $normalizedName = $this->normalizeGroupKey($group->nama_kelompok);
+
+                    $groupLookups[$group->id_shelter][$normalizedName] = [
+                        'name' => $group->nama_kelompok,
+                        'info' => $this->buildGroupDescription($group),
+                    ];
+                }
+            }
+
             foreach ($shelters as $shelter) {
                 $shelterSummaries[$shelter->id_shelter] = [
                     'id' => $shelter->id_shelter,
                     'name' => $shelter->nama_shelter,
+                    'activities' => [],
                     'metrics' => [
                         'present_count' => 0,
                         'late_count' => 0,
@@ -225,7 +252,7 @@ class WeeklyAttendanceService
             $activities = Aktivitas::query()
                 ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
                 ->whereIn('id_shelter', $shelterIds)
-                ->with(['absen.absenUser'])
+                ->with(['absen.absenUser', 'tutor'])
                 ->get();
 
             foreach ($activities as $activity) {
@@ -241,6 +268,16 @@ class WeeklyAttendanceService
                 $attendanceRecords = $activity->absen ?? collect();
                 $sessionCount = $attendanceRecords->count();
 
+                $presentCount = 0;
+                $lateCount = 0;
+                $absentCount = 0;
+                $verificationCounts = [
+                    'pending' => 0,
+                    'verified' => 0,
+                    'rejected' => 0,
+                    'manual' => 0,
+                ];
+
                 $shelterSummaries[$shelterId]['metrics']['total_sessions'] += $sessionCount;
                 $overall['total_sessions'] += $sessionCount;
 
@@ -250,12 +287,15 @@ class WeeklyAttendanceService
                     if ($status === strtolower(Absen::TEXT_YA)) {
                         $shelterSummaries[$shelterId]['metrics']['present_count']++;
                         $overall['present']++;
+                        $presentCount++;
                     } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
                         $shelterSummaries[$shelterId]['metrics']['late_count']++;
                         $overall['late']++;
+                        $lateCount++;
                     } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
                         $shelterSummaries[$shelterId]['metrics']['absent_count']++;
                         $overall['absent']++;
+                        $absentCount++;
                     }
 
                     $childId = $attendance->absenUser->id_anak ?? null;
@@ -267,7 +307,45 @@ class WeeklyAttendanceService
                     $verification = $this->normalizeVerificationStatus($attendance->verification_status ?? null);
                     $shelterSummaries[$shelterId]['metrics']['verification'][$verification]++;
                     $overall['verification'][$verification]++;
+                    $verificationCounts[$verification]++;
                 }
+
+                $attendanceRate = $sessionCount > 0
+                    ? (($presentCount + $lateCount) / $sessionCount) * 100
+                    : 0.0;
+
+                $normalizedGroupName = $this->normalizeGroupKey($activity->nama_kelompok ?? '');
+                $groupInfo = $groupLookups[$shelterId][$normalizedGroupName] ?? null;
+
+                $activityPayload = [
+                    'id' => $activity->id_aktivitas,
+                    'name' => $activity->jenis_kegiatan ?? null,
+                    'tutor' => $activity->tutor?->full_name ?? $activity->tutor?->nama ?? null,
+                    'group' => [
+                        'name' => $activity->nama_kelompok !== '' ? $activity->nama_kelompok : ($groupInfo['name'] ?? null),
+                        'info' => $groupInfo['info'] ?? null,
+                    ],
+                    'participant_count' => $sessionCount,
+                    'schedules' => [[
+                        'date' => $activity->tanggal ? $activity->tanggal->toDateString() : null,
+                        'start_time' => $activity->start_time ?? null,
+                        'end_time' => $activity->end_time ?? null,
+                    ]],
+                    'metrics' => [
+                        'present_count' => $presentCount,
+                        'late_count' => $lateCount,
+                        'absent_count' => $absentCount,
+                        'attendance_rate' => $attendanceRate,
+                        'verification' => $verificationCounts,
+                    ],
+                ];
+
+                $shelterSummaries[$shelterId]['activities'][] = $activityPayload;
+
+                $allActivities[] = $activityPayload + [
+                    'shelter_id' => $shelterSummaries[$shelterId]['id'],
+                    'shelter_name' => $shelterSummaries[$shelterId]['name'],
+                ];
             }
 
             foreach ($shelterSummaries as &$summary) {
@@ -294,6 +372,8 @@ class WeeklyAttendanceService
         $totalSessions = $overall['total_sessions'];
         $overallAttendanceCount = $overall['present'] + $overall['late'];
 
+        $activityCount = $overall['total_activities'];
+
         return [
             'filters' => [
                 'start_date' => $start->toDateString(),
@@ -302,7 +382,8 @@ class WeeklyAttendanceService
             ],
             'metadata' => [
                 'total_shelters' => count($shelterIds),
-                'total_activities' => $overall['total_activities'],
+                'total_activities' => $activityCount,
+                'activity_count' => $activityCount,
                 'total_sessions' => $totalSessions,
                 'present_count' => $overall['present'],
                 'late_count' => $overall['late'],
@@ -313,6 +394,11 @@ class WeeklyAttendanceService
                 'verification' => $overall['verification'],
             ],
             'shelters' => array_values($shelterSummaries),
+            'activities' => $allActivities,
+            'totals' => [
+                'sessions' => $totalSessions,
+                'activities' => $activityCount,
+            ],
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
     }
