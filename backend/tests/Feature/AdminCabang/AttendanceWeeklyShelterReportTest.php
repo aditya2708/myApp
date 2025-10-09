@@ -159,6 +159,11 @@ class AttendanceWeeklyShelterReportTest extends TestCase
             'tanggal' => '2024-01-10',
         ]);
 
+        $activityBetaNoAttendance = Aktivitas::create([
+            'id_shelter' => $shelterBeta->id_shelter,
+            'tanggal' => '2024-01-17',
+        ]);
+
         $attendanceUsers = [
             AbsenUser::create(['id_anak' => 201]),
             AbsenUser::create(['id_anak' => 202]),
@@ -218,7 +223,8 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         ], $payload['filters']['shelter_ids']);
 
         $this->assertSame(2, $payload['metadata']['total_shelters']);
-        $this->assertSame(2, $payload['metadata']['total_activities']);
+        $this->assertSame(3, $payload['metadata']['total_activities']);
+        $this->assertSame(3, $payload['metadata']['activity_count']);
         $this->assertSame(5, $payload['metadata']['total_sessions']);
         $this->assertSame(2, $payload['metadata']['present_count']);
         $this->assertSame(2, $payload['metadata']['late_count']);
@@ -245,6 +251,15 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         $this->assertSame(1, $alpha['metrics']['verification']['verified']);
         $this->assertSame(1, $alpha['metrics']['verification']['manual']);
         $this->assertSame(1, $alpha['metrics']['verification']['rejected']);
+        $this->assertCount(1, $alpha['activities']);
+        $alphaActivity = $alpha['activities'][0];
+        $this->assertSame($activityAlpha->id_aktivitas, $alphaActivity['id']);
+        $this->assertSame(3, $alphaActivity['participant_count']);
+        $this->assertSame('66.67', $alphaActivity['metrics']['attendance_rate']);
+        $this->assertSame(1, $alphaActivity['metrics']['present_count']);
+        $this->assertSame(1, $alphaActivity['metrics']['late_count']);
+        $this->assertSame(1, $alphaActivity['metrics']['absent_count']);
+        $this->assertCount(1, $alphaActivity['schedules']);
 
         $beta = $shelters->firstWhere('name', 'Shelter Beta');
         $this->assertSame(2, $beta['metrics']['total_sessions']);
@@ -255,7 +270,32 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         $this->assertSame('50.00', $beta['metrics']['late_rate']);
         $this->assertSame(2, $beta['metrics']['unique_children']);
         $this->assertSame(2, $beta['metrics']['verification']['pending']);
+        $this->assertCount(2, $beta['activities']);
+        $betaActivities = collect($beta['activities']);
+        $betaWithAttendance = $betaActivities->firstWhere('id', $activityBeta->id_aktivitas);
+        $this->assertSame(2, $betaWithAttendance['participant_count']);
+        $this->assertSame('100.00', $betaWithAttendance['metrics']['attendance_rate']);
+        $betaWithoutAttendance = $betaActivities->firstWhere('id', $activityBetaNoAttendance->id_aktivitas);
+        $this->assertNotNull($betaWithoutAttendance);
+        $this->assertSame(0, $betaWithoutAttendance['participant_count']);
+        $this->assertSame('0.00', $betaWithoutAttendance['metrics']['attendance_rate']);
+        $this->assertSame(0, $betaWithoutAttendance['metrics']['present_count']);
+        $this->assertSame(0, $betaWithoutAttendance['metrics']['late_count']);
+        $this->assertSame(0, $betaWithoutAttendance['metrics']['absent_count']);
+        $this->assertCount(1, $betaWithoutAttendance['schedules']);
+        $this->assertSame([], $betaWithoutAttendance['group']);
 
+        $activities = collect($payload['activities']);
+        $this->assertCount(3, $activities);
+        $emptyActivity = $activities->firstWhere('id', $activityBetaNoAttendance->id_aktivitas);
+        $this->assertSame($shelterBeta->id_shelter, $emptyActivity['shelter_id']);
+        $this->assertSame('Shelter Beta', $emptyActivity['shelter_name']);
+        $this->assertSame(0, $emptyActivity['participant_count']);
+        $this->assertSame('0.00', $emptyActivity['metrics']['attendance_rate']);
+        $this->assertSame([], $emptyActivity['group']);
+
+        $this->assertSame(5, $payload['totals']['sessions']);
+        $this->assertSame(3, $payload['totals']['activities']);
         $this->assertNotNull($payload['generated_at']);
     }
 
