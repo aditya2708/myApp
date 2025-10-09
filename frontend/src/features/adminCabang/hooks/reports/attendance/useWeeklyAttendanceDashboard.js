@@ -181,6 +181,12 @@ const normalizeSummary = (payload = {}) => {
       payload?.total_sessions ??
       payload?.total ??
       payload?.totals?.sessions ??
+      payload?.totals?.activities ??
+      payload?.totalActivities ??
+      payload?.total_activities ??
+      payload?.activities ??
+      payload?.activityCount ??
+      payload?.activity_count ??
       payload?.totalChildren ??
       payload?.total_children;
 
@@ -198,6 +204,34 @@ const normalizeSummary = (payload = {}) => {
     payload?.approvalStats ??
     {};
 
+  const totalActivities = (() => {
+    const activitiesCandidate =
+      payload?.totals?.activities ??
+      payload?.totalActivities ??
+      payload?.total_activities ??
+      payload?.activities ??
+      payload?.activityCount ??
+      payload?.activity_count ??
+      payload?.totalAktivitas ??
+      payload?.total_aktivitas;
+
+    if (activitiesCandidate !== undefined && activitiesCandidate !== null) {
+      return toNumber(activitiesCandidate, totalSessions);
+    }
+
+    const legacySessions =
+      payload?.totals?.sessions ??
+      payload?.sessions ??
+      payload?.totalSessions ??
+      payload?.total_sessions;
+
+    if (legacySessions !== undefined && legacySessions !== null) {
+      return toNumber(legacySessions, totalSessions);
+    }
+
+    return totalSessions;
+  })();
+
   return {
     attendanceRate:
       clampPercentage(
@@ -211,7 +245,15 @@ const normalizeSummary = (payload = {}) => {
     summary: buildBreakdown({ present: presentCount, late: lateCount, absent: absentCount }, totalSessions),
     verification: normalizeVerification(verificationPayload),
     totals: {
-      sessions: toNumber(payload?.totals?.sessions ?? payload?.sessions ?? totalSessions, totalSessions),
+      activities: totalActivities,
+      sessions: toNumber(
+        payload?.totals?.sessions ??
+          payload?.sessions ??
+          payload?.totalSessions ??
+          payload?.total_sessions ??
+          totalActivities,
+        totalActivities,
+      ),
     },
     dates: extractDateRange(payload),
   };
@@ -283,7 +325,8 @@ const normalizeShelter = (item, index = 0) => {
       ) ?? null,
     summary: summary.summary,
     verification: summary.verification,
-    totalSessions: summary.totals?.sessions ?? null,
+    totalActivities: summary.totals?.activities ?? summary.totals?.sessions ?? null,
+    totalSessions: summary.totals?.sessions ?? summary.totals?.activities ?? null,
     band: item?.band ?? item?.bandLabel ?? item?.band_label ?? null,
   };
 };

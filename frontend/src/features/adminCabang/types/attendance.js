@@ -16,7 +16,7 @@
  * @property {{ count: number|null, percentage: number|null }} summary.absent - Absent statistics.
  * @property {{ verified: number|null, pending: number|null, rejected: number|null }} verification -
  *   Verification breakdown for the selected period.
- * @property {{ sessions: number|null }} totals - Aggregated totals for the period.
+ * @property {{ activities: number|null, sessions: number|null }} totals - Aggregated totals for the period.
  * @property {{ start: string|null, end: string|null, label: string|null }} dates -
  *   Alias to the period date range to keep backwards compatibility with UI components.
  */
@@ -30,7 +30,8 @@
  * @property {number|null} attendanceRate - Attendance percentage used for banding.
  * @property {WeeklyAttendanceSummary['summary']} summary - Attendance breakdown for the shelter.
  * @property {WeeklyAttendanceSummary['verification']} verification - Verification breakdown.
- * @property {number|null} totalSessions - Total sessions counted within the period.
+ * @property {number|null} totalActivities - Total activities counted within the period.
+ * @property {number|null} totalSessions - Legacy alias for the total number of activities.
  * @property {string|null} band - Server provided band label, if supplied.
  */
 

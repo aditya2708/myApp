@@ -75,6 +75,7 @@ const WeeklySummaryCard = ({
     const summaryBreakdown = summary.summary || {};
     const verification = summary.verification || {};
     const totals = summary.totals || {};
+    const totalActivities = totals.activities ?? totals.sessions ?? 0;
 
     return (
       <>
@@ -155,9 +156,9 @@ const WeeklySummaryCard = ({
 
         <View style={styles.footerRow}>
           <View style={styles.footerItem}>
-            <Ionicons name="people" size={18} color="#0984e3" />
-            <Text style={styles.footerLabel}>Total Sesi</Text>
-            <Text style={styles.footerValue}>{(totals.sessions || 0).toLocaleString('id-ID')}</Text>
+            <Ionicons name="stats-chart" size={18} color="#0984e3" />
+            <Text style={styles.footerLabel}>Total Aktivitas</Text>
+            <Text style={styles.footerValue}>{totalActivities.toLocaleString('id-ID')}</Text>
           </View>
           <View style={styles.footerItem}>
             <Ionicons name="checkmark-circle" size={18} color="#2ecc71" />
