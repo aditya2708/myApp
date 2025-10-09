@@ -108,8 +108,14 @@ const normalizeSummary = (payload = {}) => {
       payload?.totalSessions ??
       payload?.total_sessions ??
       payload?.total ??
+      payload?.totals?.activities ??
       payload?.totalChildren ??
       payload?.total_children ??
+      payload?.totalActivities ??
+      payload?.total_activities ??
+      payload?.activities ??
+      payload?.activityCount ??
+      payload?.activity_count ??
       payload?.totals?.sessions;
 
     if (explicitTotal !== undefined && explicitTotal !== null) {
@@ -121,6 +127,34 @@ const normalizeSummary = (payload = {}) => {
 
   const verificationPayload =
     payload?.verification ?? payload?.verifications ?? payload?.approval ?? payload?.approvalStats ?? {};
+
+  const totalActivities = (() => {
+    const activitiesCandidate =
+      payload?.totals?.activities ??
+      payload?.totalActivities ??
+      payload?.total_activities ??
+      payload?.activities ??
+      payload?.activityCount ??
+      payload?.activity_count ??
+      payload?.totalAktivitas ??
+      payload?.total_aktivitas;
+
+    if (activitiesCandidate !== undefined && activitiesCandidate !== null) {
+      return toNumber(activitiesCandidate, totalSessions);
+    }
+
+    const legacySessions =
+      payload?.totals?.sessions ??
+      payload?.sessions ??
+      payload?.totalSessions ??
+      payload?.total_sessions;
+
+    if (legacySessions !== undefined && legacySessions !== null) {
+      return toNumber(legacySessions, totalSessions);
+    }
+
+    return totalSessions;
+  })();
 
   return {
     attendanceRate:
@@ -161,7 +195,15 @@ const normalizeSummary = (payload = {}) => {
       ),
     },
     totals: {
-      sessions: toNumber(payload?.totals?.sessions ?? payload?.sessions ?? totalSessions, totalSessions),
+      activities: totalActivities,
+      sessions: toNumber(
+        payload?.totals?.sessions ??
+          payload?.sessions ??
+          payload?.totalSessions ??
+          payload?.total_sessions ??
+          totalActivities,
+        totalActivities,
+      ),
     },
     dates: extractDateRange(payload),
   };

@@ -9,7 +9,7 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
     return null;
   }
 
-  const { name, wilbin, attendanceRate, summary, totalSessions } = shelter;
+  const { name, wilbin, attendanceRate, summary, totalActivities, totalSessions } = shelter;
   const safeSummary = summary || {};
   const presentCount = safeSummary.present?.count ?? 0;
   const presentPercentage = safeSummary.present?.percentage ?? 0;
@@ -19,6 +19,7 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
   const absentPercentage = safeSummary.absent?.percentage ?? 0;
   const badgeColor = band?.color || '#0984e3';
   const badgeBackground = band?.backgroundColor || 'rgba(9, 132, 227, 0.12)';
+  const totalActivitiesCount = totalActivities ?? totalSessions ?? 0;
 
   return (
     <TouchableOpacity
@@ -77,9 +78,9 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
 
       <View style={styles.footerRow}>
         <View style={styles.footerItem}>
-          <Ionicons name="layers-outline" size={16} color="#0984e3" />
-          <Text style={styles.footerLabel}>Total Sesi</Text>
-          <Text style={styles.footerValue}>{(totalSessions || 0).toLocaleString('id-ID')}</Text>
+          <Ionicons name="stats-chart" size={16} color="#0984e3" />
+          <Text style={styles.footerLabel}>Total Aktivitas</Text>
+          <Text style={styles.footerValue}>{totalActivitiesCount.toLocaleString('id-ID')}</Text>
         </View>
         <View style={styles.footerItem}>
           <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
