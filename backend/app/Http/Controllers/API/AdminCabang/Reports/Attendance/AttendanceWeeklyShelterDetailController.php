@@ -43,6 +43,11 @@ class AttendanceWeeklyShelterDetailController extends Controller
             'week' => ['nullable', 'string', 'regex:/^\d{4}-W\d{2}$/'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string'],
+            'activity_id' => ['nullable', 'integer', 'min:1'],
+            'schedule_date' => ['nullable', 'date'],
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -106,6 +111,11 @@ class AttendanceWeeklyShelterDetailController extends Controller
                     'start_date' => $validated['start_date'] ?? null,
                     'end_date' => $validated['end_date'] ?? null,
                 ],
+                'page' => isset($validated['page']) ? (int) $validated['page'] : null,
+                'per_page' => isset($validated['per_page']) ? (int) $validated['per_page'] : null,
+                'search' => $validated['search'] ?? null,
+                'activity_id' => isset($validated['activity_id']) ? (int) $validated['activity_id'] : null,
+                'schedule_date' => $validated['schedule_date'] ?? null,
             ]
         );
 
