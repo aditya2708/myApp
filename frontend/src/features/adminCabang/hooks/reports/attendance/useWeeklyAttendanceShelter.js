@@ -344,16 +344,74 @@ const useWeeklyAttendanceShelter = ({
         const response = await adminCabangReportApi.getWeeklyAttendanceShelter(shelterId, params);
         const payload = response?.data ?? response ?? {};
 
-        const weeks = ensureArray(payload?.weeks ?? payload?.data?.weeks ?? payload?.periods ?? [])
-          .map((item, index) => normalizeWeek(item, index))
-          .filter(Boolean);
+        const weeksPayload = ensureArray(
+          payload?.weeks ?? payload?.data?.weeks ?? payload?.periods ?? [],
+        );
+
+        let weeks = weeksPayload.map((item, index) => normalizeWeek(item, index)).filter(Boolean);
 
         const shelterInfo = normalizeShelterInfo(payload?.shelter ?? payload?.data?.shelter ?? {}, shelterId);
+
+        let summaryForState = shelterInfo.summary;
+
+        if (!weeks.length) {
+          const dataRoot = payload?.data ?? payload ?? {};
+
+          const fallbackGroups = ensureArray(
+            dataRoot?.groups ??
+              dataRoot?.group_list ??
+              dataRoot?.kelompok ??
+              payload?.groups ??
+              payload?.group_list ??
+              payload?.kelompok ??
+              [],
+          ).filter(Boolean);
+
+          if (fallbackGroups.length) {
+            const summaryPayload =
+              dataRoot?.summary ??
+              dataRoot?.metrics ??
+              payload?.summary ??
+              payload?.metrics ??
+              shelterInfo.summary ??
+              {};
+
+            const periodPayload =
+              dataRoot?.period ??
+              dataRoot?.periode ??
+              dataRoot?.currentPeriod ??
+              dataRoot?.current_period ??
+              dataRoot?.periodInfo ??
+              dataRoot?.period_info ??
+              dataRoot?.dateRange ??
+              dataRoot?.date_range ??
+              payload?.period ??
+              payload?.periode ??
+              payload?.currentPeriod ??
+              payload?.current_period ??
+              payload?.dateRange ??
+              payload?.date_range ??
+              {};
+
+            const fallbackWeekPayload = {
+              ...periodPayload,
+              summary: summaryPayload,
+              groups: fallbackGroups,
+            };
+
+            const fallbackWeek = normalizeWeek(fallbackWeekPayload, 0);
+
+            if (fallbackWeek) {
+              weeks = [fallbackWeek];
+              summaryForState = fallbackWeek;
+            }
+          }
+        }
 
         setState({
           shelter: shelterInfo,
           weeks,
-          summary: shelterInfo.summary,
+          summary: summaryForState,
         });
 
         if (weekId !== undefined) {
