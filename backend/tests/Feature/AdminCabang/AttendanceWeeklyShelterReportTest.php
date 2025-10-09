@@ -8,6 +8,7 @@ use App\Models\AdminCabang;
 use App\Models\Aktivitas;
 use App\Models\Kacab;
 use App\Models\Shelter;
+use App\Models\Tutor;
 use App\Models\User;
 use App\Models\Wilbin;
 use Illuminate\Database\Schema\Blueprint;
@@ -31,6 +32,7 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('tutor');
         Schema::dropIfExists('shelter');
         Schema::dropIfExists('wilbin');
         Schema::dropIfExists('admin_cabang');
@@ -75,9 +77,17 @@ class AttendanceWeeklyShelterReportTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('tutor', function (Blueprint $table) {
+            $table->id('id_tutor');
+            $table->unsignedBigInteger('id_shelter')->nullable();
+            $table->string('nama');
+            $table->timestamps();
+        });
+
         Schema::create('aktivitas', function (Blueprint $table) {
             $table->id('id_aktivitas');
             $table->unsignedBigInteger('id_shelter');
+            $table->unsignedBigInteger('id_tutor')->nullable();
             $table->date('tanggal');
             $table->timestamps();
         });
@@ -105,6 +115,7 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('tutor');
         Schema::dropIfExists('shelter');
         Schema::dropIfExists('wilbin');
         Schema::dropIfExists('admin_cabang');
@@ -149,18 +160,31 @@ class AttendanceWeeklyShelterReportTest extends TestCase
             'nama_shelter' => 'Shelter Beta',
         ]);
 
+        $tutorAlpha = Tutor::create([
+            'id_shelter' => $shelterAlpha->id_shelter,
+            'nama' => 'Tutor Alpha',
+        ]);
+
+        $tutorBeta = Tutor::create([
+            'id_shelter' => $shelterBeta->id_shelter,
+            'nama' => 'Tutor Beta',
+        ]);
+
         $activityAlpha = Aktivitas::create([
             'id_shelter' => $shelterAlpha->id_shelter,
+            'id_tutor' => $tutorAlpha->id_tutor,
             'tanggal' => '2024-01-03',
         ]);
 
         $activityBeta = Aktivitas::create([
             'id_shelter' => $shelterBeta->id_shelter,
+            'id_tutor' => $tutorBeta->id_tutor,
             'tanggal' => '2024-01-10',
         ]);
 
         $activityBetaNoAttendance = Aktivitas::create([
             'id_shelter' => $shelterBeta->id_shelter,
+            'id_tutor' => $tutorBeta->id_tutor,
             'tanggal' => '2024-01-17',
         ]);
 
@@ -254,6 +278,7 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         $this->assertCount(1, $alpha['activities']);
         $alphaActivity = $alpha['activities'][0];
         $this->assertSame($activityAlpha->id_aktivitas, $alphaActivity['id']);
+        $this->assertSame('Tutor Alpha', $alphaActivity['tutor']);
         $this->assertSame(3, $alphaActivity['participant_count']);
         $this->assertSame('66.67', $alphaActivity['metrics']['attendance_rate']);
         $this->assertSame(1, $alphaActivity['metrics']['present_count']);
@@ -273,10 +298,12 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         $this->assertCount(2, $beta['activities']);
         $betaActivities = collect($beta['activities']);
         $betaWithAttendance = $betaActivities->firstWhere('id', $activityBeta->id_aktivitas);
+        $this->assertSame('Tutor Beta', $betaWithAttendance['tutor']);
         $this->assertSame(2, $betaWithAttendance['participant_count']);
         $this->assertSame('100.00', $betaWithAttendance['metrics']['attendance_rate']);
         $betaWithoutAttendance = $betaActivities->firstWhere('id', $activityBetaNoAttendance->id_aktivitas);
         $this->assertNotNull($betaWithoutAttendance);
+        $this->assertSame('Tutor Beta', $betaWithoutAttendance['tutor']);
         $this->assertSame(0, $betaWithoutAttendance['participant_count']);
         $this->assertSame('0.00', $betaWithoutAttendance['metrics']['attendance_rate']);
         $this->assertSame(0, $betaWithoutAttendance['metrics']['present_count']);
@@ -290,6 +317,7 @@ class AttendanceWeeklyShelterReportTest extends TestCase
         $emptyActivity = $activities->firstWhere('id', $activityBetaNoAttendance->id_aktivitas);
         $this->assertSame($shelterBeta->id_shelter, $emptyActivity['shelter_id']);
         $this->assertSame('Shelter Beta', $emptyActivity['shelter_name']);
+        $this->assertSame('Tutor Beta', $emptyActivity['tutor']);
         $this->assertSame(0, $emptyActivity['participant_count']);
         $this->assertSame('0.00', $emptyActivity['metrics']['attendance_rate']);
         $this->assertSame([], $emptyActivity['group']);
