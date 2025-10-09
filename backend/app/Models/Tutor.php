@@ -28,15 +28,20 @@ class Tutor extends Model
         'foto'
     ];
 
-    protected $appends = ['foto_url'];
+    protected $appends = ['foto_url', 'full_name'];
 
     public function getFotoUrlAttribute()
     {
         if ($this->foto) {
             return url("storage/Tutor/{$this->id_tutor}/{$this->foto}");
         }
-        
+
         return url('images/default.png');
+    }
+
+    public function getFullNameAttribute(): ?string
+    {
+        return $this->nama;
     }
 
     public function kacab() {

@@ -252,7 +252,7 @@ class WeeklyAttendanceService
             $activities = Aktivitas::query()
                 ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
                 ->whereIn('id_shelter', $shelterIds)
-                ->with(['absen.absenUser', 'tutor'])
+                ->with(['absen.absenUser', 'tutor:id_tutor,nama'])
                 ->get();
 
             foreach ($activities as $activity) {
@@ -551,7 +551,7 @@ class WeeklyAttendanceService
             ->where('id_shelter', $shelter->id_shelter)
             ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
             ->with([
-                'tutor:id_tutor,full_name,nama',
+                'tutor:id_tutor,nama',
                 'absen' => function ($query) {
                     $query->select('id_absen', 'id_absen_user', 'id_aktivitas', 'absen', 'verification_status');
                 },

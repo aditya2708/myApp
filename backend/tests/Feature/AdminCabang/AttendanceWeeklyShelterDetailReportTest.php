@@ -10,6 +10,7 @@ use App\Models\Anak;
 use App\Models\Kacab;
 use App\Models\Kelompok;
 use App\Models\Shelter;
+use App\Models\Tutor;
 use App\Models\User;
 use App\Models\Wilbin;
 use Illuminate\Database\Schema\Blueprint;
@@ -33,6 +34,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('tutor');
         Schema::dropIfExists('anak');
         Schema::dropIfExists('kelompok');
         Schema::dropIfExists('shelter');
@@ -100,6 +102,13 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('tutor', function (Blueprint $table) {
+            $table->id('id_tutor');
+            $table->unsignedBigInteger('id_shelter')->nullable();
+            $table->string('nama');
+            $table->timestamps();
+        });
+
         Schema::create('aktivitas', function (Blueprint $table) {
             $table->id('id_aktivitas');
             $table->unsignedBigInteger('id_shelter');
@@ -133,6 +142,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         Schema::dropIfExists('absen');
         Schema::dropIfExists('absen_user');
         Schema::dropIfExists('aktivitas');
+        Schema::dropIfExists('tutor');
         Schema::dropIfExists('anak');
         Schema::dropIfExists('kelompok');
         Schema::dropIfExists('shelter');
@@ -222,8 +232,19 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
             'status_validasi' => 'aktif',
         ]);
 
+        $tutorAlpha = Tutor::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama' => 'Tutor Alpha',
+        ]);
+
+        $tutorBeta = Tutor::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama' => 'Tutor Beta',
+        ]);
+
         $activityAlpha = Aktivitas::create([
             'id_shelter' => $shelter->id_shelter,
+            'id_tutor' => $tutorAlpha->id_tutor,
             'nama_kelompok' => $kelompokAlpha->nama_kelompok,
             'jenis_kegiatan' => 'Pertemuan Rutin',
             'materi' => 'Matematika',
@@ -232,6 +253,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
 
         $activityBeta = Aktivitas::create([
             'id_shelter' => $shelter->id_shelter,
+            'id_tutor' => $tutorBeta->id_tutor,
             'nama_kelompok' => $kelompokBeta->nama_kelompok,
             'jenis_kegiatan' => 'Kelas Tambahan',
             'materi' => 'Bahasa',
@@ -364,6 +386,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $this->assertSame('Kelompok Alpha', $alphaActivity['group']['name']);
         $this->assertSame('Gabungan A', $alphaActivity['group']['description']);
         $this->assertSame(15, $alphaActivity['group']['member_count']);
+        $this->assertSame('Tutor Alpha', $alphaActivity['tutor']);
         $this->assertSame(2, $alphaActivity['participant_count']);
         $this->assertCount(1, $alphaActivity['schedules']);
         $this->assertSame('2024-01-03', $alphaActivity['schedules'][0]['date']);
@@ -378,6 +401,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
 
         $betaActivity = $activities->firstWhere('id', $activityBeta->id_aktivitas);
         $this->assertSame('Kelas Tambahan', $betaActivity['name']);
+        $this->assertSame('Tutor Beta', $betaActivity['tutor']);
         $this->assertSame(2, $betaActivity['participant_count']);
         $this->assertSame('2024-01-04', $betaActivity['schedules'][0]['date']);
         $this->assertSame(1, $betaActivity['metrics']['present_count']);
@@ -390,6 +414,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $gammaActivity = $activities->firstWhere('id', $activityOther->id_aktivitas);
         $this->assertSame('Sesi Khusus', $gammaActivity['name']);
         $this->assertSame('Kelompok Gamma', $gammaActivity['group']['name']);
+        $this->assertNull($gammaActivity['tutor']);
         $this->assertSame(1, $gammaActivity['participant_count']);
         $this->assertSame('2024-01-05', $gammaActivity['schedules'][0]['date']);
         $this->assertSame('100.00', $gammaActivity['metrics']['attendance_rate']);
@@ -467,8 +492,14 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
             'status_validasi' => 'aktif',
         ]);
 
+        $tutor = Tutor::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama' => 'Tutor Filter',
+        ]);
+
         $activityA = Aktivitas::create([
             'id_shelter' => $shelter->id_shelter,
+            'id_tutor' => $tutor->id_tutor,
             'nama_kelompok' => $group->nama_kelompok,
             'jenis_kegiatan' => 'Sesi Matematika',
             'materi' => 'Aljabar',
@@ -479,6 +510,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
 
         $activityB = Aktivitas::create([
             'id_shelter' => $shelter->id_shelter,
+            'id_tutor' => $tutor->id_tutor,
             'nama_kelompok' => $group->nama_kelompok,
             'jenis_kegiatan' => 'Sesi Bahasa',
             'materi' => 'Gramatika',
@@ -489,6 +521,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
 
         $activityC = Aktivitas::create([
             'id_shelter' => $shelter->id_shelter,
+            'id_tutor' => $tutor->id_tutor,
             'nama_kelompok' => $group->nama_kelompok,
             'jenis_kegiatan' => 'Sesi Sains',
             'materi' => 'Fisika',
@@ -499,6 +532,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
 
         $activityD = Aktivitas::create([
             'id_shelter' => $shelter->id_shelter,
+            'id_tutor' => $tutor->id_tutor,
             'nama_kelompok' => $group->nama_kelompok,
             'jenis_kegiatan' => 'Sesi Seni',
             'materi' => 'Melukis',
@@ -541,6 +575,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $this->assertSame(2, $page1Data['pagination']['last_page']);
         $this->assertSame($activityA->id_aktivitas, $page1Data['activities'][0]['id']);
         $this->assertSame($activityB->id_aktivitas, $page1Data['activities'][1]['id']);
+        $this->assertSame('Tutor Filter', $page1Data['activities'][0]['tutor']);
 
         $responsePage2 = $this->getJson($baseUrl . '?week=2024-W01&per_page=2&page=2');
         $responsePage2->assertOk();
@@ -567,6 +602,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $scheduleData = $responseSchedule->json('data');
         $this->assertCount(1, $scheduleData['activities']);
         $this->assertSame($activityB->id_aktivitas, $scheduleData['activities'][0]['id']);
+        $this->assertSame('Tutor Filter', $scheduleData['activities'][0]['tutor']);
         $this->assertSame('2024-01-03', $scheduleData['activities'][0]['schedules'][0]['date']);
         $this->assertSame('2024-01-03', $scheduleData['filters']['schedule_date']);
 
@@ -576,6 +612,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $byIdData = $responseById->json('data');
         $this->assertCount(1, $byIdData['activities']);
         $this->assertSame($activityD->id_aktivitas, $byIdData['activities'][0]['id']);
+        $this->assertSame('Tutor Filter', $byIdData['activities'][0]['tutor']);
         $this->assertSame(0, $byIdData['activities'][0]['participant_count']);
         $this->assertSame(0, $byIdData['activities'][0]['metrics']['present_count']);
         $this->assertSame(0, $byIdData['activities'][0]['metrics']['late_count']);
