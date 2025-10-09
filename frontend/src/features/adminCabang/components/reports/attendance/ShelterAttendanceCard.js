@@ -9,9 +9,14 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
     return null;
   }
 
-  const { name, wilbin, attendanceRate, summary, verification, totalSessions } = shelter;
+  const { name, wilbin, attendanceRate, summary, totalSessions } = shelter;
   const safeSummary = summary || {};
-  const safeVerification = verification || {};
+  const presentCount = safeSummary.present?.count ?? 0;
+  const presentPercentage = safeSummary.present?.percentage ?? 0;
+  const lateCount = safeSummary.late?.count ?? 0;
+  const latePercentage = safeSummary.late?.percentage ?? 0;
+  const absentCount = safeSummary.absent?.count ?? 0;
+  const absentPercentage = safeSummary.absent?.percentage ?? 0;
   const badgeColor = band?.color || '#0984e3';
   const badgeBackground = band?.backgroundColor || 'rgba(9, 132, 227, 0.12)';
 
@@ -44,8 +49,8 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
         <View style={styles.progressItem}>
           <AttendanceProgressBar
             label="Hadir"
-            count={safeSummary.present?.count}
-            percentage={safeSummary.present?.percentage}
+            count={presentCount}
+            percentage={presentPercentage}
             color="#2ecc71"
             icon="checkmark-circle"
           />
@@ -53,8 +58,8 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
         <View style={styles.progressItem}>
           <AttendanceProgressBar
             label="Terlambat"
-            count={safeSummary.late?.count}
-            percentage={safeSummary.late?.percentage}
+            count={lateCount}
+            percentage={latePercentage}
             color="#f1c40f"
             icon="time"
           />
@@ -62,8 +67,8 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
         <View style={[styles.progressItem, styles.progressItemLast]}>
           <AttendanceProgressBar
             label="Tidak Hadir"
-            count={safeSummary.absent?.count}
-            percentage={safeSummary.absent?.percentage}
+            count={absentCount}
+            percentage={absentPercentage}
             color="#e74c3c"
             icon="close-circle"
           />
@@ -78,18 +83,18 @@ const ShelterAttendanceCard = ({ shelter, band, onPress }) => {
         </View>
         <View style={styles.footerItem}>
           <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
-          <Text style={styles.footerLabel}>Terverifikasi</Text>
-          <Text style={styles.footerValue}>{(safeVerification.verified || 0).toLocaleString('id-ID')}</Text>
+          <Text style={styles.footerLabel}>Hadir</Text>
+          <Text style={styles.footerValue}>{presentCount.toLocaleString('id-ID')}</Text>
         </View>
         <View style={styles.footerItem}>
           <Ionicons name="time" size={16} color="#f1c40f" />
-          <Text style={styles.footerLabel}>Menunggu</Text>
-          <Text style={styles.footerValue}>{(safeVerification.pending || 0).toLocaleString('id-ID')}</Text>
+          <Text style={styles.footerLabel}>Terlambat</Text>
+          <Text style={styles.footerValue}>{lateCount.toLocaleString('id-ID')}</Text>
         </View>
         <View style={styles.footerItem}>
           <Ionicons name="close-circle" size={16} color="#e74c3c" />
-          <Text style={styles.footerLabel}>Ditolak</Text>
-          <Text style={styles.footerValue}>{(safeVerification.rejected || 0).toLocaleString('id-ID')}</Text>
+          <Text style={styles.footerLabel}>Tidak Hadir</Text>
+          <Text style={styles.footerValue}>{absentCount.toLocaleString('id-ID')}</Text>
         </View>
       </View>
     </TouchableOpacity>
