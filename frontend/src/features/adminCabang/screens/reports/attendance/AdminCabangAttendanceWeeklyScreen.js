@@ -430,9 +430,23 @@ const AdminCabangAttendanceWeeklyScreen = () => {
         startDate: startDate || null,
         endDate: endDate || null,
         periodLabel,
+        weekId: selectedWeek?.id ?? null,
+        weekStartDate: selectedWeek?.dates?.start ?? null,
+        weekEndDate: selectedWeek?.dates?.end ?? null,
+        weekLabel: selectedWeek?.dates?.label || selectedWeek?.label || null,
       });
     },
-    [endDate, formatRangeLabel, navigation, selectedWeek?.dates?.label, selectedWeek?.label, startDate]
+    [
+      endDate,
+      formatRangeLabel,
+      navigation,
+      selectedWeek?.dates?.label,
+      selectedWeek?.dates?.start,
+      selectedWeek?.dates?.end,
+      selectedWeek?.id,
+      selectedWeek?.label,
+      startDate,
+    ]
   );
 
   const filteredShelters = useMemo(() => {

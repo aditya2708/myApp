@@ -86,10 +86,17 @@ const AdminCabangAttendanceShelterScreen = () => {
   const {
     shelterId,
     shelterName,
-    startDate,
-    endDate,
+    startDate: initialStartDate,
+    endDate: initialEndDate,
     periodLabel: initialPeriodLabel,
+    weekId,
+    weekStartDate,
+    weekEndDate,
+    weekLabel,
   } = route.params ?? {};
+
+  const startDate = weekStartDate ?? initialStartDate ?? null;
+  const endDate = weekEndDate ?? initialEndDate ?? null;
 
   const [refreshing, setRefreshing] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -107,10 +114,12 @@ const AdminCabangAttendanceShelterScreen = () => {
     shelterId,
     startDate,
     endDate,
+    weekId,
   });
 
   const derivedShelter = useMemo(() => {
-    const fallbackPeriodLabel = initialPeriodLabel || formatDateRangeLabel(startDate, endDate);
+    const fallbackPeriodLabel =
+      initialPeriodLabel || weekLabel || formatDateRangeLabel(startDate, endDate);
     const period = shelterData?.period ?? {
       start: startDate,
       end: endDate,
@@ -143,11 +152,25 @@ const AdminCabangAttendanceShelterScreen = () => {
     shelterId,
     shelterName,
     startDate,
+    weekLabel,
   ]);
 
   const resolvedPeriodLabel = useMemo(() => {
-    return periodLabel || derivedShelter?.period?.label || initialPeriodLabel || formatDateRangeLabel(startDate, endDate);
-  }, [derivedShelter?.period?.label, initialPeriodLabel, periodLabel, startDate, endDate]);
+    return (
+      periodLabel ||
+      derivedShelter?.period?.label ||
+      initialPeriodLabel ||
+      weekLabel ||
+      formatDateRangeLabel(startDate, endDate)
+    );
+  }, [
+    derivedShelter?.period?.label,
+    initialPeriodLabel,
+    periodLabel,
+    startDate,
+    endDate,
+    weekLabel,
+  ]);
 
   const handleRefresh = useCallback(async () => {
     try {
