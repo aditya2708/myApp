@@ -4,12 +4,23 @@ import { adminCabangReportApi } from '../../../api/adminCabangReportApi';
 
 const DEFAULT_PAGE_SIZE = 20;
 
+const createStatusMeta = (status, label, icon, color, code = null) => ({
+  status,
+  label,
+  icon,
+  color,
+  code,
+});
+
 const STATUS_MAP = {
-  H: { status: 'H', label: 'Hadir', icon: 'checkmark-circle', color: '#2ecc71' },
-  A: { status: 'A', label: 'Tidak Hadir', icon: 'close-circle', color: '#e74c3c' },
-  T: { status: 'T', label: 'Terlambat', icon: 'time', color: '#f1c40f' },
-  S: { status: 'S', label: 'Sakit', icon: 'medkit', color: '#00cec9' },
-  I: { status: 'I', label: 'Izin', icon: 'document-text', color: '#0984e3' },
+  H: createStatusMeta('present', 'Hadir', 'checkmark-circle', '#2ecc71', 'H'),
+  PRESENT: createStatusMeta('present', 'Hadir', 'checkmark-circle', '#2ecc71', 'H'),
+  A: createStatusMeta('absent', 'Tidak Hadir', 'close-circle', '#e74c3c', 'A'),
+  ABSENT: createStatusMeta('absent', 'Tidak Hadir', 'close-circle', '#e74c3c', 'A'),
+  T: createStatusMeta('late', 'Terlambat', 'time', '#f1c40f', 'T'),
+  LATE: createStatusMeta('late', 'Terlambat', 'time', '#f1c40f', 'T'),
+  S: createStatusMeta('S', 'Sakit', 'medkit', '#00cec9', 'S'),
+  I: createStatusMeta('I', 'Izin', 'document-text', '#0984e3', 'I'),
 };
 
 const ensureArray = (value) => {
@@ -123,13 +134,21 @@ const formatDateTimeLabel = (timestamp) => {
 
 const normalizeStatus = (value, label) => {
   if (value && typeof value === 'object') {
-    const code = value?.code ?? value?.status ?? value?.value ?? null;
-    const fallback = code ? STATUS_MAP[code.toString().trim().toUpperCase()] : null;
+    const rawCode = value?.code ?? value?.status ?? value?.value ?? null;
+    const normalizedCode = rawCode ? rawCode.toString().trim().toUpperCase() : null;
+    const fallback = normalizedCode ? STATUS_MAP[normalizedCode] : null;
+    const fallbackLabel = typeof rawCode === 'string' ? rawCode.trim() : rawCode;
+
     return {
-      status: code ?? fallback?.status ?? null,
-      label: value?.label ?? label ?? fallback?.label ?? code ?? 'Tidak diketahui',
+      status:
+        fallback?.status ??
+        (typeof value?.status === 'string' ? value.status.trim() : value?.status) ??
+        fallbackLabel ??
+        null,
+      label: value?.label ?? label ?? fallback?.label ?? fallbackLabel ?? 'Tidak diketahui',
       icon: value?.icon ?? fallback?.icon ?? 'help-circle',
       color: value?.color ?? fallback?.color ?? '#b2bec3',
+      code: fallback?.code ?? normalizedCode,
     };
   }
 
@@ -139,20 +158,23 @@ const normalizeStatus = (value, label) => {
       label: label || 'Tidak diketahui',
       icon: 'help-circle',
       color: '#b2bec3',
+      code: null,
     };
   }
 
-  const code = value.toString().trim().toUpperCase();
+  const rawValue = value.toString().trim();
+  const normalizedCode = rawValue.toUpperCase();
 
-  if (STATUS_MAP[code]) {
-    return STATUS_MAP[code];
+  if (STATUS_MAP[normalizedCode]) {
+    return STATUS_MAP[normalizedCode];
   }
 
   return {
-    status: code,
-    label: label || code,
+    status: rawValue,
+    label: label || rawValue,
     icon: 'ellipse-outline',
     color: '#636e72',
+    code: normalizedCode,
   };
 };
 
@@ -370,7 +392,25 @@ const useWeeklyAttendanceGroupStudents = ({
   const pageRef = useRef(1);
 
   const normalizedSearch = useMemo(() => search?.toString().trim(), [search]);
-  const normalizedStatus = useMemo(() => (status ? status.toString().trim().toUpperCase() : null), [status]);
+  const normalizedStatus = useMemo(() => {
+    if (!status) {
+      return null;
+    }
+
+    const rawValue = status.toString().trim();
+
+    if (!rawValue) {
+      return null;
+    }
+
+    const fallback = STATUS_MAP[rawValue.toUpperCase()];
+
+    if (fallback?.status) {
+      return fallback.status;
+    }
+
+    return rawValue;
+  }, [status]);
 
   const buildParams = useCallback(
     ({ page = 1 } = {}) => {
