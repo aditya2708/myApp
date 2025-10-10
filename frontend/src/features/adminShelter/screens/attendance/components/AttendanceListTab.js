@@ -13,7 +13,15 @@ import {
   selectActivityAttendance, selectAttendanceLoading, selectAttendanceError, resetAttendanceError
 } from '../../../redux/attendanceSlice';
 
-const AttendanceListTab = ({ navigation, id_aktivitas, activityName, activityDate }) => {
+const AttendanceListTab = ({
+  navigation,
+  id_aktivitas,
+  activityName,
+  activityDate,
+  activityType,
+  kelompokId,
+  kelompokName,
+}) => {
   const dispatch = useDispatch();
   
   const attendanceRecords = useSelector(state => selectActivityAttendance(state, id_aktivitas));
@@ -154,7 +162,14 @@ const AttendanceListTab = ({ navigation, id_aktivitas, activityName, activityDat
   };
   
   const navigateToManualEntry = () => {
-    navigation.navigate('ManualAttendance', { id_aktivitas, activityName, activityDate });
+    navigation.navigate('ManualAttendance', {
+      id_aktivitas,
+      activityName,
+      activityDate,
+      activityType,
+      kelompokId,
+      kelompokName,
+    });
   };
 
   const getStatusColor = (absen) => ({
