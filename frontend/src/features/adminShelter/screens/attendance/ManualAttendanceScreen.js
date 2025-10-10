@@ -42,7 +42,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const tutorError = useSelector(selectTutorAttendanceError);
   
   const [mode, setMode] = useState('student');
-  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedStudents, setSelectedStudents] = useState([]);
   const [selectedTutor, setSelectedTutor] = useState(null);
   const [notes, setNotes] = useState('');
   const [students, setStudents] = useState([]);
@@ -243,30 +243,45 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     if (selectedTime) setArrivalTime(selectedTime);
   };
 
-  const filteredStudents = students.filter(student => 
+  const filteredStudents = students.filter(student =>
     (student.full_name || student.nick_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
-  const renderStudentItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.item, selectedStudent?.id_anak === item.id_anak && styles.selectedItem]}
-      onPress={() => setSelectedStudent(item)}
-      disabled={dateStatus !== 'valid'}
-    >
-      <View style={styles.avatar}>
-        <Ionicons name="person" size={24} color="#95a5a6" />
-      </View>
-      <View style={styles.info}>
-        <Text style={styles.name}>
-          {item.full_name || item.nick_name || `Siswa ${item.id_anak}`}
-        </Text>
-        {item.id_anak && <Text style={styles.id}>ID: {item.id_anak}</Text>}
-      </View>
-      {selectedStudent?.id_anak === item.id_anak && (
-        <Ionicons name="checkmark-circle" size={24} color="#3498db" />
-      )}
-    </TouchableOpacity>
-  );
+
+  const toggleStudentSelection = (student) => {
+    if (dateStatus !== 'valid') return;
+
+    setSelectedStudents(prevSelected => {
+      const isAlreadySelected = prevSelected.some(item => item.id_anak === student.id_anak);
+      return isAlreadySelected
+        ? prevSelected.filter(item => item.id_anak !== student.id_anak)
+        : [...prevSelected, student];
+    });
+  };
+
+  const renderStudentItem = ({ item }) => {
+    const isSelected = selectedStudents.some(student => student.id_anak === item.id_anak);
+
+    return (
+      <TouchableOpacity
+        style={[styles.item, isSelected && styles.selectedItem]}
+        onPress={() => toggleStudentSelection(item)}
+        disabled={dateStatus !== 'valid'}
+      >
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={24} color="#95a5a6" />
+        </View>
+        <View style={styles.info}>
+          <Text style={styles.name}>
+            {item.full_name || item.nick_name || `Siswa ${item.id_anak}`}
+          </Text>
+          {item.id_anak && <Text style={styles.id}>ID: {item.id_anak}</Text>}
+        </View>
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={24} color="#3498db" />
+        )}
+      </TouchableOpacity>
+    );
+  };
   
   const handleSubmit = () => {
     if (dateStatus === 'future') {
@@ -275,41 +290,38 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     }
     
     if (mode === 'student') {
-      if (!selectedStudent) {
-        Alert.alert('Error', 'Silakan pilih siswa');
+      if (!selectedStudents.length) {
+        Alert.alert('Error', 'Silakan pilih minimal satu siswa');
         return;
       }
-      
+
       if (!notes) {
         Alert.alert('Error', 'Silakan masukkan catatan verifikasi');
         return;
       }
-      
+
+      const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
+      const attendancePayloads = selectedStudents.map(student => ({
+        id_anak: student.id_anak,
+        id_aktivitas,
+        status: null,
+        notes,
+        arrival_time: formattedTime
+      }));
+
       if (dateStatus === 'past') {
         Alert.alert(
-          'Aktivitas Lampau', 
+          'Aktivitas Lampau',
           'Aktivitas ini sudah berlalu. Kehadiran akan ditandai sebagai tidak hadir. Lanjutkan?',
           [
             { text: 'Batal', style: 'cancel' },
-            { text: 'Lanjutkan', onPress: () => {
-              const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
-              const attendanceData = {
-                id_anak: selectedStudent.id_anak, id_aktivitas, status: null,
-                notes, arrival_time: formattedTime
-              };
-              submitStudentAttendance(attendanceData);
-            }}
+            { text: 'Lanjutkan', onPress: () => submitStudentAttendance(attendancePayloads) }
           ]
         );
         return;
       }
 
-      const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
-      const attendanceData = {
-        id_anak: selectedStudent.id_anak, id_aktivitas, status: null,
-        notes, arrival_time: formattedTime
-      };
-      submitStudentAttendance(attendanceData);
+      submitStudentAttendance(attendancePayloads);
     } else {
       if (!selectedTutor) {
         Alert.alert('Error', 'Silakan pilih tutor');
@@ -354,24 +366,89 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     }
   };
 
-  const submitStudentAttendance = async (attendanceData) => {
-    try {
-      if (isConnected) {
-        await dispatch(recordAttendanceManually(attendanceData)).unwrap();
-        Alert.alert('Berhasil', 'Kehadiran siswa berhasil dicatat', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
-      } else {
-        const result = await OfflineSync.processAttendance(attendanceData, 'manual');
-        Alert.alert('Mode Offline', result.message || 'Disimpan untuk sinkronisasi saat online', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
-      }
-    } catch (err) {
-      if (!err.isDuplicate) {
-        Alert.alert('Error', err.message || 'Gagal mencatat kehadiran');
+  const submitStudentAttendance = async (attendanceList) => {
+    if (!attendanceList || !attendanceList.length) {
+      return;
+    }
+
+    const currentSelection = [...selectedStudents];
+    const successIds = [];
+    const duplicateIds = [];
+    const errorDetails = [];
+
+    for (const attendanceData of attendanceList) {
+      try {
+        if (isConnected) {
+          await dispatch(recordAttendanceManually(attendanceData)).unwrap();
+        } else {
+          await OfflineSync.processAttendance(attendanceData, 'manual');
+        }
+        successIds.push(attendanceData.id_anak);
+      } catch (err) {
+        if (err?.isDuplicate) {
+          duplicateIds.push(attendanceData.id_anak);
+        } else {
+          errorDetails.push({ id: attendanceData.id_anak, message: err?.message });
+        }
       }
     }
+
+    const getStudentName = (id) => {
+      const student = currentSelection.find(item => item.id_anak === id)
+        || students.find(item => item.id_anak === id);
+      return student?.full_name || student?.nick_name || `Siswa ${id}`;
+    };
+
+    const formatList = (ids) => ids.map(getStudentName).join(', ');
+
+    const successCount = successIds.length;
+    const duplicateCount = duplicateIds.length;
+    const errorCount = errorDetails.length;
+
+    let summaryTitle = 'Ringkasan';
+    let summaryMessage = '';
+
+    if (successCount > 0) {
+      summaryMessage += isConnected
+        ? `Berhasil memproses kehadiran untuk ${successCount} siswa.`
+        : `Berhasil menyimpan ${successCount} kehadiran siswa untuk sinkronisasi offline.`;
+    }
+
+    if (duplicateCount > 0) {
+      if (summaryMessage) summaryMessage += '\n';
+      summaryMessage += `Duplikat (${duplicateCount}): ${formatList(duplicateIds)}.`;
+    }
+
+    if (errorCount > 0) {
+      if (summaryMessage) summaryMessage += '\n';
+      const errorNames = errorDetails.map(({ id, message }) =>
+        `${getStudentName(id)}${message ? ` (${message})` : ''}`
+      ).join(', ');
+      summaryMessage += `Gagal (${errorCount}): ${errorNames}.`;
+    }
+
+    if (!summaryMessage) {
+      summaryMessage = 'Tidak ada perubahan yang dicatat.';
+    }
+
+    if (successCount > 0) {
+      setSelectedStudents([]);
+    }
+
+    Alert.alert(
+      summaryTitle,
+      summaryMessage,
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            if (successCount > 0) {
+              navigation.goBack();
+            }
+          }
+        }
+      ]
+    );
   };
   
   const submitTutorAttendance = async (tutorData) => {
@@ -648,7 +725,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
           <View style={styles.duplicateAlert}>
             <Ionicons name="alert-circle" size={20} color="#fff" />
             <Text style={styles.duplicateText}>
-              {duplicateError || 'Catatan kehadiran ini sudah ada untuk aktivitas ini'}
+              {duplicateError || 'Beberapa catatan kehadiran sudah ada untuk aktivitas ini'}
             </Text>
             <TouchableOpacity style={styles.duplicateClose} onPress={closeDuplicateAlert}>
               <Ionicons name="close" size={20} color="#fff" />
