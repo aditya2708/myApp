@@ -76,7 +76,18 @@ const AttendanceManagementScreen = ({ navigation, route }) => {
     id_aktivitas,
     activityName,
     activityDate,
-  }), [navigation, id_aktivitas, activityName, activityDate]);
+    activityType,
+    kelompokId,
+    kelompokName,
+  }), [
+    navigation,
+    id_aktivitas,
+    activityName,
+    activityDate,
+    activityType,
+    kelompokId,
+    kelompokName,
+  ]);
 
   return (
     <View style={styles.container}>
