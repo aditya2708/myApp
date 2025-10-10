@@ -22,13 +22,11 @@ import AdminCabangUserFormScreen from '../features/adminCabang/screens/user/User
 import AdminCabangUserDetailScreen from '../features/adminCabang/screens/user/UserDetailScreen';
 import AdminCabangReportHomeScreen from '../features/adminCabang/screens/reports/AdminCabangReportHomeScreen';
 import AdminCabangChildReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildReportScreen';
-import AdminCabangChildDetailScreen from '../features/adminCabang/screens/reports/AdminCabangChildDetailScreen';
 import AdminCabangTutorReportScreen from '../features/adminCabang/screens/reports/AdminCabangTutorReportScreen';
 import AdminCabangAttendanceReportScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceReportScreen';
 import AdminCabangAttendanceWeeklyScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceWeeklyScreen';
 import AdminCabangAttendanceShelterScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceShelterScreen';
 import AdminCabangAttendanceGroupScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceGroupScreen';
-import ChartFullScreenScreen from '../features/adminCabang/components/reports/ChartFullScreenScreen';
 
 // Kurikulum screens
 import KurikulumHomeScreen from '../features/adminCabang/screens/kurikulum/KurikulumHomeScreen';
@@ -236,19 +234,9 @@ const ReportsStackNavigator = () => (
       options={{ headerTitle: 'Detail Kehadiran Kelompok' }}
     />
     <ReportsStack.Screen
-      name="AdminCabangChildDetail"
-      component={AdminCabangChildDetailScreen}
-      options={{ headerTitle: 'Detail Anak' }}
-    />
-    <ReportsStack.Screen
       name="AdminCabangTutorReport"
       component={AdminCabangTutorReportScreen}
       options={{ headerTitle: 'Laporan Tutor' }}
-    />
-    <ReportsStack.Screen
-      name="ChartFullScreen"
-      component={ChartFullScreenScreen}
-      options={{ headerShown: false }}
     />
   </ReportsStack.Navigator>
 );
@@ -304,3 +292,4 @@ const AdminCabangNavigator = () => (
 );
 
 export default AdminCabangNavigator;
+
