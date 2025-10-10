@@ -40,6 +40,11 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const [studentError, setStudentError] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
   const [isBimbel, setIsBimbel] = useState(activityType === 'Bimbel');
+  const [resolvedKelompokId, setResolvedKelompokId] = useState(kelompokId || null);
+  const [kelompokResolutionAttempted, setKelompokResolutionAttempted] = useState(
+    activityType === 'Bimbel' ? Boolean(kelompokId) : true
+  );
+  const [resolvingKelompok, setResolvingKelompok] = useState(false);
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [activityDetails, setActivityDetails] = useState(null);
   const [loadingActivity, setLoadingActivity] = useState(false);
@@ -62,10 +67,96 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   }, [activityType, id_aktivitas, activityDate]);
 
   useEffect(() => {
-    if (dateStatus === 'valid') {
-      isBimbel && kelompokId ? fetchStudentsByGroup(kelompokId) : fetchAllStudents();
+    let isActive = true;
+
+    const resolveKelompokId = async () => {
+      if (!isBimbel) {
+        if (isActive) {
+          setResolvedKelompokId(null);
+          setKelompokResolutionAttempted(true);
+          setResolvingKelompok(false);
+        }
+        return;
+      }
+
+      if (kelompokId) {
+        if (isActive) {
+          setResolvedKelompokId(kelompokId);
+          setKelompokResolutionAttempted(true);
+          setResolvingKelompok(false);
+        }
+        return;
+      }
+
+      if (typeof kelompokName !== 'string' || !kelompokName.trim()) {
+        if (isActive) {
+          setResolvedKelompokId(null);
+          setKelompokResolutionAttempted(true);
+          setResolvingKelompok(false);
+        }
+        return;
+      }
+
+      if (isActive) {
+        setResolvingKelompok(true);
+        setKelompokResolutionAttempted(false);
+      }
+
+      try {
+        const response = await adminShelterKelompokApi.getAllKelompok();
+        const kelompokList = response.data?.data || [];
+        const normalizedKelompokName = kelompokName.trim().toLowerCase();
+        const matchedKelompok = kelompokList.find(kelompok =>
+          (kelompok.nama_kelompok || '').trim().toLowerCase() === normalizedKelompokName
+        );
+
+        if (isActive) {
+          setResolvedKelompokId(matchedKelompok?.id_kelompok || null);
+        }
+      } catch (err) {
+        console.error('Gagal mencari kelompok berdasarkan nama:', err);
+        if (isActive) {
+          setResolvedKelompokId(null);
+        }
+      } finally {
+        if (isActive) {
+          setResolvingKelompok(false);
+          setKelompokResolutionAttempted(true);
+        }
+      }
+    };
+
+    resolveKelompokId();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isBimbel, kelompokId, kelompokName]);
+
+  useEffect(() => {
+    if (dateStatus !== 'valid') return;
+
+    if (isBimbel) {
+      if (resolvedKelompokId) {
+        fetchStudentsByGroup(resolvedKelompokId);
+        return;
+      }
+
+      if (kelompokResolutionAttempted && !resolvingKelompok && !resolvedKelompokId) {
+        fetchAllStudents();
+      }
+
+      return;
     }
-  }, [isBimbel, kelompokId, dateStatus]);
+
+    fetchAllStudents();
+  }, [
+    isBimbel,
+    resolvedKelompokId,
+    dateStatus,
+    kelompokResolutionAttempted,
+    resolvingKelompok
+  ]);
   
   useEffect(() => {
     if (duplicateError) setShowDuplicate(true);
