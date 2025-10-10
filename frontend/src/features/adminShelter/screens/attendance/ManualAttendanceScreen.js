@@ -11,11 +11,6 @@ import NetInfo from '@react-native-community/netinfo';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
-import GpsPermissionModal from '../../../../common/components/GpsPermissionModal';
-import {
-  validateLocationDistance,
-  prepareGpsDataForApi
-} from '../../../../common/utils/gpsUtils';
 
 import { adminShelterAnakApi } from '../../api/adminShelterAnakApi';
 import { adminShelterKelompokApi } from '../../api/adminShelterKelompokApi';
@@ -67,9 +62,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [arrivalTime, setArrivalTime] = useState(new Date());
   const [dateStatus, setDateStatus] = useState('valid');
-  const [showGpsModal, setShowGpsModal] = useState(false);
-  const [pendingSubmitData, setPendingSubmitData] = useState(null);
-  const [gpsLocation, setGpsLocation] = useState(null);
   
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -251,64 +243,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     if (selectedTime) setArrivalTime(selectedTime);
   };
 
-  const requestGpsLocationForSubmit = async (submitData) => {
-    // For Bimbel activities, GPS is always required if shelter has GPS config
-    const isGpsRequired = activityDetails?.require_gps || (isBimbel && activityDetails);
-    
-    if (!isGpsRequired) {
-      // GPS not required, proceed directly
-      return proceedWithSubmit(submitData, null);
-    }
-    
-    // GPS required, show modal to get location
-    setPendingSubmitData(submitData);
-    setShowGpsModal(true);
-  };
-
-  const handleGpsLocationSuccess = async (locationData) => {
-    setGpsLocation(locationData);
-    setShowGpsModal(false);
-    
-    if (pendingSubmitData) {
-      // Validate location if activity has GPS coordinates
-      let gpsValidation = null;
-      if (activityDetails?.latitude && activityDetails?.longitude) {
-        gpsValidation = validateLocationDistance(
-          { latitude: locationData.latitude, longitude: locationData.longitude },
-          { latitude: activityDetails.latitude, longitude: activityDetails.longitude },
-          activityDetails.max_distance_meters || 50
-        );
-        
-        if (!gpsValidation.valid) {
-          Alert.alert('Error GPS', gpsValidation.reason);
-          setPendingSubmitData(null);
-          return;
-        }
-      }
-      
-      // Prepare GPS data for API
-      const gpsData = prepareGpsDataForApi(locationData, gpsValidation);
-      await proceedWithSubmit(pendingSubmitData, gpsData);
-      setPendingSubmitData(null);
-    }
-  };
-
-  const handleGpsLocationError = (error) => {
-    setShowGpsModal(false);
-    setPendingSubmitData(null);
-    Alert.alert('Error GPS', error);
-  };
-
-  const proceedWithSubmit = async (submitData, gpsData) => {
-    const { mode, data } = submitData;
-    
-    if (mode === 'student') {
-      return submitStudentAttendance(data, gpsData);
-    } else {
-      return submitTutorAttendance(data, gpsData);
-    }
-  };
-  
   const filteredStudents = students.filter(student => 
     (student.full_name || student.nick_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -334,7 +268,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     </TouchableOpacity>
   );
   
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (dateStatus === 'future') {
       Alert.alert('Error', 'Aktivitas belum dimulai. Silakan tunggu sampai tanggal aktivitas.');
       return;
@@ -363,19 +297,19 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
                 id_anak: selectedStudent.id_anak, id_aktivitas, status: null,
                 notes, arrival_time: formattedTime
               };
-              requestGpsLocationForSubmit({ mode: 'student', data: attendanceData });
+              submitStudentAttendance(attendanceData);
             }}
           ]
         );
         return;
       }
-      
+
       const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
       const attendanceData = {
         id_anak: selectedStudent.id_anak, id_aktivitas, status: null,
         notes, arrival_time: formattedTime
       };
-      requestGpsLocationForSubmit({ mode: 'student', data: attendanceData });
+      submitStudentAttendance(attendanceData);
     } else {
       if (!selectedTutor) {
         Alert.alert('Error', 'Silakan pilih tutor');
@@ -404,28 +338,23 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
                 id_tutor: selectedTutor.id_tutor, id_aktivitas, status: null,
                 notes, arrival_time: formattedTime
               };
-              requestGpsLocationForSubmit({ mode: 'tutor', data: tutorData });
+              submitTutorAttendance(tutorData);
             }}
           ]
         );
         return;
       }
-      
+
       const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
       const tutorData = {
         id_tutor: selectedTutor.id_tutor, id_aktivitas, status: null,
         notes, arrival_time: formattedTime
       };
-      requestGpsLocationForSubmit({ mode: 'tutor', data: tutorData });
+      submitTutorAttendance(tutorData);
     }
   };
-  
-  const submitStudentAttendance = async (attendanceData, gpsData = null) => {
-    // Add GPS data to the attendance data if provided
-    if (gpsData) {
-      attendanceData.gps_data = gpsData;
-    }
-    
+
+  const submitStudentAttendance = async (attendanceData) => {
     try {
       if (isConnected) {
         await dispatch(recordAttendanceManually(attendanceData)).unwrap();
@@ -445,12 +374,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     }
   };
   
-  const submitTutorAttendance = async (tutorData, gpsData = null) => {
-    // Add GPS data to the tutor data if provided
-    if (gpsData) {
-      tutorData.gps_data = gpsData;
-    }
-    
+  const submitTutorAttendance = async (tutorData) => {
     try {
       if (isConnected) {
         await dispatch(recordTutorAttendanceManually(tutorData)).unwrap();
@@ -720,16 +644,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
           </View>
         )}
         
-        {(activityDetails?.require_gps || (isBimbel && activityDetails)) && (
-          <View style={styles.gpsRequiredIndicator}>
-            <Ionicons name="location" size={18} color="#fff" />
-            <Text style={styles.gpsRequiredText}>
-              GPS diperlukan{isBimbel && !activityDetails?.require_gps ? ' (Aktivitas Bimbel)' : ''} - Radius maksimal: {activityDetails?.max_distance_meters || 50}m
-              {activityDetails?.location_name && ` di ${activityDetails.location_name}`}
-            </Text>
-          </View>
-        )}
-        
         {showDuplicate && (
           <View style={styles.duplicateAlert}>
             <Ionicons name="alert-circle" size={20} color="#fff" />
@@ -772,25 +686,11 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
         </View>
         
         {isAnyLoading && (
-          <LoadingSpinner 
-            fullScreen 
+          <LoadingSpinner
+            fullScreen
             message={`Mencatat kehadiran ${mode === 'student' ? 'siswa' : 'tutor'}...`}
           />
         )}
-        
-        <GpsPermissionModal
-          visible={showGpsModal}
-          onClose={() => {
-            setShowGpsModal(false);
-            setPendingSubmitData(null);
-          }}
-          onLocationSuccess={handleGpsLocationSuccess}
-          onLocationError={handleGpsLocationError}
-          title="GPS Diperlukan untuk Kehadiran"
-          subtitle="Kami perlu memverifikasi lokasi Anda untuk mencatat kehadiran"
-          requiredAccuracy={20}
-          autoCloseOnSuccess={true}
-        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -850,10 +750,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#e74c3c', padding: 12
   },
   offlineText: { color: '#fff', marginLeft: 8, fontSize: 14 },
-  gpsRequiredIndicator: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#9b59b6', padding: 12
-  },
-  gpsRequiredText: { color: '#fff', marginLeft: 8, fontSize: 14, fontWeight: '500' },
   duplicateAlert: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#f39c12', padding: 12
   },
