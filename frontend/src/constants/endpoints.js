@@ -151,7 +151,6 @@ export const ADMIN_CABANG_ENDPOINTS = {
   },
   REPORTS: {
     SUMMARY: '/admin-cabang/laporan/summary',
-    ATTENDANCE_SUMMARY: (cabangId) => `/admin-cabang/${cabangId}/attendance-summary`,
     ATTENDANCE: {
       MONTHLY_SHELTER: '/admin-cabang/laporan/attendance/monthly-shelter',
       MONTHLY_BRANCH: '/admin-cabang/laporan/attendance/monthly-branch',
@@ -162,16 +161,6 @@ export const ADMIN_CABANG_ENDPOINTS = {
         `/admin-cabang/laporan/attendance/weekly/shelters/${shelterId}`,
       GROUP_STUDENTS: (groupId) =>
         `/admin-cabang/laporan/attendance/weekly/groups/${groupId}/students`,
-    },
-    ANAK: {
-      LIST: '/admin-cabang/laporan/anak-binaan',
-      DETAIL: (childId) => `/admin-cabang/laporan/anak-binaan/child/${childId}`,
-      FILTER_OPTIONS: '/admin-cabang/laporan/anak-binaan/filter-options',
-      FILTERS: {
-        JENIS_KEGIATAN: '/admin-cabang/reports/anak/filter-options/jenis-kegiatan',
-        WILAYAH_BINAAN: '/admin-cabang/reports/anak/filter-options/wilayah-binaan',
-        SHELTER_BY_WILAYAH: (wilbinId) => `/admin-cabang/reports/anak/filter-options/wilayah-binaan/${wilbinId}/shelters`,
-      },
     },
     TUTORS: '/admin-cabang/reports/tutors',
   },
@@ -419,3 +408,4 @@ export const MANAGEMENT_ENDPOINTS = {
   SHELTER: '/shelter',
   SHELTER_DETAIL: (id) => `/shelter/${id}`
 };
+

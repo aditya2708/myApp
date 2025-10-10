@@ -30,7 +30,6 @@ import materiReducer from '../features/adminCabang/redux/materiSlice';
 import semesterCabangReducer from '../features/adminCabang/redux/semesterCabangSlice';
 import templateAdoptionReducer from '../features/adminCabang/redux/templateAdoptionSlice';
 import kurikulumHierarchyReducer from '../features/adminCabang/redux/kurikulumHierarchySlice';
-import reportAnakReducer from '../features/adminCabang/redux/reportAnakSlice';
 import { kurikulumApi } from '../features/adminCabang/api/kurikulumApi';
 
 // Admin Shelter Kurikulum Consumer (NEW - Phase 3)
@@ -69,7 +68,6 @@ const appReducer = combineReducers({
   semesterCabang: semesterCabangReducer,
   templateAdoption: templateAdoptionReducer,
   kurikulumHierarchy: kurikulumHierarchyReducer,
-  reportAnak: reportAnakReducer,
   
   // Admin Shelter Kurikulum Consumer (NEW - Phase 3)
   kurikulumConsumer: kurikulumConsumerReducer,
@@ -87,3 +85,4 @@ const rootReducer = (state, action) => {
 };
 
 export default rootReducer;
+
