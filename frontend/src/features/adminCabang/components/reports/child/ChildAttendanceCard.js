@@ -25,13 +25,15 @@ const BAND_STYLES = {
     color: '#e74c3c',
     backgroundColor: 'rgba(231, 76, 60, 0.15)',
   },
+  unknown: {
+    label: 'Perlu Data',
+    color: '#636e72',
+    backgroundColor: 'rgba(99, 110, 114, 0.12)',
+  },
 };
 
 const getInitials = (name) => {
-  if (!name) {
-    return 'AN';
-  }
-
+  if (!name) return 'AN';
   return name
     .trim()
     .split(' ')
@@ -50,19 +52,9 @@ const resolveBandMeta = (band, percentage) => {
   }
 
   const numeric = Number(percentage);
-
-  if (!Number.isFinite(numeric)) {
-    return { code: 'unknown', label: 'Band tidak diketahui', color: '#636e72', backgroundColor: 'rgba(99, 110, 114, 0.12)' };
-  }
-
-  if (numeric >= 85) {
-    return { code: 'high', ...BAND_STYLES.high };
-  }
-
-  if (numeric >= 60) {
-    return { code: 'medium', ...BAND_STYLES.medium };
-  }
-
+  if (!Number.isFinite(numeric)) return BAND_STYLES.unknown;
+  if (numeric >= 85) return { code: 'high', ...BAND_STYLES.high };
+  if (numeric >= 60) return { code: 'medium', ...BAND_STYLES.medium };
   return { code: 'low', ...BAND_STYLES.low };
 };
 
@@ -75,12 +67,13 @@ const ChildAttendanceCard = ({
   actionLabel = 'Lihat Detail',
   disabled = false,
 }) => {
-  const { bandMeta, attendanceRateLabel, totals } = useMemo(() => {
+  const { bandMeta, attendanceRateLabel, totals, lastActivity } = useMemo(() => {
     if (!child) {
       return {
         bandMeta: resolveBandMeta(null, null),
         attendanceRateLabel: '0%',
         totals: { present: 0, late: 0, absent: 0 },
+        lastActivity: null,
       };
     }
 
@@ -92,7 +85,10 @@ const ChildAttendanceCard = ({
       child?.attendance?.band ??
       null;
 
-    const attendanceRateValue = child?.attendanceRate?.value ?? child?.attendanceRate ?? child?.attendance?.attendance_percentage;
+    const attendanceRateValue =
+      child?.attendanceRate?.value ??
+      child?.attendanceRate ??
+      child?.attendance?.attendance_percentage;
 
     return {
       bandMeta: resolveBandMeta(bandValue, attendanceRateValue),
@@ -100,13 +96,16 @@ const ChildAttendanceCard = ({
         child?.attendanceRate?.label ??
         child?.attendance_label ??
         (Number.isFinite(Number(attendanceRateValue))
-          ? `${Number(attendanceRateValue).toFixed(Number(attendanceRateValue) % 1 === 0 ? 0 : 1)}%`
+          ? `${Number(attendanceRateValue).toFixed(
+              Number(attendanceRateValue) % 1 === 0 ? 0 : 1
+            )}%`
           : '0%'),
       totals: {
         present: child?.totals?.present ?? child?.attendance?.present_count ?? 0,
         late: child?.totals?.late ?? child?.attendance?.late_count ?? 0,
         absent: child?.totals?.absent ?? child?.attendance?.absent_count ?? 0,
       },
+      lastActivity: child?.last_activity ?? null,
     };
   }, [child]);
 
@@ -126,11 +125,10 @@ const ChildAttendanceCard = ({
     );
   }
 
-  if (!child) {
-    return null;
-  }
+  if (!child) return null;
 
-  const photoUrl = child?.photoUrl ?? child?.photo_url ?? child?.avatarUrl ?? child?.avatar_url ?? null;
+  const photoUrl =
+    child?.photoUrl ?? child?.photo_url ?? child?.avatarUrl ?? child?.avatar_url ?? null;
   const displayName = child?.name || child?.fullName || child?.full_name || 'Nama tidak tersedia';
   const identifier = child?.identifier || child?.code || child?.childCode || child?.attendance_code || null;
   const shelterName = child?.shelter?.name || child?.shelterName || '-';
@@ -164,9 +162,7 @@ const ChildAttendanceCard = ({
           <Text style={styles.name} numberOfLines={1}>
             {displayName}
           </Text>
-          {identifier ? (
-            <Text style={styles.identifier}>ID: {identifier}</Text>
-          ) : null}
+          {identifier ? <Text style={styles.identifier}>ID: {identifier}</Text> : null}
 
           <View style={styles.metaRow}>
             <Ionicons name="home-outline" size={14} color="#636e72" />
@@ -181,6 +177,7 @@ const ChildAttendanceCard = ({
             </Text>
           </View>
 
+          {/* Attendance Breakdown */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Hadir</Text>
@@ -198,6 +195,7 @@ const ChildAttendanceCard = ({
         </View>
       </View>
 
+      {/* Footer */}
       <View style={styles.footerRow}>
         <View style={styles.attendanceRateBadge}>
           <Ionicons name="stats-chart" size={16} color="#0984e3" />
@@ -215,6 +213,15 @@ const ChildAttendanceCard = ({
           </TouchableOpacity>
         )}
       </View>
+
+      {lastActivity ? (
+        <View style={styles.footerActivity}>
+          <Text style={styles.footerLabel}>Aktivitas terakhir</Text>
+          <Text style={styles.footerText} numberOfLines={1}>
+            {lastActivity.activity_name} • {lastActivity.date} • {lastActivity.status}
+          </Text>
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 };
@@ -233,23 +240,10 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginBottom: 16,
   },
-  cardDisabled: {
-    opacity: 0.6,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  avatarContainer: {
-    marginRight: 16,
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#dfe6e9',
-  },
+  cardDisabled: { opacity: 0.6 },
+  cardContent: { flexDirection: 'row', alignItems: 'flex-start' },
+  avatarContainer: { marginRight: 16, alignItems: 'center' },
+  avatarImage: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#dfe6e9' },
   avatarPlaceholder: {
     width: 64,
     height: 64,
@@ -258,11 +252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitials: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
+  avatarInitials: { fontSize: 20, fontWeight: '700', color: '#ffffff' },
   bandBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -272,62 +262,20 @@ const styles = StyleSheet.create({
     marginTop: 10,
     maxWidth: 120,
   },
-  bandIcon: {
-    marginRight: 6,
-  },
-  bandText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  infoWrapper: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2d3436',
-  },
-  identifier: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#95a5a6',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  metaText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: '#636e72',
-    flex: 1,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-  },
-  statItem: {
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#95a5a6',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  statValuePositive: {
-    color: '#2ecc71',
-  },
-  statValueWarning: {
-    color: '#f39c12',
-  },
-  statValueNegative: {
-    color: '#e74c3c',
-  },
+  bandIcon: { marginRight: 6 },
+  bandText: { fontSize: 11, fontWeight: '600' },
+  infoWrapper: { flex: 1 },
+  name: { fontSize: 16, fontWeight: '700', color: '#2d3436' },
+  identifier: { marginTop: 2, fontSize: 12, color: '#95a5a6' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  metaText: { marginLeft: 6, fontSize: 13, color: '#636e72', flex: 1 },
+  statsRow: { flexDirection: 'row', marginTop: 12 },
+  statItem: { flex: 1 },
+  statLabel: { fontSize: 12, color: '#95a5a6', marginBottom: 4 },
+  statValue: { fontSize: 16, fontWeight: '700' },
+  statValuePositive: { color: '#2ecc71' },
+  statValueWarning: { color: '#f39c12' },
+  statValueNegative: { color: '#e74c3c' },
   footerRow: {
     marginTop: 16,
     flexDirection: 'row',
@@ -342,12 +290,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
   },
-  attendanceRateText: {
-    marginLeft: 6,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0984e3',
-  },
+  attendanceRateText: { marginLeft: 6, fontSize: 13, fontWeight: '600', color: '#0984e3' },
   detailButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -356,34 +299,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
   },
-  detailButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
-    marginRight: 6,
-  },
-  loadingIndicator: {
+  detailButtonText: { color: '#fff', fontSize: 13, fontWeight: '600', marginRight: 6 },
+  footerActivity: {
     marginTop: 12,
+    backgroundColor: '#f5f9ff',
+    borderRadius: 12,
+    padding: 12,
   },
-  avatarSkeleton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#f0f0f0',
+  footerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0984e3',
+    marginBottom: 4,
   },
-  infoSkeleton: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  lineSkeleton: {
-    height: 14,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 6,
-    marginBottom: 8,
-  },
-  lineSkeletonShort: {
-    width: '60%',
-  },
+  footerText: { fontSize: 12, color: '#2d3436' },
+  loadingIndicator: { marginTop: 12 },
+  avatarSkeleton: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#f0f0f0' },
+  infoSkeleton: { flex: 1, marginLeft: 16 },
+  lineSkeleton: { height: 14, backgroundColor: '#f0f0f0', borderRadius: 6, marginBottom: 8 },
+  lineSkeletonShort: { width: '60%' },
 });
 
 export default ChildAttendanceCard;

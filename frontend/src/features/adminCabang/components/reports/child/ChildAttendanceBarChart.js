@@ -2,32 +2,43 @@ import React, { useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+const BAR_COLORS = ['#0984e3', '#6c5ce7', '#00b894', '#e17055', '#fdcb6e'];
+
 const normalizeChartItems = (items) => {
-  if (!Array.isArray(items)) {
-    return [];
-  }
+  if (!Array.isArray(items)) return [];
 
   return items.map((item, index) => {
-    const percentageValue = Number(item?.percentage?.value ?? item?.percentage ?? item?.attendanceRate ?? item?.attendance_percentage ?? 0);
+    const percentageValue = Number(
+      item?.percentage?.value ??
+        item?.percentage ??
+        item?.attendanceRate ??
+        item?.attendance_percentage ??
+        0
+    );
 
     return {
-      id: item?.id ?? `chart-${index}`,
+      id: item?.id ?? item?.shelter_id ?? `chart-${index}`,
       label: item?.label ?? item?.name ?? `Shelter ${index + 1}`,
-      percentageValue: Number.isFinite(percentageValue) ? Math.max(0, Math.min(100, percentageValue)) : 0,
-      percentageLabel:
-        item?.percentage?.label ??
-        (Number.isFinite(percentageValue) ? `${percentageValue.toFixed(percentageValue % 1 === 0 ? 0 : 1)}%` : '0%'),
-      totalChildren: item?.totalChildren ?? item?.childrenCount ?? item?.total_children ?? null,
+      percentageValue: Number.isFinite(percentageValue)
+        ? Math.max(0, Math.min(100, percentageValue))
+        : 0,
+      percentageLabel: item?.percentage?.label ??
+        (Number.isFinite(percentageValue)
+          ? `${percentageValue.toFixed(percentageValue % 1 === 0 ? 0 : 1)}%`
+          : '0%'),
+      totalChildren:
+        item?.totalChildren ?? item?.childrenCount ?? item?.total_children ?? null,
+      color: BAR_COLORS[index % BAR_COLORS.length],
     };
   });
 };
 
 const ChildAttendanceBarChart = ({
-  data,
+  data = [],
   loading = false,
-  title = 'Perbandingan Kehadiran per Shelter',
+  title = 'Persentase Kehadiran per Shelter',
   subtitle = 'Persentase kehadiran anak berdasarkan shelter',
-  emptyMessage = 'Belum ada data perbandingan kehadiran shelter.',
+  emptyMessage = 'Belum ada data kehadiran per shelter.',
   style,
 }) => {
   const items = useMemo(() => normalizeChartItems(data), [data]);
@@ -35,6 +46,7 @@ const ChildAttendanceBarChart = ({
 
   return (
     <View style={[styles.container, style]}>
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.title}>{title}</Text>
@@ -43,6 +55,7 @@ const ChildAttendanceBarChart = ({
         {loading ? <ActivityIndicator color="#0984e3" /> : null}
       </View>
 
+      {/* Loading skeleton */}
       {loading ? (
         <View style={styles.skeletonList}>
           {[0, 1, 2].map((index) => (
@@ -53,6 +66,7 @@ const ChildAttendanceBarChart = ({
           ))}
         </View>
       ) : hasData ? (
+        // Data list
         <ScrollView style={styles.scrollArea} contentContainerStyle={styles.listContent}>
           {items.map((item) => (
             <View key={item.id} style={styles.itemRow}>
@@ -64,14 +78,13 @@ const ChildAttendanceBarChart = ({
                   <Text style={styles.itemMeta}>{item.totalChildren.toLocaleString('id-ID')} anak</Text>
                 ) : null}
               </View>
+
               <View style={styles.barWrapper}>
-                <View style={[styles.barTrack]}>
+                <View style={styles.barTrack}>
                   <View
                     style={[
                       styles.barFill,
-                      {
-                        width: `${item.percentageValue}%`,
-                      },
+                      { width: `${item.percentageValue}%`, backgroundColor: item.color },
                     ]}
                   />
                 </View>
@@ -81,6 +94,7 @@ const ChildAttendanceBarChart = ({
           ))}
         </ScrollView>
       ) : (
+        // Empty state
         <View style={styles.emptyState}>
           <Ionicons name="bar-chart-outline" size={32} color="#b2bec3" />
           <Text style={styles.emptyStateText}>{emptyMessage}</Text>
@@ -160,7 +174,6 @@ const styles = StyleSheet.create({
   },
   barFill: {
     height: '100%',
-    backgroundColor: '#0984e3',
     borderRadius: 12,
   },
   percentage: {

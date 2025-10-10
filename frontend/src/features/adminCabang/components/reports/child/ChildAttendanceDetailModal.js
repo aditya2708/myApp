@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
 import EmptyState from '../../../../../common/components/EmptyState';
 import AttendanceProgressBar from '../attendance/AttendanceProgressBar';
 
@@ -38,10 +37,7 @@ const BAND_STYLES = {
 };
 
 const getInitials = (name) => {
-  if (!name) {
-    return 'AN';
-  }
-
+  if (!name) return 'AN';
   return name
     .trim()
     .split(' ')
@@ -53,90 +49,40 @@ const getInitials = (name) => {
 
 const resolveBandMeta = (band, percentage) => {
   const normalizedBand = band ? String(band).toLowerCase() : null;
-
-  if (normalizedBand && BAND_STYLES[normalizedBand]) {
-    return BAND_STYLES[normalizedBand];
-  }
+  if (normalizedBand && BAND_STYLES[normalizedBand]) return BAND_STYLES[normalizedBand];
 
   const numeric = Number(percentage);
-
-  if (!Number.isFinite(numeric)) {
-    return BAND_STYLES.unknown;
-  }
-
-  if (numeric >= 85) {
-    return BAND_STYLES.high;
-  }
-
-  if (numeric >= 60) {
-    return BAND_STYLES.medium;
-  }
-
+  if (!Number.isFinite(numeric)) return BAND_STYLES.unknown;
+  if (numeric >= 85) return BAND_STYLES.high;
+  if (numeric >= 60) return BAND_STYLES.medium;
   return BAND_STYLES.low;
 };
 
 const resolveMonthlyItems = (child, monthly) => {
-  if (Array.isArray(monthly) && monthly.length) {
-    return monthly;
-  }
-
+  if (Array.isArray(monthly) && monthly.length) return monthly;
   const fromChild = child?.monthlyBreakdown || child?.monthly || child?.monthly_breakdown;
-
-  if (Array.isArray(fromChild)) {
-    return fromChild;
-  }
-
-  return [];
+  return Array.isArray(fromChild) ? fromChild : [];
 };
 
 const resolveTimelineItems = (timeline, child) => {
-  if (Array.isArray(timeline) && timeline.length) {
-    return timeline;
-  }
-
+  if (Array.isArray(timeline) && timeline.length) return timeline;
   const fromChild = child?.timeline || child?.attendanceTimeline || child?.activities;
-
-  if (Array.isArray(fromChild)) {
-    return fromChild;
-  }
-
-  return [];
+  return Array.isArray(fromChild) ? fromChild : [];
 };
 
 const getStatusColor = (status) => {
   const normalized = status ? String(status).toLowerCase() : '';
-
-  if (normalized.includes('hadir') || normalized === 'present' || normalized === 'attended') {
-    return '#2ecc71';
-  }
-
-  if (normalized.includes('terlambat') || normalized === 'late') {
-    return '#f39c12';
-  }
-
-  if (normalized.includes('tidak') || normalized === 'absent' || normalized === 'alfa') {
-    return '#e74c3c';
-  }
-
+  if (normalized.includes('hadir') || normalized === 'present' || normalized === 'attended') return '#2ecc71';
+  if (normalized.includes('terlambat') || normalized === 'late') return '#f39c12';
+  if (normalized.includes('tidak') || normalized === 'absent' || normalized === 'alfa') return '#e74c3c';
   return '#636e72';
 };
 
 const formatDateLabel = (value) => {
-  if (!value) {
-    return '-';
-  }
-
+  if (!value) return '-';
   const parsed = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(parsed);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
 };
 
 const ChildAttendanceDetailModal = ({
@@ -206,7 +152,6 @@ const ChildAttendanceDetailModal = ({
     () =>
       resolveTimelineItems(timeline, safeChild).map((item, index, list) => {
         const statusColor = item?.statusColor || item?.status_color || getStatusColor(item?.status);
-
         return {
           id: item?.id ?? item?.timeline_id ?? item?.value ?? `timeline-${index}`,
           date: formatDateLabel(item?.date),
@@ -279,6 +224,7 @@ const ChildAttendanceDetailModal = ({
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.scrollContent}>
+            {/* Summary Card */}
             <View style={styles.summaryCard}>
               <View style={styles.summaryTopRow}>
                 <View style={styles.avatarWrapper}>
@@ -323,6 +269,7 @@ const ChildAttendanceDetailModal = ({
                 </View>
               </View>
 
+              {/* Attendance Stats */}
               <View style={styles.summaryMetrics}>
                 <View style={styles.metricBox}>
                   <Text style={styles.metricLabel}>Persentase Kehadiran</Text>
@@ -349,6 +296,7 @@ const ChildAttendanceDetailModal = ({
               </View>
             </View>
 
+            {/* Monthly Breakdown */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Performa Bulanan</Text>
               {monthlyItems.length ? (
@@ -356,13 +304,11 @@ const ChildAttendanceDetailModal = ({
                   {monthlyItems.map((item) => {
                     const percentageValue = Number(item.percentage) || 0;
                     const color = percentageValue >= 85 ? '#2ecc71' : percentageValue >= 60 ? '#f39c12' : '#e74c3c';
-
                     return (
                       <View key={item.id} style={styles.monthlyItem}>
                         <AttendanceProgressBar
                           label={item.label}
                           percentage={percentageValue}
-                          count={item?.totals?.present ?? item?.totals?.totalSessions ?? null}
                           color={color}
                           showCount={false}
                           backgroundColor="rgba(236, 240, 241, 0.6)"
@@ -376,6 +322,7 @@ const ChildAttendanceDetailModal = ({
               )}
             </View>
 
+            {/* Timeline */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Timeline Aktivitas</Text>
               {timelineItems.length ? (
@@ -383,7 +330,7 @@ const ChildAttendanceDetailModal = ({
                   {timelineItems.map((item) => (
                     <View key={item.id} style={styles.timelineItem}>
                       <View style={styles.timelineIndicator}>
-                        <View style={[styles.timelineDot, { borderColor: item.statusColor }]}> 
+                        <View style={[styles.timelineDot, { borderColor: item.statusColor }]}>
                           <View style={[styles.timelineDotInner, { backgroundColor: item.statusColor }]} />
                         </View>
                         {!item.isLast ? <View style={styles.timelineLine} /> : null}
@@ -393,14 +340,14 @@ const ChildAttendanceDetailModal = ({
                           <Text style={styles.timelineActivity} numberOfLines={2}>
                             {item.activity}
                           </Text>
-                          <View style={[styles.timelineStatusBadge, { backgroundColor: `${item.statusColor}20` }]}> 
-                            <Text style={[styles.timelineStatusText, { color: item.statusColor }]}>{item.status}</Text>
+                          <View style={[styles.timelineStatusBadge, { backgroundColor: `${item.statusColor}20` }]}>
+                            <Text style={[styles.timelineStatusText, { color: item.statusColor }]}>
+                              {item.status}
+                            </Text>
                           </View>
                         </View>
                         <Text style={styles.timelineDate}>{item.date}</Text>
-                        {item.mentor ? (
-                          <Text style={styles.timelineMeta}>Pendamping: {item.mentor}</Text>
-                        ) : null}
+                        {item.mentor ? <Text style={styles.timelineMeta}>Pendamping: {item.mentor}</Text> : null}
                         {item.verification ? (
                           <Text style={styles.timelineMeta}>Status verifikasi: {item.verification}</Text>
                         ) : null}
@@ -513,8 +460,8 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     backgroundColor: '#0984e3',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
+    justifyContent:
+
   avatarInitials: {
     fontSize: 22,
     fontWeight: '700',
@@ -700,17 +647,7 @@ const styles = StyleSheet.create({
   timelineDate: {
     fontSize: 12,
     color: '#95a5a6',
-  },
-  timelineMeta: {
-    fontSize: 12,
-    color: '#636e72',
-    marginTop: 2,
-  },
-  timelineNote: {
-    fontSize: 13,
-    color: '#2d3436',
-    marginTop: 6,
-  },
+
 });
 
 export default ChildAttendanceDetailModal;

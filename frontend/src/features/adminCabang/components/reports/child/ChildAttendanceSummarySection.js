@@ -1,19 +1,24 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
 import ReportSummaryCard from '../ReportSummaryCard';
 
-const buildSummaryItems = (summary) => {
-  if (!summary) {
-    return [];
-  }
+const FALLBACK_SUMMARY = {
+  totalChildren: 0,
+  totalSessions: 0,
+  presentCount: 0,
+  lateCount: 0,
+  absentCount: 0,
+  attendance_percentage: '0%',
+  activeChildren: 0,
+};
 
-  const totalChildren = summary.totalChildren ?? summary?.totals?.totalChildren ?? 0;
-  const present = summary?.breakdown?.present ?? summary.presentCount ?? 0;
-  const absent = summary?.breakdown?.absent ?? summary.absentCount ?? 0;
-  const late = summary?.breakdown?.late ?? summary.lateCount ?? 0;
-  const attendanceRate = summary?.attendanceRate?.label ?? summary?.attendance_percentage ?? '0%';
+const buildSummaryItems = (summary) => {
+  const totalChildren = summary.totalChildren ?? 0;
+  const present = summary.presentCount ?? 0;
+  const absent = summary.absentCount ?? 0;
+  const late = summary.lateCount ?? 0;
+  const attendanceRate = summary.attendance_percentage ?? '0%';
 
   return [
     {
@@ -21,7 +26,7 @@ const buildSummaryItems = (summary) => {
       icon: 'stats-chart',
       label: 'Rata-rata Kehadiran',
       value: attendanceRate,
-      description: `${present + late} hadir dari ${summary?.totals?.totalSessions ?? summary.totalSessions ?? 0} sesi`,
+      description: `${present + late} hadir dari ${summary.totalSessions ?? 0} sesi`,
       color: '#0984e3',
     },
     {
@@ -37,7 +42,7 @@ const buildSummaryItems = (summary) => {
       icon: 'close-circle',
       label: 'Jumlah Tidak Hadir',
       value: absent,
-      description: `Total sesi: ${summary?.totals?.totalSessions ?? summary.totalSessions ?? 0}`,
+      description: `Total sesi: ${summary.totalSessions ?? 0}`,
       color: '#e74c3c',
     },
     {
@@ -45,7 +50,7 @@ const buildSummaryItems = (summary) => {
       icon: 'people',
       label: 'Total Anak Dipantau',
       value: totalChildren,
-      description: `Aktif: ${summary?.activeChildren ?? '-'}`,
+      description: `Aktif: ${summary.activeChildren ?? '-'}`,
       color: '#8e44ad',
     },
   ];
@@ -59,9 +64,10 @@ const ChildAttendanceSummarySection = ({
   style,
   emptyMessage = 'Belum ada data ringkasan kehadiran.',
 }) => {
-  const dateLabel = periodLabel || summary?.dateRange?.label || null;
-  const generatedAt = reportDate || summary?.generatedAt || summary?.meta?.generatedAt || null;
-  const items = buildSummaryItems(summary);
+  const effectiveSummary = useMemo(() => ({ ...FALLBACK_SUMMARY, ...(summary || {}) }), [summary]);
+  const dateLabel = periodLabel || effectiveSummary?.dateRange?.label || null;
+  const generatedAt = reportDate || effectiveSummary?.generatedAt || null;
+  const items = buildSummaryItems(effectiveSummary);
 
   return (
     <View style={[styles.container, style]}>
@@ -113,14 +119,10 @@ const ChildAttendanceSummarySection = ({
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#ecf0f1',
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
     elevation: 2,
     marginBottom: 16,
   },
@@ -152,14 +154,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
   },
-  badgeIcon: {
-    marginRight: 6,
-  },
-  badgeText: {
-    fontSize: 12,
-    color: '#636e72',
-    fontWeight: '600',
-  },
+  badgeIcon: { marginRight: 6 },
+  badgeText: { fontSize: 12, color: '#636e72', fontWeight: '600' },
   cardsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -192,16 +188,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
-  emptyState: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    marginTop: 8,
-    color: '#95a5a6',
-    fontSize: 14,
-    textAlign: 'center',
-  },
+  emptyState: { paddingVertical: 32, alignItems: 'center' },
+  emptyStateText: { marginTop: 8, color: '#95a5a6', fontSize: 14, textAlign: 'center' },
 });
 
 export default ChildAttendanceSummarySection;

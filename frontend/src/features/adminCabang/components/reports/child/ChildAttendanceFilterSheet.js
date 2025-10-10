@@ -10,21 +10,13 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
 import SearchBar from '../../../../../common/components/SearchBar';
 import DatePicker from '../../../../../common/components/DatePicker';
 
 const formatDateLabel = (value) => {
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   const parsed = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
+  if (Number.isNaN(parsed.getTime())) return null;
   return new Intl.DateTimeFormat('id-ID', {
     day: '2-digit',
     month: 'short',
@@ -33,16 +25,9 @@ const formatDateLabel = (value) => {
 };
 
 const toISODate = (value) => {
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   const parsed = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
+  if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().split('T')[0];
 };
 
@@ -58,7 +43,7 @@ const getInitialFilters = (filters) => ({
 const ChildAttendanceFilterSheet = ({
   visible,
   onClose,
-  filters,
+  filters = {},
   shelters = [],
   groups = [],
   bands = [],
@@ -71,9 +56,7 @@ const ChildAttendanceFilterSheet = ({
   const [datePickerValue, setDatePickerValue] = useState(new Date());
 
   useEffect(() => {
-    if (visible) {
-      setLocalFilters(getInitialFilters(filters));
-    }
+    if (visible) setLocalFilters(getInitialFilters(filters));
   }, [filters, visible]);
 
   const groupedShelters = Array.isArray(shelters) ? shelters : [];
@@ -81,11 +64,7 @@ const ChildAttendanceFilterSheet = ({
 
   const filteredGroups = useMemo(() => {
     const list = Array.isArray(groups) ? groups : [];
-
-    if (!localFilters.shelterId) {
-      return list;
-    }
-
+    if (!localFilters.shelterId) return list;
     return list.filter((item) => {
       const shelterId = item?.shelterId ?? item?.shelter_id ?? item?.parent_id ?? null;
       return shelterId === localFilters.shelterId;
@@ -95,57 +74,43 @@ const ChildAttendanceFilterSheet = ({
   const openDatePicker = (type) => {
     const current = type === 'start' ? localFilters.startDate : localFilters.endDate;
     const parsed = current ? new Date(current) : new Date();
-
-    if (Number.isNaN(parsed.getTime())) {
-      setDatePickerValue(new Date());
-    } else {
-      setDatePickerValue(parsed);
-    }
-
+    setDatePickerValue(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
     setActiveDatePicker(type);
   };
 
   const handleDateChange = (date) => {
-    if (!date) {
-      setActiveDatePicker(null);
-      return;
-    }
-
+    if (!date) return setActiveDatePicker(null);
     const iso = toISODate(date);
-
-    setLocalFilters((previous) => ({
-      ...previous,
-      startDate: activeDatePicker === 'start' ? iso : previous.startDate,
-      endDate: activeDatePicker === 'end' ? iso : previous.endDate,
+    setLocalFilters((prev) => ({
+      ...prev,
+      startDate: activeDatePicker === 'start' ? iso : prev.startDate,
+      endDate: activeDatePicker === 'end' ? iso : prev.endDate,
     }));
-
     setDatePickerValue(date instanceof Date ? date : new Date(date));
     setActiveDatePicker(null);
   };
 
-  const handleDateCancel = () => {
-    setActiveDatePicker(null);
-  };
+  const handleDateCancel = () => setActiveDatePicker(null);
 
   const toggleBand = (bandId) => {
-    setLocalFilters((previous) => ({
-      ...previous,
-      band: previous.band === bandId ? null : bandId,
+    setLocalFilters((prev) => ({
+      ...prev,
+      band: prev.band === bandId ? null : bandId,
     }));
   };
 
   const handleSelectShelter = (shelterId) => {
-    setLocalFilters((previous) => ({
-      ...previous,
-      shelterId: previous.shelterId === shelterId ? null : shelterId,
+    setLocalFilters((prev) => ({
+      ...prev,
+      shelterId: prev.shelterId === shelterId ? null : shelterId,
       groupId: null,
     }));
   };
 
   const handleSelectGroup = (groupId) => {
-    setLocalFilters((previous) => ({
-      ...previous,
-      groupId: previous.groupId === groupId ? null : groupId,
+    setLocalFilters((prev) => ({
+      ...prev,
+      groupId: prev.groupId === groupId ? null : groupId,
     }));
   };
 
@@ -155,8 +120,7 @@ const ChildAttendanceFilterSheet = ({
   };
 
   const handleReset = () => {
-    const initial = getInitialFilters({});
-    setLocalFilters(initial);
+    setLocalFilters(getInitialFilters({}));
     onReset?.();
   };
 
@@ -195,7 +159,7 @@ const ChildAttendanceFilterSheet = ({
             <Text style={styles.sectionTitle}>Cari Anak</Text>
             <SearchBar
               value={localFilters.search}
-              onChangeText={(text) => setLocalFilters((previous) => ({ ...previous, search: text }))}
+              onChangeText={(text) => setLocalFilters((prev) => ({ ...prev, search: text }))}
               placeholder="Cari nama anak"
               style={styles.searchBar}
             />
@@ -231,14 +195,15 @@ const ChildAttendanceFilterSheet = ({
                 groupedShelters.map((shelter) => {
                   const id = shelter?.id ?? shelter?.value ?? shelter?.shelter_id ?? null;
                   const isActive = localFilters.shelterId === id;
-
                   return (
                     <TouchableOpacity
                       key={id || shelter?.name}
                       style={[styles.chip, isActive && styles.chipActive]}
                       onPress={() => handleSelectShelter(id)}
                     >
-                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{shelter?.name ?? 'Tanpa nama'}</Text>
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                        {shelter?.name ?? 'Tanpa nama'}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })
@@ -253,14 +218,15 @@ const ChildAttendanceFilterSheet = ({
                 filteredGroups.map((group) => {
                   const id = group?.id ?? group?.value ?? group?.group_id ?? null;
                   const isActive = localFilters.groupId === id;
-
                   return (
                     <TouchableOpacity
                       key={id || group?.name}
                       style={[styles.chip, isActive && styles.chipActive]}
                       onPress={() => handleSelectGroup(id)}
                     >
-                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{group?.name ?? 'Tanpa nama'}</Text>
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                        {group?.name ?? 'Tanpa nama'}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })
@@ -276,14 +242,15 @@ const ChildAttendanceFilterSheet = ({
                   const id = band?.id ?? band?.band ?? band?.value ?? null;
                   const label = band?.label ?? band?.name ?? band?.title ?? String(id ?? 'Band');
                   const isActive = localFilters.band === id;
-
                   return (
                     <TouchableOpacity
                       key={id || label}
                       style={[styles.chip, isActive && styles.chipActive]}
                       onPress={() => toggleBand(id)}
                     >
-                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{label}</Text>
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                        {label}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })

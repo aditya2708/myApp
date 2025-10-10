@@ -6,23 +6,17 @@ const firstDefined = (...values) => {
 };
 
 const ensureArray = (value) => {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  if (value === undefined || value === null) {
-    return [];
-  }
-
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null) return [];
   return [value];
 };
 
+// ✅ Final: versi normalizeChildAttendanceParams yang lengkap dan seragam
 const normalizeChildAttendanceParams = (params = {}) => {
   const normalized = {};
 
   const assignIfDefined = (key, ...candidates) => {
     const value = firstDefined(...candidates);
-
     if (value !== undefined) {
       normalized[key] = value;
     }
@@ -31,22 +25,21 @@ const normalizeChildAttendanceParams = (params = {}) => {
   assignIfDefined('page', params.page);
   assignIfDefined('per_page', params.per_page, params.perPage, params.pageSize);
   assignIfDefined('search', params.search, params.keyword, params.q, params.term);
-  assignIfDefined('attendance_band', params.attendance_band, params.attendanceBand, params.band);
+  assignIfDefined('attendance_band', params.attendance_band, params.attendanceBand, params.band, params.band_id);
   assignIfDefined('shelter_id', params.shelter_id, params.shelterId);
   assignIfDefined('group_id', params.group_id, params.groupId);
   assignIfDefined('start_date', params.start_date, params.startDate);
   assignIfDefined('end_date', params.end_date, params.endDate);
-  assignIfDefined('sort', params.sort, params.sort_by, params.sortBy, params.order);
+  assignIfDefined('sort_by', params.sort_by, params.sortBy);
+  assignIfDefined('sort_direction', params.sort_direction, params.sortDirection, params.order);
 
   return normalized;
 };
 
 const normalizeWeeklyAttendanceParams = (params = {}) => {
   const normalized = {};
-
   const assignIfDefined = (key, ...candidates) => {
     const value = firstDefined(...candidates);
-
     if (value !== undefined) {
       normalized[key] = value;
     }
@@ -55,20 +48,8 @@ const normalizeWeeklyAttendanceParams = (params = {}) => {
   assignIfDefined('page', params.page);
   assignIfDefined('per_page', params.per_page, params.perPage, params.pageSize);
   assignIfDefined('search', params.search, params.keyword, params.q);
-  assignIfDefined(
-    'attendance_band',
-    params.attendance_band,
-    params.attendanceBand,
-    params.band,
-    params.band_id,
-  );
-  assignIfDefined(
-    'attendance_bands',
-    params.attendance_bands,
-    params.attendanceBands,
-    params.band_ids,
-    params.bands,
-  );
+  assignIfDefined('attendance_band', params.attendance_band, params.attendanceBand, params.band, params.band_id);
+  assignIfDefined('attendance_bands', params.attendance_bands, params.attendanceBands, params.band_ids, params.bands);
   assignIfDefined('attendance_status', params.attendance_status, params.attendanceStatus, params.status);
   assignIfDefined('start_date', params.start_date, params.startDate);
   assignIfDefined('end_date', params.end_date, params.endDate);
@@ -83,15 +64,13 @@ const normalizeWeeklyAttendanceParams = (params = {}) => {
   return normalized;
 };
 
+// ✅ Gabungin logika versi paling robust dari dua branch
 const adaptChildAttendanceResponse = (response) => {
   const rawPayload = response?.data ?? response ?? {};
   const dataPayload = rawPayload?.data ?? rawPayload ?? {};
 
   const toArray = (value) => {
-    if (Array.isArray(value)) {
-      return value;
-    }
-
+    if (Array.isArray(value)) return value;
     if (value && typeof value === 'object') {
       const nested = firstDefined(
         value.data,
@@ -99,14 +78,12 @@ const adaptChildAttendanceResponse = (response) => {
         value.list,
         value.records,
         value.children,
-        value.rows,
+        value.rows
       );
-
       if (nested !== undefined) {
         return ensureArray(nested).filter(Boolean);
       }
     }
-
     return ensureArray(value).filter(Boolean);
   };
 
@@ -123,25 +100,26 @@ const adaptChildAttendanceResponse = (response) => {
       dataPayload.childList,
       rawPayload.children,
       rawPayload.child_list,
-      rawPayload.childList,
+      rawPayload.childList
     ),
     shelter_breakdown: getArrayField(
       dataPayload.shelter_breakdown,
       dataPayload.shelterBreakdown,
       rawPayload.shelter_breakdown,
-      rawPayload.shelterBreakdown,
+      rawPayload.shelterBreakdown
     ),
     shelter_attendance_chart: getArrayField(
       dataPayload.shelter_attendance_chart,
       dataPayload.shelterAttendanceChart,
       rawPayload.shelter_attendance_chart,
-      rawPayload.shelterAttendanceChart,
+      rawPayload.shelterAttendanceChart
     ),
-    attendance_band_distribution: getArrayField(
+    attendance_band_distribution: firstDefined(
       dataPayload.attendance_band_distribution,
       dataPayload.attendanceBandDistribution,
       rawPayload.attendance_band_distribution,
       rawPayload.attendanceBandDistribution,
+      { high: 0, medium: 0, low: 0 }
     ),
   };
 
@@ -157,8 +135,7 @@ const adaptChildAttendanceResponse = (response) => {
   ];
 
   const assignMetadata = (key) => {
-    const value = firstDefined(...metadataSources.map((source) => source?.[key]));
-
+    const value = firstDefined(...metadataSources.map((s) => s?.[key]));
     if (value !== undefined) {
       adaptedData[key] = value;
     }
@@ -167,10 +144,7 @@ const adaptChildAttendanceResponse = (response) => {
   ['last_refreshed_at', 'filters', 'available_filters', 'pagination'].forEach(assignMetadata);
 
   if (response?.data) {
-    return {
-      ...response,
-      data: adaptedData,
-    };
+    return { ...response, data: adaptedData };
   }
 
   return adaptedData;
@@ -189,16 +163,14 @@ const adaptAttendanceActivitiesResponse = (response) => {
     rawPayload?.activityList ??
     null;
 
-  if (!activitiesSource) {
-    return response;
-  }
+  if (!activitiesSource) return response;
 
   const activities = ensureArray(
     activitiesSource?.data ??
       activitiesSource?.items ??
       activitiesSource?.list ??
       activitiesSource?.records ??
-      activitiesSource,
+      activitiesSource
   ).filter(Boolean);
 
   const pagination =
@@ -224,10 +196,7 @@ const adaptAttendanceActivitiesResponse = (response) => {
   }
 
   if (response?.data) {
-    return {
-      ...response,
-      data: adaptedData,
-    };
+    return { ...response, data: adaptedData };
   }
 
   return adaptedData;
@@ -253,30 +222,16 @@ export const adminCabangReportApi = {
   },
 
   async getWeeklyAttendanceShelter(shelterId, params = {}) {
-    if (!shelterId) {
-      throw new Error('Shelter ID is required to fetch weekly attendance shelter detail');
-    }
-
+    if (!shelterId) throw new Error('Shelter ID is required to fetch weekly attendance shelter detail');
     const normalizedParams = normalizeWeeklyAttendanceParams({ shelterId, ...params });
-
-    return api
-      .get(WEEKLY_ATTENDANCE_ENDPOINTS.SHELTER_DETAIL(shelterId), {
-        params: normalizedParams,
-      })
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.SHELTER_DETAIL(shelterId), { params: normalizedParams })
       .then(adaptAttendanceActivitiesResponse);
   },
 
   async getWeeklyAttendanceGroupStudents(groupId, params = {}) {
-    if (!groupId) {
-      throw new Error('Group ID is required to fetch weekly attendance group students');
-    }
-
+    if (!groupId) throw new Error('Group ID is required to fetch weekly attendance group students');
     const normalizedParams = normalizeWeeklyAttendanceParams({ groupId, ...params });
-
-    return api
-      .get(WEEKLY_ATTENDANCE_ENDPOINTS.GROUP_STUDENTS(groupId), {
-        params: normalizedParams,
-      })
+    return api.get(WEEKLY_ATTENDANCE_ENDPOINTS.GROUP_STUDENTS(groupId), { params: normalizedParams })
       .then(adaptAttendanceActivitiesResponse);
   },
 
@@ -290,22 +245,14 @@ export const adminCabangReportApi = {
 
   async getChildAttendanceReport(params = {}) {
     const normalizedParams = normalizeChildAttendanceParams(params);
-
-    return api
-      .get(CHILD_ATTENDANCE_ENDPOINTS.LIST, { params: normalizedParams })
+    return api.get(CHILD_ATTENDANCE_ENDPOINTS.LIST, { params: normalizedParams })
       .then(adaptChildAttendanceResponse);
   },
 
   async getChildAttendanceReportDetail(childId, params = {}) {
-    if (!childId) {
-      throw new Error('Child ID is required to fetch child attendance report detail');
-    }
-
+    if (!childId) throw new Error('Child ID is required to fetch child attendance report detail');
     const normalizedParams = normalizeChildAttendanceParams(params);
-
-    return api
-      .get(CHILD_ATTENDANCE_ENDPOINTS.DETAIL(childId), { params: normalizedParams })
+    return api.get(CHILD_ATTENDANCE_ENDPOINTS.DETAIL(childId), { params: normalizedParams })
       .then(adaptChildAttendanceResponse);
   },
 };
-
