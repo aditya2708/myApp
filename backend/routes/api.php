@@ -195,13 +195,8 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json(['message' => 'Semester routes are working!', 'time' => now()]);
         });
 
-        Route::get('{cabang}/attendance-summary', App\Http\Controllers\API\AdminCabang\Reports\AdminCabangAttendanceSummaryController::class);
-
         Route::prefix('laporan')->group(function () {
             Route::get('/summary', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangReportSummaryController::class, 'getSummary']);
-            Route::get('/anak-binaan', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'index']);
-            Route::get('/anak-binaan/child/{id}', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'showChild']);
-            Route::get('/anak-binaan/filter-options', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangLaporanAnakController::class, 'filterOptions']);
             Route::prefix('attendance')->group(function () {
                 // Level 1 - Branch weekly attendance summary
                 // Query params: start_date, end_date, attendance_band (high|medium|low), search
