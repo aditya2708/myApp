@@ -155,6 +155,10 @@ export const ADMIN_CABANG_ENDPOINTS = {
       MONTHLY_SHELTER: '/admin-cabang/laporan/attendance/monthly-shelter',
       MONTHLY_BRANCH: '/admin-cabang/laporan/attendance/monthly-branch',
     },
+    CHILD_ATTENDANCE: {
+      LIST: '/admin-cabang/laporan/attendance/children',
+      DETAIL: (childId) => `/admin-cabang/laporan/attendance/children/${childId}`,
+    },
     WEEKLY_ATTENDANCE: {
       DASHBOARD: '/admin-cabang/laporan/attendance/weekly',
       SHELTER_DETAIL: (shelterId) =>
