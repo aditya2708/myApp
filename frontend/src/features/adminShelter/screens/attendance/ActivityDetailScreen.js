@@ -344,10 +344,25 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     </View>
   );
 
-  const ActionButton = ({ onPress, icon, text, style }) => (
-    <TouchableOpacity style={[styles.attendanceButton, style]} onPress={onPress}>
-      <Ionicons name={icon} size={24} color="#fff" />
-      <Text style={styles.attendanceButtonText}>{text}</Text>
+  const ActionButton = ({ onPress, icon, text, style, disabled }) => (
+    <TouchableOpacity
+      style={[
+        styles.attendanceButton,
+        style,
+        disabled && styles.attendanceButtonDisabled
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <Ionicons name={icon} size={24} color={disabled ? '#ecf0f1' : '#fff'} />
+      <Text
+        style={[
+          styles.attendanceButtonText,
+          disabled && styles.attendanceButtonTextDisabled
+        ]}
+      >
+        {text}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -497,6 +512,11 @@ const ActivityDetailScreen = ({ navigation, route }) => {
               icon="create"
               text="Input Manual"
               style={styles.manualButton}
+              disabled={
+                activity.jenis_kegiatan === 'Bimbel' &&
+                !kelompokId &&
+                !activity.nama_kelompok
+              }
             />
           </View>
           <ActionButton
@@ -580,6 +600,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#3498db', paddingVertical: 12, paddingHorizontal: 8,
     borderRadius: 8, marginHorizontal: 4
   },
+  attendanceButtonDisabled: {
+    backgroundColor: '#bdc3c7'
+  },
   manualButton: { backgroundColor: '#9b59b6' },
   recordsButton: { backgroundColor: '#2ecc71' },
   qrButton: { backgroundColor: '#f1c40f', marginBottom: 16 },
@@ -590,6 +613,7 @@ const styles = StyleSheet.create({
   reportExistsText: { fontSize: 14, color: '#27ae60', marginTop: 8, fontWeight: '500' },
   fullWidthButton: { marginHorizontal: 0 },
   attendanceButtonText: { color: '#fff', marginLeft: 4, fontWeight: '500', fontSize: 12 },
+  attendanceButtonTextDisabled: { color: '#ecf0f1' },
   studentsSection: {
     backgroundColor: '#fff', borderRadius: 10, padding: 16, marginBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
