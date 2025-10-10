@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,232 +10,273 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-import Button from '../../../../../common/components/Button';
-import DatePicker from '../../../../../common/components/DatePicker';
-import PickerInput from '../../../../../common/components/PickerInput';
 import SearchBar from '../../../../../common/components/SearchBar';
+import DatePicker from '../../../../../common/components/DatePicker';
 
-const mapOptions = (items, placeholderLabel = 'Semua') => {
-  if (!Array.isArray(items) || items.length === 0) {
-    return [{ label: placeholderLabel, value: null }];
-  }
-
-  return [{ label: placeholderLabel, value: null }, ...items.map((item) => ({
-    label: item?.label ?? item?.name ?? String(item?.value ?? item?.id ?? ''),
-    value: item?.value ?? item?.id ?? null,
-  }))];
+const formatDateLabel = (value) => {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(parsed);
 };
 
-const parseDate = (value) => {
-  if (!value) {
-    return null;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date;
+const toISODate = (value) => {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().split('T')[0];
 };
+
+const getInitialFilters = (filters) => ({
+  search: filters?.search ?? '',
+  shelterId: filters?.shelterId ?? filters?.shelter_id ?? null,
+  groupId: filters?.groupId ?? filters?.group_id ?? null,
+  band: filters?.band ?? filters?.attendanceBand ?? filters?.attendance_band ?? null,
+  startDate: filters?.startDate ?? filters?.start_date ?? null,
+  endDate: filters?.endDate ?? filters?.end_date ?? null,
+});
 
 const ChildAttendanceFilterSheet = ({
   visible,
   onClose,
-  filters,
-  availableFilters,
+  filters = {},
+  shelters = [],
+  groups = [],
+  bands = [],
+  loading = false,
   onApply,
   onReset,
 }) => {
-  const [localFilters, setLocalFilters] = useState({
-    search: '',
-    start_date: null,
-    end_date: null,
-    shelter_id: null,
-    group_id: null,
-    attendance_band: null,
-  });
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [localFilters, setLocalFilters] = useState(() => getInitialFilters(filters));
+  const [activeDatePicker, setActiveDatePicker] = useState(null);
+  const [datePickerValue, setDatePickerValue] = useState(new Date());
 
   useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    setLocalFilters({
-      search: filters?.search ?? '',
-      start_date: filters?.start_date ?? filters?.startDate ?? null,
-      end_date: filters?.end_date ?? filters?.endDate ?? null,
-      shelter_id: filters?.shelter_id ?? filters?.shelterId ?? null,
-      group_id: filters?.group_id ?? filters?.groupId ?? null,
-      attendance_band:
-        filters?.attendance_band ?? filters?.attendanceBand ?? filters?.band ?? null,
-    });
+    if (visible) setLocalFilters(getInitialFilters(filters));
   }, [filters, visible]);
 
-  const shelterOptions = useMemo(
-    () => mapOptions(availableFilters?.shelters, 'Semua Shelter'),
-    [availableFilters?.shelters],
-  );
-  const groupOptions = useMemo(
-    () => mapOptions(availableFilters?.groups, 'Semua Kelompok'),
-    [availableFilters?.groups],
-  );
-  const bandOptions = useMemo(
-    () => mapOptions(availableFilters?.attendance_bands, 'Semua Status'),
-    [availableFilters?.attendance_bands],
-  );
+  const groupedShelters = Array.isArray(shelters) ? shelters : [];
+  const groupedBands = Array.isArray(bands) ? bands : [];
+
+  const filteredGroups = useMemo(() => {
+    const list = Array.isArray(groups) ? groups : [];
+    if (!localFilters.shelterId) return list;
+    return list.filter((item) => {
+      const shelterId = item?.shelterId ?? item?.shelter_id ?? item?.parent_id ?? null;
+      return shelterId === localFilters.shelterId;
+    });
+  }, [groups, localFilters.shelterId]);
+
+  const openDatePicker = (type) => {
+    const current = type === 'start' ? localFilters.startDate : localFilters.endDate;
+    const parsed = current ? new Date(current) : new Date();
+    setDatePickerValue(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
+    setActiveDatePicker(type);
+  };
+
+  const handleDateChange = (date) => {
+    if (!date) return setActiveDatePicker(null);
+    const iso = toISODate(date);
+    setLocalFilters((prev) => ({
+      ...prev,
+      startDate: activeDatePicker === 'start' ? iso : prev.startDate,
+      endDate: activeDatePicker === 'end' ? iso : prev.endDate,
+    }));
+    setDatePickerValue(date instanceof Date ? date : new Date(date));
+    setActiveDatePicker(null);
+  };
+
+  const handleDateCancel = () => setActiveDatePicker(null);
+
+  const toggleBand = (bandId) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      band: prev.band === bandId ? null : bandId,
+    }));
+  };
+
+  const handleSelectShelter = (shelterId) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      shelterId: prev.shelterId === shelterId ? null : shelterId,
+      groupId: null,
+    }));
+  };
+
+  const handleSelectGroup = (groupId) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      groupId: prev.groupId === groupId ? null : groupId,
+    }));
+  };
 
   const handleApply = () => {
-    onApply?.({
-      ...localFilters,
-      search: localFilters.search?.trim() || '',
-    });
+    onApply?.(localFilters);
     onClose?.();
   };
 
   const handleReset = () => {
-    setLocalFilters({
-      search: '',
-      start_date: null,
-      end_date: null,
-      shelter_id: null,
-      group_id: null,
-      attendance_band: null,
-    });
+    setLocalFilters(getInitialFilters({}));
     onReset?.();
-    onClose?.();
   };
 
-  const startDateValue = useMemo(() => parseDate(localFilters.start_date) || new Date(), [localFilters.start_date]);
-  const endDateValue = useMemo(() => parseDate(localFilters.end_date) || new Date(), [localFilters.end_date]);
+  const renderSkeleton = () => (
+    <View style={styles.skeletonContainer}>
+      {[0, 1, 2].map((index) => (
+        <View key={index} style={[styles.skeletonRow, index > 0 && styles.skeletonRowSpacing]}>
+          <View style={styles.skeletonLabel} />
+          <View style={styles.skeletonInput} />
+        </View>
+      ))}
+    </View>
+  );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop} />
       </TouchableWithoutFeedback>
       <View style={styles.sheet}>
         <View style={styles.handle} />
-        <View style={styles.header}>
-          <Text style={styles.title}>Filter Laporan Anak</Text>
-          <TouchableOpacity onPress={onClose}>
+        <View style={styles.headerRow}>
+          <Text style={styles.sheetTitle}>Filter Kehadiran Anak</Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={22} color="#2d3436" />
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionLabel}>Pencarian</Text>
-          <SearchBar
-            value={localFilters.search}
-            onChangeText={(text) => setLocalFilters((prev) => ({ ...prev, search: text }))}
-            placeholder="Cari nama anak"
-          />
-
-          <Text style={[styles.sectionLabel, styles.sectionSpacing]}>Periode</Text>
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={styles.dateInput}
-              onPress={() => setShowStartPicker(true)}
-            >
-              <Ionicons name="calendar" size={18} color="#0984e3" style={styles.dateIcon} />
-              <Text style={styles.dateLabel}>
-                {localFilters.start_date ? localFilters.start_date : 'Mulai tanggal'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.dateInput}
-              onPress={() => setShowEndPicker(true)}
-            >
-              <Ionicons name="calendar" size={18} color="#0984e3" style={styles.dateIcon} />
-              <Text style={styles.dateLabel}>
-                {localFilters.end_date ? localFilters.end_date : 'Sampai tanggal'}
-              </Text>
-            </TouchableOpacity>
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator color="#0984e3" />
+            {renderSkeleton()}
           </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.contentContainer}>
+            <Text style={styles.sectionTitle}>Cari Anak</Text>
+            <SearchBar
+              value={localFilters.search}
+              onChangeText={(text) => setLocalFilters((prev) => ({ ...prev, search: text }))}
+              placeholder="Cari nama anak"
+              style={styles.searchBar}
+            />
 
-          <PickerInput
-            label="Shelter"
-            value={localFilters.shelter_id ?? ''}
-            onValueChange={(value) =>
-              setLocalFilters((prev) => ({ ...prev, shelter_id: value === '' ? null : value }))
-            }
-            items={shelterOptions}
-            placeholder="Pilih shelter"
-            style={styles.picker}
-          />
+            <Text style={styles.sectionTitle}>Rentang Tanggal</Text>
+            <View style={styles.dateRow}>
+              <TouchableOpacity
+                style={[styles.dateInput, styles.dateInputSpacing]}
+                onPress={() => openDatePicker('start')}
+              >
+                <Ionicons name="calendar-outline" size={18} color="#636e72" />
+                <View style={styles.dateLabelWrapper}>
+                  <Text style={styles.dateLabelTitle}>Mulai</Text>
+                  <Text style={styles.dateLabelValue}>
+                    {formatDateLabel(localFilters.startDate) || 'Pilih tanggal'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dateInput} onPress={() => openDatePicker('end')}>
+                <Ionicons name="calendar-outline" size={18} color="#636e72" />
+                <View style={styles.dateLabelWrapper}>
+                  <Text style={styles.dateLabelTitle}>Selesai</Text>
+                  <Text style={styles.dateLabelValue}>
+                    {formatDateLabel(localFilters.endDate) || 'Pilih tanggal'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
 
-          <PickerInput
-            label="Kelompok"
-            value={localFilters.group_id ?? ''}
-            onValueChange={(value) =>
-              setLocalFilters((prev) => ({ ...prev, group_id: value === '' ? null : value }))
-            }
-            items={groupOptions}
-            placeholder="Pilih kelompok"
-            style={styles.picker}
-          />
+            <Text style={styles.sectionTitle}>Shelter</Text>
+            <View style={styles.chipContainer}>
+              {groupedShelters.length ? (
+                groupedShelters.map((shelter) => {
+                  const id = shelter?.id ?? shelter?.value ?? shelter?.shelter_id ?? null;
+                  const isActive = localFilters.shelterId === id;
+                  return (
+                    <TouchableOpacity
+                      key={id || shelter?.name}
+                      style={[styles.chip, isActive && styles.chipActive]}
+                      onPress={() => handleSelectShelter(id)}
+                    >
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                        {shelter?.name ?? 'Tanpa nama'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyText}>Tidak ada shelter tersedia.</Text>
+              )}
+            </View>
 
-          <PickerInput
-            label="Status Kehadiran"
-            value={localFilters.attendance_band ?? ''}
-            onValueChange={(value) =>
-              setLocalFilters((prev) => ({
-                ...prev,
-                attendance_band: value === '' ? null : value,
-              }))
-            }
-            items={bandOptions}
-            placeholder="Pilih status"
-            style={styles.picker}
-          />
-        </ScrollView>
+            <Text style={styles.sectionTitle}>Kelompok</Text>
+            <View style={styles.chipContainer}>
+              {filteredGroups.length ? (
+                filteredGroups.map((group) => {
+                  const id = group?.id ?? group?.value ?? group?.group_id ?? null;
+                  const isActive = localFilters.groupId === id;
+                  return (
+                    <TouchableOpacity
+                      key={id || group?.name}
+                      style={[styles.chip, isActive && styles.chipActive]}
+                      onPress={() => handleSelectGroup(id)}
+                    >
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                        {group?.name ?? 'Tanpa nama'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyText}>Tidak ada kelompok untuk shelter ini.</Text>
+              )}
+            </View>
+
+            <Text style={styles.sectionTitle}>Band Kehadiran</Text>
+            <View style={styles.chipContainer}>
+              {groupedBands.length ? (
+                groupedBands.map((band) => {
+                  const id = band?.id ?? band?.band ?? band?.value ?? null;
+                  const label = band?.label ?? band?.name ?? band?.title ?? String(id ?? 'Band');
+                  const isActive = localFilters.band === id;
+                  return (
+                    <TouchableOpacity
+                      key={id || label}
+                      style={[styles.chip, isActive && styles.chipActive]}
+                      onPress={() => toggleBand(id)}
+                    >
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyText}>Band kehadiran belum tersedia.</Text>
+              )}
+            </View>
+          </ScrollView>
+        )}
 
         <View style={styles.footer}>
-          <Button title="Atur Ulang" type="outline" onPress={handleReset} style={styles.footerButton} />
-          <Button title="Terapkan" onPress={handleApply} style={styles.footerButton} />
+          <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
+            <Text style={styles.resetButtonText}>Atur Ulang</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
+            <Text style={styles.applyButtonText}>Terapkan</Text>
+            <Ionicons name="filter" size={18} color="#ffffff" style={styles.applyIcon} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {showStartPicker ? (
-        <DatePicker
-          value={startDateValue}
-          onChange={(date) => {
-            setShowStartPicker(false);
-            setLocalFilters((prev) => ({
-              ...prev,
-              start_date: date ? date.toISOString().split('T')[0] : null,
-            }));
-          }}
-          onCancel={() => setShowStartPicker(false)}
-        />
-      ) : null}
-
-      {showEndPicker ? (
-        <DatePicker
-          value={endDateValue}
-          onChange={(date) => {
-            setShowEndPicker(false);
-            setLocalFilters((prev) => ({
-              ...prev,
-              end_date: date ? date.toISOString().split('T')[0] : null,
-            }));
-          }}
-          onCancel={() => setShowEndPicker(false)}
-        />
+      {activeDatePicker ? (
+        <DatePicker value={datePickerValue} onChange={handleDateChange} onCancel={handleDateCancel} />
       ) : null}
     </Modal>
   );
-};
-
-ChildAttendanceFilterSheet.defaultProps = {
-  filters: {},
-  availableFilters: {},
-  onApply: undefined,
-  onReset: undefined,
 };
 
 const styles = StyleSheet.create({
@@ -243,15 +285,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    paddingHorizontal: 16,
     paddingBottom: 24,
-    maxHeight: '88%',
+    paddingTop: 12,
   },
   handle: {
     width: 48,
@@ -259,66 +298,159 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#dfe6e9',
     alignSelf: 'center',
-    marginVertical: 12,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
     marginBottom: 12,
   },
-  title: {
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sheetTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#2d3436',
   },
-  content: {
-    paddingHorizontal: 20,
+  closeButton: {
+    padding: 4,
   },
-  sectionLabel: {
+  contentContainer: {
+    paddingBottom: 24,
+  },
+  sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#2d3436',
     marginBottom: 8,
+    marginTop: 12,
   },
-  sectionSpacing: {
-    marginTop: 16,
+  searchBar: {
+    marginBottom: 12,
   },
-  row: {
+  dateRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    alignItems: 'stretch',
   },
   dateInput: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#dfe6e9',
     borderRadius: 12,
-    paddingVertical: 12,
     paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingVertical: 10,
     backgroundColor: '#f8f9fa',
   },
-  dateIcon: {
-    marginRight: 8,
+  dateInputSpacing: {
+    marginRight: 12,
   },
-  dateLabel: {
-    fontSize: 14,
+  dateLabelWrapper: {
+    marginLeft: 10,
+  },
+  dateLabelTitle: {
+    fontSize: 12,
+    color: '#95a5a6',
+  },
+  dateLabelValue: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#2d3436',
+    marginTop: 2,
   },
-  picker: {
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f6fa',
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+    marginHorizontal: 6,
     marginBottom: 12,
+  },
+  chipActive: {
+    backgroundColor: 'rgba(9, 132, 227, 0.15)',
+    borderColor: '#0984e3',
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#636e72',
+  },
+  chipTextActive: {
+    color: '#0984e3',
+    fontWeight: '600',
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#b2bec3',
   },
   footer: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  resetButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#b2bec3',
+  },
+  resetButtonText: {
+    color: '#636e72',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  applyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#0984e3',
+  },
+  applyButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  applyIcon: {
+    marginLeft: 2,
+  },
+  loadingState: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  skeletonContainer: {
+    marginTop: 16,
+    width: '100%',
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  skeletonRowSpacing: {
     marginTop: 12,
   },
-  footerButton: {
-    flex: 1,
+  skeletonLabel: {
+    width: '35%',
+    height: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+  },
+  skeletonInput: {
+    width: '55%',
+    height: 32,
+    backgroundColor: '#f5f6f7',
+    borderRadius: 8,
   },
 });
 

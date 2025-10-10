@@ -1,152 +1,195 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import ReportSummaryCard from '../ReportSummaryCard';
 
 const FALLBACK_SUMMARY = {
-  total_children: 0,
-  total_shelters: 0,
-  total_groups: 0,
-  total_sessions: 0,
-  present_count: 0,
-  late_count: 0,
-  absent_count: 0,
-  attendance_percentage: null,
-  low_band_children: 0,
+  totalChildren: 0,
+  totalSessions: 0,
+  presentCount: 0,
+  lateCount: 0,
+  absentCount: 0,
+  attendance_percentage: '0%',
+  activeChildren: 0,
 };
 
-const formatPercentage = (value) => {
-  if (value === null || value === undefined) {
-    return '0%';
-  }
+const buildSummaryItems = (summary) => {
+  const totalChildren = summary.totalChildren ?? 0;
+  const present = summary.presentCount ?? 0;
+  const absent = summary.absentCount ?? 0;
+  const late = summary.lateCount ?? 0;
+  const attendanceRate = summary.attendance_percentage ?? '0%';
 
-  const numeric = Number(value);
-
-  if (!Number.isFinite(numeric)) {
-    return '0%';
-  }
-
-  return `${numeric.toFixed(numeric % 1 === 0 ? 0 : 1)}%`;
+  return [
+    {
+      id: 'attendance-rate',
+      icon: 'stats-chart',
+      label: 'Rata-rata Kehadiran',
+      value: attendanceRate,
+      description: `${present + late} hadir dari ${summary.totalSessions ?? 0} sesi`,
+      color: '#0984e3',
+    },
+    {
+      id: 'present',
+      icon: 'checkmark-circle',
+      label: 'Jumlah Hadir',
+      value: present,
+      description: `Terlambat: ${late}`,
+      color: '#2ecc71',
+    },
+    {
+      id: 'absent',
+      icon: 'close-circle',
+      label: 'Jumlah Tidak Hadir',
+      value: absent,
+      description: `Total sesi: ${summary.totalSessions ?? 0}`,
+      color: '#e74c3c',
+    },
+    {
+      id: 'children',
+      icon: 'people',
+      label: 'Total Anak Dipantau',
+      value: totalChildren,
+      description: `Aktif: ${summary.activeChildren ?? '-'}`,
+      color: '#8e44ad',
+    },
+  ];
 };
 
-const ChildAttendanceSummarySection = ({ summary, period, lastRefreshedAt }) => {
+const ChildAttendanceSummarySection = ({
+  summary,
+  loading = false,
+  reportDate,
+  periodLabel,
+  style,
+  emptyMessage = 'Belum ada data ringkasan kehadiran.',
+}) => {
   const effectiveSummary = useMemo(() => ({ ...FALLBACK_SUMMARY, ...(summary || {}) }), [summary]);
-
-  const formattedPeriod = useMemo(() => {
-    const start = period?.start_date || period?.startDate;
-    const end = period?.end_date || period?.endDate;
-
-    if (!start && !end) {
-      return 'Seluruh periode';
-    }
-
-    if (start && end) {
-      return `${start} – ${end}`;
-    }
-
-    if (start) {
-      return `Mulai ${start}`;
-    }
-
-    return `Hingga ${end}`;
-  }, [period]);
-
-  const formattedRefreshed = useMemo(() => {
-    if (!lastRefreshedAt) {
-      return null;
-    }
-
-    const date = new Date(lastRefreshedAt);
-
-    if (Number.isNaN(date.getTime())) {
-      return lastRefreshedAt;
-    }
-
-    return date.toLocaleString('id-ID');
-  }, [lastRefreshedAt]);
+  const dateLabel = periodLabel || effectiveSummary?.dateRange?.label || null;
+  const generatedAt = reportDate || effectiveSummary?.generatedAt || null;
+  const items = buildSummaryItems(effectiveSummary);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, style]}>
+      <View style={styles.headerRow}>
         <View style={styles.headerTextWrapper}>
-          <Text style={styles.title}>Ringkasan Kehadiran Anak</Text>
-          <Text style={styles.subtitle}>Periode: {formattedPeriod}</Text>
-          {formattedRefreshed ? (
-            <Text style={styles.meta}>Pembaruan terakhir: {formattedRefreshed}</Text>
-          ) : null}
+          <Text style={styles.title}>Ringkasan Kehadiran</Text>
+          {dateLabel ? <Text style={styles.subtitle}>{dateLabel}</Text> : null}
         </View>
+        {generatedAt ? (
+          <View style={styles.badge}>
+            <Ionicons name="time-outline" size={14} color="#636e72" style={styles.badgeIcon} />
+            <Text style={styles.badgeText}>Laporan: {generatedAt}</Text>
+          </View>
+        ) : null}
       </View>
 
-      <View style={styles.cardsRow}>
-        <ReportSummaryCard
-          icon="people"
-          color="#0984e3"
-          label="Total Anak"
-          value={effectiveSummary.total_children}
-        />
-        <ReportSummaryCard
-          icon="school"
-          color="#6c5ce7"
-          label="Total Shelter"
-          value={effectiveSummary.total_shelters}
-        />
-      </View>
-
-      <View style={styles.cardsRow}>
-        <ReportSummaryCard
-          icon="layers"
-          color="#00b894"
-          label="Total Pertemuan"
-          value={effectiveSummary.total_sessions}
-        />
-        <ReportSummaryCard
-          icon="analytics"
-          color="#e17055"
-          label="Rata-rata Kehadiran"
-          value={formatPercentage(effectiveSummary.attendance_percentage)}
-          description={`${effectiveSummary.low_band_children} anak membutuhkan perhatian`}
-        />
-      </View>
+      {loading ? (
+        <View style={styles.skeletonWrapper}>
+          {[0, 1, 2, 3].map((index) => (
+            <View key={index} style={styles.skeletonCard} />
+          ))}
+          <ActivityIndicator color="#0984e3" style={styles.loadingIndicator} />
+        </View>
+      ) : items.length ? (
+        <View style={styles.cardsGrid}>
+          {items.map((item) => (
+            <View key={item.id} style={styles.cardWrapper}>
+              <ReportSummaryCard
+                icon={item.icon}
+                label={item.label}
+                value={item.value}
+                description={item.description}
+                color={item.color}
+                variant="compact"
+              />
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyState}>
+          <Ionicons name="pie-chart-outline" size={32} color="#b2bec3" />
+          <Text style={styles.emptyStateText}>{emptyMessage}</Text>
+        </View>
+      )}
     </View>
   );
 };
 
-ChildAttendanceSummarySection.defaultProps = {
-  summary: FALLBACK_SUMMARY,
-  period: null,
-  lastRefreshedAt: null,
-};
-
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f5f9ff',
     padding: 16,
+    backgroundColor: '#fff',
     borderRadius: 16,
-    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+    elevation: 2,
+    marginBottom: 16,
   },
-  header: {
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
   headerTextWrapper: {
-    gap: 4,
+    flex: 1,
+    paddingRight: 16,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1e272e',
+    color: '#2d3436',
   },
   subtitle: {
+    marginTop: 4,
     fontSize: 14,
-    color: '#57606f',
+    color: '#636e72',
   },
-  meta: {
-    fontSize: 12,
-    color: '#8395a7',
-  },
-  cardsRow: {
+  badge: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    backgroundColor: '#f1f2f6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
+  badgeIcon: { marginRight: 6 },
+  badgeText: { fontSize: 12, color: '#636e72', fontWeight: '600' },
+  cardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -8,
+  },
+  cardWrapper: {
+    width: '50%',
+    paddingHorizontal: 8,
+    marginBottom: 12,
+  },
+  skeletonWrapper: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -8,
+    position: 'relative',
+    minHeight: 120,
+  },
+  skeletonCard: {
+    width: '50%',
+    height: 92,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 12,
+    marginHorizontal: 8,
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    alignSelf: 'center',
+    bottom: 8,
+    left: 0,
+    right: 0,
+  },
+  emptyState: { paddingVertical: 32, alignItems: 'center' },
+  emptyStateText: { marginTop: 8, color: '#95a5a6', fontSize: 14, textAlign: 'center' },
 });
 
 export default ChildAttendanceSummarySection;

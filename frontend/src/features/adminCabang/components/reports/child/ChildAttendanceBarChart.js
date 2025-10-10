@@ -1,129 +1,218 @@
 import React, { useMemo } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const BAR_COLORS = ['#0984e3', '#6c5ce7', '#00b894', '#e17055', '#fdcb6e'];
 
-const ChildAttendanceBarChart = ({ data, title }) => {
-  const chartData = useMemo(() => {
-    const items = Array.isArray(data) ? data : [];
-    const maxValue = items.reduce((acc, item) => {
-      const numeric = Number(item?.attendance_percentage ?? item?.percentage ?? 0);
+const normalizeChartItems = (items) => {
+  if (!Array.isArray(items)) return [];
 
-      if (!Number.isFinite(numeric)) {
-        return acc;
-      }
-
-      return Math.max(acc, numeric);
-    }, 0);
+  return items.map((item, index) => {
+    const percentageValue = Number(
+      item?.percentage?.value ??
+        item?.percentage ??
+        item?.attendanceRate ??
+        item?.attendance_percentage ??
+        0
+    );
 
     return {
-      items: items.map((item, index) => {
-        const percentage = Number(item?.attendance_percentage ?? item?.percentage ?? 0);
-        const normalized = Number.isFinite(percentage) ? Math.max(0, Math.min(percentage, 100)) : 0;
-
-        return {
-          ...item,
-          key: `${item?.shelter_id ?? item?.id ?? index}`,
-          percentage: normalized,
-          color: BAR_COLORS[index % BAR_COLORS.length],
-        };
-      }),
-      maxValue,
+      id: item?.id ?? item?.shelter_id ?? `chart-${index}`,
+      label: item?.label ?? item?.name ?? `Shelter ${index + 1}`,
+      percentageValue: Number.isFinite(percentageValue)
+        ? Math.max(0, Math.min(100, percentageValue))
+        : 0,
+      percentageLabel: item?.percentage?.label ??
+        (Number.isFinite(percentageValue)
+          ? `${percentageValue.toFixed(percentageValue % 1 === 0 ? 0 : 1)}%`
+          : '0%'),
+      totalChildren:
+        item?.totalChildren ?? item?.childrenCount ?? item?.total_children ?? null,
+      color: BAR_COLORS[index % BAR_COLORS.length],
     };
-  }, [data]);
+  });
+};
 
-  const renderItem = ({ item }) => {
-    const width = `${item.percentage}%`;
-
-    return (
-      <View style={styles.barItem}>
-        <View style={styles.barInfo}>
-          <Text style={styles.label}>{item.label || item.name || 'Shelter'}</Text>
-          <Text style={styles.percentageLabel}>{item.percentage.toFixed(item.percentage % 1 === 0 ? 0 : 1)}%</Text>
-        </View>
-        <View style={styles.barTrack}>
-          <View style={[styles.barFill, { width, backgroundColor: item.color }]} />
-        </View>
-      </View>
-    );
-  };
+const ChildAttendanceBarChart = ({
+  data = [],
+  loading = false,
+  title = 'Persentase Kehadiran per Shelter',
+  subtitle = 'Persentase kehadiran anak berdasarkan shelter',
+  emptyMessage = 'Belum ada data kehadiran per shelter.',
+  style,
+}) => {
+  const items = useMemo(() => normalizeChartItems(data), [data]);
+  const hasData = items.length > 0;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
-      {chartData.items.length ? (
-        <FlatList
-          data={chartData.items}
-          keyExtractor={(item) => item.key}
-          renderItem={renderItem}
-          scrollEnabled={false}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+    <View style={[styles.container, style]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        </View>
+        {loading ? <ActivityIndicator color="#0984e3" /> : null}
+      </View>
+
+      {/* Loading skeleton */}
+      {loading ? (
+        <View style={styles.skeletonList}>
+          {[0, 1, 2].map((index) => (
+            <View key={index} style={[styles.skeletonItem, index > 0 && styles.skeletonItemSpacing]}>
+              <View style={styles.skeletonLabel} />
+              <View style={styles.skeletonBar} />
+            </View>
+          ))}
+        </View>
+      ) : hasData ? (
+        // Data list
+        <ScrollView style={styles.scrollArea} contentContainerStyle={styles.listContent}>
+          {items.map((item) => (
+            <View key={item.id} style={styles.itemRow}>
+              <View style={styles.labelColumn}>
+                <Text style={styles.itemLabel} numberOfLines={2}>
+                  {item.label}
+                </Text>
+                {typeof item.totalChildren === 'number' ? (
+                  <Text style={styles.itemMeta}>{item.totalChildren.toLocaleString('id-ID')} anak</Text>
+                ) : null}
+              </View>
+
+              <View style={styles.barWrapper}>
+                <View style={styles.barTrack}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      { width: `${item.percentageValue}%`, backgroundColor: item.color },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.percentage}>{item.percentageLabel}</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
       ) : (
-        <Text style={styles.emptyText}>Belum ada data kehadiran per shelter.</Text>
+        // Empty state
+        <View style={styles.emptyState}>
+          <Ionicons name="bar-chart-outline" size={32} color="#b2bec3" />
+          <Text style={styles.emptyStateText}>{emptyMessage}</Text>
+        </View>
       )}
     </View>
   );
 };
 
-ChildAttendanceBarChart.defaultProps = {
-  data: [],
-  title: 'Persentase Kehadiran per Shelter',
-};
-
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#ecf0f1',
+    shadowColor: '#000000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  headerText: {
+    flex: 1,
+    paddingRight: 16,
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontWeight: '700',
     color: '#2d3436',
   },
-  barItem: {
-    marginBottom: 12,
+  subtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#636e72',
   },
-  barInfo: {
+  scrollArea: {
+    maxHeight: 280,
+  },
+  listContent: {
+    paddingBottom: 4,
+  },
+  itemRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 14,
   },
-  label: {
-    fontSize: 14,
-    color: '#2d3436',
-    flex: 1,
-    marginRight: 12,
+  labelColumn: {
+    flexBasis: '40%',
+    paddingRight: 12,
   },
-  percentageLabel: {
+  itemLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#2d3436',
+  },
+  itemMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#95a5a6',
+  },
+  barWrapper: {
+    flex: 1,
   },
   barTrack: {
-    height: 10,
-    backgroundColor: '#f1f2f6',
+    height: 12,
     borderRadius: 12,
+    backgroundColor: 'rgba(9, 132, 227, 0.1)',
     overflow: 'hidden',
   },
   barFill: {
     height: '100%',
     borderRadius: 12,
   },
-  separator: {
-    height: 1,
-    backgroundColor: '#f1f2f6',
-    marginVertical: 4,
+  percentage: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2d3436',
   },
-  emptyText: {
-    fontSize: 13,
-    color: '#8395a7',
+  skeletonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  skeletonList: {
+    marginTop: 4,
+  },
+  skeletonItemSpacing: {
+    marginTop: 12,
+  },
+  skeletonLabel: {
+    width: '35%',
+    height: 18,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+  },
+  skeletonBar: {
+    flex: 1,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#f4f6f7',
+  },
+  emptyState: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    marginTop: 8,
+    color: '#95a5a6',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 
