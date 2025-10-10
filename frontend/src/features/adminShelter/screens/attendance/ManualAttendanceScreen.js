@@ -11,11 +11,6 @@ import NetInfo from '@react-native-community/netinfo';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
-import GpsPermissionModal from '../../../../common/components/GpsPermissionModal';
-import {
-  validateLocationDistance,
-  prepareGpsDataForApi
-} from '../../../../common/utils/gpsUtils';
 
 import { adminShelterAnakApi } from '../../api/adminShelterAnakApi';
 import { adminShelterKelompokApi } from '../../api/adminShelterKelompokApi';
@@ -52,8 +47,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [arrivalTime, setArrivalTime] = useState(new Date());
   const [dateStatus, setDateStatus] = useState('valid');
-  const [showGpsModal, setShowGpsModal] = useState(false);
-  const [pendingSubmitData, setPendingSubmitData] = useState(null);
   
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -213,55 +206,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     if (selectedTime) setArrivalTime(selectedTime);
   };
 
-  const requestGpsLocationForSubmit = async (attendanceRecords) => {
-    // For Bimbel activities, GPS is always required if shelter has GPS config
-    const isGpsRequired = activityDetails?.require_gps || (isBimbel && activityDetails);
-
-    if (!isGpsRequired) {
-      // GPS not required, proceed directly
-      return proceedWithSubmit(attendanceRecords, null);
-    }
-
-    // GPS required, show modal to get location
-    setPendingSubmitData(attendanceRecords);
-    setShowGpsModal(true);
-  };
-
-  const handleGpsLocationSuccess = async (locationData) => {
-    setShowGpsModal(false);
-    
-    if (pendingSubmitData) {
-      // Validate location if activity has GPS coordinates
-      let gpsValidation = null;
-      if (activityDetails?.latitude && activityDetails?.longitude) {
-        gpsValidation = validateLocationDistance(
-          { latitude: locationData.latitude, longitude: locationData.longitude },
-          { latitude: activityDetails.latitude, longitude: activityDetails.longitude },
-          activityDetails.max_distance_meters || 50
-        );
-        
-        if (!gpsValidation.valid) {
-          Alert.alert('Kesalahan GPS', gpsValidation.reason);
-          setPendingSubmitData(null);
-          return;
-        }
-      }
-      
-      // Prepare GPS data for API
-      const gpsData = prepareGpsDataForApi(locationData, gpsValidation);
-      await proceedWithSubmit(pendingSubmitData, gpsData);
-      setPendingSubmitData(null);
-    }
-  };
-
-  const handleGpsLocationError = (error) => {
-    setShowGpsModal(false);
-    setPendingSubmitData(null);
-    Alert.alert('Kesalahan GPS', error);
-  };
-
-  const proceedWithSubmit = async (attendanceRecords, gpsData) => submitStudentAttendance(attendanceRecords, gpsData);
-  
   const filteredStudents = students.filter(student => 
     (student.full_name || student.nick_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -325,7 +269,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
         arrival_time: formattedTime
       }));
 
-      requestGpsLocationForSubmit(attendanceRecords);
+      submitStudentAttendance(attendanceRecords);
     };
 
     if (dateStatus === 'past') {
@@ -343,17 +287,13 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     proceed();
   };
   
-  const submitStudentAttendance = async (attendanceRecords, gpsData = null) => {
-    const recordsWithGps = attendanceRecords.map(record => (
-      gpsData ? { ...record, gps_data: gpsData } : record
-    ));
-
+  const submitStudentAttendance = async (attendanceRecords) => {
     if (isConnected) {
       const successful = [];
       const duplicates = [];
       const failures = [];
 
-      for (const record of recordsWithGps) {
+      for (const record of attendanceRecords) {
         try {
           await dispatch(recordAttendanceManually(record)).unwrap();
           successful.push(record.id_anak);
@@ -394,7 +334,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
 
     let queuedCount = 0;
     let errorCount = 0;
-    for (const record of recordsWithGps) {
+    for (const record of attendanceRecords) {
       try {
         const result = await OfflineSync.processAttendance(record, 'manual');
         if (result?.queued || result?.offline) {
@@ -495,16 +435,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
           <View style={styles.offlineIndicator}>
             <Ionicons name="cloud-offline" size={18} color="#fff" />
             <Text style={styles.offlineText}>Mode Offline - Data akan disinkronkan nanti</Text>
-          </View>
-        )}
-        
-        {(activityDetails?.require_gps || (isBimbel && activityDetails)) && (
-          <View style={styles.gpsRequiredIndicator}>
-            <Ionicons name="location" size={18} color="#fff" />
-            <Text style={styles.gpsRequiredText}>
-              GPS diperlukan{isBimbel && !activityDetails?.require_gps ? ' (Aktivitas Bimbel)' : ''} - Radius maksimal: {activityDetails?.max_distance_meters || 50}m
-              {activityDetails?.location_name && ` di ${activityDetails.location_name}`}
-            </Text>
           </View>
         )}
         
@@ -625,19 +555,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
           />
         )}
         
-        <GpsPermissionModal
-          visible={showGpsModal}
-          onClose={() => {
-            setShowGpsModal(false);
-            setPendingSubmitData(null);
-          }}
-          onLocationSuccess={handleGpsLocationSuccess}
-          onLocationError={handleGpsLocationError}
-          title="GPS Diperlukan untuk Kehadiran"
-          subtitle="Kami perlu memverifikasi lokasi Anda untuk mencatat kehadiran"
-          requiredAccuracy={20}
-          autoCloseOnSuccess={true}
-        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -669,10 +586,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#e74c3c', padding: 12
   },
   offlineText: { color: '#fff', marginLeft: 8, fontSize: 14 },
-  gpsRequiredIndicator: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#9b59b6', padding: 12
-  },
-  gpsRequiredText: { color: '#fff', marginLeft: 8, fontSize: 14, fontWeight: '500' },
   duplicateAlert: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#f39c12', padding: 12
   },

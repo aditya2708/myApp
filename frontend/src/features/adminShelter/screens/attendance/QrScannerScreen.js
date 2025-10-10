@@ -9,12 +9,6 @@ import { Audio } from 'expo-av';
 import { format, startOfDay, isFuture, isPast } from 'date-fns';
 
 import QrScanner from '../../components/QrScanner';
-import GpsPermissionModal from '../../../../common/components/GpsPermissionModal';
-import {
-  getCurrentLocation,
-  validateLocationDistance,
-  prepareGpsDataForApi
-} from '../../../../common/utils/gpsUtils';
 import {
   validateToken, selectQrTokenLoading, selectValidationResult, resetValidationResult
 } from '../../redux/qrTokenSlice';
@@ -30,7 +24,6 @@ import {
 import OfflineSync from '../../utils/offlineSync';
 import { adminShelterKelompokApi } from '../../api/adminShelterKelompokApi';
 import { tutorAttendanceApi } from '../../api/tutorAttendanceApi';
-import { qrTokenApi } from '../../api/qrTokenApi';
 
 const QrScannerScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
@@ -59,10 +52,6 @@ const QrScannerScreen = ({ navigation, route }) => {
   const [loadingKelompokData, setLoadingKelompokData] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activityDateStatus, setActivityDateStatus] = useState('valid');
-  const [gpsConfig, setGpsConfig] = useState(null);
-  const [showGpsModal, setShowGpsModal] = useState(false);
-  const [pendingAttendanceData, setPendingAttendanceData] = useState(null);
-  const [gpsLocation, setGpsLocation] = useState(null);
   
   useEffect(() => {
     const loadSound = async () => {
@@ -101,7 +90,6 @@ const QrScannerScreen = ({ navigation, route }) => {
       fetchKelompokStudents(kelompokId);
     }
     validateActivityDate();
-    fetchGpsConfig();
   }, [activityType, kelompokId, activityDate, id_aktivitas]);
   
   useEffect(() => {
@@ -120,14 +108,12 @@ const QrScannerScreen = ({ navigation, route }) => {
         }
       }
       
-      // Request GPS location if required, otherwise proceed directly
-      requestGpsLocation({
-        token: validationResult.token.token,
-        id_anak: validationResult.anak.id_anak,
-        isTutor: false
-      });
+      handleAttendanceRecording(
+        validationResult.token.token,
+        validationResult.anak.id_anak
+      );
     }
-  }, [validationResult, isBimbelActivity, kelompokStudentIds]);
+  }, [validationResult, isBimbelActivity, kelompokStudentIds, handleAttendanceRecording]);
   
   const validateActivityDate = () => {
     if (!activityDate) {
@@ -164,20 +150,6 @@ const QrScannerScreen = ({ navigation, route }) => {
       setKelompokStudentIds([]);
     } finally {
       setLoadingKelompokData(false);
-    }
-  };
-  
-  const fetchGpsConfig = async () => {
-    if (!id_aktivitas) return;
-    
-    try {
-      const response = await qrTokenApi.getActivityGpsConfig(id_aktivitas);
-      if (response.data?.success) {
-        setGpsConfig(response.data.data);
-      }
-    } catch (error) {
-      console.error('Error mengambil konfigurasi GPS:', error);
-      setGpsConfig(null);
     }
   };
   
@@ -248,11 +220,7 @@ const QrScannerScreen = ({ navigation, route }) => {
       const isTutorToken = await validateIfTutorToken(qrData.token);
       setTimeout(() => {
         if (isTutorToken) {
-          // Request GPS location for tutor attendance
-          requestGpsLocation({
-            token: qrData.token,
-            isTutor: true
-          });
+          handleTutorAttendanceRecording(qrData.token);
         } else {
           dispatch(validateToken(qrData.token));
         }
@@ -263,7 +231,7 @@ const QrScannerScreen = ({ navigation, route }) => {
     } finally {
       setTimeout(() => setIsProcessing(false), 1000);
     }
-  }, [dispatch]);
+  }, [dispatch, handleTutorAttendanceRecording]);
   
   const validateIfTutorToken = useCallback(async (token) => {
     try {
@@ -274,72 +242,14 @@ const QrScannerScreen = ({ navigation, route }) => {
     }
   }, []);
   
-  const requestGpsLocation = async (attendanceData) => {
-    // For Bimbel activities, GPS is always required if shelter has GPS config
-    const isGpsRequired = gpsConfig?.require_gps || (isBimbelActivity && gpsConfig);
-    
-    if (!isGpsRequired) {
-      // GPS not required, proceed directly
-      return proceedWithAttendance(attendanceData, null);
-    }
-    
-    // GPS required, show modal to get location
-    setPendingAttendanceData(attendanceData);
-    setShowGpsModal(true);
-  };
-
-  const handleGpsLocationSuccess = async (locationData) => {
-    setGpsLocation(locationData);
-    setShowGpsModal(false);
-    
-    if (pendingAttendanceData) {
-      // Validate location if activity has GPS coordinates
-      let gpsValidation = null;
-      if (gpsConfig?.latitude && gpsConfig?.longitude) {
-        gpsValidation = validateLocationDistance(
-          { latitude: locationData.latitude, longitude: locationData.longitude },
-          { latitude: gpsConfig.latitude, longitude: gpsConfig.longitude },
-          gpsConfig.max_distance_meters || 50
-        );
-        
-        if (!gpsValidation.valid) {
-          showToast(gpsValidation.reason, 'error');
-          setPendingAttendanceData(null);
-          return;
-        }
-      }
-      
-      // Prepare GPS data for API
-      const gpsData = prepareGpsDataForApi(locationData, gpsValidation);
-      await proceedWithAttendance(pendingAttendanceData, gpsData);
-      setPendingAttendanceData(null);
-    }
-  };
-
-  const handleGpsLocationError = (error) => {
-    setShowGpsModal(false);
-    setPendingAttendanceData(null);
-    showToast(`Kesalahan GPS: ${error}`, 'error');
-  };
-
-  const proceedWithAttendance = async (attendanceData, gpsData) => {
-    const { token, id_anak, isTutor } = attendanceData;
-    
-    if (isTutor) {
-      return handleTutorAttendanceRecording(token, gpsData);
-    } else {
-      return handleAttendanceRecording(token, id_anak, gpsData);
-    }
-  };
-
-  const handleAttendanceRecording = useCallback(async (token, id_anak, gpsData = null) => {
+  const handleAttendanceRecording = useCallback(async (token, id_anak) => {
     try {
       if (isConnected) {
         const now = new Date();
         const formattedArrivalTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
         
         const result = await dispatch(recordAttendanceByQr({ 
-          id_anak, id_aktivitas, status: null, token, arrival_time: formattedArrivalTime, gps_data: gpsData
+          id_anak, id_aktivitas, status: null, token, arrival_time: formattedArrivalTime
         })).unwrap();
         
         await playSound();
@@ -371,31 +281,19 @@ const QrScannerScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       if (!error.isDuplicate) {
-        // Handle GPS validation errors specifically
-        if (error.error_type === 'gps_validation_failed') {
-          const gpsError = error.gps_validation;
-          if (gpsError?.error_type === 'location_out_of_range') {
-            setTimeout(() => showToast(`Anda berada ${gpsError.distance}m dari lokasi aktivitas (maksimal ${gpsError.max_distance}m)`, 'error'), 100);
-          } else if (gpsError?.error_type === 'low_accuracy') {
-            setTimeout(() => showToast(`Akurasi GPS terlalu rendah (${gpsError.current_accuracy}m). Diperlukan maksimal ${gpsError.required_accuracy}m`, 'error'), 100);
-          } else {
-            setTimeout(() => showToast(gpsError?.reason || 'Validasi GPS gagal', 'error'), 100);
-          }
-        } else {
-          setTimeout(() => showToast(error.message || 'Gagal merekam', 'error'), 100);
-        }
+        setTimeout(() => showToast(error.message || 'Gagal merekam', 'error'), 100);
       }
     }
-  }, [isConnected, dispatch, id_aktivitas, validationResult, playSound, showToast, gpsConfig]);
+  }, [isConnected, dispatch, id_aktivitas, validationResult, playSound, showToast]);
   
-  const handleTutorAttendanceRecording = useCallback(async (token, gpsData = null) => {
+  const handleTutorAttendanceRecording = useCallback(async (token) => {
     try {
       if (isConnected) {
         const now = new Date();
         const formattedArrivalTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
         
-        const result = await dispatch(recordTutorAttendanceByQr({ 
-          id_aktivitas, token, arrival_time: formattedArrivalTime, gps_data: gpsData
+        const result = await dispatch(recordTutorAttendanceByQr({
+          id_aktivitas, token, arrival_time: formattedArrivalTime
         })).unwrap();
         
         await playSound();
@@ -427,22 +325,10 @@ const QrScannerScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       if (!error.isDuplicate) {
-        // Handle GPS validation errors specifically
-        if (error.error_type === 'gps_validation_failed') {
-          const gpsError = error.gps_validation;
-          if (gpsError?.error_type === 'location_out_of_range') {
-            setTimeout(() => showToast(`Tutor berada ${gpsError.distance}m dari lokasi aktivitas (maksimal ${gpsError.max_distance}m)`, 'error'), 100);
-          } else if (gpsError?.error_type === 'low_accuracy') {
-            setTimeout(() => showToast(`Akurasi GPS terlalu rendah (${gpsError.current_accuracy}m). Diperlukan maksimal ${gpsError.required_accuracy}m`, 'error'), 100);
-          } else {
-            setTimeout(() => showToast(gpsError?.reason || 'Validasi GPS gagal', 'error'), 100);
-          }
-        } else {
-          setTimeout(() => showToast(error.message || 'Gagal merekam kehadiran tutor', 'error'), 100);
-        }
+        setTimeout(() => showToast(error.message || 'Gagal merekam kehadiran tutor', 'error'), 100);
       }
     }
-  }, [isConnected, dispatch, id_aktivitas, playSound, showToast, gpsConfig]);
+  }, [isConnected, dispatch, id_aktivitas, playSound, showToast]);
   
   const handleClose = useCallback(() => navigation.goBack(), [navigation]);
   
@@ -508,16 +394,6 @@ const QrScannerScreen = ({ navigation, route }) => {
           </View>
         )}
         
-        {(gpsConfig?.require_gps || (isBimbelActivity && gpsConfig)) && (
-          <View style={styles.gpsRequiredNote}>
-            <Ionicons name="location" size={16} color="#fff" />
-            <Text style={styles.gpsRequiredText}>
-              GPS diperlukan{isBimbelActivity && !gpsConfig?.require_gps ? ' (Aktivitas Bimbel)' : ''} - Radius maksimal: {gpsConfig?.max_distance_meters || 50}m
-              {gpsConfig?.location_name && ` di ${gpsConfig.location_name}`}
-            </Text>
-          </View>
-        )}
-        
         {activityDateStatus === 'valid' && (
           <View style={styles.autoDetectionNote}>
             <Ionicons name="time-outline" size={16} color="#fff" />
@@ -541,20 +417,6 @@ const QrScannerScreen = ({ navigation, route }) => {
           <Text style={styles.toastText}>{toastMessage}</Text>
         </Animated.View>
       )}
-      
-      <GpsPermissionModal
-        visible={showGpsModal}
-        onClose={() => {
-          setShowGpsModal(false);
-          setPendingAttendanceData(null);
-        }}
-        onLocationSuccess={handleGpsLocationSuccess}
-        onLocationError={handleGpsLocationError}
-        title="GPS Diperlukan untuk Kehadiran"
-        subtitle="Kami perlu memverifikasi lokasi Anda untuk mencatat kehadiran"
-        requiredAccuracy={20}
-        autoCloseOnSuccess={true}
-      />
     </SafeAreaView>
   );
 };
@@ -577,11 +439,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(52, 152, 219, 0.7)', padding: 10, borderRadius: 6, marginBottom: 10
   },
   autoDetectionText: { color: '#fff', marginLeft: 8, fontSize: 12, textAlign: 'center' },
-  gpsRequiredNote: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(155, 89, 182, 0.7)', padding: 10, borderRadius: 6, marginBottom: 10
-  },
-  gpsRequiredText: { color: '#fff', marginLeft: 8, fontSize: 12, textAlign: 'center', fontWeight: '500' },
   offlineIndicator: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#e74c3c', padding: 6, borderRadius: 4
