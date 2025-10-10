@@ -134,7 +134,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   }, [isBimbel, kelompokId, kelompokName]);
 
   useEffect(() => {
-    if (dateStatus !== 'valid') return;
+    if (!dateStatus) return;
 
     if (isBimbel) {
       if (resolvedKelompokId) {
@@ -316,7 +316,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
       <TouchableOpacity
         style={[styles.item, isSelected && styles.selectedItem]}
         onPress={toggleSelection}
-        disabled={dateStatus !== 'valid'}
+        disabled={isFormDisabled}
       >
         <View style={styles.avatar}>
           <Ionicons name="person" size={24} color="#95a5a6" />
@@ -470,28 +470,25 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     }
   };
 
-  const isFormDisabled = dateStatus === 'future';
+  const isFormDisabled = dateStatus !== 'valid' && dateStatus !== 'past';
   const statusInfo = getDateStatusInfo();
-  
+
   const Header = () => (
     <>
       <Text style={styles.label}>
         {`Siswa${isBimbel ? ` dari ${kelompokName || 'kelompok ini'}` : ''}`}
       </Text>
 
-      {!isFormDisabled && (
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#7f8c8d" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Cari siswa..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            clearButtonMode="while-editing"
-            editable={!isFormDisabled}
-          />
-        </View>
-      )}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#7f8c8d" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cari siswa..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          clearButtonMode="while-editing"
+        />
+      </View>
     </>
   );
   
@@ -550,67 +547,63 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
           ) : (
             <>
               <FlatList
-                data={isFormDisabled ? [] : filteredStudents}
+                data={filteredStudents}
                 renderItem={renderStudentItem}
                 keyExtractor={(item) => item.id_anak.toString()}
                 ListHeaderComponent={Header}
-                ListEmptyComponent={!isFormDisabled ? <Text style={styles.emptyText}>Tidak ada siswa ditemukan</Text> : null}
+                ListEmptyComponent={<Text style={styles.emptyText}>Tidak ada siswa ditemukan</Text>}
                 contentContainerStyle={styles.listContent}
                 keyboardShouldPersistTaps="handled"
               />
 
-              {!isFormDisabled && (
-                <>
-                  <View style={styles.formSection}>
-                    <Text style={styles.label}>Waktu Kedatangan</Text>
-                    <TouchableOpacity
-                      style={[styles.timeButton, isFormDisabled && styles.disabledButton]}
-                      onPress={() => !isFormDisabled && setShowTimePicker(true)}
-                      disabled={isFormDisabled}
-                    >
-                      <Ionicons name="time-outline" size={20} color="#3498db" />
-                      <Text style={styles.timeText}>{format(arrivalTime, 'HH:mm')}</Text>
-                    </TouchableOpacity>
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Waktu Kedatangan</Text>
+                <TouchableOpacity
+                  style={[styles.timeButton, isFormDisabled && styles.disabledButton]}
+                  onPress={() => !isFormDisabled && setShowTimePicker(true)}
+                  disabled={isFormDisabled}
+                >
+                  <Ionicons name="time-outline" size={20} color="#3498db" />
+                  <Text style={styles.timeText}>{format(arrivalTime, 'HH:mm')}</Text>
+                </TouchableOpacity>
 
-                    {showTimePicker && (
-                      <DateTimePicker
-                        value={arrivalTime}
-                        mode="time"
-                        is24Hour={true}
-                        display="default"
-                        onChange={handleTimeChange}
-                      />
-                    )}
-                  </View>
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={arrivalTime}
+                    mode="time"
+                    is24Hour={true}
+                    display="default"
+                    onChange={handleTimeChange}
+                  />
+                )}
+              </View>
 
-                  <View style={styles.formSection}>
-                    <Text style={styles.label}>Status yang Diharapkan</Text>
-                    <View style={[styles.expectedStatus, { backgroundColor: getStatusColor(expectedStatus) }]}>
-                      <Ionicons name={getStatusIcon(expectedStatus)} size={20} color="#fff" />
-                      <Text style={styles.expectedText}>
-                        {expectedStatus === 'present' ? 'Hadir' : expectedStatus === 'late' ? 'Terlambat' : 'Tidak Hadir'}
-                      </Text>
-                    </View>
-                    <Text style={styles.helperText}>
-                      Status ditentukan otomatis berdasarkan jadwal aktivitas dan waktu kedatangan
-                    </Text>
-                  </View>
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Status yang Diharapkan</Text>
+                <View style={[styles.expectedStatus, { backgroundColor: getStatusColor(expectedStatus) }]}>
+                  <Ionicons name={getStatusIcon(expectedStatus)} size={20} color="#fff" />
+                  <Text style={styles.expectedText}>
+                    {expectedStatus === 'present' ? 'Hadir' : expectedStatus === 'late' ? 'Terlambat' : 'Tidak Hadir'}
+                  </Text>
+                </View>
+                <Text style={styles.helperText}>
+                  Status ditentukan otomatis berdasarkan jadwal aktivitas dan waktu kedatangan
+                </Text>
+              </View>
 
-                  <View style={styles.formSection}>
-                    <Text style={styles.label}>Catatan Verifikasi (Wajib)</Text>
-                    <TextInput
-                      style={[styles.notesInput, isFormDisabled && styles.disabledInput]}
-                      placeholder="Masukkan catatan verifikasi..."
-                      value={notes}
-                      onChangeText={setNotes}
-                      multiline
-                      numberOfLines={3}
-                      textAlignVertical="top"
-                      editable={!isFormDisabled}
-                    />
-                  </View>
-                </>
-              )}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Catatan Verifikasi (Wajib)</Text>
+                <TextInput
+                  style={[styles.notesInput, isFormDisabled && styles.disabledInput]}
+                  placeholder="Masukkan catatan verifikasi..."
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  editable={!isFormDisabled}
+                />
+              </View>
 
               <View style={styles.buttonSection}>
                 <TouchableOpacity
