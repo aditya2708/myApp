@@ -210,6 +210,8 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/weekly/groups/{group}/students', AttendanceWeeklyGroupStudentController::class);
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
                 Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
+                Route::get('/children', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangChildReportController::class, 'index']);
+                Route::get('/children/{child}', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangChildReportController::class, 'show']);
             });
         });
 

@@ -59,6 +59,95 @@ const normalizeWeeklyAttendanceParams = (params = {}) => {
   return normalized;
 };
 
+const normalizeChildAttendanceParams = (params = {}) => {
+  const normalized = {};
+
+  const assignIfDefined = (key, ...candidates) => {
+    const value = firstDefined(...candidates);
+
+    if (value !== undefined) {
+      normalized[key] = value;
+    }
+  };
+
+  assignIfDefined('page', params.page);
+  assignIfDefined('per_page', params.per_page, params.perPage, params.pageSize);
+  assignIfDefined('search', params.search, params.keyword, params.q);
+  assignIfDefined(
+    'attendance_band',
+    params.attendance_band,
+    params.attendanceBand,
+    params.band,
+    params.band_id,
+  );
+  assignIfDefined('shelter_id', params.shelter_id, params.shelterId);
+  assignIfDefined('group_id', params.group_id, params.groupId);
+  assignIfDefined('start_date', params.start_date, params.startDate);
+  assignIfDefined('end_date', params.end_date, params.endDate);
+  assignIfDefined('sort_by', params.sort_by, params.sortBy);
+  assignIfDefined('sort_direction', params.sort_direction, params.sortDirection, params.order);
+
+  return normalized;
+};
+
+const adaptChildAttendancePayload = (payload = {}) => {
+  const ensureObject = (value, fallback = {}) => {
+    if (value && typeof value === 'object') {
+      return value;
+    }
+
+    return fallback;
+  };
+
+  const adapted = {
+    ...payload,
+    children: ensureArray(payload.children).filter(Boolean),
+    shelter_breakdown: ensureArray(payload.shelter_breakdown).filter(Boolean),
+    shelter_attendance_chart: ensureArray(payload.shelter_attendance_chart).filter(Boolean),
+  };
+
+  if (!adapted.attendance_band_distribution) {
+    adapted.attendance_band_distribution = { high: 0, medium: 0, low: 0 };
+  } else {
+    adapted.attendance_band_distribution = ensureObject(adapted.attendance_band_distribution, {
+      high: 0,
+      medium: 0,
+      low: 0,
+    });
+  }
+
+  if (!adapted.pagination) {
+    adapted.pagination = ensureObject(payload.pagination, {});
+  }
+
+  if (!adapted.available_filters) {
+    adapted.available_filters = ensureObject(payload.available_filters, {});
+  }
+
+  return adapted;
+};
+
+const adaptChildAttendanceResponse = (response) => {
+  if (response?.data?.data) {
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        data: adaptChildAttendancePayload(response.data.data),
+      },
+    };
+  }
+
+  if (response?.data) {
+    return {
+      ...response,
+      data: adaptChildAttendancePayload(response.data),
+    };
+  }
+
+  return adaptChildAttendancePayload(response);
+};
+
 const adaptAttendanceActivitiesResponse = (response) => {
   const rawPayload = response?.data ?? response ?? {};
   const dataPayload = rawPayload?.data ?? rawPayload ?? {};
@@ -117,7 +206,12 @@ const adaptAttendanceActivitiesResponse = (response) => {
 };
 
 const {
-  REPORTS: { SUMMARY: SUMMARY_ENDPOINT, ATTENDANCE: ATTENDANCE_ENDPOINTS, WEEKLY_ATTENDANCE: WEEKLY_ATTENDANCE_ENDPOINTS },
+  REPORTS: {
+    SUMMARY: SUMMARY_ENDPOINT,
+    ATTENDANCE: ATTENDANCE_ENDPOINTS,
+    WEEKLY_ATTENDANCE: WEEKLY_ATTENDANCE_ENDPOINTS,
+    CHILD_ATTENDANCE: CHILD_ATTENDANCE_ENDPOINTS,
+  },
 } = ADMIN_CABANG_ENDPOINTS;
 
 export const adminCabangReportApi = {
@@ -164,6 +258,24 @@ export const adminCabangReportApi = {
 
   async getAttendanceMonthlyBranch(params = {}) {
     return api.get(ATTENDANCE_ENDPOINTS.MONTHLY_BRANCH, { params });
+  },
+
+  async getChildAttendanceReport(params = {}) {
+    const normalizedParams = normalizeChildAttendanceParams(params);
+
+    return api.get(CHILD_ATTENDANCE_ENDPOINTS.LIST, { params: normalizedParams }).then(adaptChildAttendanceResponse);
+  },
+
+  async getChildAttendanceReportDetail(childId, params = {}) {
+    if (!childId) {
+      throw new Error('Child ID is required to fetch child attendance detail');
+    }
+
+    const normalizedParams = normalizeChildAttendanceParams(params);
+
+    return api
+      .get(CHILD_ATTENDANCE_ENDPOINTS.DETAIL(childId), { params: normalizedParams })
+      .then(adaptChildAttendanceResponse);
   },
 };
 
