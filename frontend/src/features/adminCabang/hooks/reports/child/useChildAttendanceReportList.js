@@ -51,36 +51,46 @@ const adaptSummary = (rawSummary = {}) => {
     0,
   );
 
+  const presentCount = firstDefined(
+    rawSummary.presentCount,
+    rawSummary.present,
+    totalsSource.present,
+    totalsSource.presentCount,
+    totalsSource.present_count,
+    0,
+  );
+
+  const lateCount = firstDefined(
+    rawSummary.lateCount,
+    rawSummary.late,
+    totalsSource.late,
+    totalsSource.lateCount,
+    totalsSource.late_count,
+    0,
+  );
+
+  const absentCount = firstDefined(
+    rawSummary.absentCount,
+    rawSummary.absent,
+    totalsSource.absent,
+    totalsSource.absentCount,
+    totalsSource.absent_count,
+    0,
+  );
+
   return {
     attendanceRate: {
       value: attendanceRateValue,
       label: rawSummary.attendanceRateLabel || rawSummary.attendance_rate_label || null,
     },
+    attendance_percentage: attendanceRateValue,
+    presentCount,
+    lateCount,
+    absentCount,
     totals: {
-      present: firstDefined(
-        rawSummary.presentCount,
-        rawSummary.present,
-        totalsSource.present,
-        totalsSource.presentCount,
-        totalsSource.present_count,
-        0,
-      ),
-      late: firstDefined(
-        rawSummary.lateCount,
-        rawSummary.late,
-        totalsSource.late,
-        totalsSource.lateCount,
-        totalsSource.late_count,
-        0,
-      ),
-      absent: firstDefined(
-        rawSummary.absentCount,
-        rawSummary.absent,
-        totalsSource.absent,
-        totalsSource.absentCount,
-        totalsSource.absent_count,
-        0,
-      ),
+      present: presentCount,
+      late: lateCount,
+      absent: absentCount,
       totalSessions: firstDefined(
         rawSummary.totalSessions,
         rawSummary.sessionCount,
@@ -147,9 +157,72 @@ const adaptFilters = (rawFilters = {}, currentParams = {}) => {
     null,
   );
 
+  const shelterId = firstDefined(
+    rawFilters.shelter_id,
+    rawFilters.shelterId,
+    currentParams.shelter_id,
+    currentParams.shelterId,
+    null,
+  );
+
+  const groupId = firstDefined(
+    rawFilters.group_id,
+    rawFilters.groupId,
+    currentParams.group_id,
+    currentParams.groupId,
+    null,
+  );
+
+  const startDate = firstDefined(
+    rawFilters.start_date,
+    rawFilters.startDate,
+    currentParams.start_date,
+    currentParams.startDate,
+    null,
+  );
+
+  const endDate = firstDefined(
+    rawFilters.end_date,
+    rawFilters.endDate,
+    currentParams.end_date,
+    currentParams.endDate,
+    null,
+  );
+
   return {
     search: search ?? '',
     band: band ?? null,
+    shelterId: shelterId ?? null,
+    groupId: groupId ?? null,
+    startDate: startDate ?? null,
+    endDate: endDate ?? null,
+  };
+};
+
+const adaptPayloadExtras = (payload = {}) => {
+  const {
+    summary,
+    children,
+    pagination,
+    filters,
+    metadata: metadataPayload,
+    ...rest
+  } = payload || {};
+
+  const availableFilters = firstDefined(rest.available_filters, rest.availableFilters, null);
+  const shelters = rest.shelters || rest.shelter_list || rest.shelterOptions || [];
+  const groups = rest.groups || rest.group_list || rest.groupOptions || [];
+  const chart = rest.chart ?? null;
+  const chartData = firstDefined(rest.chart_data, rest.chartData, chart, null);
+
+  return {
+    availableFilters,
+    shelters: Array.isArray(shelters) ? shelters : [],
+    groups: Array.isArray(groups) ? groups : [],
+    chart,
+    chartData,
+    metadata: metadataPayload || {},
+    rawMetadata: rest,
   };
 };
 
@@ -160,8 +233,32 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   const [summary, setSummary] = useState(() => adaptSummary({}));
   const [children, setChildren] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, perPage: 10, total: 0, totalPages: 1 });
-  const [filters, setFilters] = useState({ search: '', band: null });
-  const [params, setParams] = useState(() => ({ page: 1, perPage: 10, search: '', band: null, ...initialParams }));
+  const [filters, setFilters] = useState({
+    search: '',
+    band: null,
+    shelterId: null,
+    groupId: null,
+    startDate: null,
+    endDate: null,
+  });
+  const [availableFilters, setAvailableFilters] = useState(null);
+  const [shelters, setShelters] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [chart, setChart] = useState(null);
+  const [chartData, setChartData] = useState(null);
+  const [metadata, setMetadata] = useState({});
+  const [rawMetadata, setRawMetadata] = useState({});
+  const [params, setParams] = useState(() => ({
+    page: 1,
+    perPage: 10,
+    search: '',
+    band: null,
+    shelterId: null,
+    groupId: null,
+    startDate: null,
+    endDate: null,
+    ...initialParams,
+  }));
   const [error, setError] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
@@ -197,6 +294,14 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
         setChildren(Array.isArray(payload.children) ? payload.children : []);
         setPagination(adaptPagination(payload.pagination || {}, queryParams));
         setFilters(adaptFilters(payload.filters || {}, { ...params, ...queryParams }));
+        const extras = adaptPayloadExtras(payload);
+        setAvailableFilters(extras.availableFilters);
+        setShelters(extras.shelters);
+        setGroups(extras.groups);
+        setChart(extras.chart);
+        setChartData(extras.chartData);
+        setMetadata(extras.metadata);
+        setRawMetadata(extras.rawMetadata);
       } catch (err) {
         if (!isMountedRef.current) return;
         setError(err);
@@ -226,6 +331,42 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
     setParams((prev) => ({ ...prev, page: 1, search }));
   }, []);
 
+  const setShelterId = useCallback((shelterId) => {
+    setParams((prev) => ({
+      ...prev,
+      page: 1,
+      shelterId,
+      shelter_id: shelterId,
+    }));
+  }, []);
+
+  const setGroupId = useCallback((groupId) => {
+    setParams((prev) => ({
+      ...prev,
+      page: 1,
+      groupId,
+      group_id: groupId,
+    }));
+  }, []);
+
+  const setStartDate = useCallback((startDate) => {
+    setParams((prev) => ({
+      ...prev,
+      page: 1,
+      startDate,
+      start_date: startDate,
+    }));
+  }, []);
+
+  const setEndDate = useCallback((endDate) => {
+    setParams((prev) => ({
+      ...prev,
+      page: 1,
+      endDate,
+      end_date: endDate,
+    }));
+  }, []);
+
   const refresh = useCallback(() => {
     fetchReport({ refreshing: true });
   }, [fetchReport]);
@@ -241,12 +382,23 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
     children,
     pagination,
     filters,
+    availableFilters,
+    shelters,
+    groups,
+    chart,
+    chartData,
+    metadata,
+    rawMetadata,
     params,
     error,
     errorMessage,
     setBand,
     setSearch,
     setPage,
+    setShelterId,
+    setGroupId,
+    setStartDate,
+    setEndDate,
     refresh,
     refetch,
   };
