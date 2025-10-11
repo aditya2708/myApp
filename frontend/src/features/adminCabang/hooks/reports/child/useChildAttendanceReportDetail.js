@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { adminCabangReportApi } from '../../../../api/adminCabangReportApi';
+import { adminCabangReportApi } from '../../../api/adminCabangReportApi';
 
 const firstDefined = (...values) => {
   for (const value of values) {

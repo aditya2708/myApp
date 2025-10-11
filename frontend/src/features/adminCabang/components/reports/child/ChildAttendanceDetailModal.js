@@ -460,8 +460,8 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     backgroundColor: '#0984e3',
     alignItems: 'center',
-    justifyContent:
-
+    justifyContent: 'center',
+  },
   avatarInitials: {
     fontSize: 22,
     fontWeight: '700',
@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
   timelineDate: {
     fontSize: 12,
     color: '#95a5a6',
-
+},
 });
 
 export default ChildAttendanceDetailModal;
