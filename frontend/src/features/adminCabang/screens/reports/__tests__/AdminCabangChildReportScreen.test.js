@@ -5,21 +5,14 @@ import { act, render } from '@testing-library/react-native';
 import AdminCabangChildReportScreen from '../AdminCabangChildReportScreen';
 import ChildAttendanceFilterSheet from '../../../components/reports/child/ChildAttendanceFilterSheet';
 
-jest.mock('../../../hooks/reports/child/useChildAttendanceReportList', () => ({
-  useChildAttendanceReportList: jest.fn(),
+const mockNavigate = jest.fn();
+
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: mockNavigate }),
 }));
 
-jest.mock('../../../hooks/reports/child/useChildAttendanceReportDetail', () => ({
-  useChildAttendanceReportDetail: jest.fn(() => ({
-    child: null,
-    monthlyBreakdown: [],
-    timeline: [],
-    isLoading: false,
-    error: null,
-    errorMessage: null,
-    refresh: jest.fn(),
-    refetch: jest.fn(),
-  })),
+jest.mock('../../../hooks/reports/child/useChildAttendanceReportList', () => ({
+  useChildAttendanceReportList: jest.fn(),
 }));
 
 const mockUseChildAttendanceReportList = jest.requireMock(
@@ -30,6 +23,7 @@ describe('AdminCabangChildReportScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockNavigate.mockClear();
   });
 
   it('renders safely when filter data is not yet available and shows loading state', () => {

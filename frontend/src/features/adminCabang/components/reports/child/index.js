@@ -2,4 +2,3 @@ export { default as ChildAttendanceSummarySection } from './ChildAttendanceSumma
 export { default as ChildAttendanceBarChart } from './ChildAttendanceBarChart';
 export { default as ChildAttendanceCard } from './ChildAttendanceCard';
 export { default as ChildAttendanceFilterSheet } from './ChildAttendanceFilterSheet';
-export { default as ChildAttendanceDetailModal } from './ChildAttendanceDetailModal';
