@@ -223,8 +223,12 @@ const adaptBandDistribution = (rawDistribution) => {
   return [];
 };
 
-export const useChildAttendanceReportDetail = ({ childId, params: inputParams = {} } = {}) => {
-  const [isLoading, setIsLoading] = useState(() => Boolean(childId));
+export const useChildAttendanceReportDetail = ({
+  childId,
+  params: inputParams = {},
+  enabled = true,
+} = {}) => {
+  const [isLoading, setIsLoading] = useState(() => Boolean(childId) && enabled);
   const [child, setChild] = useState(() => adaptChild({}));
   const [summary, setSummary] = useState(() => adaptSummary({}));
   const [shelterBreakdown, setShelterBreakdown] = useState([]);
@@ -232,10 +236,18 @@ export const useChildAttendanceReportDetail = ({ childId, params: inputParams = 
   const [error, setError] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  const params = useMemo(() => ({ ...inputParams }), [inputParams]);
+  const paramsKey = JSON.stringify(inputParams ?? {});
+  const params = useMemo(() => (inputParams ? { ...inputParams } : {}), [paramsKey]);
 
   useEffect(() => {
     let isActive = true;
+
+    if (!enabled) {
+      setIsLoading(false);
+      return () => {
+        isActive = false;
+      };
+    }
 
     if (!childId) {
       setIsLoading(false);
@@ -292,7 +304,7 @@ export const useChildAttendanceReportDetail = ({ childId, params: inputParams = 
     return () => {
       isActive = false;
     };
-  }, [childId, params]);
+  }, [childId, enabled, paramsKey]);
 
   return {
     isLoading,

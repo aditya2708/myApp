@@ -365,7 +365,7 @@ const AdminCabangChildReportScreen = () => {
 
   const detailState = useChildAttendanceReportDetail({
     childId: selectedChildId,
-    filters: {
+    params: {
       startDate: normalizedFilters.startDate,
       endDate: normalizedFilters.endDate,
     },
