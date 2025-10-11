@@ -146,15 +146,21 @@ const adaptSummary = (rawSummary = {}) => {
 };
 
 const adaptChild = (rawChild = {}) => {
-  const totalsSource = rawChild.totals || rawChild;
+  const isObject = rawChild && typeof rawChild === 'object';
+  const base = {
+    ...(isObject ? rawChild : {}),
+  };
+
+  const totalsSource = base.totals || base;
 
   return {
-    id: rawChild.id ?? null,
-    name: rawChild.name ?? '',
+    ...base,
+    id: base.id ?? null,
+    name: base.name ?? '',
     attendanceRate: firstDefined(
-      rawChild.attendanceRate,
-      rawChild.attendance_rate,
-      rawChild.rate,
+      base.attendanceRate,
+      base.attendance_rate,
+      base.rate,
       null,
     ),
     totals: adaptTotals(totalsSource),
@@ -229,7 +235,7 @@ export const useChildAttendanceReportDetail = ({
   enabled = true,
 } = {}) => {
   const [isLoading, setIsLoading] = useState(() => Boolean(childId) && enabled);
-  const [child, setChild] = useState(() => adaptChild({}));
+  const [child, setChild] = useState(() => null);
   const [summary, setSummary] = useState(() => adaptSummary({}));
   const [shelterBreakdown, setShelterBreakdown] = useState([]);
   const [bandDistribution, setBandDistribution] = useState([]);
@@ -285,7 +291,12 @@ export const useChildAttendanceReportDetail = ({
           [],
         );
 
-        setChild(adaptChild(childPayload));
+        const hasChildPayload =
+          childPayload &&
+          typeof childPayload === 'object' &&
+          Object.keys(childPayload).length > 0;
+
+        setChild(hasChildPayload ? adaptChild(childPayload) : null);
         setSummary(adaptSummary(summaryPayload));
         setShelterBreakdown(adaptShelterBreakdown(shelterPayload));
         setBandDistribution(adaptBandDistribution(bandPayload));
