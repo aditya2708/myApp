@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import EmptyState from '../../../../common/components/EmptyState';
@@ -16,9 +17,7 @@ import ChildAttendanceSummarySection from '../../components/reports/child/ChildA
 import ChildAttendanceBarChart from '../../components/reports/child/ChildAttendanceBarChart';
 import ChildAttendanceCard from '../../components/reports/child/ChildAttendanceCard';
 import ChildAttendanceFilterSheet from '../../components/reports/child/ChildAttendanceFilterSheet';
-import ChildAttendanceDetailModal from '../../components/reports/child/ChildAttendanceDetailModal';
 import { useChildAttendanceReportList } from '../../hooks/reports/child/useChildAttendanceReportList';
-import { useChildAttendanceReportDetail } from '../../hooks/reports/child/useChildAttendanceReportDetail';
 
 const extractChildId = (child) => {
   if (!child) return null;
@@ -126,9 +125,8 @@ const countActiveFilters = (filters) => {
 };
 
 const AdminCabangChildReportScreen = () => {
+  const navigation = useNavigation();
   const [isFilterVisible, setFilterVisible] = useState(false);
-  const [selectedChildMeta, setSelectedChildMeta] = useState(null);
-  const [isDetailVisible, setDetailVisible] = useState(false);
 
   const reportState = useChildAttendanceReportList?.() || {};
 
@@ -347,61 +345,22 @@ const AdminCabangChildReportScreen = () => {
     }
   }, [effectiveHasNextPage, fetchNextPage, isFetchingMore, isLoading, loadMore]);
 
-  const handleSelectChild = useCallback((child) => {
-    const childId = extractChildId(child);
-    if (!childId) {
-      return;
-    }
+  const handleSelectChild = useCallback(
+    (child) => {
+      const childId = extractChildId(child);
+      if (!childId) {
+        return;
+      }
 
-    setSelectedChildMeta({ id: childId, fallback: child });
-    setDetailVisible(true);
-  }, []);
-
-  const handleCloseDetail = useCallback(() => {
-    setDetailVisible(false);
-  }, []);
-
-  const selectedChildId = selectedChildMeta?.id ?? null;
-
-  const detailState = useChildAttendanceReportDetail({
-    childId: selectedChildId,
-    params: {
-      startDate: normalizedFilters.startDate,
-      endDate: normalizedFilters.endDate,
+      navigation.navigate('AdminCabangChildReportDetail', {
+        childId,
+        fallbackChild: child,
+        filters: normalizedFilters,
+        period,
+      });
     },
-    enabled: isDetailVisible && Boolean(selectedChildId),
-  });
-
-  const {
-    child: detailChild,
-    summary: detailSummary,
-    shelterBreakdown: detailShelterBreakdown,
-    bandDistribution: detailBandDistribution,
-    monthlyBreakdown,
-    attendanceTimeline,
-    verificationSummary,
-    streaks,
-    filters: detailFilters,
-    period: detailPeriod,
-    meta: detailMeta,
-    isLoading: isDetailLoading = false,
-    error: detailError,
-    errorMessage: detailErrorMessage,
-    refresh: refreshDetail,
-    refetch: refetchDetail,
-  } = detailState || {};
-
-  const detailRefreshHandler = useCallback(() => {
-    if (typeof refreshDetail === 'function') {
-      return refreshDetail();
-    }
-    if (typeof refetchDetail === 'function') {
-      return refetchDetail();
-    }
-    return Promise.resolve();
-  }, [refreshDetail, refetchDetail]);
-
-  const combinedDetailChild = detailChild || selectedChildMeta?.fallback || null;
+    [navigation, normalizedFilters, period],
+  );
 
   const listHeader = useMemo(() => {
     return (
@@ -542,33 +501,6 @@ const AdminCabangChildReportScreen = () => {
           handleCloseFilters();
         }}
       />
-
-      <ChildAttendanceDetailModal
-        visible={isDetailVisible}
-        onClose={handleCloseDetail}
-        child={combinedDetailChild}
-        monthlyBreakdown={monthlyBreakdown}
-        timeline={attendanceTimeline}
-        attendanceTimeline={attendanceTimeline}
-        verificationSummary={verificationSummary}
-        streaks={streaks}
-        filters={detailFilters}
-        period={detailPeriod}
-        meta={detailMeta}
-        summary={detailSummary}
-        shelterBreakdown={detailShelterBreakdown}
-        bandDistribution={detailBandDistribution}
-        loading={isDetailLoading}
-        onRefresh={detailRefreshHandler}
-      />
-
-      {isDetailVisible && (detailError || detailErrorMessage) ? (
-        <View style={styles.detailErrorBanner}>
-          <Text style={styles.detailErrorText}>
-            {detailErrorMessage || detailError?.message || 'Gagal memuat detail kehadiran anak.'}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 };
@@ -655,20 +587,6 @@ const styles = StyleSheet.create({
   footerLoading: {
     paddingVertical: 20,
     alignItems: 'center',
-  },
-  detailErrorBanner: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(231, 76, 60, 0.15)',
-    borderRadius: 12,
-    padding: 12,
-  },
-  detailErrorText: {
-    color: '#c0392b',
-    fontSize: 13,
-    textAlign: 'center',
   },
 });
 

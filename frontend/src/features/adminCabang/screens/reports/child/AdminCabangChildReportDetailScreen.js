@@ -1,17 +1,9 @@
-import React, { useMemo } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useCallback, useLayoutEffect, useMemo } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import EmptyState from '../../../../../common/components/EmptyState';
-import AttendanceProgressBar from '../attendance/AttendanceProgressBar';
+import EmptyState from '../../../../common/components/EmptyState';
+import AttendanceProgressBar from '../../../../components/reports/child/attendance/AttendanceProgressBar';
+import { useChildAttendanceReportDetail } from '../../../../hooks/reports/child/useChildAttendanceReportDetail';
 
 const BAND_STYLES = {
   high: {
@@ -284,22 +276,88 @@ const normalizeMetaEntries = (meta) => {
   return entries;
 };
 
-const ChildAttendanceDetailModal = ({
-  visible,
-  onClose,
-  child,
-  summary,
-  verificationSummary,
-  streaks,
-  filters,
-  period,
-  meta,
-  monthlyBreakdown,
-  timeline,
-  loading = false,
-  onRefresh,
-}) => {
-  const safeChild = child || {};
+const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
+  const params = route?.params ?? {};
+  const fallbackChild = params.fallbackChild ?? params.child ?? null;
+  const initialFilters =
+    params.filters && typeof params.filters === 'object' ? params.filters : {};
+  const resolvedChildId =
+    params.childId ??
+    params.child_id ??
+    params.id ??
+    fallbackChild?.id ??
+    fallbackChild?.childId ??
+    fallbackChild?.child_id ??
+    null;
+
+  const requestParams = {
+    startDate:
+      params.startDate ??
+      params.start_date ??
+      initialFilters.startDate ??
+      initialFilters.start_date ??
+      null,
+    endDate:
+      params.endDate ??
+      params.end_date ??
+      initialFilters.endDate ??
+      initialFilters.end_date ??
+      null,
+  };
+
+  const detailState =
+    useChildAttendanceReportDetail({
+      childId: resolvedChildId,
+      params: requestParams,
+      enabled: Boolean(resolvedChildId),
+    }) || {};
+
+  const {
+    child,
+    summary,
+    verificationSummary,
+    streaks,
+    filters,
+    period,
+    meta,
+    monthlyBreakdown,
+    attendanceTimeline,
+    timeline,
+    isLoading = false,
+    error,
+    errorMessage,
+    refresh,
+    refetch,
+  } = detailState;
+
+  const safeChild = child || fallbackChild || null;
+  const effectiveFilters =
+    filters && Object.keys(filters).length ? filters : initialFilters;
+  const effectivePeriod = period || params.period || params.initialPeriod || null;
+  const effectiveMeta = meta || params.meta || {};
+  const timelineData = attendanceTimeline || timeline || [];
+  const loading = isLoading;
+  const detailErrorMessage = errorMessage || error?.message || null;
+
+  useLayoutEffect(() => {
+    navigation?.setOptions?.({ headerShown: false });
+  }, [navigation]);
+
+  const handleGoBack = useCallback(() => {
+    navigation?.goBack?.();
+  }, [navigation]);
+
+  const handleRefresh = useCallback(() => {
+    if (typeof refresh === 'function') {
+      return refresh();
+    }
+    if (typeof refetch === 'function') {
+      return refetch();
+    }
+    return Promise.resolve();
+  }, [refetch, refresh]);
+
+  const canRefresh = typeof refresh === 'function' || typeof refetch === 'function';
 
   const effectiveSummary = useMemo(() => {
     if (summary && typeof summary === 'object') return summary;
@@ -373,7 +431,7 @@ const ChildAttendanceDetailModal = ({
 
   const timelineItems = useMemo(
     () =>
-      resolveTimelineItems(timeline, safeChild).map((item, index, list) => {
+      resolveTimelineItems(timelineData, safeChild).map((item, index, list) => {
         const statusColor = item?.statusColor || item?.status_color || getStatusColor(item?.status);
         return {
           id: item?.id ?? item?.timeline_id ?? item?.value ?? `timeline-${index}`,
@@ -387,7 +445,7 @@ const ChildAttendanceDetailModal = ({
           isLast: index === list.length - 1,
         };
       }),
-    [safeChild, timeline],
+    [safeChild, timelineData],
   );
 
   const totals = useMemo(() => {
@@ -436,11 +494,11 @@ const ChildAttendanceDetailModal = ({
   const streakItems = useMemo(() => normalizeStreaks(streaks, safeChild), [safeChild, streaks]);
 
   const contextEntries = useMemo(
-    () => normalizeFilterEntries(filters, period, effectiveSummary, safeChild),
-    [effectiveSummary, filters, period, safeChild],
+    () => normalizeFilterEntries(effectiveFilters, effectivePeriod, effectiveSummary, safeChild),
+    [effectiveFilters, effectivePeriod, effectiveSummary, safeChild],
   );
 
-  const metaEntries = useMemo(() => normalizeMetaEntries(meta), [meta]);
+  const metaEntries = useMemo(() => normalizeMetaEntries(effectiveMeta), [effectiveMeta]);
 
   const photoUrl =
     safeChild?.photoUrl ?? safeChild?.photo_url ?? safeChild?.avatarUrl ?? safeChild?.avatar_url ?? null;
@@ -449,45 +507,53 @@ const ChildAttendanceDetailModal = ({
   const shelterName = safeChild?.shelter?.name || safeChild?.shelterName || '-';
   const groupName = safeChild?.group?.name || safeChild?.groupName || '-';
   const dateRangeLabel =
-    effectiveSummary?.dateRange?.label || safeChild?.summary?.dateRange?.label || safeChild?.dateRange?.label || null;
-
+    effectiveSummary?.dateRange?.label ||
+    safeChild?.summary?.dateRange?.label ||
+    effectivePeriod?.label ||
+    safeChild?.dateRange?.label ||
+    null;
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-            <Ionicons name="chevron-back" size={22} color="#2d3436" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Detail Kehadiran Anak</Text>
-          <View style={styles.headerSpacer}>
-            {onRefresh ? (
-              <TouchableOpacity onPress={onRefresh} style={styles.headerButton}>
-                <Ionicons name="refresh" size={20} color="#2d3436" />
-              </TouchableOpacity>
-            ) : null}
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.headerButton}>
+          <Ionicons name="chevron-back" size={22} color="#2d3436" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Detail Kehadiran Anak</Text>
+        <View style={styles.headerSpacer}>
+          {canRefresh ? (
+            <TouchableOpacity onPress={handleRefresh} style={styles.headerButton}>
+              <Ionicons name="refresh" size={20} color="#2d3436" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+
+      {detailErrorMessage ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{detailErrorMessage}</Text>
+        </View>
+      ) : null}
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0984e3" />
+          <View style={styles.loadingSkeleton}>
+            <View style={styles.loadingLine} />
+            <View style={[styles.loadingLine, styles.loadingLineShort]} />
+            <View style={[styles.loadingLine, styles.loadingLineShort]} />
           </View>
         </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0984e3" />
-            <View style={styles.loadingSkeleton}>
-              <View style={styles.loadingLine} />
-              <View style={[styles.loadingLine, styles.loadingLineShort]} />
-              <View style={[styles.loadingLine, styles.loadingLineShort]} />
-            </View>
-          </View>
-        ) : !child ? (
-          <View style={styles.emptyWrapper}>
-            <EmptyState
-              title="Data belum tersedia"
-              message="Pilih anak untuk melihat detail laporan kehadiran."
-              icon="clipboard-outline"
-              iconSize={60}
-            />
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+      ) : !safeChild ? (
+        <View style={styles.emptyWrapper}>
+          <EmptyState
+            title="Data belum tersedia"
+            message="Pilih anak untuk melihat detail laporan kehadiran."
+            icon="clipboard-outline"
+            iconSize={60}
+          />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
             {/* Summary Card */}
             <View style={styles.summaryCard}>
               <View style={styles.summaryTopRow}>
@@ -722,7 +788,7 @@ const ChildAttendanceDetailModal = ({
           </ScrollView>
         )}
       </View>
-    </Modal>
+    </View>
   );
 };
 
@@ -757,6 +823,18 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 40,
     alignItems: 'flex-end',
+  },
+  errorBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: 'rgba(231, 76, 60, 0.12)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    color: '#c0392b',
+    fontSize: 13,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -1086,4 +1164,4 @@ const styles = StyleSheet.create({
 },
 });
 
-export default ChildAttendanceDetailModal;
+export default AdminCabangChildReportDetailScreen;
