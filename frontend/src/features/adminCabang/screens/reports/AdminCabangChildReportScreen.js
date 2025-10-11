@@ -70,7 +70,10 @@ const normalizeFilters = (filters = {}, params = {}) => {
 };
 
 const getFilterOptions = (options = {}, available = {}) => {
-  const source = options && Object.keys(options).length ? options : available;
+  const normalizedOptions = options && Object.keys(options).length ? options : null;
+  const normalizedAvailable =
+    available && Object.keys(available).length ? available : null;
+  const source = normalizedOptions || normalizedAvailable || {};
 
   const toArray = (value) => {
     if (Array.isArray(value)) return value;
