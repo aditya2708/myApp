@@ -102,4 +102,17 @@ describe('useChildAttendanceReportDetail', () => {
     expect(result.current.error).toBeInstanceOf(Error);
     expect(result.current.errorMessage).toBe('Terjadi kesalahan');
   });
+
+  it('skips fetching when disabled', async () => {
+    const { result } = renderHook(useChildAttendanceReportDetail, {
+      childId: 'child-3',
+      enabled: false,
+    });
+
+    expect(result.current.isLoading).toBe(false);
+
+    await waitFor(() => {
+      expect(adminCabangReportApi.getChildAttendanceReportDetail).not.toHaveBeenCalled();
+    });
+  });
 });
