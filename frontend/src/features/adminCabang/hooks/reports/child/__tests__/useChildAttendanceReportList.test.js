@@ -40,11 +40,23 @@ describe('useChildAttendanceReportList', () => {
       data: {
         summary: {
           attendanceRate: 82.5,
-          totalChildren: 12,
           presentCount: 30,
           lateCount: 4,
           absentCount: 2,
-          totalSessions: 36,
+          date_range: {
+            label: 'Periode 1-31 Januari 2024',
+            start: '2024-01-01',
+            end: '2024-01-31',
+          },
+          generated_at: '1 Februari 2024',
+          report_date: '1 Februari 2024',
+          periodLabel: 'Periode Januari 2024',
+          totals: {
+            totalChildren: 12,
+            totalSessions: 36,
+            active_children: 9,
+            inactiveChildren: 3,
+          },
         },
         children: [
           {
@@ -111,7 +123,22 @@ describe('useChildAttendanceReportList', () => {
     expect(result.current.summary.presentCount).toBe(30);
     expect(result.current.summary.lateCount).toBe(4);
     expect(result.current.summary.absentCount).toBe(2);
+    expect(result.current.summary.totalChildren).toBe(12);
+    expect(result.current.summary.totalSessions).toBe(36);
+    expect(result.current.summary.activeChildren).toBe(9);
+    expect(result.current.summary.inactiveChildren).toBe(3);
     expect(result.current.summary.totals.totalSessions).toBe(36);
+    expect(result.current.summary.totals.totalChildren).toBe(12);
+    expect(result.current.summary.totals.activeChildren).toBe(9);
+    expect(result.current.summary.totals.inactiveChildren).toBe(3);
+    expect(result.current.summary.dateRange).toMatchObject({
+      label: 'Periode 1-31 Januari 2024',
+      start: '2024-01-01',
+      end: '2024-01-31',
+    });
+    expect(result.current.summary.generatedAt).toBe('1 Februari 2024');
+    expect(result.current.summary.reportDate).toBe('1 Februari 2024');
+    expect(result.current.summary.periodLabel).toBe('Periode Januari 2024');
     expect(result.current.children).toHaveLength(2);
     expect(result.current.pagination).toMatchObject({
       page: 2,
