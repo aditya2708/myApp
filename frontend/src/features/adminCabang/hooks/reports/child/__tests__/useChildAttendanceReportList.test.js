@@ -261,5 +261,12 @@ describe('useChildAttendanceReportList', () => {
       startDate: '2024-02-01',
       endDate: '2024-02-29',
     });
+    expect(result.current.filters).toMatchObject({
+      band: 'high',
+      shelterId: 'shelter-42',
+      groupId: 'group-7',
+      startDate: '2024-02-01',
+      endDate: '2024-02-29',
+    });
   });
 });

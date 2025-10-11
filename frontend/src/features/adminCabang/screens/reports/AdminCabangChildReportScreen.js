@@ -273,17 +273,9 @@ const AdminCabangChildReportScreen = () => {
         setStartDate?.(startDate ?? null);
         setEndDate?.(endDate ?? null);
       }
-
-      if (typeof refresh === 'function') {
-        refresh();
-      } else if (typeof refetch === 'function') {
-        refetch();
-      }
     },
     [
       applyFilters,
-      refetch,
-      refresh,
       setBand,
       setDateRange,
       setEndDate,
