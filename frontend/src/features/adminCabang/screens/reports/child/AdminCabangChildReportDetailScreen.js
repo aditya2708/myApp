@@ -2,9 +2,14 @@ import React, { useCallback, useLayoutEffect, useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import EmptyState from '../../../../common/components/EmptyState';
-import AttendanceProgressBar from '../../../../components/reports/child/attendance/AttendanceProgressBar';
 import { useChildAttendanceReportDetail } from '../../../../hooks/reports/child/useChildAttendanceReportDetail';
 import ChildReportSummaryCard from '../../../components/childReport/ChildReportSummaryCard';
+import VerificationSummaryGrid from '../../../components/childReport/VerificationSummaryGrid';
+import StreakHighlights from '../../../components/childReport/StreakHighlights';
+import ContextList from '../../../components/childReport/ContextList';
+import MetaList from '../../../components/childReport/MetaList';
+import MonthlyPerformanceList from '../../../components/childReport/MonthlyPerformanceList';
+import TimelineActivityList from '../../../components/childReport/TimelineActivityList';
 import {
   resolveBandMeta,
   resolveMonthlyItems,
@@ -298,149 +303,12 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
               onRefresh={canRefresh ? handleRefresh : undefined}
             />
 
-            {verificationItems.length ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Ringkasan Verifikasi</Text>
-                <View style={styles.verificationGrid}>
-                  {verificationItems.map((item) => (
-                    <View key={item.id} style={styles.verificationCard} testID={`verification-${item.id}`}>
-                      <Text style={styles.verificationLabel}>{item.label}</Text>
-                      <Text
-                        style={[
-                          styles.verificationValue,
-                          item.accent ? { color: item.accent } : null,
-                        ]}
-                      >
-                        {item.value ?? 0}
-                      </Text>
-                      {item.unit ? (
-                        <Text style={styles.verificationSubtext}>{item.unit}</Text>
-                      ) : null}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
-            {streakItems.length ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Catatan Streak</Text>
-                <View style={styles.streakList}>
-                  {streakItems.map((item) => (
-                    <View key={item.id} style={styles.streakCard} testID={`streak-${item.id}`}>
-                      <Text style={styles.streakValue}>{item.value ?? 0}</Text>
-                      {item.unit ? <Text style={styles.streakUnit}>{item.unit}</Text> : null}
-                      <Text style={styles.streakLabel}>{item.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
-            {contextEntries.length ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Konteks Laporan</Text>
-                <View style={styles.contextList}>
-                  {contextEntries.map((entry, index) => (
-                    <View
-                      key={entry.id}
-                      style={[
-                        styles.contextItem,
-                        index === contextEntries.length - 1 ? styles.contextItemLast : null,
-                      ]}
-                    >
-                      <Text style={styles.contextLabel}>{entry.label}</Text>
-                      <Text style={styles.contextValue}>{entry.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
-            {metaEntries.length ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Informasi Tambahan</Text>
-                <View style={styles.contextList}>
-                  {metaEntries.map((entry, index) => (
-                    <View
-                      key={entry.id}
-                      style={[
-                        styles.contextItem,
-                        index === metaEntries.length - 1 ? styles.contextItemLast : null,
-                      ]}
-                    >
-                      <Text style={styles.contextLabel}>{entry.label}</Text>
-                      <Text style={styles.contextValue}>{entry.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
-            {/* Monthly Breakdown */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Performa Bulanan</Text>
-              {monthlyItems.length ? (
-                <View style={styles.monthlyList}>
-                  {monthlyItems.map((item) => {
-                    const percentageValue = Number(item.percentage) || 0;
-                    const color = percentageValue >= 85 ? '#2ecc71' : percentageValue >= 60 ? '#f39c12' : '#e74c3c';
-                    return (
-                      <View key={item.id} style={styles.monthlyItem}>
-                        <AttendanceProgressBar
-                          label={item.label}
-                          percentage={percentageValue}
-                          color={color}
-                          showCount={false}
-                          backgroundColor="rgba(236, 240, 241, 0.6)"
-                        />
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <Text style={styles.emptySubText}>Belum ada data performa bulanan.</Text>
-              )}
-            </View>
-
-            {/* Timeline */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Timeline Aktivitas</Text>
-              {timelineItems.length ? (
-                <View style={styles.timelineList}>
-                  {timelineItems.map((item) => (
-                    <View key={item.id} style={styles.timelineItem}>
-                      <View style={styles.timelineIndicator}>
-                        <View style={[styles.timelineDot, { borderColor: item.statusColor }]}>
-                          <View style={[styles.timelineDotInner, { backgroundColor: item.statusColor }]} />
-                        </View>
-                        {!item.isLast ? <View style={styles.timelineLine} /> : null}
-                      </View>
-                      <View style={styles.timelineContent}>
-                        <View style={styles.timelineHeader}>
-                          <Text style={styles.timelineActivity} numberOfLines={2}>
-                            {item.activity}
-                          </Text>
-                          <View style={[styles.timelineStatusBadge, { backgroundColor: `${item.statusColor}20` }]}>
-                            <Text style={[styles.timelineStatusText, { color: item.statusColor }]}>
-                              {item.status}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={styles.timelineDate}>{item.date}</Text>
-                        {item.mentor ? <Text style={styles.timelineMeta}>Pendamping: {item.mentor}</Text> : null}
-                        {item.verification ? (
-                          <Text style={styles.timelineMeta}>Status verifikasi: {item.verification}</Text>
-                        ) : null}
-                        {item.note ? <Text style={styles.timelineNote}>{item.note}</Text> : null}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.emptySubText}>Belum ada histori aktivitas yang tercatat.</Text>
-              )}
-            </View>
+            <VerificationSummaryGrid items={verificationItems} />
+            <StreakHighlights items={streakItems} />
+            <ContextList entries={contextEntries} />
+            <MetaList entries={metaEntries} />
+            <MonthlyPerformanceList items={monthlyItems} />
+            <TimelineActivityList items={timelineItems} />
           </ScrollView>
         )}
       </View>
@@ -521,174 +389,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  verificationGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
-  },
-  verificationCard: {
-    width: '50%',
-    paddingHorizontal: 6,
-    marginBottom: 12,
-  },
-  verificationLabel: {
-    fontSize: 12,
-    color: '#636e72',
-    marginBottom: 6,
-  },
-  verificationValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#2d3436',
-  },
-  verificationSubtext: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#95a5a6',
-  },
-  streakList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
-  },
-  streakCard: {
-    width: '50%',
-    paddingHorizontal: 6,
-    marginBottom: 12,
-  },
-  streakValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0984e3',
-  },
-  streakUnit: {
-    fontSize: 12,
-    color: '#74b9ff',
-    marginTop: 2,
-  },
-  streakLabel: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#636e72',
-  },
-  contextList: {
-    borderWidth: 1,
-    borderColor: '#ecf0f1',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  contextItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: '#f9fafb',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  contextItemLast: {
-    borderBottomWidth: 0,
-  },
-  contextLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#95a5a6',
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  contextValue: {
-    fontSize: 13,
-    color: '#2d3436',
-  },
-  section: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#ecf0f1',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2d3436',
-    marginBottom: 12,
-  },
-  monthlyList: {},
-  monthlyItem: {
-    marginBottom: 12,
-  },
-  emptySubText: {
-    fontSize: 13,
-    color: '#95a5a6',
-  },
-  timelineList: {
-    marginTop: 4,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    marginBottom: 20,
-  },
-  timelineIndicator: {
-    width: 24,
-    alignItems: 'center',
-  },
-  timelineDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  timelineDotInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  timelineLine: {
-    flex: 1,
-    width: 2,
-    backgroundColor: '#dfe6e9',
-    marginTop: 4,
-  },
-  timelineContent: {
-    flex: 1,
-    marginLeft: 12,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  timelineHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  timelineActivity: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2d3436',
-    marginRight: 8,
-  },
-  timelineStatusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  timelineStatusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  timelineDate: {
-    fontSize: 12,
-    color: '#95a5a6',
-},
 });
 
 export default AdminCabangChildReportDetailScreen;
