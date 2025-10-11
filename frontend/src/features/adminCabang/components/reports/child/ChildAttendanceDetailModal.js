@@ -85,10 +85,215 @@ const formatDateLabel = (value) => {
   return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
 };
 
+const normalizeVerificationSummary = (summary, child) => {
+  const source = summary ?? child?.verificationSummary ?? child?.verification_summary;
+
+  if (!source) return [];
+
+  if (Array.isArray(source)) {
+    return source
+      .filter((item) => item && typeof item === 'object')
+      .map((item, index) => ({
+        id: item.id ?? item.key ?? item.type ?? `verification-${index}`,
+        label: item.label ?? item.name ?? item.title ?? 'Status',
+        value: item.value ?? item.count ?? item.total ?? 0,
+        accent: item.accent ?? item.status ?? null,
+      }));
+  }
+
+  if (typeof source === 'object') {
+    return Object.entries(source)
+      .map(([key, value]) => {
+        if (value === undefined || value === null) return null;
+
+        const normalizedValue =
+          typeof value === 'object' ? value.value ?? value.count ?? value.total ?? value.amount : value;
+
+        const normalizedLabel =
+          (value && typeof value === 'object' && (value.label || value.name || value.title)) ??
+          ({
+            total: 'Total Data',
+            verified: 'Terverifikasi',
+            pending: 'Menunggu',
+            rejected: 'Ditolak',
+            unverified: 'Belum Diverifikasi',
+            review: 'Perlu Ditinjau',
+          }[key] || key.replace(/([A-Z])/g, ' $1'));
+
+        return {
+          id: key,
+          label: normalizedLabel,
+          value: normalizedValue ?? 0,
+          accent:
+            (value && typeof value === 'object' && value.accent) ||
+            ({
+              verified: '#2ecc71',
+              pending: '#f39c12',
+              rejected: '#e74c3c',
+            }[key] || null),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const normalizeStreaks = (streaks, child) => {
+  const source = Array.isArray(streaks) && streaks.length ? streaks : child?.streaks;
+
+  if (!source) return [];
+
+  if (Array.isArray(source)) {
+    return source
+      .filter((item) => item && typeof item === 'object')
+      .map((item, index) => ({
+        id: item.id ?? item.type ?? item.key ?? `streak-${index}`,
+        label:
+          item.label ??
+          item.name ??
+          item.title ??
+          (item.type ? item.type.replace(/([A-Z])/g, ' $1') : `Streak ${index + 1}`),
+        value: item.value ?? item.count ?? item.length ?? 0,
+        unit: item.unit ?? item.suffix ?? null,
+      }));
+  }
+
+  if (typeof source === 'object') {
+    return Object.entries(source)
+      .map(([key, value], index) => {
+        const numericValue =
+          typeof value === 'object' ? value.value ?? value.count ?? value.length ?? value.total : value;
+
+        if (numericValue === undefined || numericValue === null) return null;
+
+        return {
+          id: key ?? `streak-${index}`,
+          label:
+            (value && typeof value === 'object' && (value.label || value.name || value.title)) ||
+            key.replace(/([A-Z])/g, ' $1'),
+          value: numericValue,
+          unit: value && typeof value === 'object' ? value.unit ?? value.suffix ?? null : null,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const normalizeFilterEntries = (filters, period, summary, child) => {
+  const combinedFilters = filters && Object.keys(filters || {}).length ? filters : child?.filters;
+  const entries = [];
+
+  const formatValue = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : null;
+    }
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'object') {
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => formatValue(item))
+          .filter(Boolean)
+          .join(', ');
+      }
+      return (
+        value.label ||
+        value.name ||
+        value.title ||
+        value.value ||
+        (value.startDate && value.endDate
+          ? `${value.startDate} – ${value.endDate}`
+          : value.start_date && value.end_date
+          ? `${value.start_date} – ${value.end_date}`
+          : null)
+      );
+    }
+    return null;
+  };
+
+  if (period?.label || summary?.dateRange?.label || child?.summary?.dateRange?.label) {
+    entries.push({
+      id: 'period',
+      label: 'Periode',
+      value: period?.label || summary?.dateRange?.label || child?.summary?.dateRange?.label,
+    });
+  }
+
+  if (period?.value && !entries.find((entry) => entry.id === 'period-value')) {
+    entries.push({ id: 'period-value', label: 'Rentang', value: period.value });
+  }
+
+  if (combinedFilters && typeof combinedFilters === 'object') {
+    Object.entries(combinedFilters).forEach(([key, value]) => {
+      const displayValue = formatValue(value);
+      if (!displayValue) return;
+
+      const normalizedLabel =
+        ({
+          search: 'Pencarian',
+          shelter: 'Shelter',
+          shelterId: 'Shelter',
+          shelterName: 'Shelter',
+          group: 'Kelompok',
+          groupId: 'Kelompok',
+          groupName: 'Kelompok',
+          band: 'Kategori Kehadiran',
+          attendanceBand: 'Kategori Kehadiran',
+          startDate: 'Tanggal Mulai',
+          start_date: 'Tanggal Mulai',
+          endDate: 'Tanggal Selesai',
+          end_date: 'Tanggal Selesai',
+        }[key] || key.replace(/([A-Z])/g, ' $1'));
+
+      entries.push({ id: `filter-${key}`, label: normalizedLabel, value: displayValue });
+    });
+  }
+
+  return entries;
+};
+
+const normalizeMetaEntries = (meta) => {
+  if (!meta || typeof meta !== 'object') return [];
+
+  const entries = [];
+
+  const pushIfValue = (id, label, value) => {
+    if (!value) return;
+    entries.push({ id, label, value });
+  };
+
+  pushIfValue('generatedAt', 'Dibuat', meta.generatedAt || meta.generated_at);
+  pushIfValue('lastUpdatedAt', 'Diperbarui', meta.lastUpdatedAt || meta.last_updated_at || meta.updatedAt);
+  pushIfValue('author', 'Disusun oleh', meta.generatedBy || meta.generated_by || meta.author);
+
+  Object.entries(meta).forEach(([key, value]) => {
+    if (entries.find((entry) => entry.id === key)) return;
+    if (typeof value !== 'string' && typeof value !== 'number') return;
+
+    entries.push({
+      id: key,
+      label: key.replace(/([A-Z])/g, ' $1'),
+      value: String(value),
+    });
+  });
+
+  return entries;
+};
+
 const ChildAttendanceDetailModal = ({
   visible,
   onClose,
   child,
+  summary,
+  verificationSummary,
+  streaks,
+  filters,
+  period,
+  meta,
   monthlyBreakdown,
   timeline,
   loading = false,
@@ -96,37 +301,55 @@ const ChildAttendanceDetailModal = ({
 }) => {
   const safeChild = child || {};
 
+  const effectiveSummary = useMemo(() => {
+    if (summary && typeof summary === 'object') return summary;
+    if (safeChild?.summary && typeof safeChild.summary === 'object') return safeChild.summary;
+    return null;
+  }, [safeChild, summary]);
+
+  const attendanceRateValue = useMemo(() => {
+    const fromSummary = effectiveSummary?.attendanceRate?.value;
+    if (Number.isFinite(Number(fromSummary))) return Number(fromSummary);
+
+    const fromChild = safeChild?.attendanceRate?.value ?? safeChild?.attendanceRate;
+    if (Number.isFinite(Number(fromChild))) return Number(fromChild);
+
+    const fromChildSummary = safeChild?.summary?.attendanceRate?.value;
+    if (Number.isFinite(Number(fromChildSummary))) return Number(fromChildSummary);
+
+    const fromAttendance = safeChild?.attendance?.attendance_percentage;
+    if (Number.isFinite(Number(fromAttendance))) return Number(fromAttendance);
+
+    return null;
+  }, [effectiveSummary, safeChild]);
+
   const bandMeta = useMemo(() => {
     const bandValue =
       safeChild?.attendanceBand ??
       safeChild?.band ??
       safeChild?.attendance?.attendance_band ??
       safeChild?.attendance?.band ??
+      effectiveSummary?.band ??
       null;
 
-    const percentageValue =
-      safeChild?.attendanceRate?.value ??
-      safeChild?.attendanceRate ??
-      safeChild?.attendance?.attendance_percentage ??
-      safeChild?.summary?.attendanceRate?.value ??
-      null;
-
-    return resolveBandMeta(bandValue, percentageValue);
-  }, [safeChild]);
+    return resolveBandMeta(bandValue, attendanceRateValue);
+  }, [attendanceRateValue, effectiveSummary, safeChild]);
 
   const attendanceRateLabel = useMemo(() => {
-    const value =
-      safeChild?.attendanceRate?.label ??
-      safeChild?.attendance_label ??
-      safeChild?.summary?.attendanceRate?.label ??
-      (Number.isFinite(Number(safeChild?.attendanceRate?.value))
-        ? `${Number(safeChild?.attendanceRate?.value).toFixed(
-            Number(safeChild?.attendanceRate?.value) % 1 === 0 ? 0 : 1,
-          )}%`
-        : '0%');
+    const labelFromSummary = effectiveSummary?.attendanceRate?.label;
+    if (labelFromSummary) return labelFromSummary;
 
-    return value;
-  }, [safeChild]);
+    if (Number.isFinite(attendanceRateValue)) {
+      return `${attendanceRateValue.toFixed(attendanceRateValue % 1 === 0 ? 0 : 1)}%`;
+    }
+
+    const labelFromChild =
+      safeChild?.attendanceRate?.label ?? safeChild?.attendance_label ?? safeChild?.attendanceRate;
+
+    if (typeof labelFromChild === 'string') return labelFromChild;
+
+    return '0%';
+  }, [attendanceRateValue, effectiveSummary, safeChild]);
 
   const monthlyItems = useMemo(
     () =>
@@ -167,17 +390,57 @@ const ChildAttendanceDetailModal = ({
     [safeChild, timeline],
   );
 
-  const totals = safeChild?.totals || safeChild?.attendance?.totals || {
-    present: safeChild?.attendance?.present_count ?? 0,
-    late: safeChild?.attendance?.late_count ?? 0,
-    absent: safeChild?.attendance?.absent_count ?? 0,
-    totalSessions:
-      safeChild?.totals?.totalSessions ??
-      safeChild?.attendance?.totalSessions ??
-      safeChild?.attendance?.total_sessions ??
-      safeChild?.summary?.totalSessions ??
-      0,
-  };
+  const totals = useMemo(() => {
+    if (effectiveSummary?.totals) {
+      return {
+        present: effectiveSummary.totals.present ?? 0,
+        late: effectiveSummary.totals.late ?? 0,
+        absent: effectiveSummary.totals.absent ?? 0,
+        totalSessions: effectiveSummary.totals.totalSessions ?? 0,
+      };
+    }
+
+    const childTotals = safeChild?.totals || safeChild?.attendance?.totals;
+    if (childTotals) {
+      return {
+        present: childTotals.present ?? childTotals.present_count ?? 0,
+        late: childTotals.late ?? childTotals.late_count ?? 0,
+        absent: childTotals.absent ?? childTotals.absent_count ?? 0,
+        totalSessions:
+          childTotals.totalSessions ??
+          childTotals.total_sessions ??
+          childTotals.sessions ??
+          safeChild?.attendance?.totalSessions ??
+          safeChild?.attendance?.total_sessions ??
+          0,
+      };
+    }
+
+    return {
+      present: safeChild?.attendance?.present_count ?? 0,
+      late: safeChild?.attendance?.late_count ?? 0,
+      absent: safeChild?.attendance?.absent_count ?? 0,
+      totalSessions:
+        safeChild?.attendance?.totalSessions ??
+        safeChild?.attendance?.total_sessions ??
+        safeChild?.summary?.totalSessions ??
+        0,
+    };
+  }, [effectiveSummary, safeChild]);
+
+  const verificationItems = useMemo(
+    () => normalizeVerificationSummary(verificationSummary, safeChild),
+    [safeChild, verificationSummary],
+  );
+
+  const streakItems = useMemo(() => normalizeStreaks(streaks, safeChild), [safeChild, streaks]);
+
+  const contextEntries = useMemo(
+    () => normalizeFilterEntries(filters, period, effectiveSummary, safeChild),
+    [effectiveSummary, filters, period, safeChild],
+  );
+
+  const metaEntries = useMemo(() => normalizeMetaEntries(meta), [meta]);
 
   const photoUrl =
     safeChild?.photoUrl ?? safeChild?.photo_url ?? safeChild?.avatarUrl ?? safeChild?.avatar_url ?? null;
@@ -185,7 +448,8 @@ const ChildAttendanceDetailModal = ({
   const identifier = safeChild?.identifier || safeChild?.code || safeChild?.childCode || null;
   const shelterName = safeChild?.shelter?.name || safeChild?.shelterName || '-';
   const groupName = safeChild?.group?.name || safeChild?.groupName || '-';
-  const dateRangeLabel = safeChild?.summary?.dateRange?.label || safeChild?.dateRange?.label || null;
+  const dateRangeLabel =
+    effectiveSummary?.dateRange?.label || safeChild?.summary?.dateRange?.label || safeChild?.dateRange?.label || null;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -276,25 +540,120 @@ const ChildAttendanceDetailModal = ({
                   <Text style={styles.metricValue}>{attendanceRateLabel}</Text>
                 </View>
                 <View style={styles.totalsRow}>
-                  <View style={styles.totalsItem}>
+                  <View style={styles.totalsItem} testID="totals-present">
                     <Text style={styles.totalLabel}>Hadir</Text>
-                    <Text style={[styles.totalValue, styles.totalValuePositive]}>{totals.present ?? 0}</Text>
+                    <Text
+                      style={[styles.totalValue, styles.totalValuePositive]}
+                      testID="totals-present-value"
+                    >
+                      {totals.present ?? 0}
+                    </Text>
                   </View>
-                  <View style={styles.totalsItem}>
+                  <View style={styles.totalsItem} testID="totals-late">
                     <Text style={styles.totalLabel}>Terlambat</Text>
-                    <Text style={[styles.totalValue, styles.totalValueWarning]}>{totals.late ?? 0}</Text>
+                    <Text
+                      style={[styles.totalValue, styles.totalValueWarning]}
+                      testID="totals-late-value"
+                    >
+                      {totals.late ?? 0}
+                    </Text>
                   </View>
-                  <View style={styles.totalsItem}>
+                  <View style={styles.totalsItem} testID="totals-absent">
                     <Text style={styles.totalLabel}>Tidak hadir</Text>
-                    <Text style={[styles.totalValue, styles.totalValueNegative]}>{totals.absent ?? 0}</Text>
+                    <Text
+                      style={[styles.totalValue, styles.totalValueNegative]}
+                      testID="totals-absent-value"
+                    >
+                      {totals.absent ?? 0}
+                    </Text>
                   </View>
-                  <View style={styles.totalsItem}>
+                  <View style={styles.totalsItem} testID="totals-sessions">
                     <Text style={styles.totalLabel}>Total sesi</Text>
-                    <Text style={styles.totalValue}>{totals.totalSessions ?? 0}</Text>
+                    <Text style={styles.totalValue} testID="totals-sessions-value">
+                      {totals.totalSessions ?? 0}
+                    </Text>
                   </View>
                 </View>
-              </View>
             </View>
+
+            {verificationItems.length ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Ringkasan Verifikasi</Text>
+                <View style={styles.verificationGrid}>
+                  {verificationItems.map((item) => (
+                    <View key={item.id} style={styles.verificationCard} testID={`verification-${item.id}`}>
+                      <Text style={styles.verificationLabel}>{item.label}</Text>
+                      <Text
+                        style={[
+                          styles.verificationValue,
+                          item.accent ? { color: item.accent } : null,
+                        ]}
+                      >
+                        {item.value ?? 0}
+                      </Text>
+                      {item.unit ? (
+                        <Text style={styles.verificationSubtext}>{item.unit}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {streakItems.length ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Catatan Streak</Text>
+                <View style={styles.streakList}>
+                  {streakItems.map((item) => (
+                    <View key={item.id} style={styles.streakCard} testID={`streak-${item.id}`}>
+                      <Text style={styles.streakValue}>{item.value ?? 0}</Text>
+                      {item.unit ? <Text style={styles.streakUnit}>{item.unit}</Text> : null}
+                      <Text style={styles.streakLabel}>{item.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {contextEntries.length ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Konteks Laporan</Text>
+                <View style={styles.contextList}>
+                  {contextEntries.map((entry, index) => (
+                    <View
+                      key={entry.id}
+                      style={[
+                        styles.contextItem,
+                        index === contextEntries.length - 1 ? styles.contextItemLast : null,
+                      ]}
+                    >
+                      <Text style={styles.contextLabel}>{entry.label}</Text>
+                      <Text style={styles.contextValue}>{entry.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {metaEntries.length ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Informasi Tambahan</Text>
+                <View style={styles.contextList}>
+                  {metaEntries.map((entry, index) => (
+                    <View
+                      key={entry.id}
+                      style={[
+                        styles.contextItem,
+                        index === metaEntries.length - 1 ? styles.contextItemLast : null,
+                      ]}
+                    >
+                      <Text style={styles.contextLabel}>{entry.label}</Text>
+                      <Text style={styles.contextValue}>{entry.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
 
             {/* Monthly Breakdown */}
             <View style={styles.section}>
@@ -556,6 +915,83 @@ const styles = StyleSheet.create({
   },
   totalValueNegative: {
     color: '#e74c3c',
+  },
+  verificationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  verificationCard: {
+    width: '50%',
+    paddingHorizontal: 6,
+    marginBottom: 12,
+  },
+  verificationLabel: {
+    fontSize: 12,
+    color: '#636e72',
+    marginBottom: 6,
+  },
+  verificationValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2d3436',
+  },
+  verificationSubtext: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#95a5a6',
+  },
+  streakList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  streakCard: {
+    width: '50%',
+    paddingHorizontal: 6,
+    marginBottom: 12,
+  },
+  streakValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0984e3',
+  },
+  streakUnit: {
+    fontSize: 12,
+    color: '#74b9ff',
+    marginTop: 2,
+  },
+  streakLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#636e72',
+  },
+  contextList: {
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  contextItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  contextItemLast: {
+    borderBottomWidth: 0,
+  },
+  contextLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#95a5a6',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  contextValue: {
+    fontSize: 13,
+    color: '#2d3436',
   },
   section: {
     backgroundColor: '#ffffff',
