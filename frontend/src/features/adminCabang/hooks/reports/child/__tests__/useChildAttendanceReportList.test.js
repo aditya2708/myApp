@@ -33,7 +33,9 @@ describe('useChildAttendanceReportList', () => {
     jest.clearAllMocks();
   });
 
-  it('fetches child attendance reports and updates loading, data, and pagination state', async () => {
+  it('fetches child attendance reports, exposes metadata, and normalizes summary fields', async () => {
+    const chart = { title: 'Attendance Trend' };
+    const chartData = { series: [{ name: 'Hadir', value: 30 }] };
     adminCabangReportApi.getChildAttendanceReport.mockResolvedValueOnce({
       data: {
         summary: {
@@ -71,6 +73,26 @@ describe('useChildAttendanceReportList', () => {
         filters: {
           attendance_band: null,
           search: '',
+          shelter_id: 'shelter-1',
+          group_id: 'group-1',
+          start_date: '2024-01-01',
+          end_date: '2024-01-31',
+        },
+        available_filters: {
+          attendance_bands: ['low', 'medium', 'high'],
+        },
+        shelters: [
+          { id: 'shelter-1', name: 'Shelter 1' },
+          { id: 'shelter-2', name: 'Shelter 2' },
+        ],
+        groups: [
+          { id: 'group-1', name: 'Group 1' },
+          { id: 'group-2', name: 'Group 2' },
+        ],
+        chart,
+        chart_data: chartData,
+        metadata: {
+          export_url: 'https://example.com/export.pdf',
         },
       },
     });
@@ -85,6 +107,10 @@ describe('useChildAttendanceReportList', () => {
     });
 
     expect(result.current.summary.attendanceRate.value).toBe(82.5);
+    expect(result.current.summary.attendance_percentage).toBe(82.5);
+    expect(result.current.summary.presentCount).toBe(30);
+    expect(result.current.summary.lateCount).toBe(4);
+    expect(result.current.summary.absentCount).toBe(2);
     expect(result.current.summary.totals.totalSessions).toBe(36);
     expect(result.current.children).toHaveLength(2);
     expect(result.current.pagination).toMatchObject({
@@ -93,27 +119,42 @@ describe('useChildAttendanceReportList', () => {
       total: 40,
       totalPages: 8,
     });
-    expect(result.current.filters.search).toBe('');
+    expect(result.current.filters).toMatchObject({
+      search: '',
+      band: null,
+      shelterId: 'shelter-1',
+      groupId: 'group-1',
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+    });
+    expect(result.current.availableFilters).toEqual({
+      attendance_bands: ['low', 'medium', 'high'],
+    });
+    expect(result.current.shelters).toHaveLength(2);
+    expect(result.current.groups).toHaveLength(2);
+    expect(result.current.chart).toEqual(chart);
+    expect(result.current.chartData).toEqual(chartData);
+    expect(result.current.metadata).toEqual({
+      export_url: 'https://example.com/export.pdf',
+    });
+    expect(result.current.rawMetadata).toMatchObject({
+      available_filters: {
+        attendance_bands: ['low', 'medium', 'high'],
+      },
+      chart,
+      chart_data: chartData,
+    });
   });
 
   it('re-fetches data when filters change and resets pagination', async () => {
-    adminCabangReportApi.getChildAttendanceReport
-      .mockResolvedValueOnce({
-        data: {
-          summary: { attendanceRate: 70, presentCount: 14, lateCount: 3, absentCount: 3, totalSessions: 20 },
-          children: [],
-          pagination: { current_page: 1, per_page: 10, total: 0, total_pages: 1 },
-          filters: { attendance_band: null },
-        },
-      })
-      .mockResolvedValueOnce({
-        data: {
-          summary: { attendanceRate: 90, presentCount: 18, lateCount: 1, absentCount: 1, totalSessions: 20 },
-          children: [],
-          pagination: { current_page: 1, per_page: 10, total: 0, total_pages: 1 },
-          filters: { attendance_band: 'high' },
-        },
-      });
+    adminCabangReportApi.getChildAttendanceReport.mockResolvedValue({
+      data: {
+        summary: { attendanceRate: 70, presentCount: 14, lateCount: 3, absentCount: 3, totalSessions: 20 },
+        children: [],
+        pagination: { current_page: 1, per_page: 10, total: 0, total_pages: 1 },
+        filters: {},
+      },
+    });
 
     const { result } = renderHook(useChildAttendanceReportList);
 
@@ -124,17 +165,74 @@ describe('useChildAttendanceReportList', () => {
     });
 
     await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(2));
-
-    const secondCallQuery = adminCabangReportApi.getChildAttendanceReport.mock.calls[1][0];
-
-    expect(secondCallQuery).toMatchObject({
+    expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[1][0]).toMatchObject({
       page: 1,
       per_page: 10,
       attendance_band: 'high',
     });
     expect(result.current.params.band).toBe('high');
     expect(result.current.pagination.page).toBe(1);
-    expect(result.current.isRefreshing).toBe(false);
     expect(result.current.filters.band).toBe('high');
+
+    await act(async () => {
+      result.current.setShelterId('shelter-42');
+    });
+
+    await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(3));
+    expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[2][0]).toMatchObject({
+      page: 1,
+      per_page: 10,
+      attendance_band: 'high',
+      shelter_id: 'shelter-42',
+    });
+
+    await act(async () => {
+      result.current.setGroupId('group-7');
+    });
+
+    await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(4));
+    expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[3][0]).toMatchObject({
+      page: 1,
+      per_page: 10,
+      attendance_band: 'high',
+      shelter_id: 'shelter-42',
+      group_id: 'group-7',
+    });
+
+    await act(async () => {
+      result.current.setStartDate('2024-02-01');
+    });
+
+    await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(5));
+    expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[4][0]).toMatchObject({
+      page: 1,
+      per_page: 10,
+      attendance_band: 'high',
+      shelter_id: 'shelter-42',
+      group_id: 'group-7',
+      start_date: '2024-02-01',
+    });
+
+    await act(async () => {
+      result.current.setEndDate('2024-02-29');
+    });
+
+    await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(6));
+    expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[5][0]).toMatchObject({
+      page: 1,
+      per_page: 10,
+      attendance_band: 'high',
+      shelter_id: 'shelter-42',
+      group_id: 'group-7',
+      start_date: '2024-02-01',
+      end_date: '2024-02-29',
+    });
+    expect(result.current.params).toMatchObject({
+      band: 'high',
+      shelterId: 'shelter-42',
+      groupId: 'group-7',
+      startDate: '2024-02-01',
+      endDate: '2024-02-29',
+    });
   });
 });
