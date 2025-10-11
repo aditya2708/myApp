@@ -374,8 +374,16 @@ const AdminCabangChildReportScreen = () => {
 
   const {
     child: detailChild,
+    summary: detailSummary,
+    shelterBreakdown: detailShelterBreakdown,
+    bandDistribution: detailBandDistribution,
     monthlyBreakdown,
-    timeline,
+    attendanceTimeline,
+    verificationSummary,
+    streaks,
+    filters: detailFilters,
+    period: detailPeriod,
+    meta: detailMeta,
     isLoading: isDetailLoading = false,
     error: detailError,
     errorMessage: detailErrorMessage,
@@ -540,7 +548,16 @@ const AdminCabangChildReportScreen = () => {
         onClose={handleCloseDetail}
         child={combinedDetailChild}
         monthlyBreakdown={monthlyBreakdown}
-        timeline={timeline}
+        timeline={attendanceTimeline}
+        attendanceTimeline={attendanceTimeline}
+        verificationSummary={verificationSummary}
+        streaks={streaks}
+        filters={detailFilters}
+        period={detailPeriod}
+        meta={detailMeta}
+        summary={detailSummary}
+        shelterBreakdown={detailShelterBreakdown}
+        bandDistribution={detailBandDistribution}
         loading={isDetailLoading}
         onRefresh={detailRefreshHandler}
       />

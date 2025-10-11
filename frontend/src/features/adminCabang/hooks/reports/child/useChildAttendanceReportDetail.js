@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { adminCabangReportApi } from '../../../api/adminCabangReportApi';
 
@@ -239,42 +239,56 @@ export const useChildAttendanceReportDetail = ({
   const [summary, setSummary] = useState(() => adaptSummary({}));
   const [shelterBreakdown, setShelterBreakdown] = useState([]);
   const [bandDistribution, setBandDistribution] = useState([]);
+  const [monthlyBreakdown, setMonthlyBreakdown] = useState(() => []);
+  const [attendanceTimeline, setAttendanceTimeline] = useState(() => []);
+  const [verificationSummary, setVerificationSummary] = useState(() => null);
+  const [streaks, setStreaks] = useState(() => []);
+  const [filters, setFilters] = useState(() => ({}));
+  const [period, setPeriod] = useState(() => null);
+  const [meta, setMeta] = useState(() => null);
   const [error, setError] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
   const paramsKey = JSON.stringify(inputParams ?? {});
   const params = useMemo(() => (inputParams ? { ...inputParams } : {}), [paramsKey]);
 
+  const isMountedRef = useRef(false);
+
   useEffect(() => {
-    let isActive = true;
+    isMountedRef.current = true;
 
-    if (!enabled) {
-      setIsLoading(false);
-      return () => {
-        isActive = false;
-      };
-    }
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-    if (!childId) {
-      setIsLoading(false);
-      return () => {
-        isActive = false;
-      };
-    }
+  const fetchDetail = useCallback(
+    async ({ skipLoadingState = false } = {}) => {
+      if (!enabled || !childId) {
+        if (!skipLoadingState && isMountedRef.current) {
+          setIsLoading(false);
+        }
+        return null;
+      }
 
-    const fetchDetail = async () => {
-      setIsLoading(true);
-      setError(null);
-      setErrorMessage(null);
+      if (!skipLoadingState && isMountedRef.current) {
+        setIsLoading(true);
+      }
+
+      if (isMountedRef.current) {
+        setError(null);
+        setErrorMessage(null);
+      }
 
       try {
         const response = await adminCabangReportApi.getChildAttendanceReportDetail(childId, params);
-        if (!isActive) return;
+        if (!isMountedRef.current) return null;
 
         const rawPayload = response?.data ?? response ?? {};
         const payload = rawPayload?.data ?? rawPayload ?? {};
 
-        const childPayload = firstDefined(payload.child, rawPayload.child, payload.data?.child) ?? {};
+        const childPayload =
+          firstDefined(payload.child, rawPayload.child, payload.data?.child) ?? {};
         const summaryPayload = firstDefined(payload.summary, rawPayload.summary) ?? {};
         const shelterPayload = firstDefined(
           payload.shelter_breakdown,
@@ -290,6 +304,46 @@ export const useChildAttendanceReportDetail = ({
           rawPayload.attendanceBandDistribution,
           [],
         );
+        const monthlyPayload = firstDefined(
+          payload.monthly_breakdown,
+          payload.monthlyBreakdown,
+          rawPayload.monthly_breakdown,
+          rawPayload.monthlyBreakdown,
+          childPayload?.monthly_breakdown,
+          childPayload?.monthlyBreakdown,
+          [],
+        );
+        const timelinePayload = firstDefined(
+          payload.attendance_timeline,
+          payload.attendanceTimeline,
+          rawPayload.attendance_timeline,
+          rawPayload.attendanceTimeline,
+          childPayload?.attendance_timeline,
+          childPayload?.attendanceTimeline,
+          childPayload?.timeline,
+          [],
+        );
+        const verificationPayload = firstDefined(
+          payload.verification_summary,
+          payload.verificationSummary,
+          rawPayload.verification_summary,
+          rawPayload.verificationSummary,
+          null,
+        );
+        const streaksPayload = firstDefined(
+          payload.streaks,
+          rawPayload.streaks,
+          childPayload?.streaks,
+          [],
+        );
+        const filtersPayload = firstDefined(payload.filters, rawPayload.filters, {});
+        const periodPayload = firstDefined(
+          payload.period,
+          rawPayload.period,
+          summaryPayload?.period,
+          null,
+        );
+        const metaPayload = firstDefined(payload.meta, rawPayload.meta, null);
 
         const hasChildPayload =
           childPayload &&
@@ -300,22 +354,50 @@ export const useChildAttendanceReportDetail = ({
         setSummary(adaptSummary(summaryPayload));
         setShelterBreakdown(adaptShelterBreakdown(shelterPayload));
         setBandDistribution(adaptBandDistribution(bandPayload));
+        setMonthlyBreakdown(extractArray(monthlyPayload));
+        setAttendanceTimeline(extractArray(timelinePayload));
+        setVerificationSummary(
+          verificationPayload && typeof verificationPayload === 'object'
+            ? { ...verificationPayload }
+            : verificationPayload ?? null,
+        );
+        setStreaks(extractArray(streaksPayload));
+        setFilters(
+          filtersPayload && typeof filtersPayload === 'object' ? { ...filtersPayload } : {},
+        );
+        setPeriod(
+          periodPayload && typeof periodPayload === 'object'
+            ? { ...periodPayload }
+            : periodPayload ?? null,
+        );
+        setMeta(
+          metaPayload && typeof metaPayload === 'object' ? { ...metaPayload } : metaPayload ?? null,
+        );
+
+        return payload;
       } catch (err) {
-        if (!isActive) return;
+        if (!isMountedRef.current) return null;
         setError(err);
         setErrorMessage(err?.message || '');
+        return null;
       } finally {
-        if (!isActive) return;
-        setIsLoading(false);
+        if (!isMountedRef.current) return null;
+        if (!skipLoadingState) {
+          setIsLoading(false);
+        }
       }
-    };
+    },
+    [childId, enabled, params],
+  );
+
+  useEffect(() => {
+    if (!enabled || !childId) {
+      setIsLoading(false);
+      return;
+    }
 
     fetchDetail();
-
-    return () => {
-      isActive = false;
-    };
-  }, [childId, enabled, paramsKey]);
+  }, [childId, enabled, fetchDetail]);
 
   return {
     isLoading,
@@ -323,8 +405,18 @@ export const useChildAttendanceReportDetail = ({
     summary,
     shelterBreakdown,
     bandDistribution,
+    monthlyBreakdown,
+    attendanceTimeline,
+    timeline: attendanceTimeline,
+    verificationSummary,
+    streaks,
+    filters,
+    period,
+    meta,
     error,
     errorMessage,
+    refresh: fetchDetail,
+    refetch: fetchDetail,
   };
 };
 
