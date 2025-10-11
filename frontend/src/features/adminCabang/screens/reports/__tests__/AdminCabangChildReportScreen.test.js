@@ -148,4 +148,69 @@ describe('AdminCabangChildReportScreen', () => {
     expect(refresh).not.toHaveBeenCalled();
     expect(refetch).not.toHaveBeenCalled();
   });
+
+  it('resets filters through setters without triggering manual refresh', () => {
+    const setSearch = jest.fn();
+    const setShelterId = jest.fn();
+    const setGroupId = jest.fn();
+    const setBand = jest.fn();
+    const setDateRange = jest.fn();
+    const setStartDate = jest.fn();
+    const setEndDate = jest.fn();
+    const refresh = jest.fn();
+    const refetch = jest.fn();
+
+    mockUseChildAttendanceReportList.mockReturnValue({
+      summary: null,
+      children: [],
+      pagination: null,
+      params: { search: '', shelterId: null, groupId: null, band: null, startDate: null, endDate: null },
+      filters: { search: '', shelterId: null, groupId: null, band: null, startDate: null, endDate: null },
+      chartData: [],
+      shelterAttendanceChart: null,
+      shelterBreakdown: null,
+      lastRefreshedAt: null,
+      generatedAt: null,
+      period: null,
+      isLoading: false,
+      isInitialLoading: false,
+      isRefreshing: false,
+      isFetchingMore: false,
+      error: null,
+      errorMessage: null,
+      hasNextPage: false,
+      refresh,
+      refetch,
+      loadMore: jest.fn(),
+      fetchNextPage: jest.fn(),
+      applyFilters: undefined,
+      availableFilters: null,
+      filterOptions: null,
+      resetFilters: undefined,
+      clearFilters: undefined,
+      setSearch,
+      setShelterId,
+      setGroupId,
+      setBand,
+      setDateRange,
+      setStartDate,
+      setEndDate,
+    });
+
+    const { UNSAFE_getByType } = render(<AdminCabangChildReportScreen />);
+
+    act(() => {
+      UNSAFE_getByType(ChildAttendanceFilterSheet).props.onReset();
+    });
+
+    expect(setSearch).toHaveBeenCalledWith('');
+    expect(setShelterId).toHaveBeenCalledWith(null);
+    expect(setGroupId).toHaveBeenCalledWith(null);
+    expect(setBand).toHaveBeenCalledWith(null);
+    expect(setDateRange).toHaveBeenCalledWith({ startDate: null, endDate: null });
+    expect(setStartDate).not.toHaveBeenCalled();
+    expect(setEndDate).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(refetch).not.toHaveBeenCalled();
+  });
 });

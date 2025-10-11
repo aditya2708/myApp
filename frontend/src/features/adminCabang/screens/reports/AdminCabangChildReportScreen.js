@@ -289,30 +289,26 @@ const AdminCabangChildReportScreen = () => {
   const handleResetFilters = useCallback(() => {
     if (typeof resetFilters === 'function') {
       resetFilters();
-    } else if (typeof clearFilters === 'function') {
-      clearFilters();
-    } else {
-      setSearch?.('');
-      setShelterId?.(null);
-      setGroupId?.(null);
-      setBand?.(null);
-      if (setDateRange) {
-        setDateRange({ startDate: null, endDate: null });
-      } else {
-        setStartDate?.(null);
-        setEndDate?.(null);
-      }
+      return;
     }
 
-    if (typeof refresh === 'function') {
-      refresh();
-    } else if (typeof refetch === 'function') {
-      refetch();
+    if (typeof clearFilters === 'function') {
+      clearFilters();
+      return;
+    }
+
+    setSearch?.('');
+    setShelterId?.(null);
+    setGroupId?.(null);
+    setBand?.(null);
+    if (setDateRange) {
+      setDateRange({ startDate: null, endDate: null });
+    } else {
+      setStartDate?.(null);
+      setEndDate?.(null);
     }
   }, [
     clearFilters,
-    refetch,
-    refresh,
     resetFilters,
     setBand,
     setDateRange,
