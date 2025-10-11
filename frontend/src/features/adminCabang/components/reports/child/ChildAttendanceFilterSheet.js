@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import SearchBar from '../../../../../common/components/SearchBar';
 import DatePicker from '../../../../../common/components/DatePicker';
+import PickerInput from '../../../../../common/components/PickerInput';
 
 const formatDateLabel = (value) => {
   if (!value) return null;
@@ -92,25 +93,68 @@ const ChildAttendanceFilterSheet = ({
 
   const handleDateCancel = () => setActiveDatePicker(null);
 
-  const toggleBand = (bandId) => {
+  const shelterOptions = useMemo(() => {
+    const seen = new Set();
+    const options = groupedShelters.reduce((acc, shelter) => {
+      const id = shelter?.id ?? shelter?.value ?? shelter?.shelter_id ?? null;
+      if (id === null || id === undefined || seen.has(id)) return acc;
+      seen.add(id);
+      const label = shelter?.name ?? shelter?.label ?? shelter?.title ?? 'Tanpa nama';
+      acc.push({ label, value: id });
+      return acc;
+    }, []);
+    return [{ label: 'Semua Shelter', value: null }, ...options];
+  }, [groupedShelters]);
+
+  const groupOptions = useMemo(() => {
+    const seen = new Set();
+    const options = filteredGroups.reduce((acc, group) => {
+      const id = group?.id ?? group?.value ?? group?.group_id ?? null;
+      if (id === null || id === undefined || seen.has(id)) return acc;
+      seen.add(id);
+      const label = group?.name ?? group?.label ?? group?.title ?? 'Tanpa nama';
+      acc.push({ label, value: id });
+      return acc;
+    }, []);
+    return [{ label: 'Semua Kelompok', value: null }, ...options];
+  }, [filteredGroups]);
+
+  const bandOptions = useMemo(() => {
+    const seen = new Set();
+    const options = groupedBands.reduce((acc, band) => {
+      const id = band?.id ?? band?.band ?? band?.value ?? null;
+      if (id === null || id === undefined || seen.has(id)) return acc;
+      seen.add(id);
+      const label = band?.label ?? band?.name ?? band?.title ?? String(id);
+      acc.push({ label, value: id });
+      return acc;
+    }, []);
+    return [{ label: 'Semua Band Kehadiran', value: null }, ...options];
+  }, [groupedBands]);
+
+  const handleShelterChange = (value) => {
+    const normalized = value ?? null;
+    setLocalFilters((prev) => {
+      const shouldResetGroup = normalized !== prev.shelterId;
+      return {
+        ...prev,
+        shelterId: normalized,
+        groupId: shouldResetGroup ? null : prev.groupId,
+      };
+    });
+  };
+
+  const handleGroupChange = (value) => {
     setLocalFilters((prev) => ({
       ...prev,
-      band: prev.band === bandId ? null : bandId,
+      groupId: value ?? null,
     }));
   };
 
-  const handleSelectShelter = (shelterId) => {
+  const handleBandChange = (value) => {
     setLocalFilters((prev) => ({
       ...prev,
-      shelterId: prev.shelterId === shelterId ? null : shelterId,
-      groupId: null,
-    }));
-  };
-
-  const handleSelectGroup = (groupId) => {
-    setLocalFilters((prev) => ({
-      ...prev,
-      groupId: prev.groupId === groupId ? null : groupId,
+      band: value ?? null,
     }));
   };
 
@@ -190,74 +234,46 @@ const ChildAttendanceFilterSheet = ({
             </View>
 
             <Text style={styles.sectionTitle}>Shelter</Text>
-            <View style={styles.chipContainer}>
-              {groupedShelters.length ? (
-                groupedShelters.map((shelter) => {
-                  const id = shelter?.id ?? shelter?.value ?? shelter?.shelter_id ?? null;
-                  const isActive = localFilters.shelterId === id;
-                  return (
-                    <TouchableOpacity
-                      key={id || shelter?.name}
-                      style={[styles.chip, isActive && styles.chipActive]}
-                      onPress={() => handleSelectShelter(id)}
-                    >
-                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                        {shelter?.name ?? 'Tanpa nama'}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
-              ) : (
-                <Text style={styles.emptyText}>Tidak ada shelter tersedia.</Text>
-              )}
-            </View>
+            {shelterOptions.length > 1 ? (
+              <PickerInput
+                value={localFilters.shelterId ?? null}
+                onValueChange={handleShelterChange}
+                items={shelterOptions}
+                placeholder="Pilih shelter"
+                style={styles.pickerInput}
+                pickerProps={{ testID: 'shelter-picker' }}
+              />
+            ) : (
+              <Text style={styles.emptyText}>Tidak ada shelter tersedia.</Text>
+            )}
 
             <Text style={styles.sectionTitle}>Kelompok</Text>
-            <View style={styles.chipContainer}>
-              {filteredGroups.length ? (
-                filteredGroups.map((group) => {
-                  const id = group?.id ?? group?.value ?? group?.group_id ?? null;
-                  const isActive = localFilters.groupId === id;
-                  return (
-                    <TouchableOpacity
-                      key={id || group?.name}
-                      style={[styles.chip, isActive && styles.chipActive]}
-                      onPress={() => handleSelectGroup(id)}
-                    >
-                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                        {group?.name ?? 'Tanpa nama'}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
-              ) : (
-                <Text style={styles.emptyText}>Tidak ada kelompok untuk shelter ini.</Text>
-              )}
-            </View>
+            {groupOptions.length > 1 ? (
+              <PickerInput
+                value={localFilters.groupId ?? null}
+                onValueChange={handleGroupChange}
+                items={groupOptions}
+                placeholder="Pilih kelompok"
+                style={styles.pickerInput}
+                pickerProps={{ testID: 'group-picker' }}
+              />
+            ) : (
+              <Text style={styles.emptyText}>Tidak ada kelompok untuk shelter ini.</Text>
+            )}
 
             <Text style={styles.sectionTitle}>Band Kehadiran</Text>
-            <View style={styles.chipContainer}>
-              {groupedBands.length ? (
-                groupedBands.map((band) => {
-                  const id = band?.id ?? band?.band ?? band?.value ?? null;
-                  const label = band?.label ?? band?.name ?? band?.title ?? String(id ?? 'Band');
-                  const isActive = localFilters.band === id;
-                  return (
-                    <TouchableOpacity
-                      key={id || label}
-                      style={[styles.chip, isActive && styles.chipActive]}
-                      onPress={() => toggleBand(id)}
-                    >
-                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
-              ) : (
-                <Text style={styles.emptyText}>Band kehadiran belum tersedia.</Text>
-              )}
-            </View>
+            {bandOptions.length > 1 ? (
+              <PickerInput
+                value={localFilters.band ?? null}
+                onValueChange={handleBandChange}
+                items={bandOptions}
+                placeholder="Pilih band"
+                style={styles.pickerInput}
+                pickerProps={{ testID: 'band-picker' }}
+              />
+            ) : (
+              <Text style={styles.emptyText}>Band kehadiran belum tersedia.</Text>
+            )}
           </ScrollView>
         )}
 
@@ -358,32 +374,8 @@ const styles = StyleSheet.create({
     color: '#2d3436',
     marginTop: 2,
   },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f5f6fa',
-    borderWidth: 1,
-    borderColor: '#ecf0f1',
-    marginHorizontal: 6,
-    marginBottom: 12,
-  },
-  chipActive: {
-    backgroundColor: 'rgba(9, 132, 227, 0.15)',
-    borderColor: '#0984e3',
-  },
-  chipText: {
-    fontSize: 13,
-    color: '#636e72',
-  },
-  chipTextActive: {
-    color: '#0984e3',
-    fontWeight: '600',
+  pickerInput: {
+    marginBottom: 8,
   },
   emptyText: {
     fontSize: 12,

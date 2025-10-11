@@ -2,14 +2,15 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 
-const PickerInput = ({ 
-  label, 
-  value, 
-  onValueChange, 
-  items = [], 
+const PickerInput = ({
+  label,
+  value,
+  onValueChange,
+  items = [],
   placeholder = "Pilih...",
   error,
-  style 
+  style,
+  pickerProps = {},
 }) => {
   return (
     <View style={[styles.container, style]}>
@@ -19,6 +20,7 @@ const PickerInput = ({
           selectedValue={value}
           onValueChange={onValueChange}
           style={styles.picker}
+          {...pickerProps}
         >
           <Picker.Item label={placeholder} value="" enabled={false} />
           {items.map((item, index) => (
