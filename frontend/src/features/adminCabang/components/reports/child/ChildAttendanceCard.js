@@ -8,55 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const BAND_STYLES = {
-  high: {
-    label: 'Kehadiran Tinggi',
-    color: '#2ecc71',
-    backgroundColor: 'rgba(46, 204, 113, 0.15)',
-  },
-  medium: {
-    label: 'Kehadiran Sedang',
-    color: '#f39c12',
-    backgroundColor: 'rgba(243, 156, 18, 0.15)',
-  },
-  low: {
-    label: 'Kehadiran Rendah',
-    color: '#e74c3c',
-    backgroundColor: 'rgba(231, 76, 60, 0.15)',
-  },
-  unknown: {
-    label: 'Perlu Data',
-    color: '#636e72',
-    backgroundColor: 'rgba(99, 110, 114, 0.12)',
-  },
-};
-
-const getInitials = (name) => {
-  if (!name) return 'AN';
-  return name
-    .trim()
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join('');
-};
-
-const resolveBandMeta = (band, percentage) => {
-  if (band) {
-    const normalized = String(band).toLowerCase();
-    if (BAND_STYLES[normalized]) {
-      return { code: normalized, ...BAND_STYLES[normalized] };
-    }
-  }
-
-  const numeric = Number(percentage);
-  if (!Number.isFinite(numeric)) return BAND_STYLES.unknown;
-  if (numeric >= 85) return { code: 'high', ...BAND_STYLES.high };
-  if (numeric >= 60) return { code: 'medium', ...BAND_STYLES.medium };
-  return { code: 'low', ...BAND_STYLES.low };
-};
+import { getInitials, resolveBandMeta } from '../../screens/reports/child/utils/childReportTransformers';
 
 const ChildAttendanceCard = ({
   child,
@@ -68,9 +20,12 @@ const ChildAttendanceCard = ({
   disabled = false,
 }) => {
   const { bandMeta, attendanceRateLabel, totals, lastActivity } = useMemo(() => {
+    const decorateBandMeta = (meta) =>
+      meta?.code === 'unknown' ? { ...meta, label: 'Perlu Data' } : meta;
+
     if (!child) {
       return {
-        bandMeta: resolveBandMeta(null, null),
+        bandMeta: decorateBandMeta(resolveBandMeta(null, null)),
         attendanceRateLabel: '0%',
         totals: { present: 0, late: 0, absent: 0 },
         lastActivity: null,
@@ -91,7 +46,7 @@ const ChildAttendanceCard = ({
       child?.attendance?.attendance_percentage;
 
     return {
-      bandMeta: resolveBandMeta(bandValue, attendanceRateValue),
+      bandMeta: decorateBandMeta(resolveBandMeta(bandValue, attendanceRateValue)),
       attendanceRateLabel:
         child?.attendanceRate?.label ??
         child?.attendance_label ??
