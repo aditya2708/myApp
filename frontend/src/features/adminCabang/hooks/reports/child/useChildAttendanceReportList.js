@@ -40,7 +40,7 @@ const normalizeParams = (params = {}) => {
 };
 
 const adaptSummary = (rawSummary = {}) => {
-  const totalsSource = rawSummary.totals || {};
+  const totalsSource = rawSummary.totals || rawSummary || {};
 
   const attendanceRateValue = firstDefined(
     rawSummary.attendanceRate,
@@ -78,6 +78,106 @@ const adaptSummary = (rawSummary = {}) => {
     0,
   );
 
+  const totalSessions = firstDefined(
+    rawSummary.totalSessions,
+    rawSummary.sessionCount,
+    rawSummary.total_sessions,
+    rawSummary.sessions,
+    totalsSource.totalSessions,
+    totalsSource.sessionCount,
+    totalsSource.total_sessions,
+    totalsSource.sessions,
+    0,
+  );
+
+  const totalChildren = firstDefined(
+    rawSummary.totalChildren,
+    rawSummary.childrenCount,
+    rawSummary.total_children,
+    totalsSource.totalChildren,
+    totalsSource.childrenCount,
+    totalsSource.total_children,
+    totalsSource.total,
+    0,
+  );
+
+  const activeChildren = firstDefined(
+    rawSummary.activeChildren,
+    rawSummary.active_children,
+    rawSummary.activeCount,
+    totalsSource.activeChildren,
+    totalsSource.active_children,
+    totalsSource.activeCount,
+    0,
+  );
+
+  const inactiveChildren = firstDefined(
+    rawSummary.inactiveChildren,
+    rawSummary.inactive_children,
+    rawSummary.inactiveCount,
+    totalsSource.inactiveChildren,
+    totalsSource.inactive_children,
+    totalsSource.inactiveCount,
+    0,
+  );
+
+  const dateRange = {
+    label: firstDefined(
+      rawSummary.dateRange?.label,
+      rawSummary.date_range?.label,
+      rawSummary.period?.label,
+      rawSummary.periodLabel,
+      rawSummary.dateRangeLabel,
+      null,
+    ),
+    start: firstDefined(
+      rawSummary.dateRange?.start,
+      rawSummary.date_range?.start,
+      rawSummary.period?.start,
+      rawSummary.startDate,
+      rawSummary.start_date,
+      null,
+    ),
+    end: firstDefined(
+      rawSummary.dateRange?.end,
+      rawSummary.date_range?.end,
+      rawSummary.period?.end,
+      rawSummary.endDate,
+      rawSummary.end_date,
+      null,
+    ),
+    value: firstDefined(
+      rawSummary.dateRange?.value,
+      rawSummary.date_range?.value,
+      null,
+    ),
+  };
+
+  const reportDate = firstDefined(
+    rawSummary.reportDate,
+    rawSummary.report_date,
+    rawSummary.generatedAt,
+    rawSummary.generated_at,
+    null,
+  );
+
+  const generatedAt = firstDefined(
+    rawSummary.generatedAt,
+    rawSummary.generated_at,
+    rawSummary.reportGeneratedAt,
+    rawSummary.report_generated_at,
+    rawSummary.reportDateLabel,
+    rawSummary.report_date_label,
+    null,
+  );
+
+  const periodLabel = firstDefined(
+    rawSummary.periodLabel,
+    rawSummary.period?.label,
+    dateRange.label,
+    null,
+  );
+
   return {
     attendanceRate: {
       value: attendanceRateValue,
@@ -87,26 +187,22 @@ const adaptSummary = (rawSummary = {}) => {
     presentCount,
     lateCount,
     absentCount,
+    totalSessions,
+    totalChildren,
+    activeChildren,
+    inactiveChildren,
+    dateRange,
+    generatedAt,
+    reportDate,
+    periodLabel,
     totals: {
       present: presentCount,
       late: lateCount,
       absent: absentCount,
-      totalSessions: firstDefined(
-        rawSummary.totalSessions,
-        rawSummary.sessionCount,
-        totalsSource.totalSessions,
-        totalsSource.sessionCount,
-        totalsSource.sessions,
-        0,
-      ),
-      totalChildren: firstDefined(
-        rawSummary.totalChildren,
-        rawSummary.childrenCount,
-        totalsSource.totalChildren,
-        totalsSource.childrenCount,
-        totalsSource.total,
-        0,
-      ),
+      totalSessions,
+      totalChildren,
+      activeChildren,
+      inactiveChildren,
     },
   };
 };
