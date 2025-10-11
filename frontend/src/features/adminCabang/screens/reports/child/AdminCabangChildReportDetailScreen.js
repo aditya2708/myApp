@@ -640,6 +640,7 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
                     </Text>
                   </View>
                 </View>
+              </View>
             </View>
 
             {verificationItems.length ? (
