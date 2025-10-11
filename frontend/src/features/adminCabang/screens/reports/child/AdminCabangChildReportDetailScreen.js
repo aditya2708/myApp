@@ -1,11 +1,11 @@
 import React, { useCallback, useLayoutEffect, useMemo } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import EmptyState from '../../../../common/components/EmptyState';
 import AttendanceProgressBar from '../../../../components/reports/child/attendance/AttendanceProgressBar';
 import { useChildAttendanceReportDetail } from '../../../../hooks/reports/child/useChildAttendanceReportDetail';
+import ChildReportSummaryCard from '../../../components/childReport/ChildReportSummaryCard';
 import {
-  getInitials,
   resolveBandMeta,
   resolveMonthlyItems,
   resolveTimelineItems,
@@ -241,12 +241,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
 
   const metaEntries = useMemo(() => normalizeMetaEntries(effectiveMeta), [effectiveMeta]);
 
-  const photoUrl =
-    safeChild?.photoUrl ?? safeChild?.photo_url ?? safeChild?.avatarUrl ?? safeChild?.avatar_url ?? null;
-  const displayName = safeChild?.name || safeChild?.fullName || safeChild?.full_name || 'Nama tidak tersedia';
-  const identifier = safeChild?.identifier || safeChild?.code || safeChild?.childCode || null;
-  const shelterName = safeChild?.shelter?.name || safeChild?.shelterName || '-';
-  const groupName = safeChild?.group?.name || safeChild?.groupName || '-';
   const dateRangeLabel =
     effectiveSummary?.dateRange?.label ||
     safeChild?.summary?.dateRange?.label ||
@@ -295,94 +289,14 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
-            {/* Summary Card */}
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryTopRow}>
-                <View style={styles.avatarWrapper}>
-                  {photoUrl ? (
-                    <Image source={{ uri: photoUrl }} style={styles.avatarImage} />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarInitials}>{getInitials(displayName)}</Text>
-                    </View>
-                  )}
-                  <View style={[styles.bandPill, { backgroundColor: bandMeta.backgroundColor }]}>
-                    <Ionicons name="ribbon" size={14} color={bandMeta.color} style={styles.bandIcon} />
-                    <Text style={[styles.bandLabel, { color: bandMeta.color }]}>{bandMeta.label}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.summaryInfo}>
-                  <Text style={styles.summaryName} numberOfLines={2}>
-                    {displayName}
-                  </Text>
-                  {identifier ? <Text style={styles.summaryIdentifier}>ID: {identifier}</Text> : null}
-                  <View style={styles.summaryRow}>
-                    <Ionicons name="home-outline" size={16} color="#636e72" />
-                    <Text style={styles.summaryRowText} numberOfLines={1}>
-                      {shelterName}
-                    </Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Ionicons name="people-circle-outline" size={16} color="#636e72" />
-                    <Text style={styles.summaryRowText} numberOfLines={1}>
-                      {groupName}
-                    </Text>
-                  </View>
-                  {dateRangeLabel ? (
-                    <View style={styles.summaryRow}>
-                      <Ionicons name="calendar-outline" size={16} color="#636e72" />
-                      <Text style={styles.summaryRowText} numberOfLines={1}>
-                        {dateRangeLabel}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              {/* Attendance Stats */}
-              <View style={styles.summaryMetrics}>
-                <View style={styles.metricBox}>
-                  <Text style={styles.metricLabel}>Persentase Kehadiran</Text>
-                  <Text style={styles.metricValue}>{attendanceRateLabel}</Text>
-                </View>
-                <View style={styles.totalsRow}>
-                  <View style={styles.totalsItem} testID="totals-present">
-                    <Text style={styles.totalLabel}>Hadir</Text>
-                    <Text
-                      style={[styles.totalValue, styles.totalValuePositive]}
-                      testID="totals-present-value"
-                    >
-                      {totals.present ?? 0}
-                    </Text>
-                  </View>
-                  <View style={styles.totalsItem} testID="totals-late">
-                    <Text style={styles.totalLabel}>Terlambat</Text>
-                    <Text
-                      style={[styles.totalValue, styles.totalValueWarning]}
-                      testID="totals-late-value"
-                    >
-                      {totals.late ?? 0}
-                    </Text>
-                  </View>
-                  <View style={styles.totalsItem} testID="totals-absent">
-                    <Text style={styles.totalLabel}>Tidak hadir</Text>
-                    <Text
-                      style={[styles.totalValue, styles.totalValueNegative]}
-                      testID="totals-absent-value"
-                    >
-                      {totals.absent ?? 0}
-                    </Text>
-                  </View>
-                  <View style={styles.totalsItem} testID="totals-sessions">
-                    <Text style={styles.totalLabel}>Total sesi</Text>
-                    <Text style={styles.totalValue} testID="totals-sessions-value">
-                      {totals.totalSessions ?? 0}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
+            <ChildReportSummaryCard
+              child={safeChild}
+              bandMeta={bandMeta}
+              totals={totals}
+              attendanceRateLabel={attendanceRateLabel}
+              dateRangeLabel={dateRangeLabel}
+              onRefresh={canRefresh ? handleRefresh : undefined}
+            />
 
             {verificationItems.length ? (
               <View style={styles.section}>
@@ -606,135 +520,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 32,
-  },
-  summaryCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#ecf0f1',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2,
-    marginBottom: 20,
-  },
-  summaryTopRow: {
-    flexDirection: 'row',
-  },
-  avatarWrapper: {
-    marginRight: 16,
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#dfe6e9',
-  },
-  avatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#0984e3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitials: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  bandPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginTop: 10,
-  },
-  bandIcon: {
-    marginRight: 6,
-  },
-  bandLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  summaryInfo: {
-    flex: 1,
-  },
-  summaryName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#2d3436',
-  },
-  summaryIdentifier: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#95a5a6',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  summaryRowText: {
-    marginLeft: 8,
-    fontSize: 13,
-    color: '#636e72',
-    flex: 1,
-  },
-  summaryMetrics: {
-    marginTop: 16,
-  },
-  metricBox: {
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(9, 132, 227, 0.08)',
-    marginBottom: 12,
-  },
-  metricLabel: {
-    fontSize: 13,
-    color: '#0984e3',
-    fontWeight: '600',
-  },
-  metricValue: {
-    marginTop: 6,
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0984e3',
-  },
-  totalsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-  },
-  totalsItem: {
-    width: '48%',
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#f8f9fa',
-  },
-  totalLabel: {
-    fontSize: 12,
-    color: '#95a5a6',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 6,
-    color: '#2d3436',
-  },
-  totalValuePositive: {
-    color: '#2ecc71',
-  },
-  totalValueWarning: {
-    color: '#f39c12',
-  },
-  totalValueNegative: {
-    color: '#e74c3c',
   },
   verificationGrid: {
     flexDirection: 'row',
