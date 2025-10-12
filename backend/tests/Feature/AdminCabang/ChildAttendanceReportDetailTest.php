@@ -237,5 +237,74 @@ class ChildAttendanceReportDetailTest extends TestCase
         $this->assertSame('Belajar', $timelineEntry['jenis_kegiatan']);
         $this->assertSame('Matematika', $timelineEntry['material']);
     }
+
+    public function test_it_returns_child_attendance_detail_with_group_fallback(): void
+    {
+        $user = User::create([
+            'username' => 'admin-fallback',
+            'password' => bcrypt('secret'),
+            'level' => 'admin_cabang',
+        ]);
+
+        $kacab = Kacab::create([
+            'nama_kacab' => 'Cabang Detail',
+        ]);
+
+        AdminCabang::create([
+            'user_id' => $user->id_users,
+            'id_kacab' => $kacab->id_kacab,
+        ]);
+
+        $wilbin = Wilbin::create([
+            'id_kacab' => $kacab->id_kacab,
+            'nama_wilbin' => 'Wilbin Detail',
+        ]);
+
+        $accessibleShelter = Shelter::create([
+            'id_wilbin' => $wilbin->id_wilbin,
+            'nama_shelter' => 'Shelter Detail',
+        ]);
+
+        $otherKacab = Kacab::create([
+            'nama_kacab' => 'Cabang Lain',
+        ]);
+
+        $otherWilbin = Wilbin::create([
+            'id_kacab' => $otherKacab->id_kacab,
+            'nama_wilbin' => 'Wilbin Lain',
+        ]);
+
+        $unreachableShelter = Shelter::create([
+            'id_wilbin' => $otherWilbin->id_wilbin,
+            'nama_shelter' => 'Shelter Lain',
+        ]);
+
+        $unreachableGroup = Kelompok::create([
+            'id_shelter' => $unreachableShelter->id_shelter,
+            'nama_kelompok' => 'Kelompok Luar Akses',
+        ]);
+
+        $child = Anak::create([
+            'id_shelter' => $accessibleShelter->id_shelter,
+            'id_kelompok' => $unreachableGroup->id_kelompok,
+            'full_name' => 'Anak Detail',
+            'status_validasi' => 'aktif',
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->getJson(sprintf(
+            '/api/admin-cabang/laporan/attendance/children/%d?start_date=2024-03-01&end_date=2024-03-31',
+            $child->id_anak
+        ));
+
+        $response->assertOk();
+
+        $data = $response->json('data');
+
+        $this->assertSame('Kelompok Luar Akses', $data['child']['group']['name']);
+        $this->assertSame($unreachableGroup->id_kelompok, $data['child']['group']['id']);
+        $this->assertSame($unreachableShelter->id_shelter, $data['child']['group']['shelter_id']);
+    }
 }
 

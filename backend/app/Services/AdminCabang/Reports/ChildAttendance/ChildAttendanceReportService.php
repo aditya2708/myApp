@@ -383,11 +383,29 @@ class ChildAttendanceReportService
         $group = null;
 
         if ($child->id_kelompok) {
-            $group = $groups[$child->id_kelompok] ?? [
-                'id' => (int) $child->id_kelompok,
-                'name' => null,
-                'shelter_id' => (int) $child->id_shelter,
-            ];
+            $group = $groups[$child->id_kelompok] ?? null;
+
+            if (!$group) {
+                $childGroup = $child->relationLoaded('kelompok')
+                    ? $child->kelompok
+                    : $child->loadMissing('kelompok')->kelompok;
+
+                if ($childGroup) {
+                    $group = [
+                        'id' => (int) $childGroup->id_kelompok,
+                        'name' => $childGroup->nama_kelompok,
+                        'shelter_id' => (int) $childGroup->id_shelter,
+                    ];
+                }
+            }
+
+            if (!$group) {
+                $group = [
+                    'id' => (int) $child->id_kelompok,
+                    'name' => null,
+                    'shelter_id' => (int) $child->id_shelter,
+                ];
+            }
         }
 
         return [
