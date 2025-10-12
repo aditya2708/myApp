@@ -225,7 +225,9 @@ const AdminCabangChildReportScreen = () => {
   }, [pagination]);
 
   const effectiveHasNextPage = useMemo(() => {
-    if (typeof hasNextPage === 'boolean') return hasNextPage;
+    if (hasNextPage !== undefined && hasNextPage !== null) {
+      return Boolean(hasNextPage);
+    }
     if (!currentPagination) return false;
     const totalPages = currentPagination.totalPages ?? currentPagination.last_page ?? 1;
     const currentPage = currentPagination.page ?? currentPagination.current_page ?? 1;
@@ -438,14 +440,14 @@ const AdminCabangChildReportScreen = () => {
   }, [handleRefresh, isListInitialLoading]);
 
   const listFooterComponent = useMemo(() => {
-    if (!isFetchingMore) return null;
+    if (!isFetchingMore || !effectiveHasNextPage) return null;
 
     return (
       <View style={styles.footerLoading}>
         <ActivityIndicator color="#0984e3" />
       </View>
     );
-  }, [isFetchingMore]);
+  }, [effectiveHasNextPage, isFetchingMore]);
 
   const keyExtractor = useCallback((item, index) => {
     const childId = extractChildId(item);

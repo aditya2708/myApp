@@ -329,6 +329,7 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   const [summary, setSummary] = useState(() => adaptSummary({}));
   const [children, setChildren] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, perPage: 10, total: 0, totalPages: 1 });
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     band: null,
@@ -357,6 +358,8 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   }));
   const [error, setError] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
+  const appendModeRef = useRef(false);
+  const lastSuccessfulPageRef = useRef(1);
 
   useEffect(() => {
     return () => {
@@ -366,15 +369,27 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
 
   const queryParams = useMemo(() => normalizeParams(params), [params]);
 
+  const resetAppendState = useCallback(() => {
+    appendModeRef.current = false;
+    setIsFetchingMore(false);
+  }, []);
+
   const fetchReport = useCallback(
     async ({ refreshing = false, showLoading = false } = {}) => {
       if (!isMountedRef.current) return;
 
+      const currentPageFromQuery = queryParams.page ?? params.page ?? 1;
+      const isAppendMode = appendModeRef.current && currentPageFromQuery > 1;
+
       if (refreshing) {
         setIsRefreshing(true);
       }
-      if (showLoading) {
+      if (showLoading && !isAppendMode) {
         setIsLoading(true);
+      }
+
+      if (isAppendMode) {
+        setIsFetchingMore(true);
       }
 
       setError(null);
@@ -387,8 +402,18 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
         const payload = response?.data ?? response ?? {};
 
         setSummary(adaptSummary(payload.summary || {}));
-        setChildren(Array.isArray(payload.children) ? payload.children : []);
-        setPagination(adaptPagination(payload.pagination || {}, queryParams));
+        const nextChildren = Array.isArray(payload.children) ? payload.children : [];
+        setChildren((prevChildren) => {
+          if (isAppendMode) {
+            return [...prevChildren, ...nextChildren];
+          }
+
+          return nextChildren;
+        });
+
+        const nextPagination = adaptPagination(payload.pagination || {}, queryParams);
+        setPagination(nextPagination);
+        lastSuccessfulPageRef.current = nextPagination.page ?? nextPagination.current_page ?? 1;
         setFilters(adaptFilters(payload.filters || {}, { ...params, ...queryParams }));
         const extras = adaptPayloadExtras(payload);
         setAvailableFilters(extras.availableFilters);
@@ -402,81 +427,149 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
         if (!isMountedRef.current) return;
         setError(err);
         setErrorMessage(err?.message || '');
+        const lastSuccessfulPage = lastSuccessfulPageRef.current ?? 1;
+        setParams((prev) => {
+          const currentPage = prev.page ?? lastSuccessfulPage;
+          if (currentPage === lastSuccessfulPage) {
+            return prev;
+          }
+          return { ...prev, page: lastSuccessfulPage };
+        });
+        resetAppendState();
       } finally {
         if (!isMountedRef.current) return;
         setIsLoading(false);
         setIsRefreshing(false);
+        if (appendModeRef.current) {
+          resetAppendState();
+        }
       }
     },
-    [params, queryParams],
+    [params, queryParams, resetAppendState],
   );
 
   useEffect(() => {
     fetchReport({ showLoading: true });
   }, [fetchReport]);
 
-  const setPage = useCallback((page) => {
-    setParams((prev) => ({ ...prev, page }));
-  }, []);
+  const setPage = useCallback(
+    (page) => {
+      const nextPage = typeof page === 'number' ? page : Number(page);
+      if (!nextPage || nextPage <= 1) {
+        resetAppendState();
+      }
+      setParams((prev) => {
+        if (prev.page === nextPage) return prev;
+        return { ...prev, page: nextPage || 1 };
+      });
+    },
+    [resetAppendState],
+  );
 
   const setBand = useCallback((band) => {
+    resetAppendState();
     setParams((prev) => ({ ...prev, page: 1, band }));
-  }, []);
+  }, [resetAppendState]);
 
   const setSearch = useCallback((search) => {
+    resetAppendState();
     setParams((prev) => ({ ...prev, page: 1, search }));
-  }, []);
+  }, [resetAppendState]);
 
   const setShelterId = useCallback((shelterId) => {
+    resetAppendState();
     setParams((prev) => ({
       ...prev,
       page: 1,
       shelterId,
       shelter_id: shelterId,
     }));
-  }, []);
+  }, [resetAppendState]);
 
   const setGroupId = useCallback((groupId) => {
+    resetAppendState();
     setParams((prev) => ({
       ...prev,
       page: 1,
       groupId,
       group_id: groupId,
     }));
-  }, []);
+  }, [resetAppendState]);
 
   const setStartDate = useCallback((startDate) => {
+    resetAppendState();
     setParams((prev) => ({
       ...prev,
       page: 1,
       startDate,
       start_date: startDate,
     }));
-  }, []);
+  }, [resetAppendState]);
 
   const setEndDate = useCallback((endDate) => {
+    resetAppendState();
     setParams((prev) => ({
       ...prev,
       page: 1,
       endDate,
       end_date: endDate,
     }));
-  }, []);
+  }, [resetAppendState]);
 
   const refresh = useCallback(() => {
+    resetAppendState();
     fetchReport({ refreshing: true });
-  }, [fetchReport]);
+  }, [fetchReport, resetAppendState]);
 
   const refetch = useCallback(() => {
+    resetAppendState();
     fetchReport({ showLoading: true });
-  }, [fetchReport]);
+  }, [fetchReport, resetAppendState]);
+
+  const hasNextPage = useMemo(() => {
+    if (!pagination) return false;
+    const totalPages =
+      pagination.totalPages ??
+      pagination.total_pages ??
+      pagination.last_page ??
+      pagination.pages ??
+      1;
+    const currentPage =
+      pagination.page ??
+      pagination.current_page ??
+      params.page ??
+      queryParams.page ??
+      1;
+
+    if (!totalPages) return false;
+    return currentPage < totalPages;
+  }, [pagination, params, queryParams]);
+
+  const loadMore = useCallback(() => {
+    if (isFetchingMore || isLoading || !hasNextPage) {
+      return;
+    }
+
+    appendModeRef.current = true;
+    setIsFetchingMore(true);
+    setParams((prev) => ({
+      ...prev,
+      page: (prev.page ?? queryParams.page ?? 1) + 1,
+    }));
+  }, [hasNextPage, isFetchingMore, isLoading, queryParams.page]);
+
+  const fetchNextPage = useCallback(() => {
+    loadMore();
+  }, [loadMore]);
 
   return {
     isLoading,
     isRefreshing,
+    isFetchingMore,
     summary,
     children,
     pagination,
+    hasNextPage,
     filters,
     availableFilters,
     shelters,
@@ -497,6 +590,8 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
     setEndDate,
     refresh,
     refetch,
+    loadMore,
+    fetchNextPage,
   };
 };
 
