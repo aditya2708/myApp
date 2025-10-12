@@ -268,13 +268,13 @@ class ChildAttendanceReportTest extends TestCase
         $this->assertCount(2, $data['children']);
 
         $alphaPayload = collect($data['children'])->firstWhere('full_name', 'Anak Alpha');
-        $this->assertSame(1, $alphaPayload['attendance']['present_count']);
-        $this->assertSame(1, $alphaPayload['attendance']['late_count']);
+        $this->assertSame(2, $alphaPayload['attendance']['hadir_count']);
+        $this->assertSame(0, $alphaPayload['attendance']['tidak_hadir_count']);
         $this->assertSame('100.00', $alphaPayload['attendance']['attendance_percentage']);
 
         $betaPayload = collect($data['children'])->firstWhere('full_name', 'Anak Beta');
-        $this->assertSame(0, $betaPayload['attendance']['present_count']);
-        $this->assertSame(1, $betaPayload['attendance']['absent_count']);
+        $this->assertSame(0, $betaPayload['attendance']['hadir_count']);
+        $this->assertSame(1, $betaPayload['attendance']['tidak_hadir_count']);
         $this->assertSame('0.00', $betaPayload['attendance']['attendance_percentage']);
 
         $distribution = $data['attendance_band_distribution'];

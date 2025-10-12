@@ -27,10 +27,9 @@ class ChildAttendanceItemResource extends JsonResource
                 'name' => $this->resource['group']['name'] ?? null,
             ],
             'attendance' => [
-                'present_count' => (int) ($attendance['present_count'] ?? 0),
-                'late_count' => (int) ($attendance['late_count'] ?? 0),
-                'absent_count' => (int) ($attendance['absent_count'] ?? 0),
-                'total_sessions' => (int) ($attendance['total_sessions'] ?? 0),
+                'hadir_count' => (int) ($attendance['hadir_count'] ?? 0),
+                'tidak_hadir_count' => (int) ($attendance['tidak_hadir_count'] ?? 0),
+                'total_activities' => (int) ($attendance['total_activities'] ?? 0),
                 'attendance_percentage' => number_format((float) ($attendance['attendance_percentage'] ?? 0), 2, '.', ''),
                 'attendance_band' => $attendance['attendance_band'] ?? null,
             ],
@@ -39,10 +38,9 @@ class ChildAttendanceItemResource extends JsonResource
                     return [
                         'month' => $payload['month'] ?? null,
                         'label' => $payload['label'] ?? null,
-                        'activities_count' => (int) ($payload['activities_count'] ?? 0),
-                        'attended_count' => (int) ($payload['attended_count'] ?? 0),
-                        'late_count' => (int) ($payload['late_count'] ?? 0),
-                        'absent_count' => (int) ($payload['absent_count'] ?? 0),
+                        'total_activities' => (int) ($payload['total_activities'] ?? 0),
+                        'hadir_count' => (int) ($payload['hadir_count'] ?? 0),
+                        'tidak_hadir_count' => (int) ($payload['tidak_hadir_count'] ?? 0),
                         'attendance_percentage' => number_format((float) ($payload['attendance_percentage'] ?? 0), 2, '.', ''),
                     ];
                 })
