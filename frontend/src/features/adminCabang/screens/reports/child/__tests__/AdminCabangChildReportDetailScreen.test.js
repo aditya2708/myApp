@@ -24,11 +24,11 @@ describe('AdminCabangChildReportDetailScreen', () => {
     mockUseChildAttendanceReportDetail.mockReturnValue({
       child: {
         name: 'Anisa Putri',
-        attendanceRate: { value: 92 },
+        attendanceRate: { value: 0.08 },
         totals: { hadir: 11, tidakHadir: 0, totalAktivitas: 11 },
       },
       summary: {
-        attendanceRate: { value: 92 },
+        attendanceRate: { value: 0.08 },
         totals: { hadir: 11, tidakHadir: 0, totalAktivitas: 11 },
         dateRange: { label: 'Januari 2024' },
       },
@@ -46,7 +46,7 @@ describe('AdminCabangChildReportDetailScreen', () => {
       refetch: jest.fn(),
     });
 
-    render(
+    const { getByTestId } = render(
       <AdminCabangChildReportDetailScreen
         navigation={navigationMock}
         route={{
@@ -65,5 +65,6 @@ describe('AdminCabangChildReportDetailScreen', () => {
       enabled: true,
     });
     expect(navigationMock.setOptions).toHaveBeenCalledWith({ headerShown: false });
+    expect(getByTestId('totals-persentase-value').props.children).toBe('0,08%');
   });
 });

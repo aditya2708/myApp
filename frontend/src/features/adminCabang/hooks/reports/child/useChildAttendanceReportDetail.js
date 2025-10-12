@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { adminCabangReportApi } from '../../../api/adminCabangReportApi';
+import { formatPercentageLabel } from '../../../screens/reports/child/utils/childReportTransformers';
 
 const firstDefined = (...values) => {
   for (const value of values) {
@@ -167,9 +168,7 @@ const adaptSummary = (rawSummary = {}) => {
     totals.attendanceRateLabel,
     totals.attendance_rate_label,
     totals.attendance_percentage_label,
-    Number.isFinite(attendanceRateValue)
-      ? `${attendanceRateValue.toFixed(attendanceRateValue % 1 === 0 ? 0 : 1)}%`
-      : null,
+    formatPercentageLabel(attendanceRateValue),
   );
 
   return {

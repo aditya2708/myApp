@@ -4,9 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import EmptyState from '../../../../../common/components/EmptyState';
 import { useChildAttendanceReportDetail } from '../../../hooks/reports/child/useChildAttendanceReportDetail';
 import ChildReportSummaryCard from '../../../components/childReport/ChildReportSummaryCard';
-import {
-  resolveBandMeta,
-} from './utils/childReportTransformers';
+import { formatPercentageLabel, resolveBandMeta } from './utils/childReportTransformers';
 
 const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
   const params = route?.params ?? {};
@@ -104,14 +102,21 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
     const labelFromSummary = effectiveSummary?.attendanceRate?.label;
     if (labelFromSummary) return labelFromSummary;
 
-    if (Number.isFinite(attendanceRateValue)) {
-      return `${attendanceRateValue.toFixed(attendanceRateValue % 1 === 0 ? 0 : 1)}%`;
-    }
+    const formattedFromValue = formatPercentageLabel(attendanceRateValue);
+    if (formattedFromValue) return formattedFromValue;
 
     const labelFromChild =
       safeChild?.attendanceRate?.label ?? safeChild?.attendance_label ?? safeChild?.attendanceRate;
 
-    if (typeof labelFromChild === 'string') return labelFromChild;
+    const formattedFromChildValue = formatPercentageLabel(labelFromChild);
+    if (formattedFromChildValue) return formattedFromChildValue;
+
+    if (typeof labelFromChild === 'string') {
+      const trimmed = labelFromChild.trim();
+      if (trimmed) {
+        return trimmed.endsWith('%') ? trimmed : `${trimmed}%`;
+      }
+    }
 
     return '0%';
   }, [attendanceRateValue, effectiveSummary, safeChild]);
