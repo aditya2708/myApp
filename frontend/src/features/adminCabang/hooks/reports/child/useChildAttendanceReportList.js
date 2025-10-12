@@ -208,6 +208,18 @@ const adaptSummary = (rawSummary = {}) => {
 };
 
 const adaptPagination = (rawPagination = {}, fallbackParams = {}) => {
+  const totalPages = firstDefined(
+    rawPagination.total_pages,
+    rawPagination.totalPages,
+    rawPagination.pages,
+    rawPagination.last_page,
+    fallbackParams.total_pages,
+    fallbackParams.totalPages,
+    fallbackParams.pages,
+    fallbackParams.last_page,
+    1,
+  );
+
   return {
     page: firstDefined(
       rawPagination.current_page,
@@ -224,13 +236,17 @@ const adaptPagination = (rawPagination = {}, fallbackParams = {}) => {
       fallbackParams.perPage,
       10,
     ),
-    total: firstDefined(rawPagination.total, rawPagination.total_items, rawPagination.totalItems, 0),
-    totalPages: firstDefined(
-      rawPagination.total_pages,
-      rawPagination.totalPages,
-      rawPagination.pages,
-      1,
+    total: firstDefined(
+      rawPagination.total,
+      rawPagination.total_items,
+      rawPagination.totalItems,
+      fallbackParams.total,
+      fallbackParams.total_items,
+      fallbackParams.totalItems,
+      0,
     ),
+    totalPages,
+    lastPage: totalPages,
   };
 };
 
@@ -528,12 +544,7 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
 
   const hasNextPage = useMemo(() => {
     if (!pagination) return false;
-    const totalPages =
-      pagination.totalPages ??
-      pagination.total_pages ??
-      pagination.last_page ??
-      pagination.pages ??
-      1;
+    const totalPages = pagination.totalPages ?? pagination.lastPage ?? 1;
     const currentPage =
       pagination.page ??
       pagination.current_page ??
