@@ -1,8 +1,8 @@
 import React, { useCallback, useLayoutEffect, useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import EmptyState from '../../../../common/components/EmptyState';
-import { useChildAttendanceReportDetail } from '../../../../hooks/reports/child/useChildAttendanceReportDetail';
+import EmptyState from '../../../../../common/components/EmptyState';
+import { useChildAttendanceReportDetail } from '../../../hooks/reports/child/useChildAttendanceReportDetail';
 import ChildReportSummaryCard from '../../../components/childReport/ChildReportSummaryCard';
 import VerificationSummaryGrid from '../../../components/childReport/VerificationSummaryGrid';
 import StreakHighlights from '../../../components/childReport/StreakHighlights';
@@ -312,7 +312,7 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
           </ScrollView>
         )}
       </View>
-    </View>
+   
   );
 };
 

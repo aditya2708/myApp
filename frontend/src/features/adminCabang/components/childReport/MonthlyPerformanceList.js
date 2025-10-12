@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import AttendanceProgressBar from '../reports/child/attendance/AttendanceProgressBar';
+import AttendanceProgressBar from '../reports/attendance/AttendanceProgressBar';
 import ReportSection from './ReportSection';
 
 const resolveColor = (percentage) => {

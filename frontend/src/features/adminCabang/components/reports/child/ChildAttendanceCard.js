@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getInitials, resolveBandMeta } from '../../screens/reports/child/utils/childReportTransformers';
+import { getInitials, resolveBandMeta } from '../../../screens/reports/child/utils/childReportTransformers';
 
 const ChildAttendanceCard = ({
   child,
