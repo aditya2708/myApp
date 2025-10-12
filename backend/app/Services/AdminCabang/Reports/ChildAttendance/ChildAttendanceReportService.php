@@ -303,6 +303,8 @@ class ChildAttendanceReportService
             ? (string) $filters['jenis_kegiatan']
             : null;
 
+        $groups = $this->getAccessibleGroups($shelterIds);
+
         $attendanceRows = $this->loadAttendanceRows([$child->id_anak], $shelterIds, $start, $end, $jenisKegiatan);
         $aggregates = $this->aggregateAttendance($attendanceRows, $start, $end);
 
@@ -378,6 +380,16 @@ class ChildAttendanceReportService
 
         $shelter = $accessibleShelters[$child->id_shelter] ?? ['id' => $child->id_shelter, 'name' => null];
 
+        $group = null;
+
+        if ($child->id_kelompok) {
+            $group = $groups[$child->id_kelompok] ?? [
+                'id' => (int) $child->id_kelompok,
+                'name' => null,
+                'shelter_id' => (int) $child->id_shelter,
+            ];
+        }
+
         return [
             'period' => [
                 'start_date' => $start->toDateString(),
@@ -394,7 +406,7 @@ class ChildAttendanceReportService
                     'id' => $shelter['id'] ?? $child->id_shelter,
                     'name' => $shelter['name'] ?? null,
                 ],
-                'group' => $child->id_kelompok ? ['id' => $child->id_kelompok] : null,
+                'group' => $group,
                 'guardian_contact' => null,
             ],
             'summary' => [
