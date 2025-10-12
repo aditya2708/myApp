@@ -156,4 +156,29 @@ describe('useChildAttendanceReportDetail', () => {
     expect(result.current.summary.totals.totalActivities).toBe(15);
     expect(result.current.summary.attendanceRate.value).toBe(80);
   });
+
+  it('formats fractional attendance rate labels using Indonesian locale', async () => {
+    adminCabangReportApi.getChildAttendanceReportDetail.mockResolvedValueOnce({
+      data: {
+        child: {
+          id: 'child-5',
+          name: 'Rina',
+        },
+        summary: {
+          attendanceRate: 0.08,
+        },
+      },
+    });
+
+    const { result } = renderHook(useChildAttendanceReportDetail, {
+      childId: 'child-5',
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.summary.attendanceRate.value).toBe(0.08);
+    expect(result.current.summary.attendanceRate.label).toBe('0,08%');
+  });
 });

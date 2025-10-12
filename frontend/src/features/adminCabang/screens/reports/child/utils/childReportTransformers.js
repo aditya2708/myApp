@@ -1,3 +1,19 @@
+const percentageFormatter = new Intl.NumberFormat('id-ID', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export const formatPercentageLabel = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+
+  return `${percentageFormatter.format(numeric)}%`;
+};
+
 export const BAND_STYLES = {
   high: {
     label: 'Kehadiran Tinggi',
