@@ -529,6 +529,12 @@ const ActivityDetailScreen = ({ navigation, route }) => {
               styles.reportButton
             ]}
           />
+          <ActionButton
+            onPress={handleViewAttendanceRecords}
+            icon="list"
+            text="Daftar Kehadiran"
+            style={[styles.reportButtonFullWidth, styles.recordsButton]}
+          />
         </View>
       )
     },
