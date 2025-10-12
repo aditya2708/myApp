@@ -23,11 +23,69 @@ const ChildAttendanceCard = ({
     const decorateBandMeta = (meta) =>
       meta?.code === 'unknown' ? { ...meta, label: 'Perlu Data' } : meta;
 
+    const coalesceNumber = (...candidates) => {
+      for (const value of candidates) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+      return null;
+    };
+
+    const extractTotals = (source = {}) => {
+      const rawHadir = coalesceNumber(
+        source.hadir,
+        source.hadirCount,
+        source.totalHadir,
+        source.total_hadir,
+      );
+      const present = coalesceNumber(
+        source.present,
+        source.presentCount,
+        source.present_count,
+      );
+      const late = coalesceNumber(
+        source.late,
+        source.lateCount,
+        source.late_count,
+        source.terlambat,
+      );
+      const tidakHadir =
+        coalesceNumber(
+          source.tidakHadir,
+          source.tidak_hadir,
+          source.tidakHadirCount,
+          source.absent,
+          source.absentCount,
+          source.absent_count,
+        ) ?? 0;
+      const totalAktivitasCandidate = coalesceNumber(
+        source.totalAktivitas,
+        source.total_aktivitas,
+        source.totalActivities,
+        source.total_activities,
+        source.totalSessions,
+        source.total_sessions,
+        source.sessions,
+      );
+
+      const hadirCombined = rawHadir ?? (present ?? 0) + (late ?? 0);
+      const totalAktivitas =
+        totalAktivitasCandidate ?? hadirCombined + tidakHadir;
+
+      return {
+        hadir: hadirCombined,
+        tidakHadir,
+        totalAktivitas,
+      };
+    };
+
     if (!child) {
       return {
         bandMeta: decorateBandMeta(resolveBandMeta(null, null)),
         attendanceRateLabel: '0%',
-        totals: { present: 0, late: 0, absent: 0 },
+        totals: { hadir: 0, tidakHadir: 0, totalAktivitas: 0 },
         lastActivity: null,
       };
     }
@@ -55,11 +113,26 @@ const ChildAttendanceCard = ({
               Number(attendanceRateValue) % 1 === 0 ? 0 : 1
             )}%`
           : '0%'),
-      totals: {
-        present: child?.totals?.present ?? child?.attendance?.present_count ?? 0,
-        late: child?.totals?.late ?? child?.attendance?.late_count ?? 0,
-        absent: child?.totals?.absent ?? child?.attendance?.absent_count ?? 0,
-      },
+      totals: (() => {
+        if (child?.totals) {
+          return extractTotals(child.totals);
+        }
+
+        if (child?.attendance?.totals) {
+          return extractTotals(child.attendance.totals);
+        }
+
+        return extractTotals({
+          hadir: child?.attendance?.hadir,
+          hadirCount: child?.attendance?.hadir_count,
+          present: child?.attendance?.present_count,
+          late: child?.attendance?.late_count,
+          tidakHadir: child?.attendance?.absent_count,
+          totalAktivitas: child?.attendance?.total_activities,
+          totalSessions: child?.attendance?.totalSessions,
+          total_sessions: child?.attendance?.total_sessions,
+        });
+      })(),
       lastActivity: child?.last_activity ?? null,
     };
   }, [child]);
@@ -136,15 +209,25 @@ const ChildAttendanceCard = ({
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Hadir</Text>
-              <Text style={[styles.statValue, styles.statValuePositive]}>{totals.present}</Text>
+              <Text style={[styles.statValue, styles.statValuePositive]}>
+                {totals.hadir.toLocaleString('id-ID')}
+              </Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Terlambat</Text>
-              <Text style={[styles.statValue, styles.statValueWarning]}>{totals.late}</Text>
+              <Text style={styles.statLabel}>Tidak Hadir</Text>
+              <Text style={[styles.statValue, styles.statValueNegative]}>
+                {totals.tidakHadir.toLocaleString('id-ID')}
+              </Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Tidak hadir</Text>
-              <Text style={[styles.statValue, styles.statValueNegative]}>{totals.absent}</Text>
+              <Text style={styles.statLabel}>Total Aktivitas</Text>
+              <Text style={[styles.statValue, styles.statValueNeutral]}>
+                {totals.totalAktivitas.toLocaleString('id-ID')}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Persentase</Text>
+              <Text style={[styles.statValue, styles.statValueInfo]}>{attendanceRateLabel}</Text>
             </View>
           </View>
         </View>
@@ -152,11 +235,6 @@ const ChildAttendanceCard = ({
 
       {/* Footer */}
       <View style={styles.footerRow}>
-        <View style={styles.attendanceRateBadge}>
-          <Ionicons name="stats-chart" size={16} color="#0984e3" />
-          <Text style={styles.attendanceRateText}>{attendanceRateLabel}</Text>
-        </View>
-
         {(onViewDetail || onPress) && (
           <TouchableOpacity
             style={styles.detailButton}
@@ -224,28 +302,24 @@ const styles = StyleSheet.create({
   identifier: { marginTop: 2, fontSize: 12, color: '#95a5a6' },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
   metaText: { marginLeft: 6, fontSize: 13, color: '#636e72', flex: 1 },
-  statsRow: { flexDirection: 'row', marginTop: 12 },
-  statItem: { flex: 1 },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    justifyContent: 'space-between',
+  },
+  statItem: { width: '48%', marginBottom: 12 },
   statLabel: { fontSize: 12, color: '#95a5a6', marginBottom: 4 },
   statValue: { fontSize: 16, fontWeight: '700' },
   statValuePositive: { color: '#2ecc71' },
-  statValueWarning: { color: '#f39c12' },
   statValueNegative: { color: '#e74c3c' },
+  statValueNeutral: { color: '#2d3436' },
+  statValueInfo: { color: '#0984e3' },
   footerRow: {
-    marginTop: 16,
+    marginTop: 8,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
-  attendanceRateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(9, 132, 227, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  attendanceRateText: { marginLeft: 6, fontSize: 13, fontWeight: '600', color: '#0984e3' },
   detailButton: {
     flexDirection: 'row',
     alignItems: 'center',

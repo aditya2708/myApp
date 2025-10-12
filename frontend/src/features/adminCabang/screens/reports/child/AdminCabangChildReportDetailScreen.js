@@ -117,41 +117,85 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
   }, [attendanceRateValue, effectiveSummary, safeChild]);
 
   const totals = useMemo(() => {
-    if (effectiveSummary?.totals) {
+    const coalesceNumber = (...candidates) => {
+      for (const value of candidates) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+      return null;
+    };
+
+    const extractTotals = (source = {}) => {
+      const hadirValue = coalesceNumber(
+        source.hadir,
+        source.hadirCount,
+        source.totalHadir,
+        source.total_hadir,
+      );
+      const presentValue = coalesceNumber(
+        source.present,
+        source.presentCount,
+        source.present_count,
+      );
+      const lateValue = coalesceNumber(
+        source.late,
+        source.lateCount,
+        source.late_count,
+        source.terlambat,
+      );
+      const tidakHadirValue = coalesceNumber(
+        source.tidakHadir,
+        source.tidak_hadir,
+        source.tidakHadirCount,
+        source.absent,
+        source.absentCount,
+        source.absent_count,
+      );
+      const totalAktivitasValue = coalesceNumber(
+        source.totalAktivitas,
+        source.total_aktivitas,
+        source.totalActivities,
+        source.total_activities,
+        source.totalSessions,
+        source.total_sessions,
+        source.sessions,
+      );
+
+      const hadirCombined =
+        hadirValue ?? (presentValue ?? 0) + (lateValue ?? 0);
+      const tidakHadir = tidakHadirValue ?? 0;
+      const totalAktivitas =
+        totalAktivitasValue ?? hadirCombined + tidakHadir;
+
       return {
-        present: effectiveSummary.totals.present ?? 0,
-        late: effectiveSummary.totals.late ?? 0,
-        absent: effectiveSummary.totals.absent ?? 0,
-        totalSessions: effectiveSummary.totals.totalSessions ?? 0,
+        hadir: hadirCombined,
+        tidakHadir,
+        totalAktivitas,
       };
+    };
+
+    if (effectiveSummary?.totals) {
+      return extractTotals(effectiveSummary.totals);
     }
 
     const childTotals = safeChild?.totals || safeChild?.attendance?.totals;
     if (childTotals) {
-      return {
-        present: childTotals.present ?? childTotals.present_count ?? 0,
-        late: childTotals.late ?? childTotals.late_count ?? 0,
-        absent: childTotals.absent ?? childTotals.absent_count ?? 0,
-        totalSessions:
-          childTotals.totalSessions ??
-          childTotals.total_sessions ??
-          childTotals.sessions ??
-          safeChild?.attendance?.totalSessions ??
-          safeChild?.attendance?.total_sessions ??
-          0,
-      };
+      return extractTotals(childTotals);
     }
 
-    return {
-      present: safeChild?.attendance?.present_count ?? 0,
-      late: safeChild?.attendance?.late_count ?? 0,
-      absent: safeChild?.attendance?.absent_count ?? 0,
-      totalSessions:
-        safeChild?.attendance?.totalSessions ??
-        safeChild?.attendance?.total_sessions ??
-        safeChild?.summary?.totalSessions ??
-        0,
-    };
+    return extractTotals({
+      hadir: safeChild?.attendance?.hadir,
+      hadirCount: safeChild?.attendance?.hadir_count,
+      present: safeChild?.attendance?.present_count,
+      late: safeChild?.attendance?.late_count,
+      tidakHadir: safeChild?.attendance?.absent_count,
+      totalAktivitas: safeChild?.attendance?.total_activities,
+      totalSessions: safeChild?.attendance?.totalSessions,
+      total_sessions: safeChild?.attendance?.total_sessions,
+      sessions: safeChild?.summary?.totalSessions,
+    });
   }, [effectiveSummary, safeChild]);
 
   const dateRangeLabel =

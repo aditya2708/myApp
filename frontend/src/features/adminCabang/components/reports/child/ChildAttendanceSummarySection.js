@@ -5,53 +5,93 @@ import ReportSummaryCard from '../ReportSummaryCard';
 
 const FALLBACK_SUMMARY = {
   totalChildren: 0,
-  totalSessions: 0,
-  presentCount: 0,
-  lateCount: 0,
-  absentCount: 0,
+  totalAktivitas: 0,
+  hadirCount: 0,
+  tidakHadirCount: 0,
   attendance_percentage: '0%',
   activeChildren: 0,
 };
 
+const formatNumber = (value, { allowPlaceholder = false } = {}) => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return parsed.toLocaleString('id-ID');
+  }
+
+  if (allowPlaceholder && (value === '-' || value === null || value === undefined)) {
+    return '-';
+  }
+
+  return '0';
+};
+
 const buildSummaryItems = (summary) => {
   const totalChildren = summary.totalChildren ?? 0;
-  const present = summary.presentCount ?? 0;
-  const absent = summary.absentCount ?? 0;
-  const late = summary.lateCount ?? 0;
-  const attendanceRate = summary.attendance_percentage ?? '0%';
+  const hadir =
+    summary.hadir ??
+    summary.hadirCount ??
+    summary.totalHadir ??
+    summary.total_hadir ??
+    summary.presentCount ??
+    summary.present ??
+    0;
+  const tidakHadir =
+    summary.tidakHadir ??
+    summary.tidak_hadir ??
+    summary.tidakHadirCount ??
+    summary.absentCount ??
+    summary.absent ??
+    0;
+  const totalAktivitas =
+    summary.totalAktivitas ??
+    summary.total_aktivitas ??
+    summary.totalActivities ??
+    summary.total_activities ??
+    summary.totalSessions ??
+    summary.sessions ??
+    0;
+
+  const attendanceRateLabel =
+    summary.attendanceRate?.label ??
+    summary.attendanceRateLabel ??
+    summary.attendance_percentage ??
+    '0%';
 
   return [
     {
       id: 'attendance-rate',
       icon: 'stats-chart',
-      label: 'Rata-rata Kehadiran',
-      value: attendanceRate,
-      description: `${present + late} hadir dari ${summary.totalSessions ?? 0} sesi`,
+      label: 'Persentase Kehadiran',
+      value: attendanceRateLabel,
+      description: `${formatNumber(hadir)} hadir dari ${formatNumber(totalAktivitas)} aktivitas`,
       color: '#0984e3',
     },
     {
-      id: 'present',
+      id: 'hadir',
       icon: 'checkmark-circle',
       label: 'Jumlah Hadir',
-      value: present,
-      description: `Terlambat: ${late}`,
+      value: formatNumber(hadir),
+      description: `Tidak hadir: ${formatNumber(tidakHadir)}`,
       color: '#2ecc71',
     },
     {
-      id: 'absent',
+      id: 'tidak-hadir',
       icon: 'close-circle',
       label: 'Jumlah Tidak Hadir',
-      value: absent,
-      description: `Total sesi: ${summary.totalSessions ?? 0}`,
+      value: formatNumber(tidakHadir),
+      description: `Total aktivitas: ${formatNumber(totalAktivitas)}`,
       color: '#e74c3c',
     },
     {
-      id: 'children',
-      icon: 'people',
-      label: 'Total Anak Dipantau',
-      value: totalChildren,
-      description: `Aktif: ${summary.activeChildren ?? '-'}`,
-      color: '#8e44ad',
+      id: 'total-aktivitas',
+      icon: 'time',
+      label: 'Total Aktivitas',
+      value: formatNumber(totalAktivitas),
+      description: `Anak dipantau: ${formatNumber(totalChildren)} (aktif: ${formatNumber(
+        summary.activeChildren,
+        { allowPlaceholder: true },
+      )})`,
+      color: '#6c5ce7',
     },
   ];
 };
