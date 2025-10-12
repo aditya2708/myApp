@@ -151,18 +151,22 @@ export const normalizeStreaks = (streaks, child) => {
   if (typeof source === 'object') {
     return Object.entries(source)
       .map(([key, value], index) => {
-        const numericValue =
-          typeof value === 'object' ? value.value ?? value.count ?? value.length ?? value.total : value;
+        if (value === undefined || value === null) return null;
+
+        const isObjectValue = value && typeof value === 'object';
+        const numericValue = isObjectValue
+          ? value.value ?? value.count ?? value.length ?? value.total
+          : value;
 
         if (numericValue === undefined || numericValue === null) return null;
 
         return {
           id: key ?? `streak-${index}`,
           label:
-            (value && typeof value === 'object' && (value.label || value.name || value.title)) ||
+            (isObjectValue && (value.label || value.name || value.title)) ||
             key.replace(/([A-Z])/g, ' $1'),
           value: numericValue,
-          unit: value && typeof value === 'object' ? value.unit ?? value.suffix ?? null : null,
+          unit: isObjectValue ? value.unit ?? value.suffix ?? null : null,
         };
       })
       .filter(Boolean);
