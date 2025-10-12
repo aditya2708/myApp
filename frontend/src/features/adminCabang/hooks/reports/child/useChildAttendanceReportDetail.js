@@ -11,6 +11,18 @@ const firstDefined = (...values) => {
   return undefined;
 };
 
+const coalesceNumber = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null || value === '') continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
 const ensureArray = (value) => {
   if (Array.isArray(value)) return value;
   if (value === undefined || value === null) return [];
@@ -37,98 +49,135 @@ const extractArray = (source) => {
   return ensureArray(source).filter(Boolean);
 };
 
-const adaptTotals = (rawTotals = {}) => ({
-  present: firstDefined(
+const adaptTotals = (rawTotals = {}) => {
+  const presentValue = coalesceNumber(
     rawTotals.present,
     rawTotals.presentCount,
     rawTotals.present_count,
-    0,
-  ),
-  late: firstDefined(rawTotals.late, rawTotals.lateCount, rawTotals.late_count, 0),
-  absent: firstDefined(
+  ) ?? 0;
+  const lateValue = coalesceNumber(
+    rawTotals.late,
+    rawTotals.lateCount,
+    rawTotals.late_count,
+    rawTotals.terlambat,
+  ) ?? 0;
+  const absentValue = coalesceNumber(
+    rawTotals.tidakHadir,
+    rawTotals.tidak_hadir,
+    rawTotals.tidakHadirCount,
     rawTotals.absent,
     rawTotals.absentCount,
     rawTotals.absent_count,
-    0,
-  ),
-  totalSessions: firstDefined(
-    rawTotals.totalSessions,
-    rawTotals.sessionCount,
-    rawTotals.sessions,
-    rawTotals.total_sessions,
-    0,
-  ),
-  totalChildren: firstDefined(
-    rawTotals.totalChildren,
-    rawTotals.childrenCount,
-    rawTotals.total,
-    rawTotals.total_children,
-    0,
-  ),
-});
+  ) ?? 0;
+  const hadirValue =
+    coalesceNumber(
+      rawTotals.hadir,
+      rawTotals.hadirCount,
+      rawTotals.hadir_count,
+      rawTotals.totalHadir,
+      rawTotals.total_hadir,
+    ) ?? presentValue + lateValue;
+  const totalActivitiesValue =
+    coalesceNumber(
+      rawTotals.totalAktivitas,
+      rawTotals.total_aktivitas,
+      rawTotals.totalActivities,
+      rawTotals.total_activities,
+      rawTotals.totalSessions,
+      rawTotals.total_sessions,
+      rawTotals.sessions,
+    ) ?? hadirValue + absentValue;
+  const totalSessionsValue =
+    coalesceNumber(
+      rawTotals.totalSessions,
+      rawTotals.sessionCount,
+      rawTotals.sessions,
+      rawTotals.total_sessions,
+    ) ?? totalActivitiesValue;
+  const totalChildrenValue =
+    coalesceNumber(
+      rawTotals.totalChildren,
+      rawTotals.childrenCount,
+      rawTotals.total,
+      rawTotals.total_children,
+    ) ?? 0;
+  const attendanceRateValue = coalesceNumber(
+    rawTotals.attendanceRate,
+    rawTotals.attendance_rate,
+    rawTotals.attendancePercentage,
+    rawTotals.attendance_percentage,
+    rawTotals.rate,
+  );
+
+  const totals = {
+    ...rawTotals,
+    present: presentValue,
+    presentCount: presentValue,
+    present_count: presentValue,
+    late: lateValue,
+    lateCount: lateValue,
+    late_count: lateValue,
+    absent: absentValue,
+    absentCount: absentValue,
+    absent_count: absentValue,
+    tidakHadir: absentValue,
+    tidak_hadir: absentValue,
+    hadir: hadirValue,
+    hadirCount: hadirValue,
+    hadir_count: hadirValue,
+    totalActivities: totalActivitiesValue,
+    total_activities: totalActivitiesValue,
+    totalAktivitas: totalActivitiesValue,
+    totalSessions: totalSessionsValue,
+    sessionCount: totalSessionsValue,
+    sessions: totalSessionsValue,
+    total_sessions: totalSessionsValue,
+    totalChildren: totalChildrenValue,
+    childrenCount: totalChildrenValue,
+    total_children: totalChildrenValue,
+  };
+
+  if (attendanceRateValue !== null) {
+    totals.attendanceRate = attendanceRateValue;
+    totals.attendance_rate = attendanceRateValue;
+    totals.attendance_percentage = attendanceRateValue;
+  }
+
+  return totals;
+};
 
 const adaptSummary = (rawSummary = {}) => {
   const totalsSource = rawSummary.totals || rawSummary;
+  const totals = adaptTotals(totalsSource);
+  const attendanceRateValue =
+    coalesceNumber(
+      rawSummary.attendanceRate,
+      rawSummary.attendance_rate,
+      rawSummary.attendancePercentage,
+      rawSummary.attendance_percentage,
+      rawSummary.rate,
+      totals.attendanceRate,
+      totals.attendance_rate,
+      totals.attendance_percentage,
+    ) ?? 0;
+  const attendanceRateLabel = firstDefined(
+    rawSummary.attendanceRateLabel,
+    rawSummary.attendance_rate_label,
+    rawSummary.rateLabel,
+    totals.attendanceRateLabel,
+    totals.attendance_rate_label,
+    totals.attendance_percentage_label,
+    Number.isFinite(attendanceRateValue)
+      ? `${attendanceRateValue.toFixed(attendanceRateValue % 1 === 0 ? 0 : 1)}%`
+      : null,
+  );
 
   return {
     attendanceRate: {
-      value: firstDefined(
-        rawSummary.attendanceRate,
-        rawSummary.attendance_rate,
-        rawSummary.rate,
-        totalsSource.attendanceRate,
-        totalsSource.attendance_rate,
-        0,
-      ),
-      label: firstDefined(
-        rawSummary.attendanceRateLabel,
-        rawSummary.attendance_rate_label,
-        rawSummary.rateLabel,
-        null,
-      ),
+      value: attendanceRateValue,
+      label: attendanceRateLabel,
     },
-    totals: {
-      present: firstDefined(
-        rawSummary.presentCount,
-        rawSummary.present,
-        totalsSource.present,
-        totalsSource.presentCount,
-        totalsSource.present_count,
-        0,
-      ),
-      late: firstDefined(
-        rawSummary.lateCount,
-        rawSummary.late,
-        totalsSource.late,
-        totalsSource.lateCount,
-        totalsSource.late_count,
-        0,
-      ),
-      absent: firstDefined(
-        rawSummary.absentCount,
-        rawSummary.absent,
-        totalsSource.absent,
-        totalsSource.absentCount,
-        totalsSource.absent_count,
-        0,
-      ),
-      totalSessions: firstDefined(
-        rawSummary.totalSessions,
-        rawSummary.sessionCount,
-        totalsSource.totalSessions,
-        totalsSource.sessionCount,
-        totalsSource.sessions,
-        0,
-      ),
-      totalChildren: firstDefined(
-        rawSummary.totalChildren,
-        rawSummary.childrenCount,
-        totalsSource.totalChildren,
-        totalsSource.childrenCount,
-        totalsSource.total,
-        0,
-      ),
-    },
+    totals,
     dateRange: {
       label: firstDefined(
         rawSummary.dateRange?.label,
@@ -151,65 +200,73 @@ const adaptChild = (rawChild = {}) => {
     ...(isObject ? rawChild : {}),
   };
 
-  const totalsSource = base.totals || base;
+  const totalsSource = firstDefined(base.totals, base.attendance?.totals, base.attendance, base);
+  const totals = adaptTotals(totalsSource || {});
+  const attendanceRateValue =
+    coalesceNumber(
+      base.attendanceRate?.value,
+      base.attendanceRate,
+      base.attendance_rate,
+      base.rate,
+      base.attendance?.attendance_percentage,
+      base.summary?.attendanceRate?.value,
+      base.summary?.attendanceRate,
+    ) ?? null;
+  const attendanceRateLabel = firstDefined(
+    base.attendanceRate?.label,
+    base.attendance_label,
+    base.attendance?.attendance_label,
+    base.summary?.attendanceRate?.label,
+    attendanceRateValue !== null
+      ? `${attendanceRateValue.toFixed(attendanceRateValue % 1 === 0 ? 0 : 1)}%`
+      : null,
+  );
 
   return {
     ...base,
     id: base.id ?? null,
     name: base.name ?? '',
-    attendanceRate: firstDefined(
-      base.attendanceRate,
-      base.attendance_rate,
-      base.rate,
-      null,
-    ),
-    totals: adaptTotals(totalsSource),
+    attendanceRate:
+      attendanceRateValue === null && !attendanceRateLabel
+        ? firstDefined(base.attendanceRate, base.attendance_rate, base.rate, null)
+        : {
+            value: attendanceRateValue,
+            label: attendanceRateLabel,
+          },
+    totals,
   };
 };
 
 const adaptShelterBreakdown = (rawShelters = []) => {
-  return extractArray(rawShelters).map((shelter) => ({
-    id: shelter.id ?? null,
-    name: shelter.name ?? '',
-    attendanceRate: firstDefined(
-      shelter.attendanceRate,
-      shelter.attendance_rate,
-      shelter.rate,
-      0,
-    ),
-    totalChildren: firstDefined(
-      shelter.totalChildren,
-      shelter.childrenCount,
-      shelter.total,
-      0,
-    ),
-    totals: {
-      present: firstDefined(
-        shelter.presentCount,
-        shelter.present,
-        shelter.totals?.present,
-        shelter.totals?.presentCount,
-        shelter.totals?.present_count,
-        0,
-      ),
-      late: firstDefined(
-        shelter.lateCount,
-        shelter.late,
-        shelter.totals?.late,
-        shelter.totals?.lateCount,
-        shelter.totals?.late_count,
-        0,
-      ),
-      absent: firstDefined(
-        shelter.absentCount,
-        shelter.absent,
-        shelter.totals?.absent,
-        shelter.totals?.absentCount,
-        shelter.totals?.absent_count,
-        0,
-      ),
-    },
-  }));
+  return extractArray(rawShelters).map((shelter) => {
+    const totalsSource = firstDefined(shelter.totals, shelter);
+    const totals = adaptTotals(totalsSource || {});
+    const attendanceRateValue =
+      coalesceNumber(
+        shelter.attendanceRate,
+        shelter.attendance_rate,
+        shelter.rate,
+        totals.attendanceRate,
+        totals.attendance_rate,
+        totals.attendance_percentage,
+      ) ?? 0;
+
+    return {
+      id: shelter.id ?? null,
+      name: shelter.name ?? '',
+      attendanceRate: attendanceRateValue,
+      totalChildren:
+        firstDefined(
+          shelter.totalChildren,
+          shelter.childrenCount,
+          shelter.total,
+          totals.totalChildren,
+          totals.childrenCount,
+          totals.total_children,
+        ) ?? 0,
+      totals,
+    };
+  });
 };
 
 const adaptBandDistribution = (rawDistribution) => {

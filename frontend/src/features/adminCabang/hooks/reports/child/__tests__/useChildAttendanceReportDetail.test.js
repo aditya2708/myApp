@@ -115,4 +115,45 @@ describe('useChildAttendanceReportDetail', () => {
       expect(adminCabangReportApi.getChildAttendanceReportDetail).not.toHaveBeenCalled();
     });
   });
+
+  it('coalesces hadir/tidak hadir/total aktivitas totals from new schema fields', async () => {
+    adminCabangReportApi.getChildAttendanceReportDetail.mockResolvedValueOnce({
+      data: {
+        child: {
+          id: 'child-4',
+          name: 'Siti',
+          attendance: {
+            hadir_count: 12,
+            tidak_hadir_count: 3,
+            total_activities: 15,
+            attendance_percentage: 80,
+          },
+        },
+        summary: {
+          attendance_percentage: 80,
+          totals: {
+            hadir_count: 12,
+            tidak_hadir_count: 3,
+            total_activities: 15,
+          },
+        },
+      },
+    });
+
+    const { result } = renderHook(useChildAttendanceReportDetail, {
+      childId: 'child-4',
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.child.totals.hadir).toBe(12);
+    expect(result.current.child.totals.tidakHadir).toBe(3);
+    expect(result.current.child.totals.totalActivities).toBe(15);
+    expect(result.current.summary.totals.hadir).toBe(12);
+    expect(result.current.summary.totals.tidakHadir).toBe(3);
+    expect(result.current.summary.totals.totalActivities).toBe(15);
+    expect(result.current.summary.attendanceRate.value).toBe(80);
+  });
 });
