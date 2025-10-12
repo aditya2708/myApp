@@ -5,21 +5,9 @@ import EmptyState from '../../../../../common/components/EmptyState';
 import { useChildAttendanceReportDetail } from '../../../hooks/reports/child/useChildAttendanceReportDetail';
 import ChildReportSummaryCard from '../../../components/childReport/ChildReportSummaryCard';
 import VerificationSummaryGrid from '../../../components/childReport/VerificationSummaryGrid';
-import StreakHighlights from '../../../components/childReport/StreakHighlights';
-import ContextList from '../../../components/childReport/ContextList';
-import MetaList from '../../../components/childReport/MetaList';
-import MonthlyPerformanceList from '../../../components/childReport/MonthlyPerformanceList';
-import TimelineActivityList from '../../../components/childReport/TimelineActivityList';
 import {
   resolveBandMeta,
-  resolveMonthlyItems,
-  resolveTimelineItems,
-  getStatusColor,
-  formatDateLabel,
   normalizeVerificationSummary,
-  normalizeStreaks,
-  normalizeFilterEntries,
-  normalizeMetaEntries,
 } from './utils/childReportTransformers';
 
 const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
@@ -62,13 +50,7 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
     child,
     summary,
     verificationSummary,
-    streaks,
-    filters,
     period,
-    meta,
-    monthlyBreakdown,
-    attendanceTimeline,
-    timeline,
     isLoading = false,
     error,
     errorMessage,
@@ -77,11 +59,7 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
   } = detailState;
 
   const safeChild = child || fallbackChild || null;
-  const effectiveFilters =
-    filters && Object.keys(filters).length ? filters : initialFilters;
   const effectivePeriod = period || params.period || params.initialPeriod || null;
-  const effectiveMeta = meta || params.meta || {};
-  const timelineData = attendanceTimeline || timeline || [];
   const loading = isLoading;
   const detailErrorMessage = errorMessage || error?.message || null;
 
@@ -155,45 +133,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
     return '0%';
   }, [attendanceRateValue, effectiveSummary, safeChild]);
 
-  const monthlyItems = useMemo(
-    () =>
-      resolveMonthlyItems(safeChild, monthlyBreakdown).map((item, index) => ({
-        id: item?.id ?? item?.month ?? `month-${index}`,
-        label: item?.label ?? item?.monthName ?? item?.name ?? `Periode ${index + 1}`,
-        percentage:
-          item?.attendanceRate?.value ??
-          item?.attendanceRate ??
-          item?.attendance_percentage ??
-          item?.percentage ??
-          0,
-        totals: item?.totals ?? {
-          present: item?.presentCount ?? item?.present_count ?? item?.attended_count ?? 0,
-          late: item?.lateCount ?? item?.late_count ?? 0,
-          absent: item?.absentCount ?? item?.absent_count ?? 0,
-        },
-      })),
-    [monthlyBreakdown, safeChild],
-  );
-
-  const timelineItems = useMemo(
-    () =>
-      resolveTimelineItems(timelineData, safeChild).map((item, index, list) => {
-        const statusColor = item?.statusColor || item?.status_color || getStatusColor(item?.status);
-        return {
-          id: item?.id ?? item?.timeline_id ?? item?.value ?? `timeline-${index}`,
-          date: formatDateLabel(item?.date),
-          status: item?.statusLabel ?? item?.status_label ?? item?.status ?? 'Status tidak diketahui',
-          note: item?.note ?? item?.notes ?? null,
-          activity: item?.activity ?? item?.activityName ?? item?.activity_name ?? 'Kegiatan',
-          mentor: item?.mentor ?? item?.mentorName ?? item?.mentor_name ?? null,
-          verification: item?.verificationLabel ?? item?.verification_label ?? item?.verificationStatus ?? null,
-          statusColor,
-          isLast: index === list.length - 1,
-        };
-      }),
-    [safeChild, timelineData],
-  );
-
   const totals = useMemo(() => {
     if (effectiveSummary?.totals) {
       return {
@@ -236,15 +175,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
     () => normalizeVerificationSummary(verificationSummary, safeChild),
     [safeChild, verificationSummary],
   );
-
-  const streakItems = useMemo(() => normalizeStreaks(streaks, safeChild), [safeChild, streaks]);
-
-  const contextEntries = useMemo(
-    () => normalizeFilterEntries(effectiveFilters, effectivePeriod, effectiveSummary, safeChild),
-    [effectiveFilters, effectivePeriod, effectiveSummary, safeChild],
-  );
-
-  const metaEntries = useMemo(() => normalizeMetaEntries(effectiveMeta), [effectiveMeta]);
 
   const dateRangeLabel =
     effectiveSummary?.dateRange?.label ||
@@ -292,8 +222,8 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
             iconSize={60}
           />
         </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollContent}>
             <ChildReportSummaryCard
               child={safeChild}
               bandMeta={bandMeta}
@@ -304,11 +234,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
             />
 
             <VerificationSummaryGrid items={verificationItems} />
-            <StreakHighlights items={streakItems} />
-            <ContextList entries={contextEntries} />
-            <MetaList entries={metaEntries} />
-            <MonthlyPerformanceList items={monthlyItems} />
-            <TimelineActivityList items={timelineItems} />
           </ScrollView>
         )}
       </View>
