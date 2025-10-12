@@ -54,8 +54,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
     isLoading = false,
     error,
     errorMessage,
-    refresh,
-    refetch,
   } = detailState;
 
   const safeChild = child || fallbackChild || null;
@@ -70,18 +68,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
   const handleGoBack = useCallback(() => {
     navigation?.goBack?.();
   }, [navigation]);
-
-  const handleRefresh = useCallback(() => {
-    if (typeof refresh === 'function') {
-      return refresh();
-    }
-    if (typeof refetch === 'function') {
-      return refetch();
-    }
-    return Promise.resolve();
-  }, [refetch, refresh]);
-
-  const canRefresh = typeof refresh === 'function' || typeof refetch === 'function';
 
   const effectiveSummary = useMemo(() => {
     if (summary && typeof summary === 'object') return summary;
@@ -189,13 +175,7 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
           <Ionicons name="chevron-back" size={22} color="#2d3436" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detail Kehadiran Anak</Text>
-        <View style={styles.headerSpacer}>
-          {canRefresh ? (
-            <TouchableOpacity onPress={handleRefresh} style={styles.headerButton}>
-              <Ionicons name="refresh" size={20} color="#2d3436" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <View style={styles.headerSpacer} />
       </View>
 
       {detailErrorMessage ? (
@@ -230,7 +210,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
               totals={totals}
               attendanceRateLabel={attendanceRateLabel}
               dateRangeLabel={dateRangeLabel}
-              onRefresh={canRefresh ? handleRefresh : undefined}
             />
 
             <VerificationSummaryGrid items={verificationItems} />
