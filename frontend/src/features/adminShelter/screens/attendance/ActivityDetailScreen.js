@@ -504,13 +504,13 @@ const ActivityDetailScreen = ({ navigation, route }) => {
             <ActionButton
               onPress={handleRecordAttendance}
               icon="calendar"
-              text="Kelola Kehadiran"
+              text="Absen QR"
               style={styles.fullWidthButton}
             />
             <ActionButton
               onPress={handleManualAttendance}
               icon="create"
-              text="Input Manual"
+              text="Absen Manual"
               style={styles.manualButton}
               disabled={
                 activity.jenis_kegiatan === 'Bimbel' &&
