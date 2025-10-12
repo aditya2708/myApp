@@ -10,7 +10,7 @@ describe('ChildAttendanceCard', () => {
       identifier: 'CH-001',
       shelter: { name: 'Shelter A' },
       group: { name: 'Kelompok 1' },
-      totals: { present: 18, late: 2, absent: 1 },
+      totals: { hadir: 18, tidakHadir: 1, totalAktivitas: 19 },
       attendanceRate: { value: 88.5, label: '88.5%' },
       attendanceBand: 'high',
     };
@@ -23,10 +23,11 @@ describe('ChildAttendanceCard', () => {
     expect(getByText('Kelompok 1')).toBeTruthy();
     expect(getByText('Hadir')).toBeTruthy();
     expect(getByText('18')).toBeTruthy();
-    expect(getByText('Terlambat')).toBeTruthy();
-    expect(getByText('2')).toBeTruthy();
-    expect(getByText('Tidak hadir')).toBeTruthy();
+    expect(getByText('Tidak Hadir')).toBeTruthy();
     expect(getByText('1')).toBeTruthy();
+    expect(getByText('Total Aktivitas')).toBeTruthy();
+    expect(getByText('19')).toBeTruthy();
+    expect(getByText('Persentase')).toBeTruthy();
     expect(getByText('88.5%')).toBeTruthy();
     expect(getByText('Kehadiran Tinggi')).toBeTruthy();
   });
@@ -38,7 +39,7 @@ describe('ChildAttendanceCard', () => {
       <ChildAttendanceCard
         child={{
           name: 'Siti Aminah',
-          totals: { present: 10, late: 1, absent: 0 },
+          totals: { hadir: 10, tidakHadir: 0, totalAktivitas: 10 },
           attendanceRate: { value: 95, label: '95%' },
         }}
         onViewDetail={onViewDetail}

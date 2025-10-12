@@ -31,15 +31,64 @@ const ChildReportSummaryCard = ({
   const bandBackgroundColor = resolvedBandMeta.backgroundColor || 'rgba(9, 132, 227, 0.1)';
   const bandColor = resolvedBandMeta.color || '#0984e3';
 
-  const totalsWithFallback = useMemo(
-    () => ({
-      present: safeTotals.present ?? 0,
-      late: safeTotals.late ?? 0,
-      absent: safeTotals.absent ?? 0,
-      totalSessions: safeTotals.totalSessions ?? 0,
-    }),
-    [safeTotals.absent, safeTotals.late, safeTotals.present, safeTotals.totalSessions],
-  );
+  const totalsWithFallback = useMemo(() => {
+    const coalesceNumber = (...candidates) => {
+      for (const value of candidates) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+      return null;
+    };
+
+    const rawHadir = coalesceNumber(
+      safeTotals.hadir,
+      safeTotals.hadirCount,
+      safeTotals.totalHadir,
+      safeTotals.total_hadir,
+    );
+    const present = coalesceNumber(
+      safeTotals.present,
+      safeTotals.presentCount,
+      safeTotals.present_count,
+    );
+    const late = coalesceNumber(
+      safeTotals.late,
+      safeTotals.lateCount,
+      safeTotals.late_count,
+      safeTotals.terlambat,
+    );
+    const tidakHadir =
+      coalesceNumber(
+        safeTotals.tidakHadir,
+        safeTotals.tidak_hadir,
+        safeTotals.tidakHadirCount,
+        safeTotals.absent,
+        safeTotals.absentCount,
+        safeTotals.absent_count,
+      ) ?? 0;
+    const totalAktivitasCandidate = coalesceNumber(
+      safeTotals.totalAktivitas,
+      safeTotals.total_aktivitas,
+      safeTotals.totalActivities,
+      safeTotals.total_activities,
+      safeTotals.totalSessions,
+      safeTotals.total_sessions,
+      safeTotals.sessions,
+    );
+
+    const hadirCombined =
+      rawHadir ?? (present ?? 0) + (late ?? 0);
+    const totalAktivitas =
+      totalAktivitasCandidate ?? hadirCombined + tidakHadir;
+
+    return {
+      hadir: hadirCombined,
+      tidakHadir,
+      totalAktivitas,
+    };
+  }, [safeTotals]);
 
   const attendanceLabel = attendanceRateLabel || '0%';
   const initials = getInitials(displayName);
@@ -92,33 +141,29 @@ const ChildReportSummaryCard = ({
       </View>
 
       <View style={styles.summaryMetrics}>
-        <View style={styles.metricBox}>
-          <Text style={styles.metricLabel}>Persentase Kehadiran</Text>
-          <Text style={styles.metricValue}>{attendanceLabel}</Text>
-        </View>
         <View style={styles.totalsRow}>
-          <View style={styles.totalsItem} testID="totals-present">
+          <View style={styles.totalsItem} testID="totals-hadir">
             <Text style={styles.totalLabel}>Hadir</Text>
-            <Text style={[styles.totalValue, styles.totalValuePositive]} testID="totals-present-value">
-              {totalsWithFallback.present}
+            <Text style={[styles.totalValue, styles.totalValuePositive]} testID="totals-hadir-value">
+              {totalsWithFallback.hadir.toLocaleString('id-ID')}
             </Text>
           </View>
-          <View style={styles.totalsItem} testID="totals-late">
-            <Text style={styles.totalLabel}>Terlambat</Text>
-            <Text style={[styles.totalValue, styles.totalValueWarning]} testID="totals-late-value">
-              {totalsWithFallback.late}
+          <View style={styles.totalsItem} testID="totals-tidak-hadir">
+            <Text style={styles.totalLabel}>Tidak Hadir</Text>
+            <Text style={[styles.totalValue, styles.totalValueNegative]} testID="totals-tidak-hadir-value">
+              {totalsWithFallback.tidakHadir.toLocaleString('id-ID')}
             </Text>
           </View>
-          <View style={styles.totalsItem} testID="totals-absent">
-            <Text style={styles.totalLabel}>Tidak hadir</Text>
-            <Text style={[styles.totalValue, styles.totalValueNegative]} testID="totals-absent-value">
-              {totalsWithFallback.absent}
+          <View style={styles.totalsItem} testID="totals-aktivitas">
+            <Text style={styles.totalLabel}>Total Aktivitas</Text>
+            <Text style={styles.totalValue} testID="totals-aktivitas-value">
+              {totalsWithFallback.totalAktivitas.toLocaleString('id-ID')}
             </Text>
           </View>
-          <View style={styles.totalsItem} testID="totals-sessions">
-            <Text style={styles.totalLabel}>Total sesi</Text>
-            <Text style={styles.totalValue} testID="totals-sessions-value">
-              {totalsWithFallback.totalSessions}
+          <View style={styles.totalsItem} testID="totals-persentase">
+            <Text style={styles.totalLabel}>Persentase</Text>
+            <Text style={[styles.totalValue, styles.totalValueInfo]} testID="totals-persentase-value">
+              {attendanceLabel}
             </Text>
           </View>
         </View>
@@ -214,23 +259,6 @@ const styles = StyleSheet.create({
   summaryMetrics: {
     marginTop: 16,
   },
-  metricBox: {
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(9, 132, 227, 0.08)',
-    marginBottom: 12,
-  },
-  metricLabel: {
-    fontSize: 13,
-    color: '#0984e3',
-    fontWeight: '600',
-  },
-  metricValue: {
-    marginTop: 6,
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0984e3',
-  },
   totalsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -256,11 +284,11 @@ const styles = StyleSheet.create({
   totalValuePositive: {
     color: '#2ecc71',
   },
-  totalValueWarning: {
-    color: '#f39c12',
-  },
   totalValueNegative: {
     color: '#e74c3c',
+  },
+  totalValueInfo: {
+    color: '#0984e3',
   },
 });
 

@@ -25,11 +25,11 @@ describe('AdminCabangChildReportDetailScreen', () => {
       child: {
         name: 'Anisa Putri',
         attendanceRate: { value: 92 },
-        totals: { present: 10, late: 1, absent: 0, totalSessions: 11 },
+        totals: { hadir: 11, tidakHadir: 0, totalAktivitas: 11 },
       },
       summary: {
         attendanceRate: { value: 92 },
-        totals: { present: 10, late: 1, absent: 0, totalSessions: 11 },
+        totals: { hadir: 11, tidakHadir: 0, totalAktivitas: 11 },
         dateRange: { label: 'Januari 2024' },
       },
       verificationSummary: [],
