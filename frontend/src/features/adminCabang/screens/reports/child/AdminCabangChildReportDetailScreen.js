@@ -4,10 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import EmptyState from '../../../../../common/components/EmptyState';
 import { useChildAttendanceReportDetail } from '../../../hooks/reports/child/useChildAttendanceReportDetail';
 import ChildReportSummaryCard from '../../../components/childReport/ChildReportSummaryCard';
-import VerificationSummaryGrid from '../../../components/childReport/VerificationSummaryGrid';
 import {
   resolveBandMeta,
-  normalizeVerificationSummary,
 } from './utils/childReportTransformers';
 
 const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
@@ -49,7 +47,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
   const {
     child,
     summary,
-    verificationSummary,
     period,
     isLoading = false,
     error,
@@ -157,11 +154,6 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
     };
   }, [effectiveSummary, safeChild]);
 
-  const verificationItems = useMemo(
-    () => normalizeVerificationSummary(verificationSummary, safeChild),
-    [safeChild, verificationSummary],
-  );
-
   const dateRangeLabel =
     effectiveSummary?.dateRange?.label ||
     safeChild?.summary?.dateRange?.label ||
@@ -212,11 +204,9 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
               dateRangeLabel={dateRangeLabel}
             />
 
-            <VerificationSummaryGrid items={verificationItems} />
           </ScrollView>
         )}
-      </View>
-   
+        </View>
   );
 };
 

@@ -74,60 +74,6 @@ export const formatDateLabel = (value) => {
   return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
 };
 
-export const normalizeVerificationSummary = (summary, child) => {
-  const source = summary ?? child?.verificationSummary ?? child?.verification_summary;
-
-  if (!source) return [];
-
-  if (Array.isArray(source)) {
-    return source
-      .filter((item) => item && typeof item === 'object')
-      .map((item, index) => ({
-        id: item.id ?? item.key ?? item.type ?? `verification-${index}`,
-        label: item.label ?? item.name ?? item.title ?? 'Status',
-        value: item.value ?? item.count ?? item.total ?? 0,
-        accent: item.accent ?? item.status ?? null,
-      }));
-  }
-
-  if (typeof source === 'object') {
-    return Object.entries(source)
-      .map(([key, value]) => {
-        if (value === undefined || value === null) return null;
-
-        const normalizedValue =
-          typeof value === 'object' ? value.value ?? value.count ?? value.total ?? value.amount : value;
-
-        const normalizedLabel =
-          (value && typeof value === 'object' && (value.label || value.name || value.title)) ??
-          ({
-            total: 'Total Data',
-            verified: 'Terverifikasi',
-            pending: 'Menunggu',
-            rejected: 'Ditolak',
-            unverified: 'Belum Diverifikasi',
-            review: 'Perlu Ditinjau',
-          }[key] || key.replace(/([A-Z])/g, ' $1'));
-
-        return {
-          id: key,
-          label: normalizedLabel,
-          value: normalizedValue ?? 0,
-          accent:
-            (value && typeof value === 'object' && value.accent) ||
-            ({
-              verified: '#2ecc71',
-              pending: '#f39c12',
-              rejected: '#e74c3c',
-            }[key] || null),
-        };
-      })
-      .filter(Boolean);
-  }
-
-  return [];
-};
-
 export const normalizeStreaks = (streaks, child) => {
   const source = Array.isArray(streaks) && streaks.length ? streaks : child?.streaks;
 
