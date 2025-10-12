@@ -51,12 +51,28 @@ const adaptSummary = (rawSummary = {}) => {
     0,
   );
 
-  const presentCount = firstDefined(
+  const presentLegacyValue = firstDefined(
     rawSummary.presentCount,
     rawSummary.present,
-    totalsSource.present,
+    rawSummary.present_count,
     totalsSource.presentCount,
+    totalsSource.present,
     totalsSource.present_count,
+    0,
+  );
+
+  const hadirValue = firstDefined(
+    rawSummary.hadir,
+    rawSummary.hadir_count,
+    rawSummary.hadirCount,
+    rawSummary.totalHadir,
+    rawSummary.total_hadir,
+    totalsSource.hadir,
+    totalsSource.hadir_count,
+    totalsSource.hadirCount,
+    totalsSource.totalHadir,
+    totalsSource.total_hadir,
+    presentLegacyValue,
     0,
   );
 
@@ -69,16 +85,30 @@ const adaptSummary = (rawSummary = {}) => {
     0,
   );
 
-  const absentCount = firstDefined(
+  const absentLegacyValue = firstDefined(
     rawSummary.absentCount,
     rawSummary.absent,
-    totalsSource.absent,
+    rawSummary.absent_count,
     totalsSource.absentCount,
+    totalsSource.absent,
     totalsSource.absent_count,
     0,
   );
 
-  const totalSessions = firstDefined(
+  const tidakHadirValue = firstDefined(
+    rawSummary.tidakHadir,
+    rawSummary.tidak_hadir,
+    rawSummary.tidakHadirCount,
+    rawSummary.tidak_hadir_count,
+    totalsSource.tidakHadir,
+    totalsSource.tidak_hadir,
+    totalsSource.tidakHadirCount,
+    totalsSource.tidak_hadir_count,
+    absentLegacyValue,
+    0,
+  );
+
+  const totalSessionsLegacy = firstDefined(
     rawSummary.totalSessions,
     rawSummary.sessionCount,
     rawSummary.total_sessions,
@@ -87,6 +117,20 @@ const adaptSummary = (rawSummary = {}) => {
     totalsSource.sessionCount,
     totalsSource.total_sessions,
     totalsSource.sessions,
+    0,
+  );
+
+  const totalAktivitasValue = firstDefined(
+    rawSummary.totalAktivitas,
+    rawSummary.total_aktivitas,
+    rawSummary.totalActivities,
+    rawSummary.total_activities,
+    totalsSource.totalAktivitas,
+    totalsSource.total_aktivitas,
+    totalsSource.totalActivities,
+    totalsSource.total_activities,
+    totalSessionsLegacy,
+    Number(hadirValue || 0) + Number(tidakHadirValue || 0),
     0,
   );
 
@@ -178,16 +222,36 @@ const adaptSummary = (rawSummary = {}) => {
     null,
   );
 
+  const presentCount = hadirValue;
+  const absentCount = tidakHadirValue;
+  const totalSessions = totalAktivitasValue;
+
   return {
     attendanceRate: {
       value: attendanceRateValue,
       label: rawSummary.attendanceRateLabel || rawSummary.attendance_rate_label || null,
     },
     attendance_percentage: attendanceRateValue,
+    hadir: hadirValue,
+    hadirCount: hadirValue,
+    hadir_count: hadirValue,
+    present: presentCount,
     presentCount,
+    present_count: presentCount,
     lateCount,
+    late_count: lateCount,
+    tidakHadir: tidakHadirValue,
+    tidak_hadir: tidakHadirValue,
+    tidakHadirCount: tidakHadirValue,
+    tidak_hadir_count: tidakHadirValue,
     absentCount,
+    absent_count: absentCount,
+    totalAktivitas: totalAktivitasValue,
+    total_aktivitas: totalAktivitasValue,
+    totalActivities: totalAktivitasValue,
+    total_activities: totalAktivitasValue,
     totalSessions,
+    sessions: totalSessions,
     totalChildren,
     activeChildren,
     inactiveChildren,
@@ -196,10 +260,28 @@ const adaptSummary = (rawSummary = {}) => {
     reportDate,
     periodLabel,
     totals: {
+      hadir: hadirValue,
+      hadirCount: hadirValue,
+      hadir_count: hadirValue,
       present: presentCount,
+      presentCount,
+      present_count: presentCount,
       late: lateCount,
+      lateCount,
+      late_count: lateCount,
+      tidakHadir: tidakHadirValue,
+      tidak_hadir: tidakHadirValue,
+      tidakHadirCount: tidakHadirValue,
+      tidak_hadir_count: tidakHadirValue,
       absent: absentCount,
+      absentCount,
+      absent_count: absentCount,
+      totalAktivitas: totalAktivitasValue,
+      total_aktivitas: totalAktivitasValue,
+      totalActivities: totalAktivitasValue,
+      total_activities: totalAktivitasValue,
       totalSessions,
+      sessions: totalSessions,
       totalChildren,
       activeChildren,
       inactiveChildren,
