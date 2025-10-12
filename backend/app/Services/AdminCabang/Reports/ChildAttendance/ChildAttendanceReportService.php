@@ -149,23 +149,21 @@ class ChildAttendanceReportService
             $monthlyPayload = collect($months)->map(function (CarbonImmutable $monthStart) use ($monthly) {
                 $key = $monthStart->format('Y-m');
                 $payload = $monthly[$key] ?? [
-                    'activities_count' => 0,
-                    'attended_count' => 0,
-                    'late_count' => 0,
-                    'absent_count' => 0,
+                    'total_activities' => 0,
+                    'hadir_count' => 0,
+                    'tidak_hadir_count' => 0,
                 ];
 
-                $attendancePercentage = $payload['activities_count'] > 0
-                    ? (($payload['attended_count'] ?? 0) / $payload['activities_count']) * 100
+                $attendancePercentage = $payload['total_activities'] > 0
+                    ? (($payload['hadir_count'] ?? 0) / $payload['total_activities']) * 100
                     : 0.0;
 
                 return [
                     'month' => $key,
                     'label' => $monthStart->translatedFormat('M Y'),
-                    'activities_count' => (int) ($payload['activities_count'] ?? 0),
-                    'attended_count' => (int) ($payload['attended_count'] ?? 0),
-                    'late_count' => (int) ($payload['late_count'] ?? 0),
-                    'absent_count' => (int) ($payload['absent_count'] ?? 0),
+                    'total_activities' => (int) ($payload['total_activities'] ?? 0),
+                    'hadir_count' => (int) ($payload['hadir_count'] ?? 0),
+                    'tidak_hadir_count' => (int) ($payload['tidak_hadir_count'] ?? 0),
                     'attendance_percentage' => $attendancePercentage,
                 ];
             })->values()->all();
@@ -206,10 +204,9 @@ class ChildAttendanceReportService
                     'name' => $group['name'] ?? null,
                 ],
                 'attendance' => [
-                    'present_count' => (int) ($stats['present_count'] ?? 0),
-                    'late_count' => (int) ($stats['late_count'] ?? 0),
-                    'absent_count' => (int) ($stats['absent_count'] ?? 0),
-                    'total_sessions' => (int) ($stats['total_sessions'] ?? 0),
+                    'hadir_count' => (int) ($stats['hadir_count'] ?? 0),
+                    'tidak_hadir_count' => (int) ($stats['tidak_hadir_count'] ?? 0),
+                    'total_activities' => (int) ($stats['total_activities'] ?? 0),
                     'attendance_percentage' => (float) ($stats['attendance_percentage'] ?? 0),
                     'attendance_band' => $stats['attendance_band'] ?? 'low',
                 ],
@@ -316,23 +313,21 @@ class ChildAttendanceReportService
         $monthlyPayload = collect($months)->map(function (CarbonImmutable $monthStart) use ($monthly) {
             $key = $monthStart->format('Y-m');
             $payload = $monthly[$key] ?? [
-                'activities_count' => 0,
-                'attended_count' => 0,
-                'late_count' => 0,
-                'absent_count' => 0,
+                'total_activities' => 0,
+                'hadir_count' => 0,
+                'tidak_hadir_count' => 0,
             ];
 
-            $attendancePercentage = $payload['activities_count'] > 0
-                ? (($payload['attended_count'] ?? 0) / $payload['activities_count']) * 100
+            $attendancePercentage = $payload['total_activities'] > 0
+                ? (($payload['hadir_count'] ?? 0) / $payload['total_activities']) * 100
                 : 0.0;
 
             return [
                 'month' => $key,
                 'label' => $monthStart->translatedFormat('F Y'),
-                'activities_count' => (int) ($payload['activities_count'] ?? 0),
-                'attended_count' => (int) ($payload['attended_count'] ?? 0),
-                'late_count' => (int) ($payload['late_count'] ?? 0),
-                'absent_count' => (int) ($payload['absent_count'] ?? 0),
+                'total_activities' => (int) ($payload['total_activities'] ?? 0),
+                'hadir_count' => (int) ($payload['hadir_count'] ?? 0),
+                'tidak_hadir_count' => (int) ($payload['tidak_hadir_count'] ?? 0),
                 'attendance_percentage' => $attendancePercentage,
             ];
         })->values()->all();
@@ -428,10 +423,9 @@ class ChildAttendanceReportService
                 'guardian_contact' => null,
             ],
             'summary' => [
-                'total_sessions' => (int) ($stats['total_sessions'] ?? 0),
-                'present_count' => (int) ($stats['present_count'] ?? 0),
-                'late_count' => (int) ($stats['late_count'] ?? 0),
-                'absent_count' => (int) ($stats['absent_count'] ?? 0),
+                'total_activities' => (int) ($stats['total_activities'] ?? 0),
+                'hadir_count' => (int) ($stats['hadir_count'] ?? 0),
+                'tidak_hadir_count' => (int) ($stats['tidak_hadir_count'] ?? 0),
                 'attendance_percentage' => (float) ($stats['attendance_percentage'] ?? 0),
                 'attendance_band' => $stats['attendance_band'] ?? 'low',
                 'last_present_on' => $stats['last_present_on']?->toDateString(),
@@ -619,10 +613,9 @@ class ChildAttendanceReportService
                 $children[$childId] = $this->emptyChildStats();
                 foreach ($monthKeys as $key) {
                     $children[$childId]['monthly_breakdown'][$key] = [
-                        'activities_count' => 0,
-                        'attended_count' => 0,
-                        'late_count' => 0,
-                        'absent_count' => 0,
+                        'total_activities' => 0,
+                        'hadir_count' => 0,
+                        'tidak_hadir_count' => 0,
                     ];
                 }
             }
@@ -630,16 +623,13 @@ class ChildAttendanceReportService
             $activityDate = Carbon::parse($row->activity_date)->startOfDay();
             $status = strtolower((string) $row->attendance_status);
 
-            $children[$childId]['total_sessions']++;
+            $children[$childId]['total_activities']++;
 
-            if ($status === strtolower(Absen::TEXT_YA)) {
-                $children[$childId]['present_count']++;
-                $children[$childId]['last_present_on'] = $activityDate;
-            } elseif ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
-                $children[$childId]['late_count']++;
+            if (in_array($status, [strtolower(Absen::TEXT_YA), strtolower(Absen::TEXT_TERLAMBAT)], true)) {
+                $children[$childId]['hadir_count']++;
                 $children[$childId]['last_present_on'] = $activityDate;
             } elseif ($status === strtolower(Absen::TEXT_TIDAK)) {
-                $children[$childId]['absent_count']++;
+                $children[$childId]['tidak_hadir_count']++;
                 $children[$childId]['last_absent_on'] = $activityDate;
             }
 
@@ -647,25 +637,20 @@ class ChildAttendanceReportService
 
             if (!isset($children[$childId]['monthly_breakdown'][$monthKey])) {
                 $children[$childId]['monthly_breakdown'][$monthKey] = [
-                    'activities_count' => 0,
-                    'attended_count' => 0,
-                    'late_count' => 0,
-                    'absent_count' => 0,
+                    'total_activities' => 0,
+                    'hadir_count' => 0,
+                    'tidak_hadir_count' => 0,
                 ];
             }
 
-            $children[$childId]['monthly_breakdown'][$monthKey]['activities_count']++;
+            $children[$childId]['monthly_breakdown'][$monthKey]['total_activities']++;
 
             if (in_array($status, [strtolower(Absen::TEXT_YA), strtolower(Absen::TEXT_TERLAMBAT)], true)) {
-                $children[$childId]['monthly_breakdown'][$monthKey]['attended_count']++;
-            }
-
-            if ($status === strtolower(Absen::TEXT_TERLAMBAT)) {
-                $children[$childId]['monthly_breakdown'][$monthKey]['late_count']++;
+                $children[$childId]['monthly_breakdown'][$monthKey]['hadir_count']++;
             }
 
             if ($status === strtolower(Absen::TEXT_TIDAK)) {
-                $children[$childId]['monthly_breakdown'][$monthKey]['absent_count']++;
+                $children[$childId]['monthly_breakdown'][$monthKey]['tidak_hadir_count']++;
             }
 
             $verificationStatus = $row->verification_status ?? null;
@@ -711,11 +696,11 @@ class ChildAttendanceReportService
         }
 
         foreach ($children as $childId => &$stats) {
-            $totalSessions = $stats['total_sessions'];
-            $attended = $stats['present_count'] + $stats['late_count'];
+            $totalActivities = $stats['total_activities'];
+            $hadirCount = $stats['hadir_count'];
 
-            $stats['attendance_percentage'] = $totalSessions > 0
-                ? ($attended / $totalSessions) * 100
+            $stats['attendance_percentage'] = $totalActivities > 0
+                ? ($hadirCount / $totalActivities) * 100
                 : 0.0;
 
             $stats['attendance_band'] = $this->determineAttendanceBand($stats['attendance_percentage']);
@@ -730,7 +715,7 @@ class ChildAttendanceReportService
             $monthly = $stats['monthly_breakdown'] ?? [];
 
             foreach ($monthly as $key => $payload) {
-                if (($payload['activities_count'] ?? 0) === 0) {
+                if (($payload['total_activities'] ?? 0) === 0) {
                     unset($stats['monthly_breakdown'][$key]);
                 }
             }
@@ -768,10 +753,9 @@ class ChildAttendanceReportService
     protected function emptyChildStats(): array
     {
         return [
-            'present_count' => 0,
-            'late_count' => 0,
-            'absent_count' => 0,
-            'total_sessions' => 0,
+            'hadir_count' => 0,
+            'tidak_hadir_count' => 0,
+            'total_activities' => 0,
             'attendance_percentage' => 0.0,
             'attendance_band' => 'low',
             'monthly_breakdown' => [],
@@ -825,26 +809,24 @@ class ChildAttendanceReportService
     protected function buildSummary(array $childIds, array $childStats, array $childShelterMap, array $childGroupMap): array
     {
         $totalChildren = count($childIds);
-        $totalPresent = 0;
-        $totalLate = 0;
-        $totalAbsent = 0;
-        $totalSessions = 0;
+        $totalHadir = 0;
+        $totalTidakHadir = 0;
+        $totalActivities = 0;
         $lowBandChildren = 0;
 
         foreach ($childIds as $childId) {
             $stats = $childStats[$childId] ?? $this->emptyChildStats();
-            $totalPresent += $stats['present_count'] ?? 0;
-            $totalLate += $stats['late_count'] ?? 0;
-            $totalAbsent += $stats['absent_count'] ?? 0;
-            $totalSessions += $stats['total_sessions'] ?? 0;
+            $totalHadir += $stats['hadir_count'] ?? 0;
+            $totalTidakHadir += $stats['tidak_hadir_count'] ?? 0;
+            $totalActivities += $stats['total_activities'] ?? 0;
 
             if (($stats['attendance_band'] ?? 'low') === 'low') {
                 $lowBandChildren++;
             }
         }
 
-        $attendancePercentage = $totalSessions > 0
-            ? (($totalPresent + $totalLate) / $totalSessions) * 100
+        $attendancePercentage = $totalActivities > 0
+            ? ($totalHadir / $totalActivities) * 100
             : 0.0;
 
         $uniqueShelters = collect($childIds)
@@ -863,10 +845,9 @@ class ChildAttendanceReportService
             'total_shelters' => (int) $uniqueShelters,
             'total_groups' => (int) $uniqueGroups,
             'total_children' => (int) $totalChildren,
-            'total_sessions' => (int) $totalSessions,
-            'present_count' => (int) $totalPresent,
-            'late_count' => (int) $totalLate,
-            'absent_count' => (int) $totalAbsent,
+            'total_activities' => (int) $totalActivities,
+            'hadir_count' => (int) $totalHadir,
+            'tidak_hadir_count' => (int) $totalTidakHadir,
             'attendance_percentage' => $attendancePercentage,
             'low_band_children' => (int) $lowBandChildren,
         ];
@@ -893,10 +874,9 @@ class ChildAttendanceReportService
                     'id' => $shelterId,
                     'name' => $accessibleShelters[$shelterId]['name'] ?? null,
                     'total_children' => 0,
-                    'present_count' => 0,
-                    'late_count' => 0,
-                    'absent_count' => 0,
-                    'total_sessions' => 0,
+                    'hadir_count' => 0,
+                    'tidak_hadir_count' => 0,
+                    'total_activities' => 0,
                     'low_band_children' => 0,
                     'previous_attendance_percentage' => 0.0,
                 ];
@@ -905,10 +885,9 @@ class ChildAttendanceReportService
             $stats = $childStats[$childId] ?? $this->emptyChildStats();
 
             $aggregates[$shelterId]['total_children']++;
-            $aggregates[$shelterId]['present_count'] += $stats['present_count'] ?? 0;
-            $aggregates[$shelterId]['late_count'] += $stats['late_count'] ?? 0;
-            $aggregates[$shelterId]['absent_count'] += $stats['absent_count'] ?? 0;
-            $aggregates[$shelterId]['total_sessions'] += $stats['total_sessions'] ?? 0;
+            $aggregates[$shelterId]['hadir_count'] += $stats['hadir_count'] ?? 0;
+            $aggregates[$shelterId]['tidak_hadir_count'] += $stats['tidak_hadir_count'] ?? 0;
+            $aggregates[$shelterId]['total_activities'] += $stats['total_activities'] ?? 0;
 
             if (($stats['attendance_band'] ?? 'low') === 'low') {
                 $aggregates[$shelterId]['low_band_children']++;
@@ -917,25 +896,25 @@ class ChildAttendanceReportService
             $previous = $previousStats[$childId] ?? null;
 
             if ($previous) {
-                $previousTotal = ($aggregates[$shelterId]['previous_total_sessions'] ?? 0) + ($previous['total_sessions'] ?? 0);
-                $previousAttended = ($aggregates[$shelterId]['previous_attended'] ?? 0)
-                    + (($previous['present_count'] ?? 0) + ($previous['late_count'] ?? 0));
+                $previousTotal = ($aggregates[$shelterId]['previous_total_activities'] ?? 0) + ($previous['total_activities'] ?? 0);
+                $previousAttended = ($aggregates[$shelterId]['previous_hadir'] ?? 0)
+                    + ($previous['hadir_count'] ?? 0);
 
-                $aggregates[$shelterId]['previous_total_sessions'] = $previousTotal;
-                $aggregates[$shelterId]['previous_attended'] = $previousAttended;
+                $aggregates[$shelterId]['previous_total_activities'] = $previousTotal;
+                $aggregates[$shelterId]['previous_hadir'] = $previousAttended;
             }
         }
 
         foreach ($aggregates as &$aggregate) {
-            $currentAttended = $aggregate['present_count'] + $aggregate['late_count'];
-            $aggregate['attendance_percentage'] = $aggregate['total_sessions'] > 0
-                ? ($currentAttended / $aggregate['total_sessions']) * 100
+            $currentAttended = $aggregate['hadir_count'];
+            $aggregate['attendance_percentage'] = $aggregate['total_activities'] > 0
+                ? ($currentAttended / $aggregate['total_activities']) * 100
                 : 0.0;
 
             $aggregate['attendance_band'] = $this->determineAttendanceBand($aggregate['attendance_percentage']);
 
-            $previousSessions = $aggregate['previous_total_sessions'] ?? 0;
-            $previousAttended = $aggregate['previous_attended'] ?? 0;
+            $previousSessions = $aggregate['previous_total_activities'] ?? 0;
+            $previousAttended = $aggregate['previous_hadir'] ?? 0;
             $previousPercentage = $previousSessions > 0
                 ? ($previousAttended / $previousSessions) * 100
                 : 0.0;
@@ -943,7 +922,7 @@ class ChildAttendanceReportService
             $aggregate['previous_attendance_percentage'] = $previousPercentage;
             $aggregate['trend_delta'] = $aggregate['attendance_percentage'] - $previousPercentage;
 
-            unset($aggregate['previous_total_sessions'], $aggregate['previous_attended']);
+            unset($aggregate['previous_total_activities'], $aggregate['previous_hadir']);
         }
         unset($aggregate);
 
@@ -1070,10 +1049,9 @@ class ChildAttendanceReportService
                 'total_shelters' => 0,
                 'total_groups' => 0,
                 'total_children' => 0,
-                'total_sessions' => 0,
-                'present_count' => 0,
-                'late_count' => 0,
-                'absent_count' => 0,
+                'total_activities' => 0,
+                'hadir_count' => 0,
+                'tidak_hadir_count' => 0,
                 'attendance_percentage' => 0.0,
                 'low_band_children' => 0,
             ],
