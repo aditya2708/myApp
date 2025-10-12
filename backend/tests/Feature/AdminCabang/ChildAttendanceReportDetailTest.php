@@ -223,6 +223,9 @@ class ChildAttendanceReportDetailTest extends TestCase
 
         $this->assertSame('Anak Detail', $data['child']['full_name']);
         $this->assertSame('Shelter Detail', $data['child']['shelter']['name']);
+        $this->assertSame('Kelompok Detail', $data['child']['group']['name']);
+        $this->assertSame($group->id_kelompok, $data['child']['group']['id']);
+        $this->assertSame($shelter->id_shelter, $data['child']['group']['shelter_id']);
 
         $this->assertSame(2, $data['summary']['total_sessions']);
         $this->assertSame('100.00', $data['summary']['attendance_percentage']);
