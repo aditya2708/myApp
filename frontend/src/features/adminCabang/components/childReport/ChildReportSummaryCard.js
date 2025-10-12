@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getInitials } from '../../screens/reports/child/utils/childReportTransformers';
 
@@ -9,7 +9,6 @@ const ChildReportSummaryCard = ({
   totals,
   attendanceRateLabel,
   dateRangeLabel,
-  onRefresh,
 }) => {
   const safeChild = child || {};
   const safeTotals = totals || {};
@@ -67,16 +66,6 @@ const ChildReportSummaryCard = ({
             <Text style={styles.summaryName} numberOfLines={2}>
               {displayName}
             </Text>
-            {onRefresh ? (
-              <TouchableOpacity
-                onPress={onRefresh}
-                style={styles.refreshButton}
-                accessibilityRole="button"
-                accessibilityLabel="Muat ulang ringkasan anak"
-              >
-                <Ionicons name="refresh" size={18} color="#0984e3" />
-              </TouchableOpacity>
-            ) : null}
           </View>
           {identifier ? <Text style={styles.summaryIdentifier}>ID: {identifier}</Text> : null}
           <View style={styles.summaryRow}>
@@ -221,12 +210,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#636e72',
     flex: 1,
-  },
-  refreshButton: {
-    marginLeft: 12,
-    padding: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(9, 132, 227, 0.08)',
   },
   summaryMetrics: {
     marginTop: 16,
