@@ -11,6 +11,8 @@ const initialState = {
   loading: false,
   error: null,
   conflicts: null,
+  statusUpdating: false,
+  attendanceSummary: null,
   kelompokDetail: null,
   kelompokLoading: false,
   kelompokError: null,
@@ -140,6 +142,25 @@ export const updateAktivitas = createAsyncThunk(
         fullResponse: error.response?.data
       };
       return rejectWithValue(errorPayload);
+    }
+  }
+);
+
+export const updateAktivitasStatus = createAsyncThunk(
+  'aktivitas/updateStatus',
+  async ({ id, status, notes }, { rejectWithValue }) => {
+    try {
+      const payload = { status };
+      if (notes !== undefined && notes !== null && notes !== '') {
+        payload.notes = notes;
+      }
+
+      const response = await aktivitasApi.updateAktivitasStatus(id, payload);
+      return { id, data: response.data };
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || 'Gagal memperbarui status aktivitas'
+      );
     }
   }
 );
@@ -487,7 +508,66 @@ const aktivitasSlice = createSlice({
           state.conflicts = null;
         }
       })
-      
+
+      // updateAktivitasStatus
+      .addCase(updateAktivitasStatus.pending, (state) => {
+        state.statusUpdating = true;
+        state.error = null;
+        state.attendanceSummary = null;
+      })
+      .addCase(updateAktivitasStatus.fulfilled, (state, action) => {
+        state.statusUpdating = false;
+
+        const { id, data } = action.payload;
+        const responseData = data?.data ?? data;
+        const updatedAktivitas = responseData?.aktivitas ?? responseData;
+        const summary =
+          responseData?.attendance_summary ??
+          updatedAktivitas?.attendance_summary ??
+          null;
+
+        state.attendanceSummary = summary;
+
+        const newStatus =
+          (updatedAktivitas && updatedAktivitas.status) ?? action.meta.arg.status;
+
+        if (state.aktivitasDetail && state.aktivitasDetail.id_aktivitas === id) {
+          if (updatedAktivitas && typeof updatedAktivitas === 'object') {
+            state.aktivitasDetail = {
+              ...state.aktivitasDetail,
+              ...updatedAktivitas,
+              status: newStatus || state.aktivitasDetail.status
+            };
+          } else if (newStatus) {
+            state.aktivitasDetail.status = newStatus;
+          }
+        }
+
+        state.aktivitasList = state.aktivitasList.map(item => {
+          if (item.id_aktivitas !== id) {
+            return item;
+          }
+
+          if (updatedAktivitas && typeof updatedAktivitas === 'object') {
+            return {
+              ...item,
+              ...updatedAktivitas,
+              status: newStatus || item.status
+            };
+          }
+
+          return {
+            ...item,
+            status: newStatus || item.status
+          };
+        });
+      })
+      .addCase(updateAktivitasStatus.rejected, (state, action) => {
+        state.statusUpdating = false;
+        state.error = action.payload || 'Failed to update activity status';
+        state.attendanceSummary = null;
+      })
+
       // deleteAktivitas
       .addCase(deleteAktivitas.pending, (state) => {
         state.loading = true;
@@ -683,6 +763,8 @@ export const selectAktivitasPagination = (state) => state.aktivitas.pagination;
 export const selectKelompokDetail = (state) => state.aktivitas.kelompokDetail?.data;
 export const selectKelompokLoading = (state) => state.aktivitas.kelompokLoading;
 export const selectIsLoadingMore = (state) => state.aktivitas.isLoadingMore;
+export const selectAktivitasStatusUpdating = (state) => state.aktivitas.statusUpdating;
+export const selectAktivitasAttendanceSummary = (state) => state.aktivitas.attendanceSummary;
 
 // NEW: Kurikulum selectors
 export const selectMateriCache = (state) => state.aktivitas.materiCache;

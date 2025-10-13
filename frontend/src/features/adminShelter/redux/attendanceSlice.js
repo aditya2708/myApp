@@ -67,6 +67,22 @@ export const getAttendanceByActivity = createAsyncThunk(
   }
 );
 
+export const fetchActivityMembersWithAttendance = createAsyncThunk(
+  'attendance/fetchMembers',
+  async (id_aktivitas, { rejectWithValue }) => {
+    try {
+      const response = await attendanceApi.getActivityMembers(id_aktivitas, {
+        include_summary: true
+      });
+      return { id_aktivitas, data: response.data };
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || 'Gagal mengambil data anggota aktivitas'
+      );
+    }
+  }
+);
+
 
 export const getAttendanceByStudent = createAsyncThunk(
   'attendance/getByStudent',
@@ -132,6 +148,8 @@ const initialState = {
   attendanceRecords: {},
   activityRecords: {},
   activityMembersData: {},
+  activityMembersLoading: {},
+  activityMembersError: {},
   studentRecords: {},
   verificationHistory: {},
   stats: null,
@@ -348,8 +366,41 @@ const attendanceSlice = createSlice({
         state.loading = false;
         state.error = action.payload?.message || 'Failed to get attendance records';
       })
-      
-      
+
+      .addCase(fetchActivityMembersWithAttendance.pending, (state, action) => {
+        const id_aktivitas = action.meta.arg;
+        state.activityMembersLoading[id_aktivitas] = true;
+        state.activityMembersError[id_aktivitas] = null;
+      })
+      .addCase(fetchActivityMembersWithAttendance.fulfilled, (state, action) => {
+        const { id_aktivitas, data } = action.payload;
+        const responseData = data?.data ?? data;
+        const rawMembers =
+          responseData?.members ??
+          responseData?.data?.members ??
+          (Array.isArray(responseData?.data) ? responseData?.data : null);
+        const members = Array.isArray(rawMembers) ? rawMembers : [];
+        const summary =
+          responseData?.summary ??
+          responseData?.attendance_summary ??
+          responseData?.data?.summary ??
+          null;
+
+        state.activityMembersLoading[id_aktivitas] = false;
+        state.activityMembersError[id_aktivitas] = null;
+        state.activityMembersData[id_aktivitas] = {
+          members,
+          summary,
+          fetchedAt: Date.now()
+        };
+      })
+      .addCase(fetchActivityMembersWithAttendance.rejected, (state, action) => {
+        const id_aktivitas = action.meta.arg;
+        state.activityMembersLoading[id_aktivitas] = false;
+        state.activityMembersError[id_aktivitas] = action.payload || 'Failed to fetch activity members';
+      })
+
+
       .addCase(getAttendanceByStudent.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -509,6 +560,7 @@ const selectAttendanceState = state => state.attendance;
 const selectActivityRecords = state => state.attendance.activityRecords;
 const selectStudentRecords = state => state.attendance.studentRecords;
 const selectVerificationHistoryRecords = state => state.attendance.verificationHistory;
+const selectActivityMembersDataMap = state => state.attendance.activityMembersData;
 
 export const selectAttendanceLoading = state => state.attendance.loading;
 export const selectAttendanceError = state => state.attendance.error;
@@ -516,10 +568,26 @@ export const selectDuplicateError = state => state.attendance.duplicateError;
 export const selectDateValidationError = state => state.attendance.dateValidationError;
 export const selectGpsError = state => state.attendance.gpsError;
 export const selectAttendanceRecords = state => state.attendance.attendanceRecords;
+export const selectActivityMembersLoading = (state, id_aktivitas) =>
+  state.attendance.activityMembersLoading[id_aktivitas] || false;
+export const selectActivityMembersError = (state, id_aktivitas) =>
+  state.attendance.activityMembersError[id_aktivitas] || null;
 
 export const selectActivityAttendance = createSelector(
   [selectActivityRecords, (_, id_aktivitas) => id_aktivitas],
   (activityRecords, id_aktivitas) => activityRecords[id_aktivitas] || emptyArray
+);
+
+export const selectActivityMembers = createSelector(
+  [selectActivityMembersDataMap, (_, id_aktivitas) => id_aktivitas],
+  (activityMembersData, id_aktivitas) =>
+    activityMembersData[id_aktivitas]?.members || emptyArray
+);
+
+export const selectActivityAttendanceSummary = createSelector(
+  [selectActivityMembersDataMap, (_, id_aktivitas) => id_aktivitas],
+  (activityMembersData, id_aktivitas) =>
+    activityMembersData[id_aktivitas]?.summary ?? null
 );
 
 
