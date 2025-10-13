@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { useFocusEffect } from '@react-navigation/native';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -14,14 +15,19 @@ import { useGpsNavigation } from '../../../../common/hooks/useGpsNavigation';
 import { qrTokenApi } from '../../api/qrTokenApi';
 
 import {
-  fetchAktivitasDetail, deleteAktivitas, selectAktivitasDetail,
-  selectAktivitasLoading, selectAktivitasError, selectKelompokDetail,
-  fetchActivityReport
+  fetchAktivitasDetail,
+  deleteAktivitas,
+  selectAktivitasDetail,
+  selectAktivitasLoading,
+  selectAktivitasError,
+  selectKelompokDetail,
+  fetchActivityReport,
+  selectAktivitasAttendanceSummary
 } from '../../redux/aktivitasSlice';
 
 const ActivityDetailScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
-  const { id_aktivitas } = route.params || {};
+  const { id_aktivitas, attendanceSummary: routeAttendanceSummary } = route.params || {};
   
   const activity = useSelector(selectAktivitasDetail);
   const loading = useSelector(selectAktivitasLoading);
@@ -29,6 +35,7 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   const kelompokDetail = useSelector(selectKelompokDetail);
   const { activityReport } = useSelector(state => state.aktivitas);
   const { profile } = useSelector(state => state.auth);
+  const cachedAttendanceSummary = useSelector(selectAktivitasAttendanceSummary);
   
   const [activePhoto, setActivePhoto] = useState(0);
   
@@ -179,9 +186,24 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     return now > endDateTime;
   }, [activity?.end_time, activity?.tanggal]);
   
+  useFocusEffect(
+    useCallback(() => {
+      if (id_aktivitas) {
+        dispatch(fetchAktivitasDetail(id_aktivitas));
+      }
+    }, [dispatch, id_aktivitas])
+  );
+
   useEffect(() => {
-    if (id_aktivitas) dispatch(fetchAktivitasDetail(id_aktivitas));
-  }, [dispatch, id_aktivitas]);
+    if (!activity) {
+      return;
+    }
+
+    navigation.setParams({
+      activityStatus: activity.status,
+      attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
+    });
+  }, [activity, cachedAttendanceSummary, navigation, routeAttendanceSummary]);
   
   // Check if activity report exists once the activity detail is loaded
   useEffect(() => {
@@ -245,7 +267,9 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
         activityType: activity.jenis_kegiatan,
         kelompokId: activity.selectedKelompokId || kelompokDetail?.id_kelompok || null,
-        kelompokName: activity.nama_kelompok || null
+        kelompokName: activity.nama_kelompok || null,
+        activityStatus: activity.status,
+        attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
       });
     };
     
@@ -262,7 +286,8 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
         activityType: activity.jenis_kegiatan,
         kelompokId: activity.selectedKelompokId || kelompokDetail?.id_kelompok || null,
-        kelompokName: activity.nama_kelompok || null
+        kelompokName: activity.nama_kelompok || null,
+        activityStatus: activity.status
       });
     };
     
@@ -280,7 +305,9 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         activityType: activity.jenis_kegiatan,
         kelompokId: activity.selectedKelompokId || kelompokDetail?.id_kelompok || null,
         kelompokName: activity.nama_kelompok || null,
-        initialTab: 'AttendanceList'
+        initialTab: 'AttendanceList',
+        activityStatus: activity.status,
+        attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
       });
     };
     
@@ -300,7 +327,9 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         kelompokName: activity.nama_kelompok || null,
         level: activity.level || null,
         completeActivity: activity,
-        initialTab: 'QrTokenGeneration'
+        initialTab: 'QrTokenGeneration',
+        activityStatus: activity.status,
+        attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
       });
     };
     

@@ -2,18 +2,35 @@ import React, { useMemo, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
 
 import QrTokenGenerationTab from './components/QrTokenGenerationTab';
 import QrScannerTab from './components/QrScannerTab';
 import AttendanceListTab from './components/AttendanceListTab';
+import {
+  selectAktivitasAttendanceSummary,
+  selectAktivitasDetail
+} from '../../redux/aktivitasSlice';
 
 const Tab = createMaterialTopTabNavigator();
 
 const AttendanceManagementScreen = ({ navigation, route }) => {
-  const { 
-    id_aktivitas, activityName, activityDate, activityType, 
-    kelompokId, kelompokName, level, completeActivity, initialTab
+  const {
+    id_aktivitas, activityName, activityDate, activityType,
+    kelompokId, kelompokName, level, completeActivity, initialTab,
+    activityStatus: routeActivityStatus,
+    attendanceSummary: routeAttendanceSummary
   } = route.params || {};
+
+  const aktivitasDetail = useSelector(selectAktivitasDetail);
+  const aktivitasSummary = useSelector(selectAktivitasAttendanceSummary);
+
+  const detailMatches = aktivitasDetail?.id_aktivitas === id_aktivitas;
+  const derivedActivityStatus = detailMatches ? aktivitasDetail?.status : null;
+  const derivedAttendanceSummary = detailMatches ? aktivitasSummary : null;
+
+  const effectiveActivityStatus = derivedActivityStatus ?? routeActivityStatus ?? null;
+  const effectiveAttendanceSummary = derivedAttendanceSummary ?? routeAttendanceSummary ?? null;
   
   // Extract timing info from activity
   const startTime = completeActivity?.start_time;
@@ -79,6 +96,8 @@ const AttendanceManagementScreen = ({ navigation, route }) => {
     activityType,
     kelompokId,
     kelompokName,
+    activityStatus: effectiveActivityStatus,
+    attendanceSummary: effectiveAttendanceSummary,
   }), [
     navigation,
     id_aktivitas,
@@ -87,6 +106,8 @@ const AttendanceManagementScreen = ({ navigation, route }) => {
     activityType,
     kelompokId,
     kelompokName,
+    effectiveActivityStatus,
+    effectiveAttendanceSummary,
   ]);
 
   return (
