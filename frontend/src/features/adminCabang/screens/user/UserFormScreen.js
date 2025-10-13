@@ -359,14 +359,16 @@ const UserFormScreen = () => {
   const handleWilbinChange = useCallback(
     (value) => {
       setIdWilbin(value);
+      clearFieldError('id_wilbin');
       if (value) {
         fetchShelterOptions(value);
       } else {
         setShelterList([]);
         setIdShelter('');
+        clearFieldError('id_shelter');
       }
     },
-    [fetchShelterOptions]
+    [clearFieldError, fetchShelterOptions]
   );
 
   useEffect(() => {
@@ -620,28 +622,66 @@ const UserFormScreen = () => {
                     <>
                       <FormRow label="Wilbin">
                         {loadingDropdown ? (
-                          <ActivityIndicator />
+                          <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color={THEME.primary} />
+                          </View>
                         ) : (
-                          <Picker selectedValue={id_wilbin} onValueChange={handleWilbinChange}>
-                            <Picker.Item label="-- Pilih Wilbin --" value="" />
-                            {wilbinList.map((w) => (
-                              <Picker.Item key={w.id_wilbin || w.id} label={w.nama_wilbin} value={String(w.id_wilbin || w.id)} />
-                            ))}
-                          </Picker>
+                          <View style={styles.pickerWrapper}>
+                            <Picker
+                              selectedValue={id_wilbin}
+                              onValueChange={handleWilbinChange}
+                              style={styles.picker}
+                              dropdownIconColor={THEME.textMuted}
+                            >
+                              <Picker.Item label="-- Pilih Wilbin --" value="" />
+                              {wilbinList.map((w) => (
+                                <Picker.Item
+                                  key={w.id_wilbin || w.id}
+                                  label={w.nama_wilbin}
+                                  value={String(w.id_wilbin || w.id)}
+                                />
+                              ))}
+                            </Picker>
+                          </View>
                         )}
+                        {formErrors.id_wilbin ? (
+                          <Text style={styles.fieldError}>{formErrors.id_wilbin}</Text>
+                        ) : null}
                       </FormRow>
 
                       <FormRow label="Shelter">
                         {loadingDropdown ? (
-                          <ActivityIndicator />
+                          <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color={THEME.primary} />
+                          </View>
                         ) : (
-                          <Picker selectedValue={id_shelter} onValueChange={setIdShelter} enabled={!!id_wilbin}>
-                            <Picker.Item label="-- Pilih Shelter --" value="" />
-                            {shelterList.map((s) => (
-                              <Picker.Item key={s.id_shelter || s.id} label={s.nama_shelter} value={String(s.id_shelter || s.id)} />
-                            ))}
-                          </Picker>
+                          <View
+                            style={[styles.pickerWrapper, !id_wilbin && styles.pickerWrapperDisabled]}
+                          >
+                            <Picker
+                              selectedValue={id_shelter}
+                              onValueChange={(value) => {
+                                setIdShelter(value);
+                                clearFieldError('id_shelter');
+                              }}
+                              enabled={!!id_wilbin}
+                              style={styles.picker}
+                              dropdownIconColor={THEME.textMuted}
+                            >
+                              <Picker.Item label="-- Pilih Shelter --" value="" />
+                              {shelterList.map((s) => (
+                                <Picker.Item
+                                  key={s.id_shelter || s.id}
+                                  label={s.nama_shelter}
+                                  value={String(s.id_shelter || s.id)}
+                                />
+                              ))}
+                            </Picker>
+                          </View>
                         )}
+                        {formErrors.id_shelter ? (
+                          <Text style={styles.fieldError}>{formErrors.id_shelter}</Text>
+                        ) : null}
                       </FormRow>
                     </>
                   )}
@@ -705,6 +745,22 @@ const styles = StyleSheet.create({
   readonlyText: { color: THEME.text, fontWeight: '600', flex: 1 },
   helperText: { color: THEME.textMuted, fontSize: 12, marginTop: 6 },
   loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  pickerWrapper: { borderWidth: 1, borderColor: THEME.border, borderRadius: 10, backgroundColor: THEME.inputBg, overflow: 'hidden' },
+  pickerWrapperDisabled: { backgroundColor: '#f0f0f0', borderColor: '#d0d0d0' },
+  picker: {
+    width: '100%',
+    color: THEME.text,
+    ...(Platform.OS === 'android' ? { height: 48 } : { height: 44 }),
+  },
+  loadingContainer: {
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: THEME.border,
+    borderRadius: 10,
+    backgroundColor: THEME.inputBg,
+  },
 });
 
 export default UserFormScreen;
