@@ -205,7 +205,7 @@ const AdminCabangProfileScreen = () => {
               text: 'Manajemen Pengguna',
               color: '#2980b9',
               onPress: () =>
-                Alert.alert('Segera Hadir', 'Fitur Manajemen Pengguna sedang dalam pengembangan.')
+                navigation.navigate('Home', { screen: 'AdminCabangUserManagement' })
             },
             { icon: 'settings-outline', text: 'Pengaturan', color: '#2ecc71', onPress: () => navigation.navigate('Settings') },
             { icon: 'log-out-outline', text: 'Keluar', color: '#e74c3c', onPress: handleLogout }
