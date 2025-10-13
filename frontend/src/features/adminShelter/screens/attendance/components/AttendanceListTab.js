@@ -69,7 +69,7 @@ const AttendanceListTab = ({
   const derivedSummary = detailMatches ? aktivitasSummary : null;
 
   const effectiveActivityStatus = derivedActivityStatus ?? routeActivityStatus ?? null;
-  const effectiveSummary = useMemo(() => {
+  const effectiveRawSummary = useMemo(() => {
     if (membersSummary) {
       return membersSummary;
     }
@@ -163,10 +163,13 @@ const AttendanceListTab = ({
     };
   }, []);
 
-  const normalizedSummary = useMemo(
-    () => normalizeAttendanceSummary(effectiveSummary),
-    [effectiveSummary, normalizeAttendanceSummary]
-  );
+  const normalizedSummary = useMemo(() => {
+    if (!effectiveRawSummary || effectiveRawSummary?.success === false) {
+      return null;
+    }
+
+    return normalizeAttendanceSummary(effectiveRawSummary);
+  }, [effectiveRawSummary, normalizeAttendanceSummary]);
 
   const fallbackSummary = useMemo(() => {
     if (!activityMembers || activityMembers.length === 0) {
@@ -182,7 +185,24 @@ const AttendanceListTab = ({
     return { total, present, late, absent, unrecorded };
   }, [activityMembers]);
 
-  const summary = normalizedSummary || fallbackSummary;
+  const summaryDataForDisplay = useMemo(() => {
+    if (effectiveRawSummary?.success === false) {
+      return null;
+    }
+
+    return normalizedSummary || fallbackSummary;
+  }, [effectiveRawSummary, normalizedSummary, fallbackSummary]);
+
+  const summaryErrorMessage = useMemo(() => {
+    if (effectiveRawSummary?.success === false) {
+      return (
+        effectiveRawSummary?.message ||
+        'Ringkasan kehadiran tidak tersedia. Silakan coba lagi nanti.'
+      );
+    }
+
+    return null;
+  }, [effectiveRawSummary]);
 
   const attendanceStatusCounts = useMemo(() => {
     const records = attendanceRecords || [];
@@ -318,8 +338,8 @@ const AttendanceListTab = ({
   }, [activityMembers, attendanceRecords, attendanceRecordMap, getStudentIdFromMember]);
 
   const summaryForMessage = useMemo(() => {
-    if (summary) {
-      return summary;
+    if (summaryDataForDisplay) {
+      return summaryDataForDisplay;
     }
 
     const total = combinedRoster.length;
@@ -329,7 +349,7 @@ const AttendanceListTab = ({
     const unrecorded = Math.max(total - (present + late + absent), 0);
 
     return { total, present, late, absent, unrecorded };
-  }, [summary, combinedRoster, attendanceStatusCounts]);
+  }, [summaryDataForDisplay, combinedRoster, attendanceStatusCounts]);
 
   const extractSummaryFromUpdate = useCallback((result) => {
     if (!result) {
@@ -346,41 +366,56 @@ const AttendanceListTab = ({
     );
   }, []);
 
-  const formatSummaryMessage = useCallback((summaryData) => {
-    if (!summaryData) {
-      return 'Aktivitas berhasil ditandai selesai.';
-    }
+  const formatSummaryMessage = useCallback(
+    (rawSummaryData, fallbackSummaryData) => {
+      if (rawSummaryData?.success === false) {
+        return (
+          rawSummaryData.message ||
+          'Ringkasan kehadiran tidak tersedia. Silakan coba lagi nanti.'
+        );
+      }
 
-    const {
-      total = 0,
-      present = 0,
-      late = 0,
-      absent = 0,
-      unrecorded = 0
-    } = summaryData;
+      const normalizedData =
+        normalizeAttendanceSummary(rawSummaryData) ||
+        fallbackSummaryData ||
+        null;
 
-    return [
-      `Total Peserta: ${total}`,
-      `Hadir: ${present}`,
-      `Terlambat: ${late}`,
-      `Tidak Hadir: ${absent}`,
-      `Belum Tercatat: ${unrecorded}`
-    ].join('\n');
-  }, []);
+      if (!normalizedData) {
+        return 'Aktivitas berhasil ditandai selesai.';
+      }
+
+      const {
+        total = 0,
+        present = 0,
+        late = 0,
+        absent = 0,
+        unrecorded = 0
+      } = normalizedData;
+
+      return [
+        `Total Peserta: ${total}`,
+        `Hadir: ${present}`,
+        `Terlambat: ${late}`,
+        `Tidak Hadir: ${absent}`,
+        `Belum Tercatat: ${unrecorded}`
+      ].join('\n');
+    },
+    [normalizeAttendanceSummary]
+  );
 
   const summaryItems = useMemo(() => {
-    if (!summary) {
+    if (!summaryDataForDisplay) {
       return [];
     }
 
     return [
-      { label: 'Total', value: summary.total ?? 0, color: '#2c3e50' },
-      { label: 'Hadir', value: summary.present ?? 0, color: '#27ae60' },
-      { label: 'Terlambat', value: summary.late ?? 0, color: '#f39c12' },
-      { label: 'Tidak Hadir', value: summary.absent ?? 0, color: '#e74c3c' },
-      { label: 'Belum Tercatat', value: summary.unrecorded ?? 0, color: '#7f8c8d' }
+      { label: 'Total', value: summaryDataForDisplay.total ?? 0, color: '#2c3e50' },
+      { label: 'Hadir', value: summaryDataForDisplay.present ?? 0, color: '#27ae60' },
+      { label: 'Terlambat', value: summaryDataForDisplay.late ?? 0, color: '#f39c12' },
+      { label: 'Tidak Hadir', value: summaryDataForDisplay.absent ?? 0, color: '#e74c3c' },
+      { label: 'Belum Tercatat', value: summaryDataForDisplay.unrecorded ?? 0, color: '#7f8c8d' }
     ];
-  }, [summary]);
+  }, [summaryDataForDisplay]);
 
   const normalizedStatus = (effectiveActivityStatus || '').toLowerCase();
   const completionDisabled =
@@ -460,13 +495,19 @@ const AttendanceListTab = ({
                 updateAktivitasStatus({ id: id_aktivitas, status: 'completed' })
               ).unwrap();
 
-              const summaryFromUpdate = normalizeAttendanceSummary(
-                extractSummaryFromUpdate(result)
-              );
+              const rawSummaryFromUpdate = extractSummaryFromUpdate(result);
+
+              if (rawSummaryFromUpdate?.success === false) {
+                const failureMessage =
+                  rawSummaryFromUpdate.message ||
+                  'Ringkasan kehadiran tidak tersedia. Silakan coba lagi nanti.';
+                Alert.alert('Ringkasan Kehadiran', failureMessage);
+                return;
+              }
 
               Alert.alert(
                 'Aktivitas Diselesaikan',
-                formatSummaryMessage(summaryFromUpdate || summaryForMessage)
+                formatSummaryMessage(rawSummaryFromUpdate, summaryForMessage)
               );
 
               await refreshData({ force: true });
@@ -484,7 +525,6 @@ const AttendanceListTab = ({
     completionDisabled,
     dispatch,
     id_aktivitas,
-    normalizeAttendanceSummary,
     extractSummaryFromUpdate,
     formatSummaryMessage,
     summaryForMessage,
@@ -749,15 +789,27 @@ const AttendanceListTab = ({
         <Text style={styles.activityDate}>{activityDate || 'Tanggal tidak ditentukan'}</Text>
       </View>
 
-      {summaryItems.length > 0 && (
-        <View style={styles.summaryContainer}>
-          {summaryItems.map(item => (
-            <View key={item.label} style={styles.summaryCard}>
-              <Text style={[styles.summaryValue, { color: item.color }]}>{item.value}</Text>
-              <Text style={styles.summaryLabel}>{item.label}</Text>
-            </View>
-          ))}
+      {summaryErrorMessage ? (
+        <View style={styles.summaryErrorContainer}>
+          <Ionicons
+            name="warning-outline"
+            size={20}
+            color="#e74c3c"
+            style={styles.summaryErrorIcon}
+          />
+          <Text style={styles.summaryErrorText}>{summaryErrorMessage}</Text>
         </View>
+      ) : (
+        summaryItems.length > 0 && (
+          <View style={styles.summaryContainer}>
+            {summaryItems.map(item => (
+              <View key={item.label} style={styles.summaryCard}>
+                <Text style={[styles.summaryValue, { color: item.color }]}>{item.value}</Text>
+                <Text style={styles.summaryLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        )
       )}
 
       <View style={styles.completeSection}>
@@ -868,6 +920,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e1e1e1'
   },
+  summaryErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff5f5',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e1e1'
+  },
+  summaryErrorIcon: { marginRight: 12, marginTop: 2 },
+  summaryErrorText: { flex: 1, color: '#c0392b', fontSize: 14, lineHeight: 20 },
   summaryCard: {
     width: '48%',
     backgroundColor: '#f8f9fa',
