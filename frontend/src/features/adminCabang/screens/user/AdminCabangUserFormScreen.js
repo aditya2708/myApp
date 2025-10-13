@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: THEME.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: THEME.inputBg, color: THEME.text },
   passwordInputWrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 },
   passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, color: THEME.text },
-  passwordToggle: { paddingHorizontal: 12, height: '100%', alignItems: 'center', justifyContent: 'center' },
+  passwordToggle: { paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   inputError: { borderColor: THEME.danger },
   fieldError: { color: THEME.danger, marginTop: 6, fontSize: 12 },
