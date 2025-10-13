@@ -20,12 +20,28 @@ class AdminCabangUserController extends Controller
      */
     public function index(Request $request)
     {
-        $request->validate(['level' => 'required|string|in:admin_cabang,admin_shelter']);
+        $validated = $request->validate([
+            'level' => 'required|string|in:admin_cabang,admin_shelter',
+            'search' => 'sometimes|string|max:255',
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+        ]);
+
+        $search = $validated['search'] ?? null;
+        $perPage = (int) ($validated['per_page'] ?? 10);
+        $perPage = max(1, min($perPage, 100));
 
         $users = User::with(['adminCabang', 'adminShelter'])
-            ->where('level', $request->level)
+            ->where('level', $validated['level'])
+            ->when($search, function ($query, $searchKeyword) {
+                $query->where(function ($innerQuery) use ($searchKeyword) {
+                    $innerQuery
+                        ->where('username', 'like', "%{$searchKeyword}%")
+                        ->orWhere('email', 'like', "%{$searchKeyword}%");
+                });
+            })
             ->orderBy('created_at', 'desc')
-            ->paginate(10);
+            ->paginate($perPage);
 
         return new UserCollection($users);
     }
