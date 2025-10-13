@@ -11,6 +11,7 @@ use App\Models\Tutor;
 use App\Models\Semester;
 use App\Models\Aktivitas;
 use App\Models\AttendanceVerification;
+use App\Models\Kelompok;
 use App\Services\AttendanceService;
 use App\Services\VerificationService;
 use App\Services\QrTokenService;
@@ -267,17 +268,50 @@ class AttendanceController extends Controller
     {
         try {
             $aktivitas = \App\Models\Aktivitas::findOrFail($id_aktivitas);
-            
-            if (!$aktivitas->id_kelompok) {
+
+            // Attempt to resolve the kelompok either by foreign key or by name/id_shelter
+            $kelompok = null;
+
+            if (!empty($aktivitas->id_kelompok)) {
+                $kelompok = Kelompok::with('anak')->find($aktivitas->id_kelompok);
+            }
+
+            if (!$kelompok && !empty($aktivitas->nama_kelompok)) {
+                $kelompok = Kelompok::with('anak')
+                    ->where('nama_kelompok', $aktivitas->nama_kelompok)
+                    ->when($aktivitas->id_shelter, function ($query) use ($aktivitas) {
+                        $query->where('id_shelter', $aktivitas->id_shelter);
+                    })
+                    ->first();
+            }
+
+            if (!$kelompok) {
+                $summary = [
+                    'total_members' => 0,
+                    'present_count' => 0,
+                    'late_count' => 0,
+                    'absent_count' => 0,
+                    'no_record_count' => 0,
+                    'attendance_rate' => 0,
+                ];
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Activity does not have an associated kelompok'
-                ], 422);
+                    'message' => 'Kelompok not found for activity.',
+                    'data' => [],
+                    'summary' => $summary,
+                    'activity' => [
+                        'id_aktivitas' => $aktivitas->id_aktivitas,
+                        'jenis_kegiatan' => $aktivitas->jenis_kegiatan,
+                        'materi' => $aktivitas->materi,
+                        'tanggal' => $aktivitas->tanggal,
+                        'start_time' => $aktivitas->start_time,
+                        'end_time' => $aktivitas->end_time,
+                    ],
+                    'kelompok' => null,
+                ], 404);
             }
-            
-            // Get kelompok with all its students
-            $kelompok = \App\Models\Kelompok::with('anak')->findOrFail($aktivitas->id_kelompok);
-            
+
             // Get all attendance records for this activity
             $attendanceRecords = \App\Models\Absen::join('absen_user', 'absen.id_absen_user', '=', 'absen_user.id_absen_user')
                 ->where('absen.id_aktivitas', $id_aktivitas)
