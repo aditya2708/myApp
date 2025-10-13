@@ -378,7 +378,18 @@ class AttendanceService
             return $summary;
         });
     }
-    
+
+    public function finalizeActivityCompletion(Aktivitas $activity, ?string $notes = null): array
+    {
+        $summary = $this->generateAbsencesForCompletedActivity($activity);
+
+        if ($notes !== null) {
+            $summary['notes'] = $notes;
+        }
+
+        return $summary;
+    }
+
     public function getAttendanceByActivity($id_aktivitas, $filters = [])
     {
         $query = Absen::where('id_aktivitas', $id_aktivitas)
