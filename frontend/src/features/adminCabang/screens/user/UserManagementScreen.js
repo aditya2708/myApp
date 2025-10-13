@@ -1,7 +1,7 @@
 // FEATURES PATH: features/adminCabang/screens/user/UserManagementScreen.js
 // DESC: Screen daftar user untuk Admin Cabang (kelola admin cabang & admin shelter)
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -22,56 +22,121 @@ const LEVELS = [
   { key: 'admin_shelter', label: 'Admin Shelter' },
 ];
 
+const DEFAULT_PER_PAGE = 10;
+
 const UserManagementScreen = () => {
   const navigation = useNavigation();
   const [level, setLevel] = useState('admin_cabang');
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [q, setQ] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [meta, setMeta] = useState(null);
+  const [links, setLinks] = useState(null);
+  const requestTokenRef = useRef(0);
+  const hasMountedRef = useRef(false);
 
-  const fetchUsers = async () => {
-    try {
-      setError(null);
-      setLoading(true);
-      const res = await adminCabangUserManagementApi.getUsers({ level });
-      const list = res?.data?.data || res?.data || [];
-      setUsers(Array.isArray(list) ? list : []);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Gagal memuat data user';
-      setError(String(msg));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const resetListState = useCallback(() => {
+    setUsers([]);
+    setMeta(null);
+    setLinks(null);
+  }, []);
+
+  const fetchUsers = useCallback(
+    async ({ page: targetPage = 1, append = false, isRefresh = false } = {}) => {
+      const requestToken = ++requestTokenRef.current;
+      const isLoadMore = append && targetPage > 1;
+
+      try {
+        setError(null);
+        if (isLoadMore) {
+          setLoadingMore(true);
+        } else if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        const { data: list = [], meta: metaRes = null, links: linksRes = null } =
+          await adminCabangUserManagementApi.getUsers({
+            level,
+            page: targetPage,
+            perPage: DEFAULT_PER_PAGE,
+            search: searchTerm || undefined,
+          });
+
+        if (requestToken !== requestTokenRef.current) {
+          return;
+        }
+
+        setUsers((prev) => (append ? [...prev, ...list] : list));
+        setMeta(metaRes);
+        setLinks(linksRes);
+      } catch (err) {
+        if (requestToken === requestTokenRef.current) {
+          const msg = err?.response?.data?.message || err?.message || 'Gagal memuat data user';
+          setError(String(msg));
+        }
+      } finally {
+        if (requestToken === requestTokenRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+          setRefreshing(false);
+        }
+      }
+    },
+    [level, searchTerm]
+  );
 
   useEffect(() => {
-    fetchUsers();
-  }, [level]);
+    const handler = setTimeout(() => {
+      setSearchTerm(q.trim());
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [q]);
+
+  useEffect(() => {
+    resetListState();
+    fetchUsers({ page: 1 });
+    hasMountedRef.current = true;
+  }, [level, searchTerm, fetchUsers, resetListState]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchUsers();
-    }, [level])
+      if (hasMountedRef.current) {
+        fetchUsers({ page: 1, append: false, isRefresh: true });
+      }
+    }, [fetchUsers])
   );
 
-  const filteredUsers = useMemo(() => {
-    if (!q) return users;
-    const query = q.toLowerCase();
-    return users.filter((item) => {
-      const u = item?.user || item || {};
-      return (
-        (u?.username || '').toLowerCase().includes(query) ||
-        (u?.email || '').toLowerCase().includes(query)
-      );
-    });
-  }, [users, q]);
-
   const onRefresh = () => {
-    setRefreshing(true);
-    fetchUsers();
+    fetchUsers({ page: 1, append: false, isRefresh: true });
+  };
+
+  const loadMore = () => {
+    if (loading || loadingMore) return;
+
+    const hasNextPage = (() => {
+      if (meta?.current_page != null && meta?.last_page != null) {
+        return meta.current_page < meta.last_page;
+      }
+      return Boolean(links?.next);
+    })();
+
+    if (!hasNextPage) return;
+
+    let nextPage = meta?.current_page ? meta.current_page + 1 : null;
+
+    if (!nextPage && links?.next) {
+      const match = links.next.match(/[?&]page=(\d+)/);
+      nextPage = match ? Number(match[1]) : null;
+    }
+
+    fetchUsers({ page: nextPage ?? undefined, append: true });
   };
 
   const gotoCreate = () => {
@@ -205,12 +270,23 @@ const UserManagementScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={filteredUsers}
-          keyExtractor={(_, idx) => String(idx)}
+          data={users}
+          keyExtractor={(item, idx) =>
+            String(item?.user?.id_users ?? item?.id_users ?? item?.id ?? idx)
+          }
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={<Text style={styles.emptyText}>Belum ada data.</Text>}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.2}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ paddingVertical: 16 }}>
+                <ActivityIndicator size="small" />
+              </View>
+            ) : null
+          }
         />
       )}
     </View>

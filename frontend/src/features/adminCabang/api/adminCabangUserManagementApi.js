@@ -10,13 +10,32 @@ export const adminCabangUserManagementApi = {
   /**
    * Ambil daftar user berdasarkan level (admin_cabang/admin_shelter)
    */
-  getUsers: async ({ level } = {}) => {
+  getUsers: async ({ level, page, perPage, search } = {}) => {
     if (!level) {
       const error = new Error('Parameter level wajib diisi');
       error.code = 'LEVEL_REQUIRED';
       throw error;
     }
-    return await api.get(USER_ENDPOINTS.LIST, { params: { level } });
+
+    const params = { level };
+    if (page) params.page = page;
+    if (perPage) params.per_page = perPage;
+    if (search) params.search = search;
+
+    const response = await api.get(USER_ENDPOINTS.LIST, { params });
+    const payload = response?.data ?? {};
+    const list = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+      ? payload
+      : [];
+
+    return {
+      data: list,
+      meta: payload?.meta ?? null,
+      links: payload?.links ?? null,
+      raw: response,
+    };
   },
 
   /** Ambil detail user */
