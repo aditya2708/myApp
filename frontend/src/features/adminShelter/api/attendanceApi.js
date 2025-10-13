@@ -1,4 +1,5 @@
 import api from '../../../api/axiosConfig';
+import { ADMIN_SHELTER_ENDPOINTS } from '../../../constants/endpoints';
 
 /**
  * Attendance API service
@@ -126,6 +127,21 @@ export const attendanceApi = {
     return await api.get(`/admin-shelter/attendance/activity/${id_aktivitas}`, {
       params: filters
     });
+  },
+
+  /**
+   * Get activity members for attendance management
+   * @param {number|string} id_aktivitas - Activity ID
+   * @param {Object} params - Optional query parameters (e.g., include_summary)
+   * @returns {Promise} - API response with activity members
+   */
+  getActivityMembers: async (id_aktivitas, params = {}) => {
+    return await api.get(
+      ADMIN_SHELTER_ENDPOINTS.ATTENDANCE.ACTIVITY_MEMBERS(id_aktivitas),
+      {
+        params
+      }
+    );
   },
 
 

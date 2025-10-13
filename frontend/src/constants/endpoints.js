@@ -307,11 +307,15 @@ export const ADMIN_SHELTER_ENDPOINTS = {
     LIST: '/admin-shelter/aktivitas',
     DETAIL: (id) => `/admin-shelter/aktivitas/${id}`,
     CREATE: '/admin-shelter/aktivitas',
+    UPDATE_STATUS: (id) => `/admin-shelter/aktivitas/${id}/status`,
     // Phase 3: Enhanced Aktivitas with Kurikulum Integration
     BY_SEMESTER: (semesterId) => `/admin-shelter/aktivitas/by-semester/${semesterId}`,
     BY_MATERI: (materiId) => `/admin-shelter/aktivitas/by-materi/${materiId}`,
     DUPLICATE: (aktivitasId) => `/admin-shelter/aktivitas/${aktivitasId}/duplicate`,
     STATS: '/admin-shelter/aktivitas-stats'
+  },
+  ATTENDANCE: {
+    ACTIVITY_MEMBERS: (id) => `/admin-shelter/attendance/activity/${id}/members`
   },
   // Phase 3: SIMPLIFIED Kurikulum Consumer (Read-only data provider)
   KURIKULUM_CONSUMER: {
