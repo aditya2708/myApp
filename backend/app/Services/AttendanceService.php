@@ -290,7 +290,7 @@ class AttendanceService
         }
     }
 
-    public function generateAbsencesForCompletedActivity(Aktivitas $activity)
+    public function generateAbsencesForCompletedActivity(Aktivitas $activity, bool $force = false)
     {
         $summary = [
             'success' => false,
@@ -302,7 +302,7 @@ class AttendanceService
             'message' => null,
         ];
 
-        if (!$activity->isCompleted()) {
+        if (!$force && $activity->status !== 'completed' && !$activity->isCompleted()) {
             $summary['message'] = 'Activity has not ended yet.';
             return $summary;
         }
@@ -379,9 +379,9 @@ class AttendanceService
         });
     }
 
-    public function finalizeActivityCompletion(Aktivitas $activity, ?string $notes = null): array
+    public function finalizeActivityCompletion(Aktivitas $activity, ?string $notes = null, bool $force = false): array
     {
-        $summary = $this->generateAbsencesForCompletedActivity($activity);
+        $summary = $this->generateAbsencesForCompletedActivity($activity, $force);
 
         if ($notes !== null) {
             $summary['notes'] = $notes;

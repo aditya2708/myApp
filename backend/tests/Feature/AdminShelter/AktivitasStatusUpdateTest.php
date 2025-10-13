@@ -1,21 +1,24 @@
 <?php
 
-namespace Tests\\Feature\\AdminShelter;
+namespace Tests\Feature\AdminShelter;
 
-use App\\Models\\Absen;
-use App\\Models\\AbsenUser;
-use App\\Models\\AdminShelter;
-use App\\Models\\Aktivitas;
-use App\\Models\\Anak;
-use App\\Models\\Kelompok;
-use App\\Models\\Shelter;
-use App\\Models\\User;
-use Illuminate\\Database\\Schema\\Blueprint;
-use Illuminate\\Support\\Carbon;
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\Support\\Facades\\Schema;
-use Laravel\\Sanctum\\Sanctum;
-use Tests\\TestCase;
+use App\Models\Absen;
+use App\Models\AbsenUser;
+use App\Models\AdminShelter;
+use App\Models\Aktivitas;
+use App\Models\Anak;
+use App\Models\Kelompok;
+use App\Models\Shelter;
+use App\Models\User;
+use App\Services\AttendanceService;
+use App\Services\LocationService;
+use App\Services\VerificationService;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
 
 class AktivitasStatusUpdateTest extends TestCase
 {
@@ -125,6 +128,117 @@ class AktivitasStatusUpdateTest extends TestCase
             ->assertJsonPath('data.attendance_summary.already_marked', $students->count());
 
         $this->assertSame($students->count(), Absen::count());
+    }
+
+    public function test_admin_can_force_finalize_activity_before_end_time(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2024-01-01 17:00:00'));
+
+        $user = User::create([
+            'username' => 'admin-shelter',
+            'email' => 'admin-shelter@example.com',
+            'password' => bcrypt('secret'),
+            'level' => 'admin_shelter',
+        ]);
+
+        $shelter = Shelter::create([
+            'nama_shelter' => 'Shelter A',
+        ]);
+
+        AdminShelter::create([
+            'user_id' => $user->id_users,
+            'id_shelter' => $shelter->id_shelter,
+            'nama_lengkap' => 'Admin Shelter',
+        ]);
+
+        $kelompok = Kelompok::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => 'Kelompok Hebat',
+            'jumlah_anggota' => 2,
+        ]);
+
+        $students = collect([
+            'Siswa A',
+            'Siswa B',
+        ])->map(function (string $name) use ($kelompok, $shelter) {
+            return Anak::create([
+                'full_name' => $name,
+                'id_kelompok' => $kelompok->id_kelompok,
+                'id_shelter' => $shelter->id_shelter,
+            ]);
+        });
+
+        $aktivitas = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $kelompok->id_kelompok,
+            'nama_kelompok' => $kelompok->nama_kelompok,
+            'jenis_kegiatan' => 'Belajar',
+            'tanggal' => Carbon::parse('2024-01-01'),
+            'start_time' => '16:00:00',
+            'end_time' => '18:00:00',
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->withHeaders(['Accept' => 'application/json'])
+            ->putJson("/api/admin-shelter/aktivitas/{$aktivitas->id_aktivitas}/status", [
+                'status' => 'completed',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.attendance_summary.success', true)
+            ->assertJsonPath('data.attendance_summary.total_members', $students->count())
+            ->assertJsonPath('data.attendance_summary.created_count', $students->count());
+
+        $this->assertSame($students->count(), Absen::count());
+        $this->assertTrue(Absen::all()->every(fn (Absen $absen) => $absen->absen === Absen::TEXT_TIDAK));
+    }
+
+    public function test_generate_absences_without_force_does_not_create_records_before_end_time(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2024-01-01 17:00:00'));
+
+        $shelter = Shelter::create([
+            'nama_shelter' => 'Shelter B',
+        ]);
+
+        $kelompok = Kelompok::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => 'Kelompok Solid',
+            'jumlah_anggota' => 1,
+        ]);
+
+        $student = Anak::create([
+            'full_name' => 'Siswa Tunggal',
+            'id_kelompok' => $kelompok->id_kelompok,
+            'id_shelter' => $shelter->id_shelter,
+        ]);
+
+        $aktivitas = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => $kelompok->id_kelompok,
+            'nama_kelompok' => $kelompok->nama_kelompok,
+            'jenis_kegiatan' => 'Belajar',
+            'tanggal' => Carbon::parse('2024-01-01'),
+            'start_time' => '16:00:00',
+            'end_time' => '18:00:00',
+            'status' => 'scheduled',
+        ]);
+
+        $attendanceService = new AttendanceService(
+            $this->createMock(VerificationService::class),
+            $this->createMock(LocationService::class)
+        );
+
+        $summary = $attendanceService->generateAbsencesForCompletedActivity($aktivitas);
+
+        $this->assertFalse($summary['success']);
+        $this->assertSame('Activity has not ended yet.', $summary['message']);
+        $this->assertSame(0, Absen::count());
+        $this->assertSame(0, AbsenUser::count());
+        $this->assertSame($student->id_anak, $student->fresh()->id_anak);
     }
 
     public function test_activity_members_endpoint_resolves_kelompok_by_name(): void
