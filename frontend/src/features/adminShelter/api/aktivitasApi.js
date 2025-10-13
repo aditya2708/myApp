@@ -53,6 +53,16 @@ export const aktivitasApi = {
   },
 
   /**
+   * Update activity status
+   * @param {number|string} id - Activity ID
+   * @param {Object} payload - Status update payload
+   * @returns {Promise} - API response
+   */
+  updateAktivitasStatus: async (id, payload) => {
+    return await api.put(ADMIN_SHELTER_ENDPOINTS.AKTIVITAS.UPDATE_STATUS(id), payload);
+  },
+
+  /**
    * Delete activity
    * @param {number|string} id - Activity ID
    * @returns {Promise} - API response
