@@ -403,20 +403,6 @@ const AttendanceListTab = ({
     [normalizeAttendanceSummary]
   );
 
-  const summaryItems = useMemo(() => {
-    if (!summaryDataForDisplay) {
-      return [];
-    }
-
-    return [
-      { label: 'Total', value: summaryDataForDisplay.total ?? 0, color: '#2c3e50' },
-      { label: 'Hadir', value: summaryDataForDisplay.present ?? 0, color: '#27ae60' },
-      { label: 'Terlambat', value: summaryDataForDisplay.late ?? 0, color: '#f39c12' },
-      { label: 'Tidak Hadir', value: summaryDataForDisplay.absent ?? 0, color: '#e74c3c' },
-      { label: 'Belum Tercatat', value: summaryDataForDisplay.unrecorded ?? 0, color: '#7f8c8d' }
-    ];
-  }, [summaryDataForDisplay]);
-
   const normalizedStatus = (effectiveActivityStatus || '').toLowerCase();
   const completionDisabled =
     statusUpdating || normalizedStatus === 'completed' || normalizedStatus === 'reported';
@@ -789,7 +775,7 @@ const AttendanceListTab = ({
         <Text style={styles.activityDate}>{activityDate || 'Tanggal tidak ditentukan'}</Text>
       </View>
 
-      {summaryErrorMessage ? (
+      {summaryErrorMessage && (
         <View style={styles.summaryErrorContainer}>
           <Ionicons
             name="warning-outline"
@@ -799,17 +785,6 @@ const AttendanceListTab = ({
           />
           <Text style={styles.summaryErrorText}>{summaryErrorMessage}</Text>
         </View>
-      ) : (
-        summaryItems.length > 0 && (
-          <View style={styles.summaryContainer}>
-            {summaryItems.map(item => (
-              <View key={item.label} style={styles.summaryCard}>
-                <Text style={[styles.summaryValue, { color: item.color }]}>{item.value}</Text>
-                <Text style={styles.summaryLabel}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-        )
       )}
 
       <View style={styles.completeSection}>
@@ -910,16 +885,6 @@ const styles = StyleSheet.create({
   activityHeader: { backgroundColor: '#3498db', padding: 16, alignItems: 'center' },
   activityName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
   activityDate: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)', marginTop: 4 },
-  summaryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e1e1'
-  },
   summaryErrorContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -931,21 +896,6 @@ const styles = StyleSheet.create({
   },
   summaryErrorIcon: { marginRight: 12, marginTop: 2 },
   summaryErrorText: { flex: 1, color: '#c0392b', fontSize: 14, lineHeight: 20 },
-  summaryCard: {
-    width: '48%',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1
-  },
-  summaryValue: { fontSize: 18, fontWeight: '600' },
-  summaryLabel: { fontSize: 12, color: '#7f8c8d', marginTop: 4 },
   completeSection: {
     backgroundColor: '#fff',
     paddingHorizontal: 16,
