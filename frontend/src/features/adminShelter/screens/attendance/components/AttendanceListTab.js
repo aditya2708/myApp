@@ -1,6 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,9 +17,24 @@ import LoadingSpinner from '../../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../../common/components/ErrorMessage';
 
 import {
-  getAttendanceByActivity, manualVerify, rejectVerification,
-  selectActivityAttendance, selectAttendanceLoading, selectAttendanceError, resetAttendanceError
+  getAttendanceByActivity,
+  manualVerify,
+  rejectVerification,
+  selectActivityAttendance,
+  selectAttendanceLoading,
+  selectAttendanceError,
+  resetAttendanceError,
+  fetchActivityMembersWithAttendance,
+  selectActivityMembers,
+  selectActivityAttendanceSummary,
+  selectActivityMembersLoading
 } from '../../../redux/attendanceSlice';
+import {
+  updateAktivitasStatus,
+  selectAktivitasDetail,
+  selectAktivitasStatusUpdating,
+  selectAktivitasAttendanceSummary as selectAktivitasDetailSummary
+} from '../../../redux/aktivitasSlice';
 
 const AttendanceListTab = ({
   navigation,
@@ -21,95 +44,452 @@ const AttendanceListTab = ({
   activityType,
   kelompokId,
   kelompokName,
+  activityStatus: routeActivityStatus,
+  attendanceSummary: routeAttendanceSummary,
 }) => {
   const dispatch = useDispatch();
-  
+
   const attendanceRecords = useSelector(state => selectActivityAttendance(state, id_aktivitas));
   const loading = useSelector(selectAttendanceLoading);
   const error = useSelector(selectAttendanceError);
+  const activityMembers = useSelector(state => selectActivityMembers(state, id_aktivitas));
+  const membersSummary = useSelector(state => selectActivityAttendanceSummary(state, id_aktivitas));
+  const membersLoading = useSelector(state => selectActivityMembersLoading(state, id_aktivitas));
+  const aktivitasDetail = useSelector(selectAktivitasDetail);
+  const statusUpdating = useSelector(selectAktivitasStatusUpdating);
+  const aktivitasSummary = useSelector(selectAktivitasDetailSummary);
   
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCardId, setExpandedCardId] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
-  
+
+  const detailMatches = aktivitasDetail?.id_aktivitas === id_aktivitas;
+  const derivedActivityStatus = detailMatches ? aktivitasDetail?.status : null;
+  const derivedSummary = detailMatches ? aktivitasSummary : null;
+
+  const effectiveActivityStatus = derivedActivityStatus ?? routeActivityStatus ?? null;
+  const effectiveSummary = useMemo(() => {
+    if (membersSummary) {
+      return membersSummary;
+    }
+
+    if (derivedSummary) {
+      return derivedSummary;
+    }
+
+    return routeAttendanceSummary || null;
+  }, [membersSummary, derivedSummary, routeAttendanceSummary]);
+
   // Ref untuk prevent multiple simultaneous requests
   const fetchingRef = useRef(false);
   const lastFetchTime = useRef(0);
-  
-  useEffect(() => {
-    if (id_aktivitas) {
-      // Debounce untuk prevent multiple calls saat tab switching
-      const timeoutId = setTimeout(() => {
-        fetchAttendanceRecords();
-      }, 200);
-      
-      return () => {
-        clearTimeout(timeoutId);
-        dispatch(resetAttendanceError());
-      };
+
+  const getStudentIdFromRecord = useCallback((record) => {
+    if (!record) return null;
+
+    return (
+      record.absen_user?.anak?.id_anak ??
+      record.id_anak ??
+      record.student_id ??
+      record.id_student ??
+      null
+    );
+  }, []);
+
+  const getStudentIdFromMember = useCallback((member) => {
+    if (!member) return null;
+
+    return (
+      member.id_anak ??
+      member.student_id ??
+      member.id_student ??
+      member.id ??
+      null
+    );
+  }, []);
+
+  const normalizeAttendanceSummary = useCallback((rawSummary) => {
+    if (!rawSummary || typeof rawSummary !== 'object') {
+      return null;
     }
-    
-    return () => dispatch(resetAttendanceError());
-  }, [id_aktivitas, dispatch]);
+
+    const total =
+      rawSummary.total_members ??
+      rawSummary.total ??
+      rawSummary.total_students ??
+      rawSummary.total_member ??
+      rawSummary.total_count ??
+      rawSummary.totalParticipants ??
+      rawSummary.totalMembers ??
+      0;
+
+    const present =
+      rawSummary.present_count ??
+      rawSummary.present ??
+      rawSummary.hadir ??
+      rawSummary.presentMembers ??
+      rawSummary.hadir_count ??
+      0;
+
+    const late =
+      rawSummary.late_count ??
+      rawSummary.late ??
+      rawSummary.terlambat ??
+      rawSummary.lateMembers ??
+      0;
+
+    const absent =
+      rawSummary.absent_count ??
+      rawSummary.absent ??
+      rawSummary.tidak_hadir ??
+      rawSummary.absentMembers ??
+      0;
+
+    const unrecorded =
+      rawSummary.no_record_count ??
+      rawSummary.unrecorded ??
+      rawSummary.belum_tercatat ??
+      rawSummary.not_recorded ??
+      rawSummary.pending ??
+      (total - (present + late + absent));
+
+    return {
+      total,
+      present,
+      late,
+      absent,
+      unrecorded
+    };
+  }, []);
+
+  const normalizedSummary = useMemo(
+    () => normalizeAttendanceSummary(effectiveSummary),
+    [effectiveSummary, normalizeAttendanceSummary]
+  );
+
+  const fallbackSummary = useMemo(() => {
+    if (!activityMembers || activityMembers.length === 0) {
+      return null;
+    }
+
+    const total = activityMembers.length;
+    const present = activityMembers.filter(member => member.attendance_status === 'Ya').length;
+    const late = activityMembers.filter(member => member.attendance_status === 'Terlambat').length;
+    const absent = activityMembers.filter(member => member.attendance_status === 'Tidak').length;
+    const unrecorded = total - present - late - absent;
+
+    return { total, present, late, absent, unrecorded };
+  }, [activityMembers]);
+
+  const summary = normalizedSummary || fallbackSummary;
+
+  const attendanceStatusCounts = useMemo(() => {
+    const records = attendanceRecords || [];
+    const present = records.filter(r => r.absen === 'Ya').length;
+    const late = records.filter(r => r.absen === 'Terlambat').length;
+    const absent = records.filter(r => r.absen === 'Tidak').length;
+
+    return { present, late, absent };
+  }, [attendanceRecords]);
+
   
-  const fetchAttendanceRecords = async () => {
-    if (!id_aktivitas) return;
-    
-    // Prevent multiple simultaneous requests
-    if (fetchingRef.current) return;
-    
-    // Rate limiting - minimum 1 second between requests
+  const refreshData = useCallback(async ({ force = false } = {}) => {
+    if (!id_aktivitas) {
+      return { membersResult: null, attendanceResult: null };
+    }
+
+    if (fetchingRef.current) {
+      return { membersResult: null, attendanceResult: null };
+    }
+
     const now = Date.now();
-    if (now - lastFetchTime.current < 1000) return;
-    
+    if (!force && now - lastFetchTime.current < 1000) {
+      return { membersResult: null, attendanceResult: null };
+    }
+
+    fetchingRef.current = true;
+    lastFetchTime.current = now;
+
     try {
-      fetchingRef.current = true;
-      lastFetchTime.current = now;
-      
-      // Use old endpoint that shows attendance records only
-      await dispatch(getAttendanceByActivity({ id_aktivitas, type: 'student' })).unwrap();
+      const membersPromise = dispatch(fetchActivityMembersWithAttendance(id_aktivitas)).unwrap();
+      const attendancePromise = dispatch(getAttendanceByActivity({ id_aktivitas, type: 'student' })).unwrap();
+
+      const [membersResult, attendanceResult] = await Promise.allSettled([
+        membersPromise,
+        attendancePromise
+      ]);
+
+      if (membersResult.status === 'rejected') {
+        console.error('Gagal mengambil anggota aktivitas:', membersResult.reason);
+      }
+
+      if (attendanceResult.status === 'rejected') {
+        console.error('Gagal mengambil kehadiran:', attendanceResult.reason);
+      }
+
+      return {
+        membersResult: membersResult.status === 'fulfilled' ? membersResult.value : null,
+        attendanceResult: attendanceResult.status === 'fulfilled' ? attendanceResult.value : null
+      };
     } catch (err) {
-      console.error('Gagal mengambil kehadiran:', err);
+      console.error('Gagal memuat data kehadiran:', err);
+      return { membersResult: null, attendanceResult: null };
     } finally {
       fetchingRef.current = false;
-      setRefreshing(false);
     }
-  };
-  
-  const handleRefresh = () => {
+  }, [dispatch, id_aktivitas]);
+
+  useEffect(() => {
+    if (!id_aktivitas) {
+      return () => dispatch(resetAttendanceError());
+    }
+
+    const timeoutId = setTimeout(() => {
+      refreshData();
+    }, 200);
+
+    return () => {
+      clearTimeout(timeoutId);
+      dispatch(resetAttendanceError());
+    };
+  }, [id_aktivitas, refreshData, dispatch]);
+
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchAttendanceRecords();
-  };
+    refreshData({ force: true }).finally(() => setRefreshing(false));
+  }, [refreshData]);
   
-  // Filter attendance records based on search and status filter
-  const filteredRecords = attendanceRecords.filter(record => {
-    const studentName = record.absen_user?.anak?.name || record.student_name || record.full_name || '';
-    const matchesSearch = studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         record.absen_user?.anak?.nis?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         record.nis?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    let matchesFilter = true;
-    if (filterStatus === 'pending') {
-      matchesFilter = record.verification_status === 'pending';
-    } else if (filterStatus === 'verified') {
-      matchesFilter = record.verification_status === 'verified';
-    } else if (filterStatus === 'rejected') {
-      matchesFilter = record.verification_status === 'rejected';
+  const attendanceRecordMap = useMemo(() => {
+    const map = new Map();
+
+    (attendanceRecords || []).forEach(record => {
+      const studentId = getStudentIdFromRecord(record);
+      if (studentId !== null && studentId !== undefined) {
+        map.set(studentId, record);
+      }
+    });
+
+    return map;
+  }, [attendanceRecords, getStudentIdFromRecord]);
+
+  const combinedRoster = useMemo(() => {
+    const roster = [];
+    const matchedRecordIds = new Set();
+
+    if (activityMembers && activityMembers.length > 0) {
+      activityMembers.forEach((member, index) => {
+        const studentId = getStudentIdFromMember(member);
+        const attendanceRecord =
+          studentId !== null && studentId !== undefined
+            ? attendanceRecordMap.get(studentId)
+            : null;
+
+        if (attendanceRecord) {
+          matchedRecordIds.add(attendanceRecord.id_absen);
+        }
+
+        const keyBase =
+          studentId ??
+          member.nis ??
+          member.full_name ??
+          member.name ??
+          index;
+
+        roster.push({
+          key: attendanceRecord ? `record-${attendanceRecord.id_absen}` : `member-${keyBase}`,
+          type: 'student',
+          member,
+          record: attendanceRecord || null
+        });
+      });
     }
-    
-    return matchesSearch && matchesFilter;
-  });
-  
-  const getFilterCounts = () => {
-    const pending = attendanceRecords.filter(r => r.verification_status === 'pending').length;
-    const verified = attendanceRecords.filter(r => r.verification_status === 'verified').length;
-    const rejected = attendanceRecords.filter(r => r.verification_status === 'rejected').length;
-    
-    return { pending, verified, rejected, all: attendanceRecords.length };
-  };
-  
-  const counts = getFilterCounts();
+
+    const additionalRecords = (attendanceRecords || [])
+      .filter(record => !matchedRecordIds.has(record.id_absen))
+      .map(record => ({
+        key: `record-${record.id_absen}`,
+        type: record.absen_user?.tutor || record.tutor_name ? 'tutor' : 'record',
+        member: null,
+        record
+      }));
+
+    return [...roster, ...additionalRecords];
+  }, [activityMembers, attendanceRecords, attendanceRecordMap, getStudentIdFromMember]);
+
+  const summaryForMessage = useMemo(() => {
+    if (summary) {
+      return summary;
+    }
+
+    const total = combinedRoster.length;
+    const present = attendanceStatusCounts.present;
+    const late = attendanceStatusCounts.late;
+    const absent = attendanceStatusCounts.absent;
+    const unrecorded = Math.max(total - (present + late + absent), 0);
+
+    return { total, present, late, absent, unrecorded };
+  }, [summary, combinedRoster, attendanceStatusCounts]);
+
+  const extractSummaryFromUpdate = useCallback((result) => {
+    if (!result) {
+      return null;
+    }
+
+    const payload = result?.data?.data ?? result?.data ?? result;
+
+    return (
+      payload?.attendance_summary ??
+      payload?.summary ??
+      payload?.aktivitas?.attendance_summary ??
+      null
+    );
+  }, []);
+
+  const formatSummaryMessage = useCallback((summaryData) => {
+    if (!summaryData) {
+      return 'Aktivitas berhasil ditandai selesai.';
+    }
+
+    const {
+      total = 0,
+      present = 0,
+      late = 0,
+      absent = 0,
+      unrecorded = 0
+    } = summaryData;
+
+    return [
+      `Total Peserta: ${total}`,
+      `Hadir: ${present}`,
+      `Terlambat: ${late}`,
+      `Tidak Hadir: ${absent}`,
+      `Belum Tercatat: ${unrecorded}`
+    ].join('\n');
+  }, []);
+
+  const summaryItems = useMemo(() => {
+    if (!summary) {
+      return [];
+    }
+
+    return [
+      { label: 'Total', value: summary.total ?? 0, color: '#2c3e50' },
+      { label: 'Hadir', value: summary.present ?? 0, color: '#27ae60' },
+      { label: 'Terlambat', value: summary.late ?? 0, color: '#f39c12' },
+      { label: 'Tidak Hadir', value: summary.absent ?? 0, color: '#e74c3c' },
+      { label: 'Belum Tercatat', value: summary.unrecorded ?? 0, color: '#7f8c8d' }
+    ];
+  }, [summary]);
+
+  const normalizedStatus = (effectiveActivityStatus || '').toLowerCase();
+  const completionDisabled =
+    statusUpdating || normalizedStatus === 'completed' || normalizedStatus === 'reported';
+  const showLoadingOverlay = (loading || membersLoading) && !refreshing;
+
+  const filteredRecords = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return combinedRoster.filter(item => {
+      const { record, member } = item;
+      const name = (
+        member?.full_name ||
+        member?.name ||
+        record?.absen_user?.anak?.name ||
+        record?.student_name ||
+        record?.full_name ||
+        record?.tutor_name ||
+        ''
+      ).toString();
+
+      const nis = (
+        member?.nis ||
+        record?.absen_user?.anak?.nis ||
+        record?.nis ||
+        ''
+      ).toString();
+
+      const matchesSearch =
+        query.length === 0 ||
+        name.toLowerCase().includes(query) ||
+        nis.toLowerCase().includes(query);
+
+      let matchesFilter = true;
+
+      if (filterStatus === 'pending') {
+        matchesFilter = record?.verification_status === 'pending';
+      } else if (filterStatus === 'verified') {
+        matchesFilter = record?.verification_status === 'verified';
+      } else if (filterStatus === 'rejected') {
+        matchesFilter = record?.verification_status === 'rejected';
+      }
+
+      if (filterStatus !== 'all' && !record) {
+        matchesFilter = false;
+      }
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [combinedRoster, searchQuery, filterStatus]);
+
+  const counts = useMemo(() => {
+    const records = attendanceRecords || [];
+    const pending = records.filter(r => r.verification_status === 'pending').length;
+    const verified = records.filter(r => r.verification_status === 'verified').length;
+    const rejected = records.filter(r => r.verification_status === 'rejected').length;
+
+    return { pending, verified, rejected, all: records.length };
+  }, [attendanceRecords]);
+
+  const handleCompleteSession = useCallback(() => {
+    if (!id_aktivitas || completionDisabled) {
+      return;
+    }
+
+    Alert.alert(
+      'Selesaikan Sesi',
+      'Pastikan seluruh kehadiran sudah tercatat. Tandai aktivitas ini sebagai selesai?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Selesaikan',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const result = await dispatch(
+                updateAktivitasStatus({ id: id_aktivitas, status: 'completed' })
+              ).unwrap();
+
+              const summaryFromUpdate = normalizeAttendanceSummary(
+                extractSummaryFromUpdate(result)
+              );
+
+              Alert.alert(
+                'Aktivitas Diselesaikan',
+                formatSummaryMessage(summaryFromUpdate || summaryForMessage)
+              );
+
+              await refreshData({ force: true });
+            } catch (err) {
+              const errorMessage =
+                (typeof err === 'string' ? err : err?.message) ||
+                'Gagal menyelesaikan sesi';
+              Alert.alert('Gagal', errorMessage);
+            }
+          }
+        }
+      ]
+    );
+  }, [
+    completionDisabled,
+    dispatch,
+    id_aktivitas,
+    normalizeAttendanceSummary,
+    extractSummaryFromUpdate,
+    formatSummaryMessage,
+    summaryForMessage,
+    refreshData
+  ]);
   
   const handleVerify = (id_absen) => {
     Alert.prompt(
@@ -169,6 +549,7 @@ const AttendanceListTab = ({
       activityType,
       kelompokId,
       kelompokName,
+      activityStatus: effectiveActivityStatus,
     });
   };
 
@@ -185,117 +566,158 @@ const AttendanceListTab = ({
   }[absen] || 'Tidak Hadir');
 
   const getVerificationColor = (record) => {
+    if (!record) return '#95a5a6';
     if (record.is_verified) return '#27ae60';
     return record.verification_status === 'rejected' ? '#e74c3c' : '#f39c12';
   };
 
   const getVerificationText = (record) => {
+    if (!record) return 'Belum Diverifikasi';
     if (record.is_verified) return 'Terverifikasi';
     return record.verification_status === 'rejected' ? 'Ditolak' : 'Menunggu';
   };
 
-  const getPersonName = (item) => {
-    return item.absen_user?.anak?.name || item.student_name || item.full_name || item.tutor_name || 'Unknown';
-  };
-
-  const getPersonType = (item) => {
-    if (item.absen_user?.anak) return 'Siswa';
-    if (item.absen_user?.tutor) return 'Tutor';
-    if (item.student_name || item.full_name) return 'Siswa';
-    if (item.tutor_name) return 'Tutor';
-    return 'Unknown';
-  };
-  
-  
-  const renderAttendanceCard = ({ item }) => (
-    <View style={styles.attendanceCard}>
-      <TouchableOpacity
-        style={styles.cardHeader}
-        onPress={() => setExpandedCardId(expandedCardId === item.id_absen ? null : item.id_absen)}
-      >
-        <View style={styles.personInfo}>
-          <View style={styles.personDetails}>
-            <Text style={styles.personName}>{getPersonName(item)}</Text>
-            <Text style={styles.personType}>{getPersonType(item)}</Text>
-          </View>
-          
-          <View style={styles.statusContainer}>
-            <View style={[styles.attendanceStatus, { backgroundColor: getStatusColor(item.absen) }]}>
-              <Text style={styles.attendanceStatusText}>{getStatusText(item.absen)}</Text>
-            </View>
-            
-            <View style={[styles.verificationStatus, { backgroundColor: getVerificationColor(item) }]}>
-              <Text style={styles.verificationStatusText}>{getVerificationText(item)}</Text>
-            </View>
-          </View>
-        </View>
-        
-        <Ionicons
-          name={expandedCardId === item.id_absen ? 'chevron-up' : 'chevron-down'}
-          size={20}
-          color="#7f8c8d"
-        />
-      </TouchableOpacity>
-      
-      {expandedCardId === item.id_absen && (
-        <View style={styles.cardContent}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Waktu Absen:</Text>
-            <Text style={styles.detailValue}>
-              {item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : 'Tidak tercatat'}
-            </Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Status:</Text>
-            <Text style={[styles.detailValue, { color: getStatusColor(item.absen) }]}>
-              {getStatusText(item.absen)}
-            </Text>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Verifikasi:</Text>
-            <Text style={[styles.detailValue, { color: getVerificationColor(item) }]}>
-              {getVerificationText(item)}
-            </Text>
-          </View>
-
-          {item.latest_verification?.verification_notes && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Catatan:</Text>
-              <Text style={styles.detailValue}>{item.latest_verification.verification_notes}</Text>
-            </View>
-          )}
-          
-          {!item.is_verified && item.verification_status === 'pending' && (
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.verifyButton]}
-                onPress={() => handleVerify(item.id_absen)}
-              >
-                <Text style={styles.actionButtonText}>Verifikasi</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.actionButton, styles.rejectButton]}
-                onPress={() => handleReject(item.id_absen)}
-              >
-                <Text style={styles.actionButtonText}>Tolak</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      )}
-    </View>
+  const getPersonName = (record, member) => (
+    member?.full_name ||
+    member?.name ||
+    record?.absen_user?.anak?.name ||
+    record?.student_name ||
+    record?.full_name ||
+    record?.tutor_name ||
+    'Tidak diketahui'
   );
+
+  const getPersonType = (record, member, type) => {
+    if (type === 'tutor' || record?.absen_user?.tutor || record?.tutor_name) return 'Tutor';
+    if (member) return 'Siswa';
+    if (record?.absen_user?.anak || record?.student_name || record?.full_name) return 'Siswa';
+    return 'Peserta';
+  };
+
+
+  const renderAttendanceCard = ({ item }) => {
+    const { record, member, key, type } = item;
+    const hasRecord = Boolean(record);
+    const cardId = record?.id_absen ?? key;
+    const attendanceStatus = record?.absen ?? member?.attendance_status ?? null;
+    const statusColor = attendanceStatus ? getStatusColor(attendanceStatus) : '#95a5a6';
+    const statusText = attendanceStatus ? getStatusText(attendanceStatus) : 'Belum Tercatat';
+    const verificationColor = getVerificationColor(record);
+    const verificationText = getVerificationText(record);
+
+    return (
+      <View style={styles.attendanceCard}>
+        <TouchableOpacity
+          style={styles.cardHeader}
+          onPress={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)}
+        >
+          <View style={styles.personInfo}>
+            <View style={styles.personDetails}>
+              <Text style={styles.personName}>{getPersonName(record, member)}</Text>
+              <Text style={styles.personType}>{getPersonType(record, member, type)}</Text>
+            </View>
+
+            <View style={styles.statusContainer}>
+              <View style={[styles.attendanceStatus, { backgroundColor: statusColor }]}>
+                <Text style={styles.attendanceStatusText}>{statusText}</Text>
+              </View>
+
+              <View style={[styles.verificationStatus, { backgroundColor: verificationColor }]}>
+                <Text style={styles.verificationStatusText}>{verificationText}</Text>
+              </View>
+            </View>
+          </View>
+
+          <Ionicons
+            name={expandedCardId === cardId ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color="#7f8c8d"
+          />
+        </TouchableOpacity>
+
+        {expandedCardId === cardId && (
+          <View style={styles.cardContent}>
+            {hasRecord ? (
+              <>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Waktu Absen:</Text>
+                  <Text style={styles.detailValue}>
+                    {record.created_at
+                      ? new Date(record.created_at).toLocaleString('id-ID')
+                      : 'Tidak tercatat'}
+                  </Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <Text style={[styles.detailValue, { color: statusColor }]}>
+                    {statusText}
+                  </Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Verifikasi:</Text>
+                  <Text style={[styles.detailValue, { color: verificationColor }]}>
+                    {verificationText}
+                  </Text>
+                </View>
+
+                {record.latest_verification?.verification_notes && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Catatan:</Text>
+                    <Text style={styles.detailValue}>
+                      {record.latest_verification.verification_notes}
+                    </Text>
+                  </View>
+                )}
+
+                {!record.is_verified && record.verification_status === 'pending' && (
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.verifyButton]}
+                      onPress={() => handleVerify(record.id_absen)}
+                    >
+                      <Text style={styles.actionButtonText}>Verifikasi</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.rejectButton]}
+                      onPress={() => handleReject(record.id_absen)}
+                    >
+                      <Text style={styles.actionButtonText}>Tolak</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.noRecordNote}>
+                <Ionicons name="information-circle-outline" size={16} color="#7f8c8d" />
+                <Text style={styles.noRecordText}>
+                  Kehadiran belum tercatat untuk peserta ini.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  };
   
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="calendar-outline" size={64} color="#bdc3c7" />
-      <Text style={styles.emptyText}>Tidak ada catatan kehadiran ditemukan</Text>
+      <Ionicons
+        name={searchQuery ? 'search-outline' : 'people-outline'}
+        size={64}
+        color="#bdc3c7"
+      />
+      <Text style={styles.emptyText}>
+        {searchQuery
+          ? 'Tidak ada peserta yang cocok dengan pencarian'
+          : 'Belum ada anggota atau catatan kehadiran untuk aktivitas ini'}
+      </Text>
       <Text style={styles.emptySubText}>
-        {searchQuery 
-          ? 'Coba ubah pencarian atau filter Anda' 
+        {searchQuery
+          ? 'Coba ubah pencarian atau filter Anda'
           : 'Ketuk tombol + untuk mencatat kehadiran'}
       </Text>
     </View>
@@ -315,7 +737,7 @@ const AttendanceListTab = ({
   if (error && !refreshing) {
     return (
       <View style={styles.container}>
-        <ErrorMessage message={error} onRetry={fetchAttendanceRecords} />
+        <ErrorMessage message={error} onRetry={() => refreshData({ force: true })} />
       </View>
     );
   }
@@ -326,7 +748,37 @@ const AttendanceListTab = ({
         <Text style={styles.activityName}>{activityName || 'Aktivitas'}</Text>
         <Text style={styles.activityDate}>{activityDate || 'Tanggal tidak ditentukan'}</Text>
       </View>
-      
+
+      {summaryItems.length > 0 && (
+        <View style={styles.summaryContainer}>
+          {summaryItems.map(item => (
+            <View key={item.label} style={styles.summaryCard}>
+              <Text style={[styles.summaryValue, { color: item.color }]}>{item.value}</Text>
+              <Text style={styles.summaryLabel}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.completeSection}>
+        <TouchableOpacity
+          style={[
+            styles.completeButton,
+            completionDisabled && styles.completeButtonDisabled
+          ]}
+          onPress={handleCompleteSession}
+          disabled={completionDisabled}
+        >
+          {statusUpdating && (
+            <ActivityIndicator size="small" color="#fff" style={styles.completeButtonSpinner} />
+          )}
+          <Text style={styles.completeButtonText}>Selesaikan Sesi</Text>
+        </TouchableOpacity>
+        <Text style={styles.statusHelperText}>
+          Status saat ini: {effectiveActivityStatus ? effectiveActivityStatus.replace(/_/g, ' ') : 'Belum ditentukan'}
+        </Text>
+      </View>
+
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Ionicons name="search" size={20} color="#7f8c8d" />
@@ -374,7 +826,7 @@ const AttendanceListTab = ({
       <FlatList
         data={filteredRecords}
         renderItem={renderAttendanceCard}
-        keyExtractor={item => item.id_absen.toString()}
+        keyExtractor={item => item.key.toString()}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={renderEmptyList}
         refreshControl={
@@ -391,8 +843,8 @@ const AttendanceListTab = ({
           <Ionicons name="create" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
-      
-      {loading && !refreshing && (
+
+      {showLoadingOverlay && (
         <View style={styles.loadingOverlay}>
           <LoadingSpinner />
         </View>
@@ -406,6 +858,50 @@ const styles = StyleSheet.create({
   activityHeader: { backgroundColor: '#3498db', padding: 16, alignItems: 'center' },
   activityName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
   activityDate: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)', marginTop: 4 },
+  summaryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e1e1'
+  },
+  summaryCard: {
+    width: '48%',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1
+  },
+  summaryValue: { fontSize: 18, fontWeight: '600' },
+  summaryLabel: { fontSize: 12, color: '#7f8c8d', marginTop: 4 },
+  completeSection: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e1e1'
+  },
+  completeButton: {
+    backgroundColor: '#16a085',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center'
+  },
+  completeButtonDisabled: { backgroundColor: '#95a5a6' },
+  completeButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  completeButtonSpinner: { marginRight: 8 },
+  statusHelperText: { marginTop: 8, fontSize: 12, color: '#7f8c8d', textAlign: 'center' },
   searchContainer: {
     padding: 12, backgroundColor: '#fff',
     borderBottomWidth: 1, borderBottomColor: '#e1e1e1'
