@@ -13,6 +13,8 @@ use App\Models\MataPelajaran;
 use App\Models\TutorKelompok;
 use App\Http\Resources\AktivitasResource;
 use App\Http\Requests\AktivitasRequest;
+use App\Http\Requests\AdminShelter\UpdateAktivitasStatusRequest;
+use App\Services\AttendanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -23,6 +25,13 @@ use Carbon\Carbon;
 
 class AktivitasController extends Controller
 {
+    protected AttendanceService $attendanceService;
+
+    public function __construct(AttendanceService $attendanceService)
+    {
+        $this->attendanceService = $attendanceService;
+    }
+
     /**
      * Display a listing of activities for the shelter.
      *
@@ -571,12 +580,94 @@ class AktivitasController extends Controller
                 'message' => 'Activity updated successfully',
                 'data' => $aktivitas
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('Error in AktivitasController@update: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat memperbarui aktivitas',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateStatus(UpdateAktivitasStatusRequest $request, $id)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user->adminShelter || !$user->adminShelter->shelter) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $shelterId = $user->adminShelter->shelter->id_shelter;
+
+            $relations = ['tutor', 'shelter', 'absen.absenUser.anak', 'absen.absenUser.tutor'];
+
+            if (method_exists(Aktivitas::class, 'materiData')) {
+                $relations[] = 'materiData';
+            }
+
+            $aktivitas = Aktivitas::with($relations)->findOrFail($id);
+
+            if ($aktivitas->id_shelter != $shelterId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access to this activity'
+                ], 403);
+            }
+
+            if ($aktivitas->status === 'completed') {
+                $resourceData = (new AktivitasResource($aktivitas))->toArray($request);
+                $resourceData['attendance_summary'] = [
+                    'success' => true,
+                    'message' => 'Activity already marked as completed. No changes applied.',
+                    'activity_id' => $aktivitas->id_aktivitas,
+                    'already_completed' => true,
+                ];
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Activity already completed',
+                    'data' => $resourceData
+                ]);
+            }
+
+            $aktivitas->status = $request->status;
+            $aktivitas->save();
+
+            $aktivitas->refresh();
+            $aktivitas->load($relations);
+
+            $summary = null;
+
+            if ($request->status === 'completed') {
+                $summary = $this->attendanceService->finalizeActivityCompletion(
+                    $aktivitas,
+                    $request->input('notes')
+                );
+            }
+
+            $resourceData = (new AktivitasResource($aktivitas))->toArray($request);
+
+            if (!is_null($summary)) {
+                $resourceData['attendance_summary'] = $summary;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Activity status updated successfully',
+                'data' => $resourceData
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error in AktivitasController@updateStatus: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat memperbarui status aktivitas',
                 'error' => $e->getMessage()
             ], 500);
         }

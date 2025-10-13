@@ -305,6 +305,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/aktivitas', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'store']);
         Route::get('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'show']);
         Route::put('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'update']);
+        Route::put('/aktivitas/{id}/status', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'updateStatus']);
         Route::delete('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'destroy']);
 
         // Phase 3: Enhanced Aktivitas with Kurikulum Integration
@@ -395,11 +396,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/generate-tutor-token', [App\Http\Controllers\API\AttendanceController::class, 'generateTutorToken']);
             Route::post('/validate-tutor-token', [App\Http\Controllers\API\AttendanceController::class, 'validateTutorToken']);
             Route::get('/tutor/{id_tutor}/history', [App\Http\Controllers\API\AttendanceController::class, 'getTutorAttendanceHistory']);
-        });
-
-        // Test endpoint for auto-mark absent functionality
-        Route::prefix('test')->group(function () {
-            Route::post('/auto-mark-absent', [App\Http\Controllers\API\AttendanceController::class, 'testAutoMarkAbsent']);
         });
 
         // Tutor Honor Management
