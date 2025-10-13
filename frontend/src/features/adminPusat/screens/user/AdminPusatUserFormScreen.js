@@ -1,4 +1,4 @@
-// FEATURES PATH: features/adminPusat/screens/user/UserFormScreen.js
+// FEATURES PATH: features/adminPusat/screens/user/AdminPusatUserFormScreen.js
 // DESC: Screen form untuk create / update user baru (dengan dropdown berjenjang kacab → wilbin → shelter)
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -71,7 +71,7 @@ const FormRow = ({ label, children }) => (
   </View>
 );
 
-const UserFormScreen = () => {
+const AdminPusatUserFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const mode = route.params?.mode || 'create';
@@ -893,4 +893,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default UserFormScreen;
+export default AdminPusatUserFormScreen;

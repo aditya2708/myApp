@@ -21,7 +21,7 @@ import ShelterFormScreen from '../features/adminPusat/screens/shelter/ShelterFor
 
 // User Management Screens
 import UserManagementScreen from '../features/adminPusat/screens/user/UserManagementScreen';
-import UserFormScreen from '../features/adminPusat/screens/user/UserFormScreen';
+import AdminPusatUserFormScreen from '../features/adminPusat/screens/user/AdminPusatUserFormScreen';
 import UserDetailScreen from '../features/adminPusat/screens/user/UserDetailScreen'; // NEW
 
 // Template Screens
@@ -121,7 +121,7 @@ const HomeStackNavigator = () => {
       />
       <Stack.Screen
         name="UserForm"
-        component={UserFormScreen}
+        component={AdminPusatUserFormScreen}
         options={{ headerTitle: 'Form User' }}
       />
       <Stack.Screen
