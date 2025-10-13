@@ -127,6 +127,73 @@ class AktivitasStatusUpdateTest extends TestCase
         $this->assertSame($students->count(), Absen::count());
     }
 
+    public function test_activity_members_endpoint_resolves_kelompok_by_name(): void
+    {
+        $user = User::create([
+            'username' => 'admin-shelter',
+            'email' => 'admin-shelter@example.com',
+            'password' => bcrypt('secret'),
+            'level' => 'admin_shelter',
+        ]);
+
+        $shelter = Shelter::create([
+            'nama_shelter' => 'Shelter A',
+        ]);
+
+        AdminShelter::create([
+            'user_id' => $user->id_users,
+            'id_shelter' => $shelter->id_shelter,
+            'nama_lengkap' => 'Admin Shelter',
+        ]);
+
+        $kelompok = Kelompok::create([
+            'id_shelter' => $shelter->id_shelter,
+            'nama_kelompok' => 'Kelompok Hebat',
+            'jumlah_anggota' => 3,
+        ]);
+
+        $students = collect([
+            'Siswa Satu',
+            'Siswa Dua',
+            'Siswa Tiga',
+        ])->map(function (string $name) use ($kelompok, $shelter) {
+            return Anak::create([
+                'full_name' => $name,
+                'id_kelompok' => $kelompok->id_kelompok,
+                'id_shelter' => $shelter->id_shelter,
+            ]);
+        });
+
+        $aktivitas = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_kelompok' => null,
+            'nama_kelompok' => $kelompok->nama_kelompok,
+            'jenis_kegiatan' => 'Belajar',
+            'tanggal' => Carbon::parse('2024-01-02'),
+            'start_time' => '16:00:00',
+            'end_time' => '18:00:00',
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->withHeaders(['Accept' => 'application/json'])
+            ->getJson("/api/admin-shelter/attendance/activity/{$aktivitas->id_aktivitas}/members");
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.total_members', $students->count())
+            ->assertJsonCount($students->count(), 'data');
+
+        $students->each(function (Anak $student) use ($response) {
+            $response->assertJsonFragment([
+                'id_anak' => $student->id_anak,
+                'full_name' => $student->full_name,
+                'attendance_status' => null,
+            ]);
+        });
+    }
+
     private function createSchema(): void
     {
         Schema::create('users', function (Blueprint $table) {
