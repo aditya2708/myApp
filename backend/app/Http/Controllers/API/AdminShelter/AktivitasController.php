@@ -647,7 +647,8 @@ class AktivitasController extends Controller
             if ($request->status === 'completed') {
                 $summary = $this->attendanceService->finalizeActivityCompletion(
                     $aktivitas,
-                    $request->input('notes')
+                    $request->input('notes'),
+                    true
                 );
             }
 
