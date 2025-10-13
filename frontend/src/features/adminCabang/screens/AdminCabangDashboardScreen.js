@@ -8,8 +8,7 @@ import {
   RefreshControl,
   Image,
   Dimensions,
-  Platform,
-  Alert
+  Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,7 +74,7 @@ const AdminCabangDashboardScreen = () => {
   const navigateToProfile = () => navigation.navigate('Profile');
   const navigateToReports = () => navigation.navigate('Reports', { screen: 'AdminCabangReportHome' });
   const navigateToUserManagement = () =>
-    Alert.alert('Segera Hadir', 'Fitur Manajemen Pengguna sedang dalam pengembangan.');
+    navigation.navigate('AdminCabangUserManagement');
 
   if (loading && !refreshing) return <LoadingSpinner fullScreen message="Memuat dashboard..." />;
 
