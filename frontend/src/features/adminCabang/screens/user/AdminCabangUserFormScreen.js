@@ -1,4 +1,4 @@
-// FEATURES PATH: features/adminCabang/screens/user/UserFormScreen.js
+// FEATURES PATH: features/adminCabang/screens/user/AdminCabangUserFormScreen.js
 // DESC: Form create/update user admin cabang dengan dropdown wilbin & shelter sesuai cabang sendiri
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -78,7 +78,7 @@ const pickProfileCabangId = (profile) => {
   );
 };
 
-const UserFormScreen = () => {
+const AdminCabangUserFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { profile } = useAuth();
@@ -763,4 +763,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default UserFormScreen;
+export default AdminCabangUserFormScreen;
