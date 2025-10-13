@@ -7,6 +7,7 @@ use App\Models\AbsenUser;
 use App\Models\Anak;
 use App\Models\Aktivitas;
 use App\Models\Tutor;
+use App\Models\Kelompok;
 use App\Models\AttendanceVerification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -213,7 +214,7 @@ class AttendanceService
     public function recordAttendanceManually($id_anak, $id_aktivitas, $status = null, $notes = '', $arrivalTime = null, $gpsData = null)
     {
         DB::beginTransaction();
-        
+
         try {
             $existingRecord = $this->checkExistingAttendance($id_anak, $id_aktivitas);
             
@@ -287,6 +288,95 @@ class AttendanceService
                 'message' => $e->getMessage()
             ];
         }
+    }
+
+    public function generateAbsencesForCompletedActivity(Aktivitas $activity)
+    {
+        $summary = [
+            'success' => false,
+            'activity_id' => $activity->id_aktivitas,
+            'total_members' => 0,
+            'already_marked' => 0,
+            'created_count' => 0,
+            'created_ids' => [],
+            'message' => null,
+        ];
+
+        if (!$activity->isCompleted()) {
+            $summary['message'] = 'Activity has not ended yet.';
+            return $summary;
+        }
+
+        $kelompok = null;
+
+        if (!empty($activity->id_kelompok)) {
+            $kelompok = Kelompok::with('anak')->find($activity->id_kelompok);
+        }
+
+        if (!$kelompok && !empty($activity->nama_kelompok)) {
+            $kelompok = Kelompok::with('anak')
+                ->where('nama_kelompok', $activity->nama_kelompok)
+                ->when($activity->id_shelter, function ($query) use ($activity) {
+                    $query->where('id_shelter', $activity->id_shelter);
+                })
+                ->first();
+        }
+
+        if (!$kelompok) {
+            $summary['message'] = 'Kelompok not found for activity.';
+            return $summary;
+        }
+
+        $members = $kelompok->anak ?? collect();
+        $summary['total_members'] = $members->count();
+
+        if ($summary['total_members'] === 0) {
+            $summary['success'] = true;
+            $summary['message'] = 'No members enrolled in kelompok.';
+            return $summary;
+        }
+
+        return DB::transaction(function () use ($members, $activity, $summary) {
+            $alreadyMarked = 0;
+            $createdCount = 0;
+            $createdIds = [];
+
+            foreach ($members as $member) {
+                if (!$member) {
+                    continue;
+                }
+
+                $existingAttendance = $this->checkExistingAttendance($member->id_anak, $activity->id_aktivitas);
+
+                if ($existingAttendance) {
+                    $alreadyMarked++;
+                    continue;
+                }
+
+                $absenUser = AbsenUser::firstOrCreate(['id_anak' => $member->id_anak]);
+
+                $absen = Absen::create([
+                    'id_absen_user' => $absenUser->id_absen_user,
+                    'id_aktivitas' => $activity->id_aktivitas,
+                    'absen' => Absen::TEXT_TIDAK,
+                    'is_read' => false,
+                    'is_verified' => true,
+                    'verification_status' => Absen::VERIFICATION_VERIFIED,
+                    'time_arrived' => null,
+                ]);
+
+                $createdIds[] = $absen->id_absen;
+                $createdCount++;
+            }
+
+            $summary['success'] = true;
+            $summary['already_marked'] = $alreadyMarked;
+            $summary['created_count'] = $createdCount;
+            $summary['created_ids'] = $createdIds;
+            $summary['message'] = 'Absence generation completed.';
+
+            return $summary;
+        });
     }
     
     public function getAttendanceByActivity($id_aktivitas, $filters = [])
