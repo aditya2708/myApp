@@ -145,10 +145,23 @@ const AdminCabangUserManagementScreen = () => {
     let nextPage = derivedNextPage;
 
     if (!Number.isInteger(nextPage) && links?.next) {
-      const match = links.next.match(/[?&]page=(\d+)/);
-      const parsedPage = match ? Number(match[1]) : null;
-      if (Number.isInteger(parsedPage) && parsedPage > 0) {
-        nextPage = parsedPage;
+      const nextLink = links.next;
+      let nextLinkUrl = null;
+
+      if (typeof nextLink === 'string') {
+        nextLinkUrl = nextLink;
+      } else if (typeof nextLink === 'object' && nextLink !== null) {
+        if (typeof nextLink.url === 'string') {
+          nextLinkUrl = nextLink.url;
+        }
+      }
+
+      if (typeof nextLinkUrl === 'string') {
+        const match = nextLinkUrl.match(/[?&]page=(\d+)/);
+        const parsedPage = match ? Number(match[1]) : null;
+        if (Number.isInteger(parsedPage) && parsedPage > 0) {
+          nextPage = parsedPage;
+        }
       }
     }
 
