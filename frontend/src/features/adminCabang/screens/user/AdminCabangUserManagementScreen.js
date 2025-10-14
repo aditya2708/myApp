@@ -1,4 +1,4 @@
-// FEATURES PATH: features/adminCabang/screens/user/UserManagementScreen.js
+// FEATURES PATH: features/adminCabang/screens/user/AdminCabangUserManagementScreen.js
 // DESC: Screen daftar user untuk Admin Cabang (kelola admin cabang & admin shelter)
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -24,7 +24,7 @@ const LEVELS = [
 
 const DEFAULT_PER_PAGE = 10;
 
-const UserManagementScreen = () => {
+const AdminCabangUserManagementScreen = () => {
   const navigation = useNavigation();
   const [level, setLevel] = useState('admin_cabang');
   const [loading, setLoading] = useState(false);
@@ -347,4 +347,4 @@ const styles = StyleSheet.create({
   emptyText: { textAlign: 'center', color: '#999', marginTop: 24 },
 });
 
-export default UserManagementScreen;
+export default AdminCabangUserManagementScreen;
