@@ -1,7 +1,8 @@
 export const AUTH_ENDPOINTS = {
   LOGIN: '/auth/login',
   LOGOUT: '/auth/logout',
-  USER: '/auth/user'
+  USER: '/auth/user',
+  CHANGE_PASSWORD: '/auth/change-password'
 };
 
 export const ADMIN_PUSAT_ENDPOINTS = {
