@@ -34,9 +34,21 @@ export const authApi = {
   getCurrentUser: async () => {
     return await api.get(AUTH_ENDPOINTS.USER);
   },
-  
+
   /**
-   * Check if auth token is valid 
+   * Change user password
+   * @param {Object} payload - Password data
+   * @param {string} payload.current_password - Current user password
+   * @param {string} payload.new_password - New user password
+   * @param {string} payload.new_password_confirmation - New password confirmation
+   * @returns {Promise} - API response
+   */
+  changePassword: async (payload) => {
+    return await api.post(AUTH_ENDPOINTS.CHANGE_PASSWORD, payload);
+  },
+
+  /**
+   * Check if auth token is valid
    * This is a lightweight call to verify token validity
    * @returns {Promise} - API response
    */
