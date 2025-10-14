@@ -83,7 +83,7 @@ class AuthController extends Controller
     public function user(Request $request)
     {
         $user = $request->user();
-        
+
         // Load role-specific profile
         $userData = null;
         switch ($user->level) {
@@ -108,6 +108,39 @@ class AuthController extends Controller
                 'level' => $user->level,
                 'profile' => $userData
             ]
+        ]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+
+        if (!Hash::check($request->input('current_password'), $user->password)) {
+            return response()->json([
+                'message' => 'Validasi gagal',
+                'errors' => [
+                    'current_password' => ['Password saat ini tidak sesuai.'],
+                ],
+            ], 422);
+        }
+
+        $user->password = Hash::make($request->input('new_password'));
+        $user->save();
+
+        return response()->json([
+            'message' => 'Password berhasil diperbarui',
         ]);
     }
 

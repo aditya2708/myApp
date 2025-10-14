@@ -12,6 +12,7 @@ Route::post('/auth/login', [App\Http\Controllers\API\AuthController::class, 'log
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [App\Http\Controllers\API\AuthController::class, 'logout']);
     Route::get('/auth/user', [App\Http\Controllers\API\AuthController::class, 'user']);
+    Route::post('/auth/change-password', [App\Http\Controllers\API\AuthController::class, 'changePassword']);
 
     Route::middleware('role:admin_pusat')->group(function () {
         Route::apiResource('kacab', App\Http\Controllers\API\KacabController::class);
