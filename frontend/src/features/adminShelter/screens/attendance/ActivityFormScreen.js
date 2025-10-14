@@ -47,7 +47,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
   
   const [uiState, setUIState] = useState({
     showDatePicker: false, showStartTimePicker: false, showEndTimePicker: false,
-    showLateThresholdPicker: false, useCustomLateThreshold: false, useCustomMateri: false
+    showLateThresholdPicker: false, useCustomLateThreshold: false
   });
   
   const MIN_ACTIVITY_DURATION = 45;
@@ -140,8 +140,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
     
     setUIState(prev => ({
       ...prev,
-      useCustomLateThreshold: activity.late_threshold !== null,
-      useCustomMateri: !activity.id_materi
+      useCustomLateThreshold: activity.late_threshold !== null
     }));
     
     if (activity.jenis_kegiatan === 'Bimbel') fetchKelompokData();
@@ -215,9 +214,6 @@ const ActivityFormScreen = ({ navigation, route }) => {
         id_materi: value === 'Bimbel' ? prev.id_materi : null
       }));
       
-      if (value !== 'Bimbel') {
-        setUIState(prev => ({ ...prev, useCustomMateri: false }));
-      }
       // Clear conflict warning when activity type changes
       setConflictWarning(null);
     } else if (name === 'id_tutor' || name === 'tanggal') {
@@ -267,14 +263,6 @@ const ActivityFormScreen = ({ navigation, route }) => {
     }));
     
     dispatch(setSelectedMateri(materi));
-  };
-  
-  const toggleCustomMateri = (value) => {
-    setUIState(prev => ({ ...prev, useCustomMateri: value }));
-    setFormData(prev => ({ ...prev, id_materi: null, materi: '' }));
-    
-    // Clear selected materi when toggling custom mode
-    dispatch(clearSelectedMateri());
   };
   
   const calculateDurationMinutes = (start, end) => {
@@ -387,12 +375,11 @@ const ActivityFormScreen = ({ navigation, route }) => {
       return false;
     }
     
-    if (formData.jenis_kegiatan === 'Bimbel' && !uiState.useCustomMateri && !formData.id_materi) {
+    if (formData.jenis_kegiatan === 'Bimbel' && !formData.id_materi) {
       Alert.alert('Error Validasi', 'Silakan pilih materi dari daftar');
       return false;
     }
-    
-    if ((formData.jenis_kegiatan === 'Kegiatan' || uiState.useCustomMateri) && !formData.materi) {
+    if (formData.jenis_kegiatan === 'Kegiatan' && !formData.materi) {
       Alert.alert('Error Validasi', 'Materi tidak boleh kosong');
       return false;
     }
@@ -431,12 +418,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
       if (formData.jenis_kegiatan === 'Bimbel') {
         data.level = formData.level || '';
         data.nama_kelompok = formData.nama_kelompok || '';
-        
-        if (!uiState.useCustomMateri && formData.id_materi) {
-          data.id_materi = formData.id_materi;
-        } else {
-          data.materi = formData.materi || '';
-        }
+        if (formData.id_materi) data.id_materi = formData.id_materi;
       } else {
         data.level = '';
         data.nama_kelompok = '';
@@ -464,12 +446,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
       if (formData.jenis_kegiatan === 'Bimbel') {
         data.append('level', formData.level || '');
         data.append('nama_kelompok', formData.nama_kelompok || '');
-        
-        if (!uiState.useCustomMateri && formData.id_materi) {
-          data.append('id_materi', formData.id_materi);
-        } else {
-          data.append('materi', formData.materi || '');
-        }
+        if (formData.id_materi) data.append('id_materi', formData.id_materi);
       } else {
         data.append('level', '');
         data.append('nama_kelompok', '');
@@ -651,40 +628,16 @@ const ActivityFormScreen = ({ navigation, route }) => {
           </View>
           
           <View style={styles.inputGroup}>
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>Input materi manual</Text>
-              <Switch
-                value={uiState.useCustomMateri}
-                onValueChange={toggleCustomMateri}
-                trackColor={{ false: '#bdc3c7', true: '#2ecc71' }}
-                thumbColor={uiState.useCustomMateri ? '#27ae60' : '#ecf0f1'}
-              />
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
             <Text style={styles.label}>Materi<Text style={styles.required}>*</Text></Text>
-            {uiState.useCustomMateri ? (
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={formData.materi}
-                onChangeText={(value) => handleChange('materi', value)}
-                placeholder="Deskripsi Materi"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            ) : (
-              <SmartMateriSelector
-                allMateri={materiCache}
-                selectedKelompok={formData.selectedKelompokObject}
-                selectedMateri={selectedMateriFromStore}
-                onMateriSelect={handleMateriSelect}
-                loading={materiCacheLoading}
-                placeholder="Pilih materi dari daftar"
-                showPreview={true}
-              />
-            )}
+            <SmartMateriSelector
+              allMateri={materiCache}
+              selectedKelompok={formData.selectedKelompokObject}
+              selectedMateri={selectedMateriFromStore}
+              onMateriSelect={handleMateriSelect}
+              loading={materiCacheLoading}
+              placeholder="Pilih materi dari daftar"
+              showPreview={true}
+            />
           </View>
         </>
       )}
