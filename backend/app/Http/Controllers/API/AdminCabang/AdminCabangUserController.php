@@ -51,41 +51,59 @@ class AdminCabangUserController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'username' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'level' => 'required|string|in:admin_cabang,admin_shelter',
-            'nama_lengkap' => 'required|string|max:255',
-            'alamat' => 'nullable|string|max:500',
-            'no_hp' => 'nullable|string|max:20',
-            'id_kacab' => 'required|integer|exists:kacab,id_kacab',
-            'id_wilbin' => 'required_if:level,admin_shelter|integer|exists:wilbin,id_wilbin',
-            'id_shelter' => 'required_if:level,admin_shelter|integer|exists:shelter,id_shelter',
-        ]);
+        try {
+            $validated = $request->validate([
+                'username' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email',
+                'password' => 'required|string|min:6',
+                'level' => 'required|string|in:admin_cabang,admin_shelter',
+                'nama_lengkap' => 'required|string|max:255',
+                'alamat' => 'nullable|string|max:500',
+                'no_hp' => 'nullable|string|max:20',
+                'id_kacab' => 'required|integer|exists:kacab,id_kacab',
+                'id_wilbin' => 'required_if:level,admin_shelter|integer|exists:wilbin,id_wilbin',
+                'id_shelter' => 'required_if:level,admin_shelter|integer|exists:shelter,id_shelter',
+            ]);
 
-        $userData = Arr::only($validated, ['username', 'email', 'password', 'level']);
-        $userData['password'] = bcrypt($userData['password']);
+            $userData = Arr::only($validated, ['username', 'email', 'password', 'level']);
+            $userData['password'] = bcrypt($userData['password']);
 
-        $profileData = Arr::only($validated, [
-            'nama_lengkap',
-            'alamat',
-            'no_hp',
-            'id_kacab',
-            'id_wilbin',
-            'id_shelter',
-        ]);
+            $profileData = Arr::only($validated, [
+                'nama_lengkap',
+                'alamat',
+                'no_hp',
+                'id_kacab',
+                'id_wilbin',
+                'id_shelter',
+            ]);
 
-        $user = User::create($userData);
+            $user = User::create($userData);
 
-        $this->syncAdminProfile($user, $user->level, $profileData);
+            $this->syncAdminProfile($user, $user->level, $profileData);
 
-        $relations = $this->relationsForLevel($user->level);
-        if (!empty($relations)) {
-            $user->load($relations);
+            $relations = $this->relationsForLevel($user->level);
+            if (!empty($relations)) {
+                $user->load($relations);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User berhasil dibuat',
+                'data' => (new UserResource($user))->resolve(),
+            ], 201);
+        } catch (ValidationException $exception) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $exception->errors(),
+            ], 422);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal membuat user',
+                'error' => $th->getMessage(),
+            ], 500);
         }
-
-        return new UserResource($user);
     }
 
     /**
@@ -109,58 +127,76 @@ class AdminCabangUserController extends Controller
     {
         $user = User::findOrFail($id);
 
-        $levelInput = $request->input('level', $user->level);
+        try {
+            $levelInput = $request->input('level', $user->level);
 
-        $validated = $request->validate([
-            'username' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|unique:users,email,' . $user->id_users . ',id_users',
-            'password' => 'nullable|string|min:6',
-            'level' => 'sometimes|required|string|in:admin_cabang,admin_shelter',
-            'nama_lengkap' => 'sometimes|required|string|max:255',
-            'alamat' => 'sometimes|nullable|string|max:500',
-            'no_hp' => 'sometimes|nullable|string|max:20',
-            'id_kacab' => 'sometimes|integer|exists:kacab,id_kacab',
-            'id_wilbin' => 'sometimes|integer|exists:wilbin,id_wilbin',
-            'id_shelter' => 'sometimes|integer|exists:shelter,id_shelter',
-        ]);
+            $validated = $request->validate([
+                'username' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|email|unique:users,email,' . $user->id_users . ',id_users',
+                'password' => 'nullable|string|min:6',
+                'level' => 'sometimes|required|string|in:admin_cabang,admin_shelter',
+                'nama_lengkap' => 'sometimes|required|string|max:255',
+                'alamat' => 'sometimes|nullable|string|max:500',
+                'no_hp' => 'sometimes|nullable|string|max:20',
+                'id_kacab' => 'sometimes|integer|exists:kacab,id_kacab',
+                'id_wilbin' => 'sometimes|integer|exists:wilbin,id_wilbin',
+                'id_shelter' => 'sometimes|integer|exists:shelter,id_shelter',
+            ]);
 
-        if (array_key_exists('password', $validated)) {
-            if (!empty($validated['password'])) {
-                $validated['password'] = bcrypt($validated['password']);
-            } else {
-                unset($validated['password']);
+            if (array_key_exists('password', $validated)) {
+                if (!empty($validated['password'])) {
+                    $validated['password'] = bcrypt($validated['password']);
+                } else {
+                    unset($validated['password']);
+                }
             }
+
+            $profileData = Arr::only($validated, [
+                'nama_lengkap',
+                'alamat',
+                'no_hp',
+                'id_kacab',
+                'id_wilbin',
+                'id_shelter',
+            ]);
+
+            $targetLevel = $validated['level'] ?? $levelInput;
+
+            $user->loadMissing(['adminCabang', 'adminShelter']);
+            $this->ensureRequiredProfileData($user, $targetLevel, $profileData);
+
+            $this->syncAdminProfile($user, $targetLevel, $profileData);
+
+            $userData = Arr::only($validated, ['username', 'email', 'password', 'level']);
+            if (!empty($userData)) {
+                $user->update($userData);
+            }
+
+            $user->refresh();
+
+            $relations = $this->relationsForLevel($user->level);
+            if (!empty($relations)) {
+                $user->load($relations);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User berhasil diupdate',
+                'data' => (new UserResource($user))->resolve(),
+            ]);
+        } catch (ValidationException $exception) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $exception->errors(),
+            ], 422);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal mengupdate user',
+                'error' => $th->getMessage(),
+            ], 500);
         }
-
-        $profileData = Arr::only($validated, [
-            'nama_lengkap',
-            'alamat',
-            'no_hp',
-            'id_kacab',
-            'id_wilbin',
-            'id_shelter',
-        ]);
-
-        $targetLevel = $validated['level'] ?? $levelInput;
-
-        $user->loadMissing(['adminCabang', 'adminShelter']);
-        $this->ensureRequiredProfileData($user, $targetLevel, $profileData);
-
-        $this->syncAdminProfile($user, $targetLevel, $profileData);
-
-        $userData = Arr::only($validated, ['username', 'email', 'password', 'level']);
-        if (!empty($userData)) {
-            $user->update($userData);
-        }
-
-        $user->refresh();
-
-        $relations = $this->relationsForLevel($user->level);
-        if (!empty($relations)) {
-            $user->load($relations);
-        }
-
-        return new UserResource($user);
     }
 
     /**
