@@ -1,4 +1,4 @@
-// FEATURES PATH: features/adminPusat/screens/user/UserManagementScreen.js
+// FEATURES PATH: features/adminPusat/screens/user/AdminPusatUserManagementScreen.js
 // DESC: Screen daftar user per level (admin_pusat/admin_cabang/admin_shelter)
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -13,7 +13,7 @@ const LEVELS = [
   { key: 'admin_shelter', label: 'Admin Shelter' },
 ];
 
-const UserManagementScreen = () => {
+const AdminPusatUserManagementScreen = () => {
   const navigation = useNavigation();
   const [level, setLevel] = useState('admin_cabang');
   const [loading, setLoading] = useState(false);
@@ -238,4 +238,4 @@ const styles = StyleSheet.create({
   emptyText: { textAlign: 'center', color: '#999', marginTop: 24 },
 });
 
-export default UserManagementScreen;
+export default AdminPusatUserManagementScreen;

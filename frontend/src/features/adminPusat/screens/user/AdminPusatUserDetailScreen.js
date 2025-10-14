@@ -1,4 +1,4 @@
-// FEATURES PATH: features/adminPusat/screens/user/UserDetailScreen.js
+// FEATURES PATH: features/adminPusat/screens/user/AdminPusatUserDetailScreen.js
 // DESC: Menampilkan detail user (user + profile) untuk Admin Pusat, tampilkan nama_cabang, nama_wilbin, nama_shelter (tanpa ID numerik).
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
@@ -57,7 +57,7 @@ const formatTanggal = (tgl) => {
   }
 };
 
-const UserDetailScreen = () => {
+const AdminPusatUserDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { idUsers, preset } = route.params || {};
@@ -218,4 +218,4 @@ const styles = StyleSheet.create({
   infoValue: { flex: 1, color: '#333', fontWeight: '500' },
 });
 
-export default UserDetailScreen;
+export default AdminPusatUserDetailScreen;
