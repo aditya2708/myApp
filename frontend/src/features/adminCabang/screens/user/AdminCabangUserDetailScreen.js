@@ -1,4 +1,4 @@
-// FEATURES PATH: features/adminCabang/screens/user/UserDetailScreen.js
+// FEATURES PATH: features/adminCabang/screens/user/AdminCabangUserDetailScreen.js
 // DESC: Detail user admin cabang (user + relasi cabang/wilbin/shelter)
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
@@ -57,7 +57,7 @@ const formatTanggal = (tgl) => {
   }
 };
 
-const UserDetailScreen = () => {
+const AdminCabangUserDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { idUsers, preset } = route.params || {};
@@ -259,4 +259,4 @@ const styles = StyleSheet.create({
   retryText: { color: '#fff', fontWeight: '600' },
 });
 
-export default UserDetailScreen;
+export default AdminCabangUserDetailScreen;

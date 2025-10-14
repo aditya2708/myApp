@@ -17,9 +17,9 @@ import AdminCabangDonaturDetailScreen from '../features/adminCabang/screens/Admi
 import DonaturFilterScreen from '../features/adminCabang/screens/DonaturFilterScreen';
 import GpsApprovalScreen from '../features/adminCabang/screens/GpsApprovalScreen';
 import GpsApprovalDetailScreen from '../features/adminCabang/screens/GpsApprovalDetailScreen';
-import AdminCabangUserManagementScreen from '../features/adminCabang/screens/user/UserManagementScreen';
+import AdminCabangUserManagementScreen from '../features/adminCabang/screens/user/AdminCabangUserManagementScreen';
 import AdminCabangUserFormScreen from '../features/adminCabang/screens/user/AdminCabangUserFormScreen';
-import AdminCabangUserDetailScreen from '../features/adminCabang/screens/user/UserDetailScreen';
+import AdminCabangUserDetailScreen from '../features/adminCabang/screens/user/AdminCabangUserDetailScreen';
 import AdminCabangReportHomeScreen from '../features/adminCabang/screens/reports/AdminCabangReportHomeScreen';
 import AdminCabangChildReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildReportScreen';
 import AdminCabangChildReportDetailScreen from '../features/adminCabang/screens/reports/child/AdminCabangChildReportDetailScreen';
