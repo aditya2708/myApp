@@ -121,22 +121,42 @@ const UserManagementScreen = () => {
     if (loading || loadingMore) return;
 
     const hasNextPage = (() => {
-      if (meta?.current_page != null && meta?.last_page != null) {
-        return meta.current_page < meta.last_page;
+      const currentPage = Number(meta?.current_page);
+      const lastPage = Number(meta?.last_page);
+      if (Number.isFinite(currentPage) && Number.isFinite(lastPage)) {
+        return currentPage < lastPage;
       }
       return Boolean(links?.next);
     })();
 
     if (!hasNextPage) return;
 
-    let nextPage = meta?.current_page ? meta.current_page + 1 : null;
+    const derivedNextPage = (() => {
+      const currentPage = Number(meta?.current_page);
+      if (Number.isFinite(currentPage)) {
+        const potentialNext = currentPage + 1;
+        if (Number.isInteger(potentialNext) && potentialNext > 0) {
+          return potentialNext;
+        }
+      }
+      return null;
+    })();
 
-    if (!nextPage && links?.next) {
+    let nextPage = derivedNextPage;
+
+    if (!Number.isInteger(nextPage) && links?.next) {
       const match = links.next.match(/[?&]page=(\d+)/);
-      nextPage = match ? Number(match[1]) : null;
+      const parsedPage = match ? Number(match[1]) : null;
+      if (Number.isInteger(parsedPage) && parsedPage > 0) {
+        nextPage = parsedPage;
+      }
     }
 
-    fetchUsers({ page: nextPage ?? undefined, append: true });
+    if (!Number.isInteger(nextPage) || !Number.isFinite(nextPage)) {
+      return;
+    }
+
+    fetchUsers({ page: nextPage, append: true });
   };
 
   const gotoCreate = () => {
