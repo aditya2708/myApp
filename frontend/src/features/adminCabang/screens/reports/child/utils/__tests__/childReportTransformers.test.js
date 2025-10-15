@@ -1,4 +1,4 @@
-import { normalizeStreaks } from '../childReportTransformers';
+import { BAND_STYLES, normalizeStreaks, resolveBandMeta } from '../childReportTransformers';
 
 describe('childReportTransformers.normalizeStreaks', () => {
   it('filters out nullish streak entries when normalizing objects', () => {
@@ -34,5 +34,37 @@ describe('childReportTransformers.normalizeStreaks', () => {
         unit: null,
       },
     ]);
+  });
+});
+
+describe('childReportTransformers.resolveBandMeta', () => {
+  it('honours explicit band values when provided', () => {
+    const result = resolveBandMeta('HIGH', 72);
+
+    expect(result).toEqual({ code: 'high', ...BAND_STYLES.high });
+  });
+
+  it('derives a high band when attendance is at least 80%', () => {
+    const result = resolveBandMeta(null, 80);
+
+    expect(result).toEqual({ code: 'high', ...BAND_STYLES.high });
+  });
+
+  it('derives a medium band when attendance is between 60% and 79.99%', () => {
+    const result = resolveBandMeta(undefined, 79.9);
+
+    expect(result).toEqual({ code: 'medium', ...BAND_STYLES.medium });
+  });
+
+  it('falls back to a low band when attendance is below 60%', () => {
+    const result = resolveBandMeta('', 42.5);
+
+    expect(result).toEqual({ code: 'low', ...BAND_STYLES.low });
+  });
+
+  it('returns unknown meta when the percentage cannot be parsed', () => {
+    const result = resolveBandMeta(null, 'invalid');
+
+    expect(result).toEqual({ code: 'unknown', ...BAND_STYLES.unknown });
   });
 });

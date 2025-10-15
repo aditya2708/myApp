@@ -67,4 +67,39 @@ describe('AdminCabangChildReportDetailScreen', () => {
     expect(navigationMock.setOptions).toHaveBeenCalledWith({ headerShown: false });
     expect(getByTestId('totals-persentase-value').props.children).toBe('0,08%');
   });
+
+  it('falls back to attendance percentage to resolve band meta when missing', () => {
+    mockUseChildAttendanceReportDetail.mockReturnValue({
+      child: {
+        name: 'Siti Aminah',
+        attendanceRate: { value: 82, label: '82%' },
+        totals: { hadir: 18, tidakHadir: 2, totalAktivitas: 20 },
+      },
+      summary: {
+        attendanceRate: { value: 82, label: '82%' },
+        totals: { hadir: 18, tidakHadir: 2, totalAktivitas: 20 },
+      },
+      period: { label: 'Februari 2024' },
+      filters: {},
+      monthlyBreakdown: [],
+      attendanceTimeline: [],
+      isLoading: false,
+      error: null,
+      errorMessage: null,
+      refresh: jest.fn(),
+      refetch: jest.fn(),
+    });
+
+    const { getByText } = render(
+      <AdminCabangChildReportDetailScreen navigation={navigationMock} route={{ params: {} }} />,
+    );
+
+    const bandLabelNode = getByText('Kehadiran Tinggi');
+    const labelStyles = Array.isArray(bandLabelNode.props.style)
+      ? bandLabelNode.props.style
+      : [bandLabelNode.props.style];
+    const colorStyle = labelStyles.find((style) => style && style.color);
+
+    expect(colorStyle?.color).toBe('#2ecc71');
+  });
 });

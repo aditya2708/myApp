@@ -50,4 +50,48 @@ describe('ChildAttendanceCard', () => {
 
     expect(onViewDetail).toHaveBeenCalledTimes(1);
   });
+
+  it('falls back to the attendance percentage to resolve band meta when missing', () => {
+    const child = {
+      name: 'Rina Sari',
+      attendanceRate: { value: 72, label: '72%' },
+      totals: { hadir: 15, tidakHadir: 3, totalAktivitas: 18 },
+    };
+
+    const { getByText } = render(<ChildAttendanceCard child={child} />);
+
+    const bandLabelNode = getByText('Kehadiran Sedang');
+    const labelStyles = Array.isArray(bandLabelNode.props.style)
+      ? bandLabelNode.props.style
+      : [bandLabelNode.props.style];
+    const colorStyle = labelStyles.find((style) => style && style.color);
+
+    expect(colorStyle?.color).toBe('#f39c12');
+
+    const badgeNode = bandLabelNode.parent;
+    const badgeStyles = Array.isArray(badgeNode.props.style)
+      ? badgeNode.props.style
+      : [badgeNode.props.style];
+    const backgroundStyle = badgeStyles.find((style) => style && style.backgroundColor);
+
+    expect(backgroundStyle?.backgroundColor).toBe('rgba(243, 156, 18, 0.15)');
+  });
+
+  it('classifies attendance of 80% and above as high when band metadata is missing', () => {
+    const child = {
+      name: 'Adi Wijaya',
+      attendanceRate: { value: 82, label: '82%' },
+      totals: { hadir: 18, tidakHadir: 2, totalAktivitas: 20 },
+    };
+
+    const { getByText } = render(<ChildAttendanceCard child={child} />);
+
+    const bandLabelNode = getByText('Kehadiran Tinggi');
+    const labelStyles = Array.isArray(bandLabelNode.props.style)
+      ? bandLabelNode.props.style
+      : [bandLabelNode.props.style];
+    const colorStyle = labelStyles.find((style) => style && style.color);
+
+    expect(colorStyle?.color).toBe('#2ecc71');
+  });
 });
