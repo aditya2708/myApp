@@ -8,7 +8,11 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getInitials, resolveBandMeta } from '../../../screens/reports/child/utils/childReportTransformers';
+import {
+  formatPercentageLabel,
+  getInitials,
+  resolveBandMeta,
+} from '../../../screens/reports/child/utils/childReportTransformers';
 
 const ChildAttendanceCard = ({
   child,
@@ -104,16 +108,27 @@ const ChildAttendanceCard = ({
       child?.attendanceRate ??
       child?.attendance?.attendance_percentage;
 
+    const rawChildLabel = child?.attendanceRate?.label ?? child?.attendance_label ?? null;
+    let formattedChildLabel = null;
+
+    if (typeof rawChildLabel === 'string') {
+      const trimmedLabel = rawChildLabel.trim();
+      if (trimmedLabel) {
+        formattedChildLabel = trimmedLabel.includes('%')
+          ? trimmedLabel
+          : formatPercentageLabel(trimmedLabel);
+      }
+    } else {
+      formattedChildLabel = formatPercentageLabel(rawChildLabel);
+    }
+    const formattedValueLabel = formatPercentageLabel(attendanceRateValue);
+
     return {
       bandMeta: decorateBandMeta(resolveBandMeta(bandValue, attendanceRateValue)),
       attendanceRateLabel:
-        child?.attendanceRate?.label ??
-        child?.attendance_label ??
-        (Number.isFinite(Number(attendanceRateValue))
-          ? `${Number(attendanceRateValue).toFixed(
-              Number(attendanceRateValue) % 1 === 0 ? 0 : 1
-            )}%`
-          : '0%'),
+        formattedChildLabel ??
+        formattedValueLabel ??
+        (typeof rawChildLabel === 'string' && rawChildLabel.trim() ? rawChildLabel : '0%'),
       totals: (() => {
         if (child?.totals) {
           return extractTotals(child.totals);

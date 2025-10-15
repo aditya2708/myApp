@@ -8,10 +8,57 @@ export const formatPercentageLabel = (value) => {
     return null;
   }
 
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return null;
+  let numericValue = null;
+  let hasExplicitPercent = false;
 
-  return `${percentageFormatter.format(numeric)}%`;
+  if (typeof value === 'number') {
+    numericValue = Number(value);
+  } else if (typeof value === 'string') {
+    const normalizedString = value.replace(/,/g, '.').trim();
+    if (!normalizedString) {
+      return null;
+    }
+
+    const percentMatch = normalizedString.match(/(-?\d+(?:\.\d+)?)\s*%/);
+    if (percentMatch) {
+      hasExplicitPercent = true;
+      numericValue = Number(percentMatch[1]);
+    } else {
+      const fractionMatch = normalizedString.match(
+        /(-?\d+(?:\.\d+)?)\s*\/\s*(-?\d+(?:\.\d+)?)/,
+      );
+
+      if (fractionMatch) {
+        const numerator = Number(fractionMatch[1]);
+        const denominator = Number(fractionMatch[2]);
+
+        if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+          numericValue = numerator / denominator;
+        }
+      }
+
+      if (numericValue === null) {
+        const genericMatch = normalizedString.match(/-?\d+(?:\.\d+)?/);
+        if (genericMatch) {
+          numericValue = Number(genericMatch[0]);
+        }
+      }
+    }
+  } else {
+    numericValue = Number(value);
+  }
+
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  if (!hasExplicitPercent && Math.abs(numericValue) < 1 && numericValue !== 0) {
+    numericValue *= 100;
+  }
+
+  const finalValue = Object.is(numericValue, -0) ? 0 : numericValue;
+
+  return `${percentageFormatter.format(finalValue)}%`;
 };
 
 export const BAND_STYLES = {

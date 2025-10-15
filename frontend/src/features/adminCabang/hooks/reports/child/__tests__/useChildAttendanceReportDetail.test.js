@@ -179,6 +179,6 @@ describe('useChildAttendanceReportDetail', () => {
     });
 
     expect(result.current.summary.attendanceRate.value).toBe(0.08);
-    expect(result.current.summary.attendanceRate.label).toBe('0,08%');
+    expect(result.current.summary.attendanceRate.label).toBe('8,00%');
   });
 });
