@@ -52,6 +52,11 @@ const AnakDetailScreen = () => {
       icon: 'book-outline'
     },
     {
+      title: 'Riwayat Kehadiran',
+      screen: 'RiwayatKehadiran',
+      icon: 'calendar-outline'
+    },
+    {
       title: 'Informasi Anak',
       screen: 'InformasiAnak',
       icon: 'clipboard-outline'
