@@ -59,4 +59,35 @@ describe('ChildAttendanceFilterSheet', () => {
       }),
     );
   });
+
+  it('passes null sort direction when no option is selected', () => {
+    const onApply = jest.fn();
+    const { getByText } = renderSheet({ onApply });
+
+    fireEvent.press(getByText('Terapkan'));
+
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sortDirection: null,
+      }),
+    );
+  });
+
+  it('resets filters to initial state with null sort direction', () => {
+    const onReset = jest.fn();
+    const { getByText } = renderSheet({ onReset, filters: { sortDirection: 'asc' } });
+
+    fireEvent.press(getByText('Atur Ulang'));
+
+    expect(onReset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: '',
+        shelterId: null,
+        groupId: null,
+        startDate: null,
+        endDate: null,
+        sortDirection: null,
+      }),
+    );
+  });
 });

@@ -32,7 +32,7 @@ describe('AdminCabangChildReportScreen', () => {
       children: [],
       pagination: null,
       params: {},
-      filters: {},
+      filters: { sortDirection: null },
       chartData: [],
       shelterAttendanceChart: null,
       shelterBreakdown: null,
@@ -74,6 +74,57 @@ describe('AdminCabangChildReportScreen', () => {
     expect(loadingIndicators.length).toBeGreaterThan(0);
   });
 
+  it('does not count null sort direction as an active filter', () => {
+    mockUseChildAttendanceReportList.mockReturnValue({
+      summary: null,
+      children: [],
+      pagination: null,
+      params: { sortDirection: null },
+      filters: {
+        search: '',
+        shelterId: null,
+        groupId: null,
+        sortDirection: null,
+        startDate: null,
+        endDate: null,
+      },
+      chartData: [],
+      shelterAttendanceChart: null,
+      shelterBreakdown: null,
+      lastRefreshedAt: null,
+      generatedAt: null,
+      period: null,
+      isLoading: false,
+      isInitialLoading: false,
+      isRefreshing: false,
+      isFetchingMore: false,
+      error: null,
+      errorMessage: null,
+      hasNextPage: false,
+      refresh: jest.fn(),
+      refetch: jest.fn(),
+      loadMore: jest.fn(),
+      fetchNextPage: jest.fn(),
+      applyFilters: undefined,
+      availableFilters: null,
+      filterOptions: null,
+      resetFilters: jest.fn(),
+      clearFilters: jest.fn(),
+      setSearch: jest.fn(),
+      setShelterId: jest.fn(),
+      setGroupId: jest.fn(),
+      setSortDirection: jest.fn(),
+      sortDirection: 'desc',
+      setDateRange: undefined,
+      setStartDate: jest.fn(),
+      setEndDate: jest.fn(),
+    });
+
+    const { queryByText } = render(<AdminCabangChildReportScreen />);
+
+    expect(queryByText('1')).toBeNull();
+  });
+
   it('applies filters via individual setters without forcing manual refresh', () => {
     const setSearch = jest.fn();
     const setShelterId = jest.fn();
@@ -93,7 +144,7 @@ describe('AdminCabangChildReportScreen', () => {
         search: '',
         shelterId: null,
         groupId: null,
-        sortDirection: 'desc',
+        sortDirection: null,
         startDate: null,
         endDate: null,
       },
@@ -158,7 +209,7 @@ describe('AdminCabangChildReportScreen', () => {
     expect(setShelterId).toHaveBeenCalledWith('shelter-2');
     expect(setGroupId).toHaveBeenCalledWith('group-4');
     expect(setSortDirection).toHaveBeenNthCalledWith(1, 'asc');
-    expect(setSortDirection).toHaveBeenNthCalledWith(2, 'desc');
+    expect(setSortDirection).toHaveBeenNthCalledWith(2, null);
     expect(setStartDate).toHaveBeenCalledWith('2024-03-01');
     expect(setEndDate).toHaveBeenCalledWith('2024-03-31');
     expect(refresh).not.toHaveBeenCalled();

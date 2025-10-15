@@ -120,14 +120,17 @@ describe('useChildAttendanceReportList', () => {
 
     expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[0][0]).toMatchObject({
       sort_by: 'attendance_rate',
-      sort_direction: 'desc',
     });
+    expect(
+      adminCabangReportApi.getChildAttendanceReport.mock.calls[0][0],
+    ).not.toHaveProperty('sort_direction');
 
     expect(typeof result.current.setSortDirection).toBe('function');
     expect(result.current.params.sort_by).toBe('attendance_rate');
-    expect(result.current.params.sort_direction).toBe('desc');
+    expect(result.current.params.sort_direction).toBeUndefined();
     expect(result.current.params.sortBy).toBe('attendance_rate');
-    expect(result.current.params.sortDirection).toBe('desc');
+    expect(result.current.params.sortDirection).toBeUndefined();
+    expect(result.current.sortDirection).toBe('desc');
 
     expect(result.current.summary.attendanceRate.value).toBe(82.5);
     expect(result.current.summary.attendance_percentage).toBe(82.5);
@@ -163,7 +166,7 @@ describe('useChildAttendanceReportList', () => {
       groupId: 'group-1',
       startDate: '2024-01-01',
       endDate: '2024-01-31',
-      sortDirection: 'desc',
+      sortDirection: null,
     });
     expect(result.current.availableFilters).toEqual({
       attendance_bands: ['low', 'medium', 'high'],
@@ -288,5 +291,28 @@ describe('useChildAttendanceReportList', () => {
       endDate: '2024-02-29',
       sortDirection: 'asc',
     });
+
+    await act(async () => {
+      result.current.setSortDirection(null);
+    });
+
+    await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(7));
+    expect(
+      adminCabangReportApi.getChildAttendanceReport.mock.calls[6][0],
+    ).toMatchObject({
+      page: 1,
+      per_page: 10,
+      shelter_id: 'shelter-42',
+      group_id: 'group-7',
+      start_date: '2024-02-01',
+      end_date: '2024-02-29',
+      sort_by: 'attendance_rate',
+    });
+    expect(
+      adminCabangReportApi.getChildAttendanceReport.mock.calls[6][0],
+    ).not.toHaveProperty('sort_direction');
+    expect(result.current.params.sortDirection).toBeNull();
+    expect(result.current.params.sort_direction).toBeUndefined();
+    expect(result.current.filters.sortDirection).toBeNull();
   });
 });

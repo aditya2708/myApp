@@ -32,11 +32,24 @@ const toISODate = (value) => {
   return parsed.toISOString().split('T')[0];
 };
 
+const normalizeSortDirectionValue = (value) => {
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'asc' || normalized === 'desc') {
+    return normalized;
+  }
+
+  return null;
+};
+
 const getInitialFilters = (filters) => ({
   search: filters?.search ?? '',
   shelterId: filters?.shelterId ?? filters?.shelter_id ?? null,
   groupId: filters?.groupId ?? filters?.group_id ?? null,
-  sortDirection: filters?.sortDirection ?? filters?.sort_direction ?? 'desc',
+  sortDirection: normalizeSortDirectionValue(
+    filters?.sortDirection ?? filters?.sort_direction ?? null,
+  ),
   startDate: filters?.startDate ?? filters?.start_date ?? null,
   endDate: filters?.endDate ?? filters?.end_date ?? null,
 });
@@ -147,7 +160,7 @@ const ChildAttendanceFilterSheet = ({
   const handleSortDirectionChange = (value) => {
     setLocalFilters((prev) => ({
       ...prev,
-      sortDirection: value ?? 'desc',
+      sortDirection: normalizeSortDirectionValue(value),
     }));
   };
 
@@ -257,7 +270,7 @@ const ChildAttendanceFilterSheet = ({
 
             <Text style={styles.sectionTitle}>Urutan Nilai Kehadiran</Text>
             <PickerInput
-              value={localFilters.sortDirection ?? 'desc'}
+              value={localFilters.sortDirection ?? null}
               onValueChange={handleSortDirectionChange}
               items={sortDirectionOptions}
               placeholder="Pilih urutan"
