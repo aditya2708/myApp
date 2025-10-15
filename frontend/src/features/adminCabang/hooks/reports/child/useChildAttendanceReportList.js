@@ -11,6 +11,17 @@ const firstDefined = (...values) => {
   return undefined;
 };
 
+const normalizeSortDirectionValue = (value) => {
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'asc' || normalized === 'desc') {
+    return normalized;
+  }
+
+  return null;
+};
+
 const normalizeParams = (params = {}) => {
   const normalized = {};
 
@@ -29,7 +40,13 @@ const normalizeParams = (params = {}) => {
   assign('start_date', params.start_date, params.startDate);
   assign('end_date', params.end_date, params.endDate);
   assign('sort_by', params.sort_by, params.sortBy, 'attendance_rate');
-  assign('sort_direction', params.sort_direction, params.sortDirection, params.order, 'desc');
+
+  const sortDirection = normalizeSortDirectionValue(
+    firstDefined(params.sort_direction, params.sortDirection, params.order),
+  );
+  if (sortDirection) {
+    normalized.sort_direction = sortDirection;
+  }
 
   return normalized;
 };
@@ -368,17 +385,24 @@ const adaptFilters = (rawFilters = {}, currentParams = {}) => {
     null,
   );
 
-  const sortDirection = firstDefined(
-    rawFilters.sortDirection,
-    rawFilters.sort_direction,
-    currentParams.sortDirection,
-    currentParams.sort_direction,
-    currentParams.order,
-    'desc',
+  const paramSortPreference = normalizeSortDirectionValue(
+    firstDefined(
+      currentParams.sortDirection,
+      currentParams.sort_direction,
+      currentParams.order,
+    ),
   );
 
-  const normalizedSortDirection =
-    typeof sortDirection === 'string' && sortDirection.toLowerCase() === 'asc' ? 'asc' : 'desc';
+  const sortCandidate = firstDefined(
+    rawFilters.sortDirection,
+    rawFilters.sort_direction,
+    paramSortPreference,
+  );
+
+  let normalizedSortDirection = normalizeSortDirectionValue(sortCandidate);
+  if (normalizedSortDirection === 'desc' && !paramSortPreference) {
+    normalizedSortDirection = null;
+  }
 
   return {
     search: search ?? '',
@@ -425,14 +449,23 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   const [children, setChildren] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, perPage: 10, total: 0, totalPages: 1 });
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [filters, setFilters] = useState({
+
+  const initialSortDirection = normalizeSortDirectionValue(
+    firstDefined(
+      initialParams.sortDirection,
+      initialParams.sort_direction,
+      initialParams.order,
+    ),
+  );
+
+  const [filters, setFilters] = useState(() => ({
     search: '',
     shelterId: null,
     groupId: null,
     startDate: null,
     endDate: null,
-    sortDirection: 'desc',
-  });
+    sortDirection: initialSortDirection,
+  }));
   const [availableFilters, setAvailableFilters] = useState(null);
   const [shelters, setShelters] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -440,44 +473,31 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   const [chartData, setChartData] = useState(null);
   const [metadata, setMetadata] = useState({});
   const [rawMetadata, setRawMetadata] = useState({});
-  const resolveInitialSortDirection = () => {
-    const value = firstDefined(
-      initialParams.sortDirection,
-      initialParams.sort_direction,
-      initialParams.order,
-      null,
-    );
 
-    if (typeof value === 'string') {
-      const normalized = value.toLowerCase();
-      if (normalized === 'asc' || normalized === 'desc') {
-        return normalized;
-      }
+  const [params, setParams] = useState(() => {
+    const baseParams = {
+      page: 1,
+      perPage: 10,
+      search: '',
+      shelterId: null,
+      groupId: null,
+      startDate: null,
+      endDate: null,
+      ...initialParams,
+      sortBy: 'attendance_rate',
+      sort_by: 'attendance_rate',
+    };
+
+    if (initialSortDirection) {
+      baseParams.sortDirection = initialSortDirection;
+      baseParams.sort_direction = initialSortDirection;
+    } else {
+      delete baseParams.sortDirection;
+      delete baseParams.sort_direction;
     }
 
-    return 'desc';
-  };
-
-  const initialSortDirection = resolveInitialSortDirection();
-
-  const [params, setParams] = useState(() => ({
-    page: 1,
-    perPage: 10,
-    search: '',
-    shelterId: null,
-    groupId: null,
-    startDate: null,
-    endDate: null,
-    sortBy: 'attendance_rate',
-    sort_by: 'attendance_rate',
-    sortDirection: initialSortDirection,
-    sort_direction: initialSortDirection,
-    ...initialParams,
-    sortBy: 'attendance_rate',
-    sort_by: 'attendance_rate',
-    sortDirection: initialSortDirection,
-    sort_direction: initialSortDirection,
-  }));
+    return baseParams;
+  });
   const [error, setError] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const appendModeRef = useRef(false);
@@ -591,17 +611,34 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   const setSortDirection = useCallback(
     (direction) => {
       resetAppendState();
-      setParams((prev) => {
-        const normalized =
-          typeof direction === 'string' && direction.toLowerCase() === 'asc' ? 'asc' : 'desc';
+      const normalized = normalizeSortDirectionValue(direction);
 
-        return {
+      setFilters((prevFilters) => ({
+        ...prevFilters,
+        sortDirection: normalized,
+      }));
+
+      setParams((prev) => {
+        const base = {
           ...prev,
           page: 1,
-          sortDirection: normalized,
-          sort_direction: normalized,
           sortBy: 'attendance_rate',
           sort_by: 'attendance_rate',
+        };
+
+        if (normalized) {
+          return {
+            ...base,
+            sortDirection: normalized,
+            sort_direction: normalized,
+          };
+        }
+
+        const { sort_direction: _ignoredSortDirection, ...rest } = base;
+
+        return {
+          ...rest,
+          sortDirection: null,
         };
       });
     },

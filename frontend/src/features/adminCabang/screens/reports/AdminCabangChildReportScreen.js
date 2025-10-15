@@ -36,6 +36,17 @@ const extractChildId = (child) => {
   );
 };
 
+const normalizeSortDirectionValue = (value) => {
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'asc' || normalized === 'desc') {
+    return normalized;
+  }
+
+  return null;
+};
+
 const normalizeFilters = (filters = {}, params = {}) => {
   const resolve = (...candidates) => {
     for (const value of candidates) {
@@ -46,30 +57,32 @@ const normalizeFilters = (filters = {}, params = {}) => {
     return null;
   };
 
+  const paramSortPreference = normalizeSortDirectionValue(
+    resolve(params.sortDirection, params.sort_direction, params.order),
+  );
+
+  const sortCandidate = resolve(
+    filters.sortDirection,
+    filters.sort_direction,
+    paramSortPreference,
+  );
+
+  let normalizedSortDirection = normalizeSortDirectionValue(sortCandidate);
+  if (normalizedSortDirection === 'desc' && !paramSortPreference) {
+    normalizedSortDirection = null;
+  }
+
   const normalized = {
     search: resolve(filters.search, filters.keyword, filters.q, params.search, params.keyword, params.q, ''),
     shelterId: resolve(filters.shelterId, filters.shelter_id, params.shelterId, params.shelter_id),
     groupId: resolve(filters.groupId, filters.group_id, params.groupId, params.group_id),
     startDate: resolve(filters.startDate, filters.start_date, params.startDate, params.start_date),
     endDate: resolve(filters.endDate, filters.end_date, params.endDate, params.end_date),
-    sortDirection: resolve(
-      filters.sortDirection,
-      filters.sort_direction,
-      params.sortDirection,
-      params.sort_direction,
-      'desc',
-    ),
+    sortDirection: normalizedSortDirection,
   };
 
   if (normalized.search === null) {
     normalized.search = '';
-  }
-
-  if (typeof normalized.sortDirection === 'string') {
-    const normalizedDirection = normalized.sortDirection.toLowerCase();
-    normalized.sortDirection = normalizedDirection === 'asc' ? 'asc' : 'desc';
-  } else {
-    normalized.sortDirection = 'desc';
   }
 
   return normalized;
@@ -165,11 +178,10 @@ const countActiveFilters = (filters) => {
   if (filters.groupId) count += 1;
   if (filters.startDate) count += 1;
   if (filters.endDate) count += 1;
-  const sortDirection =
-    typeof filters.sortDirection === 'string'
-      ? filters.sortDirection
-      : filters.sort_direction;
-  if (sortDirection && String(sortDirection).toLowerCase() !== 'desc') {
+  const sortDirection = normalizeSortDirectionValue(
+    filters.sortDirection ?? filters.sort_direction ?? null,
+  );
+  if (sortDirection && sortDirection !== 'desc') {
     count += 1;
   }
 
@@ -380,8 +392,14 @@ const AdminCabangChildReportScreen = () => {
         return;
       }
 
-      const { search, shelterId, groupId, sortDirection: nextSortDirection, startDate, endDate } =
-        nextFilters;
+      const {
+        search,
+        shelterId,
+        groupId,
+        sortDirection: nextSortDirection,
+        startDate,
+        endDate,
+      } = nextFilters;
 
       if (setSearch) {
         setSearch(search ?? '');
@@ -389,7 +407,9 @@ const AdminCabangChildReportScreen = () => {
 
       setShelterId?.(shelterId ?? null);
       setGroupId?.(groupId ?? null);
-      setSortDirection?.(nextSortDirection ?? 'desc');
+      if (setSortDirection) {
+        setSortDirection(normalizeSortDirectionValue(nextSortDirection));
+      }
 
       if (setDateRange) {
         setDateRange({ startDate: startDate ?? null, endDate: endDate ?? null });
@@ -427,7 +447,9 @@ const AdminCabangChildReportScreen = () => {
       }
     }
 
-    setSortDirection?.('desc');
+    if (setSortDirection) {
+      setSortDirection(null);
+    }
 
     if (typeof refresh === 'function') {
       refresh();
