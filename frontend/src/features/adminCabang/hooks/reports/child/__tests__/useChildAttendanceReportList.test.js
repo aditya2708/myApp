@@ -148,11 +148,11 @@ describe('useChildAttendanceReportList', () => {
     });
     expect(result.current.filters).toMatchObject({
       search: '',
-      band: null,
       shelterId: 'shelter-1',
       groupId: 'group-1',
       startDate: '2024-01-01',
       endDate: '2024-01-31',
+      sortDirection: 'desc',
     });
     expect(result.current.availableFilters).toEqual({
       attendance_bands: ['low', 'medium', 'high'],
@@ -188,18 +188,20 @@ describe('useChildAttendanceReportList', () => {
     await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(1));
 
     await act(async () => {
-      result.current.setBand('high');
+      result.current.setSortDirection('asc');
     });
 
     await waitFor(() => expect(adminCabangReportApi.getChildAttendanceReport).toHaveBeenCalledTimes(2));
     expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[1][0]).toMatchObject({
       page: 1,
       per_page: 10,
-      attendance_band: 'high',
+      sort_by: 'attendance_rate',
+      sort_direction: 'asc',
     });
-    expect(result.current.params.band).toBe('high');
+    expect(result.current.params.sortDirection).toBe('asc');
+    expect(result.current.params.sort_direction).toBe('asc');
     expect(result.current.pagination.page).toBe(1);
-    expect(result.current.filters.band).toBe('high');
+    expect(result.current.filters.sortDirection).toBe('asc');
 
     await act(async () => {
       result.current.setShelterId('shelter-42');
@@ -209,8 +211,9 @@ describe('useChildAttendanceReportList', () => {
     expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[2][0]).toMatchObject({
       page: 1,
       per_page: 10,
-      attendance_band: 'high',
       shelter_id: 'shelter-42',
+      sort_by: 'attendance_rate',
+      sort_direction: 'asc',
     });
 
     await act(async () => {
@@ -221,9 +224,10 @@ describe('useChildAttendanceReportList', () => {
     expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[3][0]).toMatchObject({
       page: 1,
       per_page: 10,
-      attendance_band: 'high',
       shelter_id: 'shelter-42',
       group_id: 'group-7',
+      sort_by: 'attendance_rate',
+      sort_direction: 'asc',
     });
 
     await act(async () => {
@@ -234,10 +238,11 @@ describe('useChildAttendanceReportList', () => {
     expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[4][0]).toMatchObject({
       page: 1,
       per_page: 10,
-      attendance_band: 'high',
       shelter_id: 'shelter-42',
       group_id: 'group-7',
       start_date: '2024-02-01',
+      sort_by: 'attendance_rate',
+      sort_direction: 'asc',
     });
 
     await act(async () => {
@@ -248,25 +253,29 @@ describe('useChildAttendanceReportList', () => {
     expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[5][0]).toMatchObject({
       page: 1,
       per_page: 10,
-      attendance_band: 'high',
       shelter_id: 'shelter-42',
       group_id: 'group-7',
       start_date: '2024-02-01',
       end_date: '2024-02-29',
+      sort_by: 'attendance_rate',
+      sort_direction: 'asc',
     });
     expect(result.current.params).toMatchObject({
-      band: 'high',
       shelterId: 'shelter-42',
       groupId: 'group-7',
       startDate: '2024-02-01',
       endDate: '2024-02-29',
+      sortDirection: 'asc',
+      sort_direction: 'asc',
+      sortBy: 'attendance_rate',
+      sort_by: 'attendance_rate',
     });
     expect(result.current.filters).toMatchObject({
-      band: 'high',
       shelterId: 'shelter-42',
       groupId: 'group-7',
       startDate: '2024-02-01',
       endDate: '2024-02-29',
+      sortDirection: 'asc',
     });
   });
 });

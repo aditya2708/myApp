@@ -58,7 +58,8 @@ describe('AdminCabangChildReportScreen', () => {
       setSearch: jest.fn(),
       setShelterId: jest.fn(),
       setGroupId: jest.fn(),
-      setBand: jest.fn(),
+      setSortDirection: jest.fn(),
+      sortDirection: 'desc',
       setDateRange: jest.fn(),
       setStartDate: jest.fn(),
       setEndDate: jest.fn(),
@@ -77,7 +78,7 @@ describe('AdminCabangChildReportScreen', () => {
     const setSearch = jest.fn();
     const setShelterId = jest.fn();
     const setGroupId = jest.fn();
-    const setBand = jest.fn();
+    const setSortDirection = jest.fn();
     const setStartDate = jest.fn();
     const setEndDate = jest.fn();
     const refresh = jest.fn();
@@ -88,7 +89,14 @@ describe('AdminCabangChildReportScreen', () => {
       children: [],
       pagination: null,
       params: {},
-      filters: { search: '', shelterId: null, groupId: null, band: null, startDate: null, endDate: null },
+      filters: {
+        search: '',
+        shelterId: null,
+        groupId: null,
+        sortDirection: 'desc',
+        startDate: null,
+        endDate: null,
+      },
       chartData: [],
       shelterAttendanceChart: null,
       shelterBreakdown: null,
@@ -114,7 +122,8 @@ describe('AdminCabangChildReportScreen', () => {
       setSearch,
       setShelterId,
       setGroupId,
-      setBand,
+      setSortDirection,
+      sortDirection: 'desc',
       setDateRange: undefined,
       setStartDate,
       setEndDate,
@@ -127,7 +136,7 @@ describe('AdminCabangChildReportScreen', () => {
         search: 'ani',
         shelterId: 'shelter-2',
         groupId: 'group-4',
-        band: 'high',
+        sortDirection: 'asc',
         startDate: '2024-03-01',
         endDate: '2024-03-31',
       });
@@ -136,7 +145,7 @@ describe('AdminCabangChildReportScreen', () => {
     expect(setSearch).toHaveBeenCalledWith('ani');
     expect(setShelterId).toHaveBeenCalledWith('shelter-2');
     expect(setGroupId).toHaveBeenCalledWith('group-4');
-    expect(setBand).toHaveBeenCalledWith('high');
+    expect(setSortDirection).toHaveBeenCalledWith('asc');
     expect(setStartDate).toHaveBeenCalledWith('2024-03-01');
     expect(setEndDate).toHaveBeenCalledWith('2024-03-31');
     expect(refresh).not.toHaveBeenCalled();
