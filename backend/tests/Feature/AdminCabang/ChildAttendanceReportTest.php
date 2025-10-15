@@ -264,6 +264,8 @@ class ChildAttendanceReportTest extends TestCase
 
         $this->assertSame(2, $data['summary']['total_children']);
         $this->assertSame('66.67', $data['summary']['attendance_percentage']);
+        $this->assertSame(2, $data['summary']['active_children']);
+        $this->assertSame(0, $data['summary']['inactive_children']);
 
         $this->assertCount(2, $data['children']);
 

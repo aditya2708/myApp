@@ -813,17 +813,26 @@ class ChildAttendanceReportService
         $totalTidakHadir = 0;
         $totalActivities = 0;
         $lowBandChildren = 0;
+        $activeChildren = 0;
 
         foreach ($childIds as $childId) {
             $stats = $childStats[$childId] ?? $this->emptyChildStats();
             $totalHadir += $stats['hadir_count'] ?? 0;
             $totalTidakHadir += $stats['tidak_hadir_count'] ?? 0;
-            $totalActivities += $stats['total_activities'] ?? 0;
+
+            $childActivities = (int) ($stats['total_activities'] ?? 0);
+            $totalActivities += $childActivities;
+
+            if ($childActivities > 0) {
+                $activeChildren++;
+            }
 
             if (($stats['attendance_band'] ?? 'low') === 'low') {
                 $lowBandChildren++;
             }
         }
+
+        $inactiveChildren = max(0, $totalChildren - $activeChildren);
 
         $attendancePercentage = $totalActivities > 0
             ? ($totalHadir / $totalActivities) * 100
@@ -850,6 +859,8 @@ class ChildAttendanceReportService
             'tidak_hadir_count' => (int) $totalTidakHadir,
             'attendance_percentage' => $attendancePercentage,
             'low_band_children' => (int) $lowBandChildren,
+            'active_children' => (int) $activeChildren,
+            'inactive_children' => (int) $inactiveChildren,
         ];
     }
 
@@ -1054,6 +1065,8 @@ class ChildAttendanceReportService
                 'tidak_hadir_count' => 0,
                 'attendance_percentage' => 0.0,
                 'low_band_children' => 0,
+                'active_children' => 0,
+                'inactive_children' => 0,
             ],
             'shelter_breakdown' => [],
             'shelter_attendance_chart' => [],

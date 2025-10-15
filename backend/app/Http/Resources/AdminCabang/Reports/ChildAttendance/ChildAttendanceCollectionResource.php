@@ -28,6 +28,8 @@ class ChildAttendanceCollectionResource extends JsonResource
                 'tidak_hadir_count' => (int) ($summary['tidak_hadir_count'] ?? 0),
                 'attendance_percentage' => number_format((float) ($summary['attendance_percentage'] ?? 0), 2, '.', ''),
                 'low_band_children' => (int) ($summary['low_band_children'] ?? 0),
+                'active_children' => (int) ($summary['active_children'] ?? $summary['activeChildren'] ?? 0),
+                'inactive_children' => (int) ($summary['inactive_children'] ?? $summary['inactiveChildren'] ?? 0),
             ],
             'shelter_breakdown' => ShelterBreakdownResource::collection(collect($data['shelter_breakdown'] ?? []))->values()->all(),
             'shelter_attendance_chart' => collect($data['shelter_attendance_chart'] ?? [])->map(function ($payload) {
