@@ -18,7 +18,7 @@ Menyiapkan endpoint laporan kehadiran anak khusus admin cabang yang menyajikan r
    - Turunkan daftar shelter yang dapat diakses admin cabang (lihat pola `WeeklyAttendanceService`).
    - Seleksi anak aktif (`Anak::STATUS_AKTIF`) pada shelter tersebut.
    - Gabungkan data kehadiran melalui relasi `absens`, `absenUsers`, dan `aktivitas` untuk menghitung hadir, terlambat, tidak hadir, dan total sesi dalam rentang tanggal.
-   - Rakitan agregasi shelter dan banding persentase (high/medium/low) sesuai batasan (≥85, 75–84, <75).
+   - Rakitan agregasi shelter dan banding persentase (high/medium/low) sesuai batasan terbaru (≥80, 60–79, <60).
 
 3. **Mempersiapkan DTO/Resource**
    - Buat resource koleksi (mis. `AdminCabang\ChildReport\ChildResource`, `ShelterSummaryResource`) agar format JSON konsisten.

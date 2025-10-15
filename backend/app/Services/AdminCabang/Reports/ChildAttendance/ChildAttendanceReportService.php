@@ -245,9 +245,9 @@ class ChildAttendanceReportService
             'shelters' => array_values($accessibleShelters),
             'groups' => array_values($groups),
             'attendance_bands' => [
-                ['value' => 'high', 'label' => 'Baik (≥85%)'],
-                ['value' => 'medium', 'label' => 'Cukup (75-84%)'],
-                ['value' => 'low', 'label' => 'Rendah (<75%)'],
+                ['value' => 'high', 'label' => 'Baik (≥80%)'],
+                ['value' => 'medium', 'label' => 'Cukup (60-79%)'],
+                ['value' => 'low', 'label' => 'Rendah (<60%)'],
             ],
         ];
 
@@ -967,11 +967,11 @@ class ChildAttendanceReportService
 
     protected function determineAttendanceBand(float $percentage): string
     {
-        if ($percentage >= 85.0) {
+        if ($percentage >= 80.0) {
             return 'high';
         }
 
-        if ($percentage >= 75.0) {
+        if ($percentage >= 60.0) {
             return 'medium';
         }
 
@@ -1096,9 +1096,9 @@ class ChildAttendanceReportService
                 'shelters' => array_values($shelters),
                 'groups' => array_values($groups),
                 'attendance_bands' => [
-                    ['value' => 'high', 'label' => 'Baik (≥85%)'],
-                    ['value' => 'medium', 'label' => 'Cukup (75-84%)'],
-                    ['value' => 'low', 'label' => 'Rendah (<75%)'],
+                    ['value' => 'high', 'label' => 'Baik (≥80%)'],
+                    ['value' => 'medium', 'label' => 'Cukup (60-79%)'],
+                    ['value' => 'low', 'label' => 'Rendah (<60%)'],
                 ],
             ],
             'meta' => [
