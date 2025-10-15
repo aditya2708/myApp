@@ -55,6 +55,7 @@ const ChildAttendanceCard = ({
         coalesceNumber(
           source.tidakHadir,
           source.tidak_hadir,
+          source.tidak_hadir_count,
           source.tidakHadirCount,
           source.absent,
           source.absentCount,
@@ -128,6 +129,8 @@ const ChildAttendanceCard = ({
           present: child?.attendance?.present_count,
           late: child?.attendance?.late_count,
           tidakHadir: child?.attendance?.absent_count,
+          tidak_hadir_count: child?.attendance?.tidak_hadir_count,
+          tidakHadirCount: child?.attendance?.tidak_hadir_count,
           totalAktivitas: child?.attendance?.total_activities,
           totalSessions: child?.attendance?.totalSessions,
           total_sessions: child?.attendance?.total_sessions,
