@@ -256,7 +256,8 @@ describe('AdminCabangChildReportScreen', () => {
     const children = [
       { id: 'child-1', attendanceRate: { value: 40 } },
       { id: 'child-2', attendanceRate: { value: 95 } },
-      { id: 'child-3', attendance_rate: 70 },
+      { id: 'child-3', attendance_rate: 0 },
+      { id: 'child-4', attendanceRateLabel: '33,3%' },
     ];
 
     mockUseChildAttendanceReportList
@@ -268,16 +269,18 @@ describe('AdminCabangChildReportScreen', () => {
     const flatListDesc = UNSAFE_getByType(FlatList);
     expect(flatListDesc.props.data.map((item) => item.id)).toEqual([
       'child-2',
-      'child-3',
       'child-1',
+      'child-4',
+      'child-3',
     ]);
 
     rerender(<AdminCabangChildReportScreen />);
 
     const flatListAsc = UNSAFE_getByType(FlatList);
     expect(flatListAsc.props.data.map((item) => item.id)).toEqual([
-      'child-1',
       'child-3',
+      'child-4',
+      'child-1',
       'child-2',
     ]);
   });
