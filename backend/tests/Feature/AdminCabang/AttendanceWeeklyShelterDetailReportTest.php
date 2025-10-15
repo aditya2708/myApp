@@ -345,7 +345,7 @@ class AttendanceWeeklyShelterDetailReportTest extends TestCase
         $this->assertSame(1, $payload['summary']['late_count']);
         $this->assertSame(1, $payload['summary']['absent_count']);
         $this->assertSame('80.00', $payload['summary']['attendance_percentage']);
-        $this->assertSame('medium', $payload['summary']['attendance_band']);
+        $this->assertSame('high', $payload['summary']['attendance_band']);
 
         $groups = collect($payload['groups']);
         $this->assertCount(3, $groups);

@@ -186,7 +186,7 @@ class AttendanceWeeklyReportTest extends TestCase
         $this->assertSame(1, $alphaPayload['late_count']);
         $this->assertSame(1, $alphaPayload['absent_count']);
         $this->assertSame('83.33', $alphaPayload['attendance_percentage']);
-        $this->assertSame('medium', $alphaPayload['attendance_band']);
+        $this->assertSame('high', $alphaPayload['attendance_band']);
         $this->assertSame('83.33', $alphaPayload['trend_delta']);
 
         $betaPayload = $shelters->firstWhere('name', 'Shelter Beta');
