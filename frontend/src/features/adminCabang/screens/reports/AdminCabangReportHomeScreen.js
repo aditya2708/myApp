@@ -15,6 +15,23 @@ import ReportQuickLinkTile from '../../components/reports/ReportQuickLinkTile';
 import ReportQuickActionTile from '../../components/reports/ReportQuickActionTile';
 import { adminCabangReportApi } from '../../api/adminCabangReportApi';
 
+const DEPRECATED_REPORT_KEYS = new Set([
+  'attendance',
+  'attendance-weekly',
+  'attendance_weekly',
+  'attendance-shelter',
+  'attendance_shelter',
+  'attendance_group',
+  'attendance-group',
+]);
+
+const DEPRECATED_REPORT_ROUTES = new Set([
+  'AdminCabangAttendanceReport',
+  'AdminCabangAttendanceWeekly',
+  'AdminCabangAttendanceShelterDetail',
+  'AdminCabangAttendanceGroup',
+]);
+
 const DEFAULT_LINKS = [
   {
     key: 'children',
@@ -23,14 +40,6 @@ const DEFAULT_LINKS = [
     icon: 'school',
     color: '#2980b9',
     route: 'AdminCabangChildReport',
-  },
-  {
-    key: 'attendance',
-    title: 'Laporan Kehadiran',
-    description: 'Analisis kehadiran mingguan dan bulanan untuk seluruh cabang dan shelter.',
-    icon: 'calendar',
-    color: '#16a085',
-    route: 'AdminCabangAttendanceReport',
   },
   {
     key: 'tutors',
@@ -92,7 +101,6 @@ const AdminCabangReportHomeScreen = () => {
   const routeMap = useMemo(
     () => ({
       children: 'AdminCabangChildReport',
-      attendance: 'AdminCabangAttendanceReport',
       tutors: 'AdminCabangTutorReport',
     }),
     []
@@ -232,19 +240,29 @@ const AdminCabangReportHomeScreen = () => {
         return dedupeByRouteAndTitle([...DEFAULT_LINKS]);
       }
 
-      const mappedLinks = payload.map((link, index) => {
-        const key = link.key || `link-${index}`;
-        return {
-          key,
-          title: link.title || link.label || 'Laporan',
-          description: link.description || link.subtitle || '',
-          icon: link.icon || 'document-text',
-          color: link.color || '#3498db',
-          route: link.route || routeMap[key] || 'AdminCabangReportHome',
-          params: link.params || {},
-          disabled: link.disabled || false,
-        };
-      });
+      const mappedLinks = payload
+        .filter((link) => {
+          const key = (link?.key || '').toString().trim().toLowerCase();
+          const route = (link?.route || '').toString().trim();
+          return !DEPRECATED_REPORT_KEYS.has(key) && !DEPRECATED_REPORT_ROUTES.has(route);
+        })
+        .map((link, index) => {
+          const key = link.key || `link-${index}`;
+          return {
+            key,
+            title: link.title || link.label || 'Laporan',
+            description: link.description || link.subtitle || '',
+            icon: link.icon || 'document-text',
+            color: link.color || '#3498db',
+            route: link.route || routeMap[key] || 'AdminCabangReportHome',
+            params: link.params || {},
+            disabled: link.disabled || false,
+          };
+        });
+
+      if (mappedLinks.length === 0) {
+        return dedupeByRouteAndTitle([...DEFAULT_LINKS]);
+      }
 
       return dedupeByRouteAndTitle(mappedLinks);
     },
@@ -255,26 +273,36 @@ const AdminCabangReportHomeScreen = () => {
     (payload, existingLinks = []) => {
       const source = Array.isArray(payload) && payload.length > 0 ? payload : DEFAULT_ACTIONS;
 
-      const mappedActions = source.map((action, index) => {
-        const key = action.key || `action-${index}`;
-        const mappedRoute = action.route || routeMap[key] || 'AdminCabangReportHome';
-
-        return {
-          key,
-          title: action.title || action.label || 'Aksi',
-          description: action.description || action.subtitle || '',
-          icon: action.icon || 'flash',
-          color: action.color || '#2980b9',
-          route: mappedRoute,
-          params: action.params || {},
-          disabled: action.disabled || false,
-          badge: action.badge ?? action.count ?? null,
-        };
-      });
-
       const existingSignatures = existingLinks
         .map((link) => createSignature(link))
         .filter(Boolean);
+
+      const mappedActions = source
+        .filter((action) => {
+          const key = (action?.key || '').toString().trim().toLowerCase();
+          const route = (action?.route || '').toString().trim();
+          return !DEPRECATED_REPORT_KEYS.has(key) && !DEPRECATED_REPORT_ROUTES.has(route);
+        })
+        .map((action, index) => {
+          const key = action.key || `action-${index}`;
+          const mappedRoute = action.route || routeMap[key] || 'AdminCabangReportHome';
+
+          return {
+            key,
+            title: action.title || action.label || 'Aksi',
+            description: action.description || action.subtitle || '',
+            icon: action.icon || 'flash',
+            color: action.color || '#2980b9',
+            route: mappedRoute,
+            params: action.params || {},
+            disabled: action.disabled || false,
+            badge: action.badge ?? action.count ?? null,
+          };
+        });
+
+      if (mappedActions.length === 0) {
+        return dedupeByRouteAndTitle([...DEFAULT_ACTIONS], existingSignatures);
+      }
 
       return dedupeByRouteAndTitle(mappedActions, existingSignatures);
     },

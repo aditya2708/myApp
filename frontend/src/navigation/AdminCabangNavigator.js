@@ -24,10 +24,6 @@ import AdminCabangReportHomeScreen from '../features/adminCabang/screens/reports
 import AdminCabangChildReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildReportScreen';
 import AdminCabangChildReportDetailScreen from '../features/adminCabang/screens/reports/child/AdminCabangChildReportDetailScreen';
 import AdminCabangTutorReportScreen from '../features/adminCabang/screens/reports/AdminCabangTutorReportScreen';
-import AdminCabangAttendanceReportScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceReportScreen';
-import AdminCabangAttendanceWeeklyScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceWeeklyScreen';
-import AdminCabangAttendanceShelterScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceShelterScreen';
-import AdminCabangAttendanceGroupScreen from '../features/adminCabang/screens/reports/attendance/AdminCabangAttendanceGroupScreen';
 
 // Kurikulum screens
 import KurikulumHomeScreen from '../features/adminCabang/screens/kurikulum/KurikulumHomeScreen';
@@ -218,26 +214,6 @@ const ReportsStackNavigator = () => (
       name="AdminCabangChildReportDetail"
       component={AdminCabangChildReportDetailScreen}
       options={{ headerTitle: 'Detail Kehadiran Anak' }}
-    />
-    <ReportsStack.Screen
-      name="AdminCabangAttendanceReport"
-      component={AdminCabangAttendanceReportScreen}
-      options={{ headerTitle: 'Laporan Kehadiran' }}
-    />
-    <ReportsStack.Screen
-      name="AdminCabangAttendanceWeekly"
-      component={AdminCabangAttendanceWeeklyScreen}
-      options={{ headerTitle: 'Rekap Kehadiran Mingguan' }}
-    />
-    <ReportsStack.Screen
-      name="AdminCabangAttendanceShelterDetail"
-      component={AdminCabangAttendanceShelterScreen}
-      options={{ headerTitle: 'Detail Kehadiran Shelter' }}
-    />
-    <ReportsStack.Screen
-      name="AdminCabangAttendanceGroup"
-      component={AdminCabangAttendanceGroupScreen}
-      options={{ headerTitle: 'Detail Kehadiran Kelompok' }}
     />
     <ReportsStack.Screen
       name="AdminCabangTutorReport"

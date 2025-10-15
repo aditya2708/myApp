@@ -1,16 +1,9 @@
 import React, { useCallback } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 
 import ReportQuickLinkTile from '../../../components/reports/ReportQuickLinkTile';
 
 const AdminCabangAttendanceReportScreen = () => {
-  const navigation = useNavigation();
-
-  const handleWeeklyPress = useCallback(() => {
-    navigation.navigate('AdminCabangAttendanceWeekly');
-  }, [navigation]);
-
   const handleDevelopmentPress = useCallback(() => {
     Alert.alert('Sedang Dikembangkan', 'Fitur ini sedang dalam pengembangan.');
   }, []);
@@ -24,13 +17,6 @@ const AdminCabangAttendanceReportScreen = () => {
         </Text>
       </View>
 
-      <ReportQuickLinkTile
-        title="Rekap Mingguan Cabang"
-        description="Lihat ringkasan kehadiran mingguan untuk seluruh cabang."
-        icon="calendar"
-        color="#16a085"
-        onPress={handleWeeklyPress}
-      />
       <ReportQuickLinkTile
         title="Rekap Bulanan per Shelter"
         description="Ringkasan kehadiran bulanan yang dikelompokkan per shelter."

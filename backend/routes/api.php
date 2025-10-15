@@ -1,10 +1,6 @@
 <?php
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyController;
-use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyShelterController;
-use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyGroupStudentController;
-use App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceWeeklyShelterDetailController;
 
 
 Route::post('/auth/login', [App\Http\Controllers\API\AuthController::class, 'login']);
@@ -199,16 +195,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('laporan')->group(function () {
             Route::get('/summary', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangReportSummaryController::class, 'getSummary']);
             Route::prefix('attendance')->group(function () {
-                // Level 1 - Branch weekly attendance summary
-                // Query params: start_date, end_date, attendance_band (high|medium|low), search
-                Route::get('/weekly', AttendanceWeeklyController::class)
-                    ->name('admin-cabang.reports.attendance.weekly.index');
-                Route::get('/weekly/shelters', AttendanceWeeklyShelterController::class);
-                // Level 2 - Shelter weekly attendance detail
-                // Query params: start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), week (ISO-8601, e.g. 2024-W01)
-                // Future hooks: export (csv|xlsx), share_token
-                Route::get('/weekly/shelters/{shelter}', AttendanceWeeklyShelterDetailController::class);
-                Route::get('/weekly/groups/{group}/students', AttendanceWeeklyGroupStudentController::class);
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
                 Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
                 Route::get('/children', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangChildReportController::class, 'index']);

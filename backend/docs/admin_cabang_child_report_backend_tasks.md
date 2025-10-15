@@ -4,7 +4,7 @@
 Menyiapkan endpoint laporan kehadiran anak khusus admin cabang yang menyajikan ringkasan lintas shelter beserta detail per anak, mengikuti skema data yang telah disepakati.
 
 ## Prasyarat
-- Pastikan struktur relasi admin cabang → shelter → anak telah dipahami dari service laporan mingguan.
+- Pastikan struktur relasi admin cabang → shelter → anak telah dipahami dari implementasi laporan yang ada.
 - Review logika agregasi pada `AdminShelterLaporanAnakController::getLaporanAnakBinaan()` sebagai referensi.
 
 ## Daftar Tugas
@@ -15,7 +15,7 @@ Menyiapkan endpoint laporan kehadiran anak khusus admin cabang yang menyajikan r
    - Tambahkan method `getChildDetail(AdminCabang $adminCabang, Anak $child, array $filters)` untuk menyiapkan data detail.
 
 2. **Menyusun Query Agregasi**
-   - Turunkan daftar shelter yang dapat diakses admin cabang (lihat pola `WeeklyAttendanceService`).
+   - Turunkan daftar shelter yang dapat diakses admin cabang menggunakan pola akses terbaru yang berlaku.
    - Seleksi anak aktif (`Anak::STATUS_AKTIF`) pada shelter tersebut.
    - Gabungkan data kehadiran melalui relasi `absens`, `absenUsers`, dan `aktivitas` untuk menghitung hadir, terlambat, tidak hadir, dan total sesi dalam rentang tanggal.
    - Rakitan agregasi shelter dan banding persentase (high/medium/low) sesuai batasan terbaru (≥80, 60–79, <60).

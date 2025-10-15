@@ -160,13 +160,6 @@ export const ADMIN_CABANG_ENDPOINTS = {
       LIST: '/admin-cabang/laporan/attendance/children',
       DETAIL: (childId) => `/admin-cabang/laporan/attendance/children/${childId}`,
     },
-    WEEKLY_ATTENDANCE: {
-      DASHBOARD: '/admin-cabang/laporan/attendance/weekly',
-      SHELTER_DETAIL: (shelterId) =>
-        `/admin-cabang/laporan/attendance/weekly/shelters/${shelterId}`,
-      GROUP_STUDENTS: (groupId) =>
-        `/admin-cabang/laporan/attendance/weekly/groups/${groupId}/students`,
-    },
     TUTORS: '/admin-cabang/reports/tutors',
   },
   KURIKULUM: {
