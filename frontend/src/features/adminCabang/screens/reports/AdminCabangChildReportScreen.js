@@ -110,20 +110,60 @@ const parsePercentageValue = (value) => {
 const extractChildAttendanceRate = (child) => {
   if (!child || typeof child !== 'object') return null;
 
-  const candidates = [
+  const rawCandidates = [
     child.attendanceRate?.value,
     child.attendanceRate?.percentage,
     child.attendanceRate?.percent,
+    child.attendanceRate?.label,
+    child.attendanceRate?.text,
+    child.attendanceRate?.display,
+    child.attendanceRateLabel,
+    child.attendanceRateText,
+    child.attendanceRateDisplay,
     child.attendanceRate,
-    child.attendance_rate,
-    child.attendance_percentage,
+    child.attendanceRateLabelText,
+    child.attendanceLabel,
+    child.attendance_label,
+    child.attendance_rate_label,
+    child.attendance_percentage_label,
+    child.attendancePercentageLabel,
     child.attendancePercentage,
     child.attendancePercent,
+    child.attendance_percentage,
+    child.attendance_rate,
     child.attendance?.attendance_percentage,
     child.attendance?.attendanceRate?.value,
+    child.attendance?.attendanceRate?.label,
     child.attendance?.attendanceRate,
+    child.attendance?.attendance_label,
     child.attendance?.attendance_rate,
   ];
+
+  const candidates = [];
+  const seen = new Set();
+
+  for (const candidate of rawCandidates) {
+    if (candidate === undefined || candidate === null) continue;
+
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (!trimmed) continue;
+      if (seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      candidates.push(trimmed);
+      continue;
+    }
+
+    if (typeof candidate === 'number') {
+      const key = `number:${candidate}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push(candidate);
+      continue;
+    }
+
+    candidates.push(candidate);
+  }
 
   for (const candidate of candidates) {
     const parsed = parsePercentageValue(candidate);
