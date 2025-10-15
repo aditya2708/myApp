@@ -18,6 +18,7 @@ import ChildAttendanceBarChart from '../../components/reports/child/ChildAttenda
 import ChildAttendanceCard from '../../components/reports/child/ChildAttendanceCard';
 import ChildAttendanceFilterSheet from '../../components/reports/child/ChildAttendanceFilterSheet';
 import { useChildAttendanceReportList } from '../../hooks/reports/child/useChildAttendanceReportList';
+import { formatPercentageLabel } from './child/utils/childReportTransformers';
 
 const extractChildId = (child) => {
   if (!child) return null;
@@ -66,6 +67,53 @@ const normalizeFilters = (filters = {}, params = {}) => {
   }
 
   return normalized;
+};
+
+const parsePercentageValue = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.replace(/,/g, '.');
+    const match = normalized.match(/-?\d+(?:\.\d+)?/);
+    if (!match) return null;
+
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const extractChildAttendanceRate = (child) => {
+  if (!child || typeof child !== 'object') return null;
+
+  const candidates = [
+    child.attendanceRate?.value,
+    child.attendanceRate?.percentage,
+    child.attendanceRate?.percent,
+    child.attendanceRate,
+    child.attendance_rate,
+    child.attendance_percentage,
+    child.attendancePercentage,
+    child.attendancePercent,
+    child.attendance?.attendance_percentage,
+    child.attendance?.attendanceRate?.value,
+    child.attendance?.attendanceRate,
+    child.attendance?.attendance_rate,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parsePercentageValue(candidate);
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
+  return null;
 };
 
 const getFilterOptions = (options = {}, available = {}) => {
@@ -166,6 +214,49 @@ const AdminCabangChildReportScreen = () => {
     setStartDate,
     setEndDate,
   } = reportState;
+
+  const summaryWithAverage = useMemo(() => {
+    const attendanceValues = (children || [])
+      .map((item) => extractChildAttendanceRate(item))
+      .filter((value) => Number.isFinite(value));
+
+    if (!attendanceValues.length) {
+      return summary;
+    }
+
+    const average = attendanceValues.reduce((total, value) => total + value, 0) / attendanceValues.length;
+    if (!Number.isFinite(average)) {
+      return summary;
+    }
+
+    const normalizedAverage = Number(Number(average).toFixed(2));
+    const formattedAverage = formatPercentageLabel(normalizedAverage);
+
+    const baseSummary = (summary && typeof summary === 'object' ? summary : {}) || {};
+    const attendanceRate =
+      baseSummary.attendanceRate && typeof baseSummary.attendanceRate === 'object'
+        ? baseSummary.attendanceRate
+        : {};
+    const totals =
+      baseSummary.totals && typeof baseSummary.totals === 'object' ? baseSummary.totals : {};
+
+    return {
+      ...baseSummary,
+      attendanceRate: {
+        ...attendanceRate,
+        value: normalizedAverage,
+        label: formattedAverage,
+      },
+      attendance_percentage: formattedAverage,
+      attendanceRateLabel: formattedAverage,
+      totals: {
+        ...totals,
+        attendanceRate: normalizedAverage,
+        attendanceRateLabel: formattedAverage,
+        attendance_percentage: formattedAverage,
+      },
+    };
+  }, [children, summary]);
 
   const normalizedFilters = useMemo(
     () => normalizeFilters(rawFilters, params),
@@ -392,7 +483,7 @@ const AdminCabangChildReportScreen = () => {
         </View>
 
         <ChildAttendanceSummarySection
-          summary={summary}
+          summary={summaryWithAverage}
           loading={isListInitialLoading}
           reportDate={generatedAt}
           periodLabel={period?.label}
@@ -415,7 +506,7 @@ const AdminCabangChildReportScreen = () => {
     isLoading,
     lastRefreshedAt,
     period?.label,
-    summary,
+    summaryWithAverage,
   ]);
 
   const listEmptyComponent = useMemo(() => {
