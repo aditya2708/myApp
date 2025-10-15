@@ -24,17 +24,12 @@ const normalizeParams = (params = {}) => {
   assign('page', params.page, params.current_page, params.currentPage);
   assign('per_page', params.per_page, params.perPage, params.pageSize);
   assign('search', params.search, params.keyword, params.q, params.term, '');
-  assign(
-    'attendance_band',
-    params.attendance_band,
-    params.attendanceBand,
-    params.band,
-    params.band_id,
-  );
   assign('shelter_id', params.shelter_id, params.shelterId);
   assign('group_id', params.group_id, params.groupId);
   assign('start_date', params.start_date, params.startDate);
   assign('end_date', params.end_date, params.endDate);
+  assign('sort_by', params.sort_by, params.sortBy, 'attendance_rate');
+  assign('sort_direction', params.sort_direction, params.sortDirection, params.order, 'desc');
 
   return normalized;
 };
@@ -341,16 +336,6 @@ const adaptFilters = (rawFilters = {}, currentParams = {}) => {
     '',
   );
 
-  const band = firstDefined(
-    rawFilters.band,
-    rawFilters.attendanceBand,
-    rawFilters.attendance_band,
-    currentParams.band,
-    currentParams.attendanceBand,
-    currentParams.attendance_band,
-    null,
-  );
-
   const shelterId = firstDefined(
     rawFilters.shelter_id,
     rawFilters.shelterId,
@@ -383,13 +368,25 @@ const adaptFilters = (rawFilters = {}, currentParams = {}) => {
     null,
   );
 
+  const sortDirection = firstDefined(
+    rawFilters.sortDirection,
+    rawFilters.sort_direction,
+    currentParams.sortDirection,
+    currentParams.sort_direction,
+    currentParams.order,
+    'desc',
+  );
+
+  const normalizedSortDirection =
+    typeof sortDirection === 'string' && sortDirection.toLowerCase() === 'asc' ? 'asc' : 'desc';
+
   return {
     search: search ?? '',
-    band: band ?? null,
     shelterId: shelterId ?? null,
     groupId: groupId ?? null,
     startDate: startDate ?? null,
     endDate: endDate ?? null,
+    sortDirection: normalizedSortDirection,
   };
 };
 
@@ -430,11 +427,11 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
-    band: null,
     shelterId: null,
     groupId: null,
     startDate: null,
     endDate: null,
+    sortDirection: 'desc',
   });
   const [availableFilters, setAvailableFilters] = useState(null);
   const [shelters, setShelters] = useState([]);
@@ -443,16 +440,43 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
   const [chartData, setChartData] = useState(null);
   const [metadata, setMetadata] = useState({});
   const [rawMetadata, setRawMetadata] = useState({});
+  const resolveInitialSortDirection = () => {
+    const value = firstDefined(
+      initialParams.sortDirection,
+      initialParams.sort_direction,
+      initialParams.order,
+      null,
+    );
+
+    if (typeof value === 'string') {
+      const normalized = value.toLowerCase();
+      if (normalized === 'asc' || normalized === 'desc') {
+        return normalized;
+      }
+    }
+
+    return 'desc';
+  };
+
+  const initialSortDirection = resolveInitialSortDirection();
+
   const [params, setParams] = useState(() => ({
     page: 1,
     perPage: 10,
     search: '',
-    band: null,
     shelterId: null,
     groupId: null,
     startDate: null,
     endDate: null,
+    sortBy: 'attendance_rate',
+    sort_by: 'attendance_rate',
+    sortDirection: initialSortDirection,
+    sort_direction: initialSortDirection,
     ...initialParams,
+    sortBy: 'attendance_rate',
+    sort_by: 'attendance_rate',
+    sortDirection: initialSortDirection,
+    sort_direction: initialSortDirection,
   }));
   const [error, setError] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -564,10 +588,25 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
     [resetAppendState],
   );
 
-  const setBand = useCallback((band) => {
-    resetAppendState();
-    setParams((prev) => ({ ...prev, page: 1, band }));
-  }, [resetAppendState]);
+  const setSortDirection = useCallback(
+    (direction) => {
+      resetAppendState();
+      setParams((prev) => {
+        const normalized =
+          typeof direction === 'string' && direction.toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+        return {
+          ...prev,
+          page: 1,
+          sortDirection: normalized,
+          sort_direction: normalized,
+          sortBy: 'attendance_rate',
+          sort_by: 'attendance_rate',
+        };
+      });
+    },
+    [resetAppendState],
+  );
 
   const setSearch = useCallback((search) => {
     resetAppendState();
@@ -672,9 +711,10 @@ export const useChildAttendanceReportList = (initialParams = {}) => {
     metadata,
     rawMetadata,
     params,
+    sortDirection: params.sortDirection ?? params.sort_direction ?? 'desc',
     error,
     errorMessage,
-    setBand,
+    setSortDirection,
     setSearch,
     setPage,
     setShelterId,

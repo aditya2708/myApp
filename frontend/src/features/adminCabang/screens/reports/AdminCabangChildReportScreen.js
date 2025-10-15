@@ -50,20 +50,26 @@ const normalizeFilters = (filters = {}, params = {}) => {
     search: resolve(filters.search, filters.keyword, filters.q, params.search, params.keyword, params.q, ''),
     shelterId: resolve(filters.shelterId, filters.shelter_id, params.shelterId, params.shelter_id),
     groupId: resolve(filters.groupId, filters.group_id, params.groupId, params.group_id),
-    band: resolve(
-      filters.band,
-      filters.attendanceBand,
-      filters.attendance_band,
-      params.band,
-      params.attendanceBand,
-      params.attendance_band,
-    ),
     startDate: resolve(filters.startDate, filters.start_date, params.startDate, params.start_date),
     endDate: resolve(filters.endDate, filters.end_date, params.endDate, params.end_date),
+    sortDirection: resolve(
+      filters.sortDirection,
+      filters.sort_direction,
+      params.sortDirection,
+      params.sort_direction,
+      'desc',
+    ),
   };
 
   if (normalized.search === null) {
     normalized.search = '';
+  }
+
+  if (typeof normalized.sortDirection === 'string') {
+    const normalizedDirection = normalized.sortDirection.toLowerCase();
+    normalized.sortDirection = normalizedDirection === 'asc' ? 'asc' : 'desc';
+  } else {
+    normalized.sortDirection = 'desc';
   }
 
   return normalized;
@@ -145,14 +151,6 @@ const getFilterOptions = (options = {}, available = {}) => {
         source.group_options ??
         source.availableGroups,
     ),
-    bands:
-      toArray(
-        source.bands ??
-          source.bandOptions ??
-          source.band_options ??
-          source.attendanceBands ??
-          source.attendance_band_options,
-      ) || [],
     loading: Boolean(source.loading ?? source.isLoading ?? source.fetching),
   };
 };
@@ -165,9 +163,15 @@ const countActiveFilters = (filters) => {
   if (filters.search && String(filters.search).trim()) count += 1;
   if (filters.shelterId) count += 1;
   if (filters.groupId) count += 1;
-  if (filters.band) count += 1;
   if (filters.startDate) count += 1;
   if (filters.endDate) count += 1;
+  const sortDirection =
+    typeof filters.sortDirection === 'string'
+      ? filters.sortDirection
+      : filters.sort_direction;
+  if (sortDirection && String(sortDirection).toLowerCase() !== 'desc') {
+    count += 1;
+  }
 
   return count;
 };
@@ -209,7 +213,8 @@ const AdminCabangChildReportScreen = () => {
     setSearch,
     setShelterId,
     setGroupId,
-    setBand,
+    sortDirection,
+    setSortDirection,
     setDateRange,
     setStartDate,
     setEndDate,
@@ -263,7 +268,7 @@ const AdminCabangChildReportScreen = () => {
     [rawFilters, params],
   );
 
-  const { shelters, groups, bands, loading: isFilterLoading } = useMemo(
+  const { shelters, groups, loading: isFilterLoading } = useMemo(
     () => getFilterOptions(filterOptions, availableFilters),
     [availableFilters, filterOptions],
   );
@@ -273,13 +278,40 @@ const AdminCabangChildReportScreen = () => {
     [normalizedFilters],
   );
 
+  const sortedChildren = useMemo(() => {
+    if (!Array.isArray(children)) return [];
+
+    const normalizedDirection =
+      typeof sortDirection === 'string' && sortDirection.toLowerCase() === 'asc'
+        ? 'asc'
+        : 'desc';
+
+    return [...children].sort((a, b) => {
+      const rateA = extractChildAttendanceRate(a);
+      const rateB = extractChildAttendanceRate(b);
+
+      const isValidA = Number.isFinite(rateA);
+      const isValidB = Number.isFinite(rateB);
+
+      if (!isValidA && !isValidB) return 0;
+      if (!isValidA) return 1;
+      if (!isValidB) return -1;
+
+      if (normalizedDirection === 'asc') {
+        return rateA - rateB;
+      }
+
+      return rateB - rateA;
+    });
+  }, [children, sortDirection]);
+
   const listContentStyle = useMemo(() => {
-    if (children && children.length) {
+    if (sortedChildren && sortedChildren.length) {
       return styles.listContent;
     }
 
     return [styles.listContent, styles.listContentEmpty];
-  }, [children]);
+  }, [sortedChildren]);
 
   const chartData = useMemo(() => {
     const sources = [
@@ -348,7 +380,8 @@ const AdminCabangChildReportScreen = () => {
         return;
       }
 
-      const { search, shelterId, groupId, band, startDate, endDate } = nextFilters;
+      const { search, shelterId, groupId, sortDirection: nextSortDirection, startDate, endDate } =
+        nextFilters;
 
       if (setSearch) {
         setSearch(search ?? '');
@@ -356,7 +389,7 @@ const AdminCabangChildReportScreen = () => {
 
       setShelterId?.(shelterId ?? null);
       setGroupId?.(groupId ?? null);
-      setBand?.(band ?? null);
+      setSortDirection?.(nextSortDirection ?? 'desc');
 
       if (setDateRange) {
         setDateRange({ startDate: startDate ?? null, endDate: endDate ?? null });
@@ -367,12 +400,12 @@ const AdminCabangChildReportScreen = () => {
     },
     [
       applyFilters,
-      setBand,
       setDateRange,
       setEndDate,
       setGroupId,
       setSearch,
       setShelterId,
+      setSortDirection,
       setStartDate,
     ],
   );
@@ -386,7 +419,6 @@ const AdminCabangChildReportScreen = () => {
       setSearch?.('');
       setShelterId?.(null);
       setGroupId?.(null);
-      setBand?.(null);
       if (setDateRange) {
         setDateRange({ startDate: null, endDate: null });
       } else {
@@ -394,6 +426,8 @@ const AdminCabangChildReportScreen = () => {
         setEndDate?.(null);
       }
     }
+
+    setSortDirection?.('desc');
 
     if (typeof refresh === 'function') {
       refresh();
@@ -405,12 +439,12 @@ const AdminCabangChildReportScreen = () => {
     refetch,
     refresh,
     resetFilters,
-    setBand,
     setDateRange,
     setEndDate,
     setGroupId,
     setSearch,
     setShelterId,
+    setSortDirection,
     setStartDate,
   ]);
 
@@ -565,7 +599,7 @@ const AdminCabangChildReportScreen = () => {
       ) : null}
 
       <FlatList
-        data={children}
+        data={sortedChildren}
         renderItem={renderChildItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={listContentStyle}
@@ -586,7 +620,6 @@ const AdminCabangChildReportScreen = () => {
         filters={normalizedFilters}
         shelters={shelters}
         groups={groups}
-        bands={bands}
         loading={isFilterLoading}
         onApply={handleApplyFilters}
         onReset={() => {

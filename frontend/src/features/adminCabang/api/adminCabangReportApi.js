@@ -25,13 +25,24 @@ const normalizeChildAttendanceParams = (params = {}) => {
   assignIfDefined('page', params.page);
   assignIfDefined('per_page', params.per_page, params.perPage, params.pageSize);
   assignIfDefined('search', params.search, params.keyword, params.q, params.term);
-  assignIfDefined('attendance_band', params.attendance_band, params.attendanceBand, params.band, params.band_id);
   assignIfDefined('shelter_id', params.shelter_id, params.shelterId);
   assignIfDefined('group_id', params.group_id, params.groupId);
   assignIfDefined('start_date', params.start_date, params.startDate);
   assignIfDefined('end_date', params.end_date, params.endDate);
-  assignIfDefined('sort_by', params.sort_by, params.sortBy);
-  assignIfDefined('sort_direction', params.sort_direction, params.sortDirection, params.order);
+  normalized.sort_by = 'attendance_rate';
+
+  const sortDirectionCandidate = firstDefined(
+    params.sort_direction,
+    params.sortDirection,
+    params.order,
+  );
+
+  if (typeof sortDirectionCandidate === 'string') {
+    const normalizedDirection = sortDirectionCandidate.toLowerCase();
+    normalized.sort_direction = normalizedDirection === 'asc' ? 'asc' : 'desc';
+  } else {
+    normalized.sort_direction = 'desc';
+  }
 
   return normalized;
 };
