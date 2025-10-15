@@ -52,6 +52,7 @@ import SuratFormScreen from '../features/adminShelter/screens/anakDetail/SuratFo
 import RiwayatScreen from '../features/adminShelter/screens/anakDetail/RiwayatScreen';
 import RiwayatDetailScreen from '../features/adminShelter/screens/anakDetail/RiwayatDetailScreen';
 import RiwayatFormScreen from '../features/adminShelter/screens/anakDetail/RiwayatFormScreen';
+import RiwayatKehadiranScreen from '../features/adminShelter/screens/anakDetail/RiwayatKehadiranScreen';
 import NilaiAnakScreen from '../features/adminShelter/screens/anakDetail/NilaiAnakScreen';
 import RaporShelterScreen from '../features/adminShelter/screens/anakDetail/RaporShelterScreen';
 import RaportFormalScreen from '../features/adminShelter/screens/anakDetail/RaportFormalScreen';
@@ -283,6 +284,11 @@ const ManagementStackNavigator = () => (
   <ManagementStack.Screen name="Riwayat" component={RiwayatScreen} options={{ headerTitle: 'Riwayat' }} />
   <ManagementStack.Screen name="RiwayatDetail" component={RiwayatDetailScreen} options={{ headerTitle: 'Detail Riwayat' }} />
   <ManagementStack.Screen name="RiwayatForm" component={RiwayatFormScreen} options={{ headerTitle: 'Form Riwayat' }} />
+  <ManagementStack.Screen
+    name="RiwayatKehadiran"
+    component={RiwayatKehadiranScreen}
+    options={{ headerTitle: 'Riwayat Kehadiran' }}
+  />
   <ManagementStack.Screen name="NilaiAnak" component={NilaiAnakScreen} options={{ headerTitle: 'Nilai Anak' }} />
   <ManagementStack.Screen name="NilaiSikap" component={NilaiSikapScreen} options={{ headerTitle: 'Nilai Sikap' }} />
   <ManagementStack.Screen name="NilaiSikapForm" component={NilaiSikapFormScreen} options={{ headerTitle: 'Form Nilai Sikap' }} />
