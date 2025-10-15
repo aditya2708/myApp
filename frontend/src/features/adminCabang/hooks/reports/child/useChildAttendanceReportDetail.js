@@ -65,6 +65,7 @@ const adaptTotals = (rawTotals = {}) => {
   const absentValue = coalesceNumber(
     rawTotals.tidakHadir,
     rawTotals.tidak_hadir,
+    rawTotals.tidak_hadir_count,
     rawTotals.tidakHadirCount,
     rawTotals.absent,
     rawTotals.absentCount,

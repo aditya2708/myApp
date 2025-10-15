@@ -63,6 +63,7 @@ const ChildReportSummaryCard = ({
       coalesceNumber(
         safeTotals.tidakHadir,
         safeTotals.tidak_hadir,
+        safeTotals.tidak_hadir_count,
         safeTotals.tidakHadirCount,
         safeTotals.absent,
         safeTotals.absentCount,

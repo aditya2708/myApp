@@ -153,6 +153,7 @@ const AdminCabangChildReportDetailScreen = ({ navigation, route }) => {
       const tidakHadirValue = coalesceNumber(
         source.tidakHadir,
         source.tidak_hadir,
+        source.tidak_hadir_count,
         source.tidakHadirCount,
         source.absent,
         source.absentCount,
