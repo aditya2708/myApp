@@ -91,17 +91,72 @@ const normalizeFilters = (filters = {}, params = {}) => {
 const parsePercentageValue = (value) => {
   if (value === undefined || value === null || value === '') return null;
 
+  const normalizeNumber = (candidate) => {
+    if (!Number.isFinite(candidate)) return null;
+    if (candidate > -1 && candidate < 1) {
+      return candidate * 100;
+    }
+    return candidate;
+  };
+
   if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
+    return normalizeNumber(Number(value));
   }
 
   if (typeof value === 'string') {
-    const normalized = value.replace(/,/g, '.');
-    const match = normalized.match(/-?\d+(?:\.\d+)?/);
-    if (!match) return null;
+    const normalizedString = value.replace(/,/g, '.').trim();
+    if (!normalizedString) return null;
 
-    const parsed = Number(match[0]);
-    return Number.isFinite(parsed) ? parsed : null;
+    const percentMatch = normalizedString.match(/(-?\d+(?:\.\d+)?)\s*%/);
+    if (percentMatch) {
+      const parsedPercent = Number(percentMatch[1]);
+      return normalizeNumber(parsedPercent);
+    }
+
+    const fractionMatch = normalizedString.match(
+      /(-?\d+(?:\.\d+)?)\s*\/\s*(-?\d+(?:\.\d+)?)/,
+    );
+    if (fractionMatch) {
+      const numerator = Number(fractionMatch[1]);
+      const denominator = Number(fractionMatch[2]);
+      if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+        return normalizeNumber(numerator / denominator);
+      }
+    }
+
+    const genericMatch = normalizedString.match(/-?\d+(?:\.\d+)?/);
+    if (!genericMatch) return null;
+    const parsedGeneric = Number(genericMatch[0]);
+    return normalizeNumber(parsedGeneric);
+  }
+
+  if (typeof value === 'object') {
+    const nestedCandidates = [];
+    const fields = [
+      'value',
+      'percentage',
+      'percent',
+      'ratio',
+      'label',
+      'text',
+      'display',
+      'attendance_percentage',
+      'attendanceRate',
+      'attendance_rate',
+    ];
+
+    for (const field of fields) {
+      if (field in value) {
+        nestedCandidates.push(value[field]);
+      }
+    }
+
+    for (const candidate of nestedCandidates) {
+      const parsed = parsePercentageValue(candidate);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
   }
 
   return null;
@@ -330,40 +385,94 @@ const AdminCabangChildReportScreen = () => {
     [normalizedFilters],
   );
 
-  const sortedChildren = useMemo(() => {
+  const normalizedSortDirection = useMemo(() => {
+    if (typeof sortDirection === 'string' && sortDirection.toLowerCase() === 'asc') {
+      return 'asc';
+    }
+
+    return 'desc';
+  }, [sortDirection]);
+
+  const childListEntries = useMemo(() => {
     if (!Array.isArray(children)) return [];
 
-    const normalizedDirection =
-      typeof sortDirection === 'string' && sortDirection.toLowerCase() === 'asc'
-        ? 'asc'
-        : 'desc';
+    const baseEntries = children.map((child, index) => {
+      const rate = extractChildAttendanceRate(child);
+      return {
+        child,
+        normalizedRate: Number.isFinite(rate) ? Number(rate) : null,
+        originalIndex: index,
+      };
+    });
 
-    return [...children].sort((a, b) => {
-      const rateA = extractChildAttendanceRate(a);
-      const rateB = extractChildAttendanceRate(b);
+    if (!baseEntries.length) {
+      return baseEntries;
+    }
 
-      const isValidA = Number.isFinite(rateA);
-      const isValidB = Number.isFinite(rateB);
+    const hasValidRate = baseEntries.some((entry) => entry.normalizedRate !== null);
+    if (!hasValidRate) {
+      return baseEntries;
+    }
 
-      if (!isValidA && !isValidB) return 0;
-      if (!isValidA) return 1;
-      if (!isValidB) return -1;
+    const isBackendOrdered = baseEntries.every((entry, index) => {
+      if (index === 0) return true;
 
-      if (normalizedDirection === 'asc') {
+      const previous = baseEntries[index - 1];
+      const previousRate = previous.normalizedRate;
+      const currentRate = entry.normalizedRate;
+
+      if (previousRate === null || currentRate === null) {
+        return true;
+      }
+
+      if (normalizedSortDirection === 'asc') {
+        return previousRate <= currentRate;
+      }
+
+      return previousRate >= currentRate;
+    });
+
+    if (isBackendOrdered) {
+      return baseEntries;
+    }
+
+    const sortedEntries = [...baseEntries].sort((a, b) => {
+      const rateA = a.normalizedRate;
+      const rateB = b.normalizedRate;
+
+      if (rateA === null && rateB === null) {
+        return a.originalIndex - b.originalIndex;
+      }
+
+      if (rateA === null) return 1;
+      if (rateB === null) return -1;
+
+      if (rateA === rateB) {
+        return a.originalIndex - b.originalIndex;
+      }
+
+      if (normalizedSortDirection === 'asc') {
         return rateA - rateB;
       }
 
       return rateB - rateA;
     });
-  }, [children, sortDirection]);
+
+    return sortedEntries;
+  }, [children, normalizedSortDirection]);
+
+  const childListData = useMemo(
+    () => childListEntries.map((entry) => entry.child),
+    [childListEntries],
+  );
 
   const listContentStyle = useMemo(() => {
-    if (sortedChildren && sortedChildren.length) {
+    if (childListData && childListData.length) {
       return styles.listContent;
     }
 
     return [styles.listContent, styles.listContentEmpty];
-  }, [sortedChildren]);
+  }, [childListData]);
 
   const chartData = useMemo(() => {
     const sources = [
@@ -552,6 +661,8 @@ const AdminCabangChildReportScreen = () => {
   );
 
   const listHeader = useMemo(() => {
+    const hasChildren = childListData && childListData.length > 0;
+
     return (
       <View>
         <View style={styles.pageHeader}>
@@ -587,7 +698,7 @@ const AdminCabangChildReportScreen = () => {
 
         <ChildAttendanceBarChart data={chartData} loading={isLoading && !chartData.length} />
 
-        {children && children.length ? (
+        {hasChildren ? (
           <Text style={styles.sectionTitle}>Daftar Anak</Text>
         ) : null}
       </View>
@@ -595,7 +706,7 @@ const AdminCabangChildReportScreen = () => {
   }, [
     activeFiltersCount,
     chartData,
-    children,
+    childListData,
     generatedAt,
     handleOpenFilters,
     isListInitialLoading,
@@ -661,7 +772,7 @@ const AdminCabangChildReportScreen = () => {
       ) : null}
 
       <FlatList
-        data={sortedChildren}
+        data={childListData}
         renderItem={renderChildItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={listContentStyle}
