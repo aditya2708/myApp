@@ -1108,11 +1108,11 @@ class WeeklyAttendanceService
 
     protected function determineAttendanceBand(float $attendancePercentage): string
     {
-        if ($attendancePercentage > 85.0) {
+        if ($attendancePercentage >= 80.0) {
             return 'high';
         }
 
-        if ($attendancePercentage >= 75.0) {
+        if ($attendancePercentage >= 60.0) {
             return 'medium';
         }
 
