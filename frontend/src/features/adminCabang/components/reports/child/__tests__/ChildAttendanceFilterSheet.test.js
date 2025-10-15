@@ -13,11 +13,6 @@ const groups = [
   { id: 'group-2', name: 'Kelompok B', shelterId: 'shelter-2' },
 ];
 
-const bands = [
-  { id: 'high', label: 'Kehadiran Tinggi' },
-  { id: 'medium', label: 'Kehadiran Sedang' },
-];
-
 describe('ChildAttendanceFilterSheet', () => {
   const renderSheet = (props = {}) =>
     render(
@@ -26,20 +21,19 @@ describe('ChildAttendanceFilterSheet', () => {
         onClose={jest.fn()}
         shelters={shelters}
         groups={groups}
-        bands={bands}
         {...props}
       />,
     );
 
-  it('renders picker inputs for shelter, group, and band', () => {
+  it('renders picker inputs for shelter, group, and sort direction', () => {
     const { getByTestId, getByText } = renderSheet();
 
     expect(getByText('Shelter')).toBeTruthy();
     expect(getByText('Kelompok')).toBeTruthy();
-    expect(getByText('Band Kehadiran')).toBeTruthy();
+    expect(getByText('Urutan Nilai Kehadiran')).toBeTruthy();
     expect(getByTestId('shelter-picker')).toBeTruthy();
     expect(getByTestId('group-picker')).toBeTruthy();
-    expect(getByTestId('band-picker')).toBeTruthy();
+    expect(getByTestId('sort-direction-picker')).toBeTruthy();
   });
 
   it('applies selected filters and filters groups by shelter', async () => {
@@ -53,7 +47,7 @@ describe('ChildAttendanceFilterSheet', () => {
     });
 
     fireEvent.valueChange(getByTestId('group-picker'), 'group-1');
-    fireEvent.valueChange(getByTestId('band-picker'), 'high');
+    fireEvent.valueChange(getByTestId('sort-direction-picker'), 'asc');
 
     fireEvent.press(getByText('Terapkan'));
 
@@ -61,7 +55,7 @@ describe('ChildAttendanceFilterSheet', () => {
       expect.objectContaining({
         shelterId: 'shelter-1',
         groupId: 'group-1',
-        band: 'high',
+        sortDirection: 'asc',
       }),
     );
   });

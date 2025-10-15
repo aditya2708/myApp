@@ -36,7 +36,7 @@ const getInitialFilters = (filters) => ({
   search: filters?.search ?? '',
   shelterId: filters?.shelterId ?? filters?.shelter_id ?? null,
   groupId: filters?.groupId ?? filters?.group_id ?? null,
-  band: filters?.band ?? filters?.attendanceBand ?? filters?.attendance_band ?? null,
+  sortDirection: filters?.sortDirection ?? filters?.sort_direction ?? 'desc',
   startDate: filters?.startDate ?? filters?.start_date ?? null,
   endDate: filters?.endDate ?? filters?.end_date ?? null,
 });
@@ -47,7 +47,6 @@ const ChildAttendanceFilterSheet = ({
   filters = {},
   shelters = [],
   groups = [],
-  bands = [],
   loading = false,
   onApply,
   onReset,
@@ -61,7 +60,6 @@ const ChildAttendanceFilterSheet = ({
   }, [filters, visible]);
 
   const groupedShelters = Array.isArray(shelters) ? shelters : [];
-  const groupedBands = Array.isArray(bands) ? bands : [];
 
   const filteredGroups = useMemo(() => {
     const list = Array.isArray(groups) ? groups : [];
@@ -119,18 +117,13 @@ const ChildAttendanceFilterSheet = ({
     return [{ label: 'Semua Kelompok', value: null }, ...options];
   }, [filteredGroups]);
 
-  const bandOptions = useMemo(() => {
-    const seen = new Set();
-    const options = groupedBands.reduce((acc, band) => {
-      const id = band?.id ?? band?.band ?? band?.value ?? null;
-      if (id === null || id === undefined || seen.has(id)) return acc;
-      seen.add(id);
-      const label = band?.label ?? band?.name ?? band?.title ?? String(id);
-      acc.push({ label, value: id });
-      return acc;
-    }, []);
-    return [{ label: 'Semua Band Kehadiran', value: null }, ...options];
-  }, [groupedBands]);
+  const sortDirectionOptions = useMemo(
+    () => [
+      { label: 'Tertinggi ke Terendah', value: 'desc' },
+      { label: 'Terendah ke Tertinggi', value: 'asc' },
+    ],
+    [],
+  );
 
   const handleShelterChange = (value) => {
     const normalized = value ?? null;
@@ -151,10 +144,10 @@ const ChildAttendanceFilterSheet = ({
     }));
   };
 
-  const handleBandChange = (value) => {
+  const handleSortDirectionChange = (value) => {
     setLocalFilters((prev) => ({
       ...prev,
-      band: value ?? null,
+      sortDirection: value ?? 'desc',
     }));
   };
 
@@ -164,8 +157,9 @@ const ChildAttendanceFilterSheet = ({
   };
 
   const handleReset = () => {
-    setLocalFilters(getInitialFilters({}));
-    onReset?.();
+    const initial = getInitialFilters({});
+    setLocalFilters(initial);
+    onReset?.(initial);
   };
 
   const renderSkeleton = () => (
@@ -261,19 +255,15 @@ const ChildAttendanceFilterSheet = ({
               <Text style={styles.emptyText}>Tidak ada kelompok untuk shelter ini.</Text>
             )}
 
-            <Text style={styles.sectionTitle}>Band Kehadiran</Text>
-            {bandOptions.length > 1 ? (
-              <PickerInput
-                value={localFilters.band ?? null}
-                onValueChange={handleBandChange}
-                items={bandOptions}
-                placeholder="Pilih band"
-                style={styles.pickerInput}
-                pickerProps={{ testID: 'band-picker' }}
-              />
-            ) : (
-              <Text style={styles.emptyText}>Band kehadiran belum tersedia.</Text>
-            )}
+            <Text style={styles.sectionTitle}>Urutan Nilai Kehadiran</Text>
+            <PickerInput
+              value={localFilters.sortDirection ?? 'desc'}
+              onValueChange={handleSortDirectionChange}
+              items={sortDirectionOptions}
+              placeholder="Pilih urutan"
+              style={styles.pickerInput}
+              pickerProps={{ testID: 'sort-direction-picker' }}
+            />
           </ScrollView>
         )}
 
