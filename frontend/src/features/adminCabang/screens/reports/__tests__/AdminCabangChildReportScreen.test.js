@@ -216,7 +216,7 @@ describe('AdminCabangChildReportScreen', () => {
     expect(refetch).not.toHaveBeenCalled();
   });
 
-  it('sorts children before passing them to FlatList based on sort direction', () => {
+  it('respects backend ordering when children are already sorted', () => {
     const baseState = {
       summary: null,
       pagination: null,
@@ -260,28 +260,74 @@ describe('AdminCabangChildReportScreen', () => {
       { id: 'child-4', attendanceRateLabel: '33,3%' },
     ];
 
-    mockUseChildAttendanceReportList
-      .mockReturnValueOnce({ ...baseState, children, sortDirection: 'desc' })
-      .mockReturnValue({ ...baseState, children, sortDirection: 'asc' });
+    mockUseChildAttendanceReportList.mockReturnValue({
+      ...baseState,
+      children,
+      sortDirection: 'desc',
+    });
 
-    const { UNSAFE_getByType, rerender } = render(<AdminCabangChildReportScreen />);
+    const { UNSAFE_getByType } = render(<AdminCabangChildReportScreen />);
 
-    const flatListDesc = UNSAFE_getByType(FlatList);
-    expect(flatListDesc.props.data.map((item) => item.id)).toEqual([
-      'child-2',
-      'child-1',
-      'child-4',
-      'child-3',
-    ]);
+    const flatList = UNSAFE_getByType(FlatList);
+    expect(flatList.props.data.map((item) => item.id)).toEqual(
+      children.map((item) => item.id),
+    );
+  });
 
-    rerender(<AdminCabangChildReportScreen />);
+  it('normalizes ratio payload when sorting by highest percentage', () => {
+    const baseState = {
+      summary: null,
+      pagination: null,
+      params: {},
+      filters: {},
+      chartData: [],
+      shelterAttendanceChart: null,
+      shelterBreakdown: null,
+      lastRefreshedAt: null,
+      generatedAt: null,
+      period: null,
+      isLoading: false,
+      isInitialLoading: false,
+      isRefreshing: false,
+      isFetchingMore: false,
+      error: null,
+      errorMessage: null,
+      hasNextPage: false,
+      refresh: jest.fn(),
+      refetch: jest.fn(),
+      loadMore: jest.fn(),
+      fetchNextPage: jest.fn(),
+      applyFilters: undefined,
+      availableFilters: null,
+      filterOptions: null,
+      resetFilters: jest.fn(),
+      clearFilters: jest.fn(),
+      setSearch: jest.fn(),
+      setShelterId: jest.fn(),
+      setGroupId: jest.fn(),
+      setSortDirection: jest.fn(),
+      setDateRange: undefined,
+      setStartDate: jest.fn(),
+      setEndDate: jest.fn(),
+    };
 
-    const flatListAsc = UNSAFE_getByType(FlatList);
-    expect(flatListAsc.props.data.map((item) => item.id)).toEqual([
-      'child-3',
-      'child-4',
-      'child-1',
-      'child-2',
+    const children = [
+      { id: 'child-low', attendanceRateLabel: '3/10 (30%)' },
+      { id: 'child-high', attendanceRateLabel: '0.95' },
+    ];
+
+    mockUseChildAttendanceReportList.mockReturnValue({
+      ...baseState,
+      children,
+      sortDirection: 'desc',
+    });
+
+    const { UNSAFE_getByType } = render(<AdminCabangChildReportScreen />);
+
+    const flatList = UNSAFE_getByType(FlatList);
+    expect(flatList.props.data.map((item) => item.id)).toEqual([
+      'child-high',
+      'child-low',
     ]);
   });
 });
