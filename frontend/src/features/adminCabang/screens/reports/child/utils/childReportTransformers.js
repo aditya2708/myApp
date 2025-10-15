@@ -58,7 +58,7 @@ export const resolveBandMeta = (band, percentage) => {
 
   const numeric = Number(percentage);
   if (!Number.isFinite(numeric)) return { code: 'unknown', ...BAND_STYLES.unknown };
-  if (numeric >= 85) return { code: 'high', ...BAND_STYLES.high };
+  if (numeric >= 80) return { code: 'high', ...BAND_STYLES.high };
   if (numeric >= 60) return { code: 'medium', ...BAND_STYLES.medium };
   return { code: 'low', ...BAND_STYLES.low };
 };
