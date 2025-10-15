@@ -51,6 +51,18 @@ describe('ChildAttendanceCard', () => {
     expect(onViewDetail).toHaveBeenCalledTimes(1);
   });
 
+  it('formats fractional attendance rates using the percentage helper as a fallback', () => {
+    const child = {
+      name: 'Joko',
+      totals: { hadir: 19, tidakHadir: 1, totalAktivitas: 20 },
+      attendanceRate: { value: 0.95 },
+    };
+
+    const { getByText } = render(<ChildAttendanceCard child={child} />);
+
+    expect(getByText('95,00%')).toBeTruthy();
+  });
+
   it('falls back to the attendance percentage to resolve band meta when missing', () => {
     const child = {
       name: 'Rina Sari',

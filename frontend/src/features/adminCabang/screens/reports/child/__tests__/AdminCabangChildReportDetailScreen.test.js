@@ -65,7 +65,7 @@ describe('AdminCabangChildReportDetailScreen', () => {
       enabled: true,
     });
     expect(navigationMock.setOptions).toHaveBeenCalledWith({ headerShown: false });
-    expect(getByTestId('totals-persentase-value').props.children).toBe('0,08%');
+    expect(getByTestId('totals-persentase-value').props.children).toBe('8,00%');
   });
 
   it('falls back to attendance percentage to resolve band meta when missing', () => {

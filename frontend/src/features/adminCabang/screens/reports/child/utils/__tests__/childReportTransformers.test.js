@@ -1,4 +1,9 @@
-import { BAND_STYLES, normalizeStreaks, resolveBandMeta } from '../childReportTransformers';
+import {
+  BAND_STYLES,
+  formatPercentageLabel,
+  normalizeStreaks,
+  resolveBandMeta,
+} from '../childReportTransformers';
 
 describe('childReportTransformers.normalizeStreaks', () => {
   it('filters out nullish streak entries when normalizing objects', () => {
@@ -34,6 +39,23 @@ describe('childReportTransformers.normalizeStreaks', () => {
         unit: null,
       },
     ]);
+  });
+});
+
+describe('childReportTransformers.formatPercentageLabel', () => {
+  it('formats numeric ratios below one into percentages', () => {
+    expect(formatPercentageLabel(0.95)).toBe('95,00%');
+    expect(formatPercentageLabel('0.125')).toBe('12,50%');
+  });
+
+  it('parses fractional representations and converts them to percentages', () => {
+    expect(formatPercentageLabel('3/4')).toBe('75,00%');
+    expect(formatPercentageLabel('  1 / 5  ')).toBe('20,00%');
+  });
+
+  it('returns null when the value cannot be parsed', () => {
+    expect(formatPercentageLabel('')).toBeNull();
+    expect(formatPercentageLabel('not a number')).toBeNull();
   });
 });
 
