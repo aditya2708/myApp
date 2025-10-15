@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, FlatList } from 'react-native';
 import { act, render } from '@testing-library/react-native';
 
 import AdminCabangChildReportScreen from '../AdminCabangChildReportScreen';
@@ -131,8 +131,10 @@ describe('AdminCabangChildReportScreen', () => {
 
     const { UNSAFE_getByType } = render(<AdminCabangChildReportScreen />);
 
+    const filterSheet = UNSAFE_getByType(ChildAttendanceFilterSheet);
+
     act(() => {
-      UNSAFE_getByType(ChildAttendanceFilterSheet).props.onApply({
+      filterSheet.props.onApply({
         search: 'ani',
         shelterId: 'shelter-2',
         groupId: 'group-4',
@@ -142,13 +144,90 @@ describe('AdminCabangChildReportScreen', () => {
       });
     });
 
+    act(() => {
+      filterSheet.props.onApply({
+        search: 'budi',
+        shelterId: 'shelter-9',
+        groupId: 'group-3',
+        startDate: '2024-04-01',
+        endDate: '2024-04-30',
+      });
+    });
+
     expect(setSearch).toHaveBeenCalledWith('ani');
     expect(setShelterId).toHaveBeenCalledWith('shelter-2');
     expect(setGroupId).toHaveBeenCalledWith('group-4');
-    expect(setSortDirection).toHaveBeenCalledWith('asc');
+    expect(setSortDirection).toHaveBeenNthCalledWith(1, 'asc');
+    expect(setSortDirection).toHaveBeenNthCalledWith(2, 'desc');
     expect(setStartDate).toHaveBeenCalledWith('2024-03-01');
     expect(setEndDate).toHaveBeenCalledWith('2024-03-31');
     expect(refresh).not.toHaveBeenCalled();
     expect(refetch).not.toHaveBeenCalled();
+  });
+
+  it('sorts children before passing them to FlatList based on sort direction', () => {
+    const baseState = {
+      summary: null,
+      pagination: null,
+      params: {},
+      filters: {},
+      chartData: [],
+      shelterAttendanceChart: null,
+      shelterBreakdown: null,
+      lastRefreshedAt: null,
+      generatedAt: null,
+      period: null,
+      isLoading: false,
+      isInitialLoading: false,
+      isRefreshing: false,
+      isFetchingMore: false,
+      error: null,
+      errorMessage: null,
+      hasNextPage: false,
+      refresh: jest.fn(),
+      refetch: jest.fn(),
+      loadMore: jest.fn(),
+      fetchNextPage: jest.fn(),
+      applyFilters: undefined,
+      availableFilters: null,
+      filterOptions: null,
+      resetFilters: jest.fn(),
+      clearFilters: jest.fn(),
+      setSearch: jest.fn(),
+      setShelterId: jest.fn(),
+      setGroupId: jest.fn(),
+      setSortDirection: jest.fn(),
+      setDateRange: undefined,
+      setStartDate: jest.fn(),
+      setEndDate: jest.fn(),
+    };
+
+    const children = [
+      { id: 'child-1', attendanceRate: { value: 40 } },
+      { id: 'child-2', attendanceRate: { value: 95 } },
+      { id: 'child-3', attendance_rate: 70 },
+    ];
+
+    mockUseChildAttendanceReportList
+      .mockReturnValueOnce({ ...baseState, children, sortDirection: 'desc' })
+      .mockReturnValue({ ...baseState, children, sortDirection: 'asc' });
+
+    const { UNSAFE_getByType, rerender } = render(<AdminCabangChildReportScreen />);
+
+    const flatListDesc = UNSAFE_getByType(FlatList);
+    expect(flatListDesc.props.data.map((item) => item.id)).toEqual([
+      'child-2',
+      'child-3',
+      'child-1',
+    ]);
+
+    rerender(<AdminCabangChildReportScreen />);
+
+    const flatListAsc = UNSAFE_getByType(FlatList);
+    expect(flatListAsc.props.data.map((item) => item.id)).toEqual([
+      'child-1',
+      'child-3',
+      'child-2',
+    ]);
   });
 });

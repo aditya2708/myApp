@@ -118,6 +118,17 @@ describe('useChildAttendanceReportList', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
+    expect(adminCabangReportApi.getChildAttendanceReport.mock.calls[0][0]).toMatchObject({
+      sort_by: 'attendance_rate',
+      sort_direction: 'desc',
+    });
+
+    expect(typeof result.current.setSortDirection).toBe('function');
+    expect(result.current.params.sort_by).toBe('attendance_rate');
+    expect(result.current.params.sort_direction).toBe('desc');
+    expect(result.current.params.sortBy).toBe('attendance_rate');
+    expect(result.current.params.sortDirection).toBe('desc');
+
     expect(result.current.summary.attendanceRate.value).toBe(82.5);
     expect(result.current.summary.attendance_percentage).toBe(82.5);
     expect(result.current.summary.presentCount).toBe(30);
