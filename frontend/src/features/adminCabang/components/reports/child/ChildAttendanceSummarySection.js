@@ -18,8 +18,6 @@ const FALLBACK_SUMMARY = {
   tidakHadirCount: 0,
   tidak_hadir_count: 0,
   attendance_percentage: '0%',
-  activeChildren: 0,
-  inactiveChildren: 0,
   totals: {
     hadir: 0,
     hadirCount: 0,
@@ -34,8 +32,6 @@ const FALLBACK_SUMMARY = {
     total_activities: 0,
     totalSessions: 0,
     sessions: 0,
-    activeChildren: 0,
-    inactiveChildren: 0,
   },
 };
 
@@ -78,14 +74,6 @@ const buildSummaryItems = (summary) => {
     summary.sessions ??
     0;
 
-  const activeChildren =
-    summary.activeChildren ?? summary.totals?.activeChildren ?? summary.active_children ?? 0;
-  const inactiveChildren =
-    summary.inactiveChildren ??
-    summary.totals?.inactiveChildren ??
-    summary.inactive_children ??
-    Math.max(0, totalChildren - activeChildren);
-
   const attendanceRateLabel =
     summary.attendanceRate?.label ??
     summary.attendanceRateLabel ??
@@ -122,10 +110,7 @@ const buildSummaryItems = (summary) => {
       icon: 'time',
       label: 'Total Aktivitas',
       value: formatNumber(totalAktivitas),
-      description: `Anak dipantau: ${formatNumber(totalChildren)} (aktif: ${formatNumber(
-        activeChildren,
-        { allowPlaceholder: true },
-      )}, inaktif: ${formatNumber(inactiveChildren, { allowPlaceholder: true })})`,
+      description: `Anak dipantau: ${formatNumber(totalChildren)}`,
       color: '#6c5ce7',
     },
   ];
