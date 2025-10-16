@@ -12,122 +12,8 @@ import Button from '../../../../common/components/Button';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 
-import {
-  createActivityReport,
-  fetchActivityReport,
-  updateAktivitasStatus
-} from '../../redux/aktivitasSlice';
-import {
-  fetchActivityMembersWithAttendance,
-  getAttendanceByActivity
-} from '../../redux/attendanceSlice';
+import { createActivityReport, fetchActivityReport } from '../../redux/aktivitasSlice';
 import CampaignShareModal from '../../components/CampaignShareModal';
-
-const extractSummaryFromUpdate = (result) => {
-  if (!result) {
-    return null;
-  }
-
-  const payload = result?.data?.data ?? result?.data ?? result;
-
-  return (
-    payload?.attendance_summary ??
-    payload?.summary ??
-    payload?.aktivitas?.attendance_summary ??
-    null
-  );
-};
-
-const normalizeAttendanceSummary = (rawSummary) => {
-  if (!rawSummary || typeof rawSummary !== 'object') {
-    return null;
-  }
-
-  const total =
-    rawSummary.total_members ??
-    rawSummary.total ??
-    rawSummary.total_students ??
-    rawSummary.total_member ??
-    rawSummary.total_count ??
-    rawSummary.totalParticipants ??
-    rawSummary.totalMembers ??
-    0;
-
-  const present =
-    rawSummary.present_count ??
-    rawSummary.present ??
-    rawSummary.hadir ??
-    rawSummary.presentMembers ??
-    rawSummary.hadir_count ??
-    0;
-
-  const late =
-    rawSummary.late_count ??
-    rawSummary.late ??
-    rawSummary.terlambat ??
-    rawSummary.lateMembers ??
-    0;
-
-  const absent =
-    rawSummary.absent_count ??
-    rawSummary.absent ??
-    rawSummary.tidak_hadir ??
-    rawSummary.absentMembers ??
-    0;
-
-  const unrecorded =
-    rawSummary.no_record_count ??
-    rawSummary.unrecorded ??
-    rawSummary.belum_tercatat ??
-    rawSummary.not_recorded ??
-    rawSummary.pending ??
-    (total - (present + late + absent));
-
-  return {
-    total,
-    present,
-    late,
-    absent,
-    unrecorded
-  };
-};
-
-const formatSummaryMessage = (rawSummary) => {
-  if (!rawSummary) {
-    return null;
-  }
-
-  if (rawSummary?.success === false) {
-    return (
-      rawSummary.message ||
-      'Ringkasan kehadiran tidak tersedia. Silakan coba lagi nanti.'
-    );
-  }
-
-  const normalized = normalizeAttendanceSummary(rawSummary);
-
-  if (!normalized) {
-    return 'Status aktivitas berhasil diperbarui.';
-  }
-
-  const {
-    total = 0,
-    present = 0,
-    late = 0,
-    absent = 0,
-    unrecorded = 0
-  } = normalized;
-
-  return [
-    'Status aktivitas berhasil diperbarui.',
-    '',
-    `Total Peserta: ${total}`,
-    `Hadir: ${present}`,
-    `Terlambat: ${late}`,
-    `Tidak Hadir: ${absent}`,
-    `Belum Tercatat: ${unrecorded}`
-  ].join('\n');
-};
 
 const ActivityReportScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
@@ -164,8 +50,7 @@ const ActivityReportScreen = ({ navigation, route }) => {
         const reportData = await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
         // If successful, report exists - navigate to view screen
         navigation.replace('ViewReportScreen', {
-          report: reportData?.data ?? reportData,
-          id_aktivitas,
+          report: reportData,
           activityName,
           activityDate
         });
@@ -255,41 +140,8 @@ const ActivityReportScreen = ({ navigation, route }) => {
       });
       
       await dispatch(createActivityReport(formData)).unwrap();
-
-      let statusUpdateMessage = null;
-      let statusUpdateErrorMessage = null;
-
-      try {
-        const updateResult = await dispatch(
-          updateAktivitasStatus({ id: id_aktivitas, status: 'reported' })
-        ).unwrap();
-
-        const rawSummary = extractSummaryFromUpdate(updateResult);
-        statusUpdateMessage = formatSummaryMessage(rawSummary);
-
-        await Promise.allSettled([
-          dispatch(fetchActivityMembersWithAttendance(id_aktivitas)).unwrap(),
-          dispatch(getAttendanceByActivity({ id_aktivitas, type: 'student' })).unwrap()
-        ]);
-      } catch (statusError) {
-        console.error('Error memperbarui status aktivitas setelah laporan:', statusError);
-        const rawMessage = typeof statusError === 'string'
-          ? statusError
-          : statusError?.message;
-        statusUpdateErrorMessage = rawMessage || 'Status aktivitas gagal diperbarui secara otomatis. Silakan coba lagi dari halaman daftar hadir.';
-      }
-
-      const successMessageParts = ['Laporan kegiatan berhasil dikirim.'];
-
-      if (statusUpdateMessage) {
-        successMessageParts.push('', statusUpdateMessage);
-      }
-
-      if (statusUpdateErrorMessage) {
-        successMessageParts.push('', statusUpdateErrorMessage);
-      }
-
-      Alert.alert('Berhasil', successMessageParts.join('\n'), [
+      
+      Alert.alert('Berhasil', 'Laporan kegiatan berhasil dikirim', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (err) {
