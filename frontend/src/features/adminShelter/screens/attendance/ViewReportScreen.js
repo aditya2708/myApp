@@ -52,7 +52,7 @@ const ViewReportScreen = ({ navigation, route }) => {
   );
   const membersError = useSelector(state => selectActivityMembersError(state, activityId));
   const hasMembersData = useSelector(state =>
-    Boolean(state.attendance.activityMembersData?.[activityId])
+    Boolean(state.attendance.members?.[activityId])
   );
 
   useEffect(() => {

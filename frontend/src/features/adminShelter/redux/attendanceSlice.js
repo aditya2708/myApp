@@ -147,7 +147,8 @@ export const generateStats = createAsyncThunk(
 const initialState = {
   attendanceRecords: {},
   activityRecords: {},
-  activityMembersData: {},
+  members: {},
+  attendanceSummary: {},
   activityMembersLoading: {},
   activityMembersError: {},
   studentRecords: {},
@@ -373,26 +374,32 @@ const attendanceSlice = createSlice({
         state.activityMembersError[id_aktivitas] = null;
       })
       .addCase(fetchActivityMembersWithAttendance.fulfilled, (state, action) => {
-        const { id_aktivitas, data } = action.payload;
-        const responseData = data?.data ?? data;
-        const rawMembers =
-          responseData?.members ??
-          responseData?.data?.members ??
-          (Array.isArray(responseData?.data) ? responseData?.data : null);
-        const members = Array.isArray(rawMembers) ? rawMembers : [];
-        const summary =
-          responseData?.summary ??
-          responseData?.attendance_summary ??
-          responseData?.data?.summary ??
-          null;
+        const activityId = action.meta?.arg;
+        const payload = action.payload || {};
+        let { data = [], summary = null } = payload;
 
-        state.activityMembersLoading[id_aktivitas] = false;
-        state.activityMembersError[id_aktivitas] = null;
-        state.activityMembersData[id_aktivitas] = {
-          members,
-          summary,
-          fetchedAt: Date.now()
-        };
+        if (!Array.isArray(data)) {
+          if (Array.isArray(payload?.members)) {
+            data = payload.members;
+          } else if (Array.isArray(payload?.data?.members)) {
+            data = payload.data.members;
+          } else {
+            data = [];
+          }
+        }
+
+        if (summary == null) {
+          summary = payload?.attendance_summary ?? payload?.data?.summary ?? null;
+        }
+
+        if (activityId == null) {
+          return;
+        }
+
+        state.members[activityId] = data;
+        state.attendanceSummary[activityId] = summary;
+        state.activityMembersLoading[activityId] = false;
+        state.activityMembersError[activityId] = null;
       })
       .addCase(fetchActivityMembersWithAttendance.rejected, (state, action) => {
         const id_aktivitas = action.meta.arg;
@@ -560,7 +567,8 @@ const selectAttendanceState = state => state.attendance;
 const selectActivityRecords = state => state.attendance.activityRecords;
 const selectStudentRecords = state => state.attendance.studentRecords;
 const selectVerificationHistoryRecords = state => state.attendance.verificationHistory;
-const selectActivityMembersDataMap = state => state.attendance.activityMembersData;
+const selectMembersMap = state => state.attendance.members;
+const selectAttendanceSummaryMap = state => state.attendance.attendanceSummary;
 
 export const selectAttendanceLoading = state => state.attendance.loading;
 export const selectAttendanceError = state => state.attendance.error;
@@ -579,15 +587,14 @@ export const selectActivityAttendance = createSelector(
 );
 
 export const selectActivityMembers = createSelector(
-  [selectActivityMembersDataMap, (_, id_aktivitas) => id_aktivitas],
-  (activityMembersData, id_aktivitas) =>
-    activityMembersData[id_aktivitas]?.members || emptyArray
+  [selectMembersMap, (_, id_aktivitas) => id_aktivitas],
+  (membersMap, id_aktivitas) => membersMap[id_aktivitas] || emptyArray
 );
 
 export const selectActivityAttendanceSummary = createSelector(
-  [selectActivityMembersDataMap, (_, id_aktivitas) => id_aktivitas],
-  (activityMembersData, id_aktivitas) =>
-    activityMembersData[id_aktivitas]?.summary ?? null
+  [selectAttendanceSummaryMap, (_, id_aktivitas) => id_aktivitas],
+  (attendanceSummaryMap, id_aktivitas) =>
+    attendanceSummaryMap[id_aktivitas] ?? null
 );
 
 
