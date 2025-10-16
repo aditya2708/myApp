@@ -161,6 +161,8 @@ const ViewReportScreen = ({ navigation, route }) => {
     '-';
 
   const getGroupName = () =>
+    effectiveActivityDetail?.aktivitas?.nama_kelompok ||
+    reportData?.aktivitas?.nama_kelompok ||
     effectiveActivityDetail?.kelompok?.nama ||
     effectiveActivityDetail?.kelompok?.nama_kelompok ||
     reportData?.kelompok?.nama ||
