@@ -164,7 +164,8 @@ const ActivityReportScreen = ({ navigation, route }) => {
         const reportData = await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
         // If successful, report exists - navigate to view screen
         navigation.replace('ViewReportScreen', {
-          report: reportData,
+          report: reportData?.data ?? reportData,
+          id_aktivitas,
           activityName,
           activityDate
         });
