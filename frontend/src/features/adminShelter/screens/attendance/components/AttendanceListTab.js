@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,7 +30,9 @@ import {
   selectActivityMembersLoading
 } from '../../../redux/attendanceSlice';
 import {
+  updateAktivitasStatus,
   selectAktivitasDetail,
+  selectAktivitasStatusUpdating,
   selectAktivitasAttendanceSummary as selectAktivitasDetailSummary
 } from '../../../redux/aktivitasSlice';
 
@@ -53,6 +56,7 @@ const AttendanceListTab = ({
   const membersSummary = useSelector(state => selectActivityAttendanceSummary(state, id_aktivitas));
   const membersLoading = useSelector(state => selectActivityMembersLoading(state, id_aktivitas));
   const aktivitasDetail = useSelector(selectAktivitasDetail);
+  const statusUpdating = useSelector(selectAktivitasStatusUpdating);
   const aktivitasSummary = useSelector(selectAktivitasDetailSummary);
   
   const [refreshing, setRefreshing] = useState(false);
@@ -105,6 +109,90 @@ const AttendanceListTab = ({
     );
   }, []);
 
+  const normalizeAttendanceSummary = useCallback((rawSummary) => {
+    if (!rawSummary || typeof rawSummary !== 'object') {
+      return null;
+    }
+
+    const total =
+      rawSummary.total_members ??
+      rawSummary.total ??
+      rawSummary.total_students ??
+      rawSummary.total_member ??
+      rawSummary.total_count ??
+      rawSummary.totalParticipants ??
+      rawSummary.totalMembers ??
+      0;
+
+    const present =
+      rawSummary.present_count ??
+      rawSummary.present ??
+      rawSummary.hadir ??
+      rawSummary.presentMembers ??
+      rawSummary.hadir_count ??
+      0;
+
+    const late =
+      rawSummary.late_count ??
+      rawSummary.late ??
+      rawSummary.terlambat ??
+      rawSummary.lateMembers ??
+      0;
+
+    const absent =
+      rawSummary.absent_count ??
+      rawSummary.absent ??
+      rawSummary.tidak_hadir ??
+      rawSummary.absentMembers ??
+      0;
+
+    const unrecorded =
+      rawSummary.no_record_count ??
+      rawSummary.unrecorded ??
+      rawSummary.belum_tercatat ??
+      rawSummary.not_recorded ??
+      rawSummary.pending ??
+      (total - (present + late + absent));
+
+    return {
+      total,
+      present,
+      late,
+      absent,
+      unrecorded
+    };
+  }, []);
+
+  const normalizedSummary = useMemo(() => {
+    if (!effectiveRawSummary || effectiveRawSummary?.success === false) {
+      return null;
+    }
+
+    return normalizeAttendanceSummary(effectiveRawSummary);
+  }, [effectiveRawSummary, normalizeAttendanceSummary]);
+
+  const fallbackSummary = useMemo(() => {
+    if (!activityMembers || activityMembers.length === 0) {
+      return null;
+    }
+
+    const total = activityMembers.length;
+    const present = activityMembers.filter(member => member.attendance_status === 'Ya').length;
+    const late = activityMembers.filter(member => member.attendance_status === 'Terlambat').length;
+    const absent = activityMembers.filter(member => member.attendance_status === 'Tidak').length;
+    const unrecorded = total - present - late - absent;
+
+    return { total, present, late, absent, unrecorded };
+  }, [activityMembers]);
+
+  const summaryDataForDisplay = useMemo(() => {
+    if (effectiveRawSummary?.success === false) {
+      return null;
+    }
+
+    return normalizedSummary || fallbackSummary;
+  }, [effectiveRawSummary, normalizedSummary, fallbackSummary]);
+
   const summaryErrorMessage = useMemo(() => {
     if (effectiveRawSummary?.success === false) {
       return (
@@ -115,6 +203,15 @@ const AttendanceListTab = ({
 
     return null;
   }, [effectiveRawSummary]);
+
+  const attendanceStatusCounts = useMemo(() => {
+    const records = attendanceRecords || [];
+    const present = records.filter(r => r.absen === 'Ya').length;
+    const late = records.filter(r => r.absen === 'Terlambat').length;
+    const absent = records.filter(r => r.absen === 'Tidak').length;
+
+    return { present, late, absent };
+  }, [attendanceRecords]);
 
   
   const refreshData = useCallback(async ({ force = false } = {}) => {
@@ -240,6 +337,76 @@ const AttendanceListTab = ({
     return [...roster, ...additionalRecords];
   }, [activityMembers, attendanceRecords, attendanceRecordMap, getStudentIdFromMember]);
 
+  const summaryForMessage = useMemo(() => {
+    if (summaryDataForDisplay) {
+      return summaryDataForDisplay;
+    }
+
+    const total = combinedRoster.length;
+    const present = attendanceStatusCounts.present;
+    const late = attendanceStatusCounts.late;
+    const absent = attendanceStatusCounts.absent;
+    const unrecorded = Math.max(total - (present + late + absent), 0);
+
+    return { total, present, late, absent, unrecorded };
+  }, [summaryDataForDisplay, combinedRoster, attendanceStatusCounts]);
+
+  const extractSummaryFromUpdate = useCallback((result) => {
+    if (!result) {
+      return null;
+    }
+
+    const payload = result?.data?.data ?? result?.data ?? result;
+
+    return (
+      payload?.attendance_summary ??
+      payload?.summary ??
+      payload?.aktivitas?.attendance_summary ??
+      null
+    );
+  }, []);
+
+  const formatSummaryMessage = useCallback(
+    (rawSummaryData, fallbackSummaryData) => {
+      if (rawSummaryData?.success === false) {
+        return (
+          rawSummaryData.message ||
+          'Ringkasan kehadiran tidak tersedia. Silakan coba lagi nanti.'
+        );
+      }
+
+      const normalizedData =
+        normalizeAttendanceSummary(rawSummaryData) ||
+        fallbackSummaryData ||
+        null;
+
+      if (!normalizedData) {
+        return 'Aktivitas berhasil ditandai selesai.';
+      }
+
+      const {
+        total = 0,
+        present = 0,
+        late = 0,
+        absent = 0,
+        unrecorded = 0
+      } = normalizedData;
+
+      return [
+        `Total Peserta: ${total}`,
+        `Hadir: ${present}`,
+        `Terlambat: ${late}`,
+        `Tidak Hadir: ${absent}`,
+        `Belum Tercatat: ${unrecorded}`
+      ].join('\n');
+    },
+    [normalizeAttendanceSummary]
+  );
+
+  const normalizedStatus = (effectiveActivityStatus || '').toLowerCase();
+  const completionDisabled =
+    statusUpdating || normalizedStatus === 'completed' || normalizedStatus === 'reported';
+
   const showLoadingOverlay = (loading || membersLoading) && !refreshing;
 
   const filteredRecords = useMemo(() => {
@@ -295,6 +462,61 @@ const AttendanceListTab = ({
 
     return { pending, verified, rejected, all: records.length };
   }, [attendanceRecords]);
+
+  const handleCompleteSession = useCallback(() => {
+    if (!id_aktivitas || completionDisabled) {
+      return;
+    }
+
+    Alert.alert(
+      'Selesaikan Sesi',
+      'Pastikan seluruh kehadiran sudah tercatat. Tandai aktivitas ini sebagai selesai?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Selesaikan',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const result = await dispatch(
+                updateAktivitasStatus({ id: id_aktivitas, status: 'completed' })
+              ).unwrap();
+
+              const rawSummaryFromUpdate = extractSummaryFromUpdate(result);
+
+              if (rawSummaryFromUpdate?.success === false) {
+                const failureMessage =
+                  rawSummaryFromUpdate.message ||
+                  'Ringkasan kehadiran tidak tersedia. Silakan coba lagi nanti.';
+                Alert.alert('Ringkasan Kehadiran', failureMessage);
+                return;
+              }
+
+              Alert.alert(
+                'Aktivitas Diselesaikan',
+                formatSummaryMessage(rawSummaryFromUpdate, summaryForMessage)
+              );
+
+              await refreshData({ force: true });
+            } catch (err) {
+              const errorMessage =
+                (typeof err === 'string' ? err : err?.message) ||
+                'Gagal menyelesaikan sesi';
+              Alert.alert('Gagal', errorMessage);
+            }
+          }
+        }
+      ]
+    );
+  }, [
+    completionDisabled,
+    dispatch,
+    id_aktivitas,
+    extractSummaryFromUpdate,
+    formatSummaryMessage,
+    summaryForMessage,
+    refreshData
+  ]);
 
   const handleVerify = (id_absen) => {
     Alert.prompt(
@@ -566,19 +788,24 @@ const AttendanceListTab = ({
         </View>
       )}
 
-      {effectiveActivityStatus && (
-        <View style={styles.statusInfoContainer}>
-          <Ionicons
-            name="information-circle-outline"
-            size={18}
-            color="#16a085"
-            style={styles.statusInfoIcon}
-          />
-          <Text style={styles.statusInfoText}>
-            Status aktivitas: {effectiveActivityStatus.replace(/_/g, ' ')}
-          </Text>
-        </View>
-      )}
+      <View style={styles.completeSection}>
+        <TouchableOpacity
+          style={[
+            styles.completeButton,
+            completionDisabled && styles.completeButtonDisabled
+          ]}
+          onPress={handleCompleteSession}
+          disabled={completionDisabled}
+        >
+          {statusUpdating && (
+            <ActivityIndicator size="small" color="#fff" style={styles.completeButtonSpinner} />
+          )}
+          <Text style={styles.completeButtonText}>Selesaikan Sesi</Text>
+        </TouchableOpacity>
+        <Text style={styles.statusHelperText}>
+          Status saat ini: {effectiveActivityStatus ? effectiveActivityStatus.replace(/_/g, ' ') : 'Belum ditentukan'}
+        </Text>
+      </View>
 
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
@@ -670,17 +897,25 @@ const styles = StyleSheet.create({
   },
   summaryErrorIcon: { marginRight: 12, marginTop: 2 },
   summaryErrorText: { flex: 1, color: '#c0392b', fontSize: 14, lineHeight: 20 },
-  statusInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  completeSection: {
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e1e1e1'
   },
-  statusInfoIcon: { marginRight: 8 },
-  statusInfoText: { fontSize: 13, color: '#16a085', fontWeight: '500' },
+  completeButton: {
+    backgroundColor: '#16a085',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center'
+  },
+  completeButtonDisabled: { backgroundColor: '#95a5a6' },
+  completeButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  completeButtonSpinner: { marginRight: 8 },
+  statusHelperText: { marginTop: 8, fontSize: 12, color: '#7f8c8d', textAlign: 'center' },
   searchContainer: {
     padding: 12, backgroundColor: '#fff',
     borderBottomWidth: 1, borderBottomColor: '#e1e1e1'
