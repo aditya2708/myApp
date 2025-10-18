@@ -5,7 +5,7 @@ Menyiapkan endpoint laporan kehadiran anak khusus admin cabang yang menyajikan r
 
 ## Prasyarat
 - Pastikan struktur relasi admin cabang → shelter → anak telah dipahami dari implementasi laporan yang ada.
-- Review logika agregasi pada `AdminShelterLaporanAnakController::getLaporanAnakBinaan()` sebagai referensi.
+- Tinjau kembali kebutuhan agregasi laporan anak binaan berdasarkan spesifikasi bisnis terbaru (endpoint laporan admin shelter lama sudah dipensiunkan).
 
 ## Daftar Tugas
 1. **Mendefinisikan Service Baru**

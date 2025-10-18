@@ -443,46 +443,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/keuangan/child/{childId}', [App\Http\Controllers\API\AdminShelter\AdminShelterKeuanganController::class, 'getByChild']);
         Route::get('/keuangan-statistics', [App\Http\Controllers\API\AdminShelter\AdminShelterKeuanganController::class, 'getStatistics']);
 
-        // Laporan Management
-        Route::prefix('laporan')->group(function () {
-    Route::get('/anak-binaan', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAnakController::class, 'getLaporanAnakBinaan']);
-    Route::get('/anak-binaan/child/{childId}', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAnakController::class, 'getChildDetailReport']);
-    Route::get('/jenis-kegiatan-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAnakController::class, 'getJenisKegiatanOptions']);
-    Route::get('/available-years', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAnakController::class, 'getAvailableYears']);
-    Route::get('/anak-binaan/export', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAnakController::class, 'exportLaporanAnakBinaan']);
-
-    Route::get('/tutor', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanTutorController::class, 'getLaporanTutor']);
-    Route::get('/tutor/detail/{tutorId}', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanTutorController::class, 'getTutorDetailReport']);
-    Route::get('/mapel-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanTutorController::class, 'getMapelOptions']);
-    Route::get('/tutor/jenis-kegiatan-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanTutorController::class, 'getJenisKegiatanOptions']);
-    Route::get('/tutor/available-years', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanTutorController::class, 'getAvailableYears']);
-    Route::get('/tutor/export', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanTutorController::class, 'exportTutorData']);
-
-    Route::get('/laporan-aktivitas', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAktivitasController::class, 'getLaporanAktivitas']);
-    Route::get('/aktivitas/detail/{activityId}', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAktivitasController::class, 'getActivityDetailReport']);
-    Route::get('/aktivitas/jenis-kegiatan-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAktivitasController::class, 'getJenisKegiatanOptions']);
-    Route::get('/aktivitas/available-years', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanAktivitasController::class, 'getAvailableYears']);
-
-    Route::get('/histori', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanHistoriController::class, 'getLaporanHistori']);
-    Route::get('/histori/detail/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanHistoriController::class, 'getHistoriDetail']);
-    Route::get('/histori/jenis-histori-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanHistoriController::class, 'getJenisHistoriOptions']);
-    Route::get('/histori/available-years', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanHistoriController::class, 'getAvailableYears']);
-
-    Route::get('/cpb', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanCpbController::class, 'getCpbReport']);
-    Route::get('/cpb/status/{status}', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanCpbController::class, 'getCpbByStatus']);
-    Route::get('/cpb/export', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanCpbController::class, 'exportCpbData']);
-
-    Route::get('/raport', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanRaportController::class, 'getLaporanRaport']);
-    Route::get('/raport/child/{childId}', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanRaportController::class, 'getChildDetailReport']);
-    Route::get('/raport/semester-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanRaportController::class, 'getSemesterOptions']);
-    Route::get('/raport/mata-pelajaran-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanRaportController::class, 'getMataPelajaranOptions']);
-    Route::get('/raport/available-years', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanRaportController::class, 'getAvailableYears']);
-
-    Route::get('/surat', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanSuratController::class, 'getLaporanSurat']);
-    Route::get('/surat/shelter/{shelterId}', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanSuratController::class, 'getShelterDetail']);
-    Route::get('/surat/filter-options', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanSuratController::class, 'getFilterOptions']);
-    Route::get('/surat/available-years', [App\Http\Controllers\API\AdminShelter\AdminShelterLaporanSuratController::class, 'getAvailableYears']);
-        }); // End Laporan prefix group
+        // Laporan Management routes removed (legacy endpoints retired)
 
     }); // End Admin Shelter middleware group
     
