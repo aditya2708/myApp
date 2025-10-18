@@ -56,7 +56,25 @@ export const tutorAttendanceApi = {
   },
 
   getTutorAttendanceByActivity: async (id_aktivitas) => {
-    return await api.get(`/admin-shelter/attendance/activity/${id_aktivitas}`);
+    const fetchTutorAttendance = async (url, config = {}) => {
+      const response = await api.get(url, config);
+      const tutorRecord = response?.data?.tutor ?? response?.data?.data ?? response?.data ?? null;
+
+      response.data = tutorRecord;
+      return response;
+    };
+
+    try {
+      return await fetchTutorAttendance(`/admin-shelter/attendance/activity/${id_aktivitas}/tutor`);
+    } catch (error) {
+      if (error.response?.status === 404 || error.response?.status === 405) {
+        return await fetchTutorAttendance(`/admin-shelter/attendance/activity/${id_aktivitas}`, {
+          params: { type: 'tutor' }
+        });
+      }
+
+      throw error;
+    }
   },
 
   getTutorAttendanceHistory: async (id_tutor, filters = {}) => {
