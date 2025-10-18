@@ -29,7 +29,7 @@ export const tutorAttendanceApi = {
       params.gps_data = gps_data;
     }
     
-    return await api.post('/admin-shelter/tutor-attendance/record', params);
+    return await api.post('/admin-shelter/attendance/record', params);
   },
 
   recordTutorAttendanceManually: async (id_tutor, id_aktivitas, status, notes = '', arrival_time = null, gps_data = null) => {
