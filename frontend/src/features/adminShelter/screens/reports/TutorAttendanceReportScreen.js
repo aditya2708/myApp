@@ -346,7 +346,7 @@ const TutorAttendanceReportScreen = () => {
 
     try {
       const response = await dispatch(getTutorAttendanceByActivity(id_aktivitas)).unwrap();
-      const attendanceData = response?.data ?? null;
+      const attendanceData = response ?? null;
       setAttendanceCache(prev => ({
         ...prev,
         [id_aktivitas]: {
@@ -479,10 +479,16 @@ const TutorAttendanceReportScreen = () => {
     }
 
     const record = cached.data;
+    const tutorName = record?.absen_user?.tutor?.nama || record?.nama_tutor || '-';
     const verification = record.latest_verification || record.verifications?.[0] || null;
 
     return (
       <View style={styles.attendanceDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Tutor</Text>
+          <Text style={styles.detailValue}>{tutorName}</Text>
+        </View>
+
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Status</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(record.absen) }]}>

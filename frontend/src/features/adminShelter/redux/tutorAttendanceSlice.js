@@ -60,7 +60,8 @@ export const getTutorAttendanceByActivity = createAsyncThunk(
   async (id_aktivitas, { rejectWithValue }) => {
     try {
       const response = await tutorAttendanceApi.getTutorAttendanceByActivity(id_aktivitas);
-      return response.data;
+      const record = response?.data ?? null;
+      return record;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: error.message });
     }
@@ -204,13 +205,13 @@ const tutorAttendanceSlice = createSlice({
       })
       .addCase(getTutorAttendanceByActivity.fulfilled, (state, action) => {
         state.loading = false;
-        if (action.payload.data) {
-          const id_aktivitas = action.meta.arg;
-          state.activityRecords[id_aktivitas] = action.payload.data;
-          
-          if (action.payload.data.id_absen) {
-            state.attendanceRecords[action.payload.data.id_absen] = action.payload.data;
-          }
+        const id_aktivitas = action.meta.arg;
+        const record = action.payload ?? null;
+
+        state.activityRecords[id_aktivitas] = record;
+
+        if (record?.id_absen) {
+          state.attendanceRecords[record.id_absen] = record;
         }
         state.lastUpdated = new Date().toISOString();
       })
