@@ -369,6 +369,7 @@ Route::middleware('auth:sanctum')->group(function () {
             
             // Activity attendance endpoints
             Route::get('/activity/{id_aktivitas}', [App\Http\Controllers\API\AttendanceController::class, 'getByActivity']);
+            Route::get('/activity/{id_aktivitas}/tutor', [App\Http\Controllers\API\AttendanceController::class, 'getTutorAttendanceForActivity']);
             Route::get('/activity/{id_aktivitas}/members', [App\Http\Controllers\API\AttendanceController::class, 'getActivityMembersWithAttendance']);
             
             // Student attendance endpoints

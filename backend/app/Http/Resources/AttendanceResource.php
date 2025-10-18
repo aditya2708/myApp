@@ -20,6 +20,7 @@ class AttendanceResource extends JsonResource
             'id_absen_user' => $this->id_absen_user,
             'is_verified' => $this->is_verified,
             'verification_status' => $this->verification_status,
+            'time_arrived' => optional($this->time_arrived)->format('Y-m-d H:i:s'),
             'absen_user' => $this->whenLoaded('absenUser', function () {
                 $result = [
                     'id_absen_user' => $this->absenUser->id_absen_user ?? null,
