@@ -92,6 +92,7 @@ import KurikulumAssignmentScreen from '../features/adminShelter/screens/kelola/K
 import KurikulumSelectionScreen from '../features/adminShelter/screens/KurikulumSelectionScreen';
 import HonorCalculationScreen from '../features/adminShelter/screens/HonorCalculationScreen';
 import LaporanKegiatanMainScreen from '../features/adminShelter/screens/reports/LaporanKegiatanMainScreen';
+import TutorAttendanceReportScreen from '../features/adminShelter/screens/reports/TutorAttendanceReportScreen';
 
 
 
@@ -237,6 +238,11 @@ const ManagementStackNavigator = () => (
     <ManagementStack.Screen name="TutorManagement" component={TutorManagementScreen} options={{ headerTitle: 'Tutor Management' }} />
     <ManagementStack.Screen name="KeuanganList" component={KeuanganListScreen} options={{ headerTitle: 'Daftar Keuangan' }} />
     <ManagementStack.Screen name="LaporanKegiatanMain" component={LaporanKegiatanMainScreen} options={{ headerTitle: 'Laporan Kegiatan' }} />
+    <ManagementStack.Screen
+      name="TutorAttendanceReport"
+      component={TutorAttendanceReportScreen}
+      options={{ headerTitle: 'Laporan Kehadiran Tutor' }}
+    />
     <ManagementStack.Screen name="RaportGenerate" component={RaportGenerateScreen} options={{ headerTitle: 'Generate Raport' }} />
     <ManagementStack.Screen name="RaportView" component={RaportViewScreen} options={{ headerTitle: 'View Raport' }} />
 
