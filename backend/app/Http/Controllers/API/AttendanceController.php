@@ -17,6 +17,7 @@ use App\Services\VerificationService;
 use App\Services\QrTokenService;
 use App\Http\Resources\AttendanceResource;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Schema;
 
 class AttendanceController extends Controller
@@ -211,7 +212,7 @@ class AttendanceController extends Controller
     {
         $filters = $request->only(['is_verified', 'verification_status', 'status', 'type']);
         $type = $request->get('type', 'all');
-        
+
         try {
             if ($type === 'tutor') {
                 $attendanceRecord = $this->attendanceService->getTutorAttendanceByActivity($id_aktivitas);
@@ -222,13 +223,13 @@ class AttendanceController extends Controller
             } else {
                 $studentRecords = $this->attendanceService->getAttendanceByActivity($id_aktivitas, $filters);
                 $tutorRecord = $this->attendanceService->getTutorAttendanceByActivity($id_aktivitas);
-                
+
                 $data = [
                     'students' => AttendanceResource::collection($studentRecords),
                     'tutor' => $tutorRecord ? new AttendanceResource($tutorRecord) : null
                 ];
             }
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $data
@@ -237,6 +238,37 @@ class AttendanceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve attendance records: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getTutorAttendanceForActivity($id_aktivitas)
+    {
+        try {
+            $attendance = $this->attendanceService->getTutorAttendanceByActivity($id_aktivitas);
+
+            if ($attendance) {
+                $attendance->loadMissing(['absenUser.tutor']);
+
+                return response()->json([
+                    'success' => true,
+                    'data' => new AttendanceResource($attendance),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => null,
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Activity not found',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve tutor attendance: ' . $e->getMessage(),
             ], 500);
         }
     }
