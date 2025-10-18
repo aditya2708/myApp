@@ -1,12 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  ActivityIndicator
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -16,13 +9,6 @@ import {
   selectAktivitasDetail,
   resetAktivitasDetail
 } from '../../redux/aktivitasSlice';
-import {
-  fetchActivityMembersWithAttendance,
-  selectActivityMembers,
-  selectActivityAttendanceSummary,
-  selectActivityMembersLoading,
-  selectActivityMembersError
-} from '../../redux/attendanceSlice';
 
 const ViewReportScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
@@ -43,18 +29,6 @@ const ViewReportScreen = ({ navigation, route }) => {
   const detailMatches = activityDetail?.id_aktivitas === activityId;
   const effectiveActivityDetail = detailMatches ? activityDetail : null;
 
-  const members = useSelector(state => selectActivityMembers(state, activityId));
-  const attendanceSummary = useSelector(state =>
-    selectActivityAttendanceSummary(state, activityId)
-  );
-  const membersLoading = useSelector(state =>
-    selectActivityMembersLoading(state, activityId)
-  );
-  const membersError = useSelector(state => selectActivityMembersError(state, activityId));
-  const hasMembersData = useSelector(state =>
-    Boolean(state.attendance.members?.[activityId])
-  );
-
   useEffect(() => {
     if (!activityId) {
       return;
@@ -63,11 +37,7 @@ const ViewReportScreen = ({ navigation, route }) => {
     if (!detailMatches) {
       dispatch(fetchAktivitasDetail(activityId));
     }
-
-    if (!hasMembersData) {
-      dispatch(fetchActivityMembersWithAttendance(activityId));
-    }
-  }, [activityId, detailMatches, dispatch, hasMembersData]);
+  }, [activityId, detailMatches, dispatch]);
 
   const cleanupActivityIdRef = useRef(activityId);
   cleanupActivityIdRef.current = activityId;
@@ -180,36 +150,6 @@ const ViewReportScreen = ({ navigation, route }) => {
     reportData?.pengajar?.nama ||
     '-';
 
-  const renderSummaryItem = (label, value, color) => (
-    <View style={styles.summaryItem}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <View style={[styles.summaryBadge, { backgroundColor: color.background }]}>
-        <Text style={[styles.summaryValue, { color: color.text }]}>{value}</Text>
-      </View>
-    </View>
-  );
-
-  const getStatusMeta = status => {
-    const normalized = (status || '').toString().toLowerCase();
-
-    if (['ya', 'hadir', 'present', 'attendance_present'].includes(normalized)) {
-      return { label: 'Hadir', backgroundColor: '#e8f5e8', textColor: '#27ae60' };
-    }
-
-    if (['tidak', 'absent', 'tidak hadir', 'attendance_absent'].includes(normalized)) {
-      return { label: 'Tidak Hadir', backgroundColor: '#fdecea', textColor: '#c0392b' };
-    }
-
-    if (['terlambat', 'late', 'attendance_late'].includes(normalized)) {
-      return { label: 'Terlambat', backgroundColor: '#fff4e5', textColor: '#f39c12' };
-    }
-
-    if (['belum', 'pending', 'not_recorded', 'belum absen'].includes(normalized)) {
-      return { label: 'Belum Absen', backgroundColor: '#ecf0f1', textColor: '#7f8c8d' };
-    }
-
-    return { label: 'Belum Absen', backgroundColor: '#ecf0f1', textColor: '#7f8c8d' };
-  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -321,108 +261,6 @@ const ViewReportScreen = ({ navigation, route }) => {
             <Text style={styles.infoValue}>{getTutorName()}</Text>
           </View>
         </View>
-      </View>
-
-      <View style={styles.sectionCard}>
-        <View style={styles.cardHeaderRow}>
-          <Ionicons name="people-outline" size={18} color="#7f8c8d" />
-          <Text style={styles.sectionTitle}>Ringkasan Kehadiran</Text>
-        </View>
-
-        <View style={styles.summaryContainer}>
-          {renderSummaryItem('Hadir', attendanceSummary?.present ?? attendanceSummary?.hadir ?? 0, {
-            background: '#e8f5e8',
-            text: '#27ae60'
-          })}
-          {renderSummaryItem('Tidak Hadir', attendanceSummary?.absent ?? attendanceSummary?.tidak_hadir ?? 0, {
-            background: '#fdecea',
-            text: '#c0392b'
-          })}
-          {renderSummaryItem('Terlambat', attendanceSummary?.late ?? attendanceSummary?.terlambat ?? 0, {
-            background: '#fff4e5',
-            text: '#f39c12'
-          })}
-          {renderSummaryItem('Belum Tercatat', attendanceSummary?.unknown ?? attendanceSummary?.belum_tercatat ?? 0, {
-            background: '#ecf0f1',
-            text: '#7f8c8d'
-          })}
-        </View>
-      </View>
-
-      <View style={styles.sectionCard}>
-        <View style={styles.cardHeaderRow}>
-          <Ionicons name="people-circle-outline" size={18} color="#7f8c8d" />
-          <Text style={styles.sectionTitle}>Daftar Anggota</Text>
-        </View>
-
-        {membersLoading ? (
-          <View style={styles.stateContainer}>
-            <ActivityIndicator size="small" color="#3498db" />
-            <Text style={styles.stateText}>Memuat daftar anggota...</Text>
-          </View>
-        ) : membersError ? (
-          <View style={styles.stateContainer}>
-            <Ionicons name="warning-outline" size={20} color="#e74c3c" />
-            <Text style={[styles.stateText, { color: '#e74c3c' }]}>
-              {membersError?.message || membersError}
-            </Text>
-          </View>
-        ) : members.length === 0 ? (
-          <View style={styles.stateContainer}>
-            <Ionicons name="people-outline" size={20} color="#7f8c8d" />
-            <Text style={styles.stateText}>Belum ada data anggota.</Text>
-          </View>
-        ) : (
-          <View style={styles.membersList}>
-            {members.map((member, index) => {
-              const memberKey =
-                member?.id ||
-                member?.id_member ||
-                member?.user_id ||
-                member?.student_id ||
-                member?.attendance_id ||
-                member?.absen_id ||
-                member?.full_name ||
-                member?.name ||
-                `member-${index}`;
-              const statusMeta = getStatusMeta(member?.attendance_status);
-              const attendanceTime =
-                member?.attendance_time ||
-                member?.check_in_time ||
-                member?.created_at ||
-                null;
-
-              return (
-                <View key={memberKey} style={styles.memberCard}>
-                  <View style={styles.memberHeader}>
-                    <Text style={styles.memberName}>
-                      {member?.full_name ||
-                        member?.name ||
-                        member?.student_name ||
-                        member?.nama ||
-                        'Tidak diketahui'}
-                    </Text>
-
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: statusMeta.backgroundColor }
-                      ]}
-                    >
-                      <Text style={[styles.statusBadgeText, { color: statusMeta.textColor }]}>
-                        {statusMeta.label}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {attendanceTime && (
-                    <Text style={styles.memberTime}>Waktu: {formatTime(attendanceTime)}</Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        )}
       </View>
 
       <View style={styles.photosSection}>
@@ -541,80 +379,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#2c3e50',
     fontWeight: '500'
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between'
-  },
-  summaryItem: {
-    width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginBottom: 12
-  },
-  summaryLabel: {
-    fontSize: 13,
-    color: '#7f8c8d',
-    marginBottom: 8
-  },
-  summaryBadge: {
-    borderRadius: 8,
-    paddingVertical: 6,
-    alignItems: 'center'
-  },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: '700'
-  },
-  stateContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 24
-  },
-  stateText: {
-    color: '#7f8c8d',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8
-  },
-  membersList: {},
-  memberCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginBottom: 12
-  },
-  memberHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6
-  },
-  memberName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2c3e50',
-    flex: 1,
-    marginRight: 12
-  },
-  statusBadge: {
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 12
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  memberTime: {
-    fontSize: 13,
-    color: '#7f8c8d'
   },
   photosSection: {
     marginBottom: 20
