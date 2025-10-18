@@ -15,13 +15,6 @@ import penilaianReducer from '../features/adminShelter/redux/penilaianSlice';
 import semesterReducer from '../features/adminShelter/redux/semesterSlice';
 import kurikulumShelterReducer from '../features/adminShelter/redux/kurikulumShelterSlice';
 import tutorAttendaceReducer from '../features/adminShelter/redux/tutorAttendanceSlice';
-import laporanReducer from '../features/adminShelter/redux/laporanSlice';
-import tutorLaporanReducer from '../features/adminShelter/redux/tutorLaporanSlice';
-import cpbLaporanReducer from '../features/adminShelter/redux/cpbLaporanSlice';
-import raportLaporanReducer from '../features/adminShelter/redux/raportLaporanSlice';
-import laporanSuratReducer from '../features/adminShelter/redux/laporanSuratSlice';
-import laporanAktivitasReducer from '../features/adminShelter/redux/laporanAktivitasSlice';
-import historiLaporanReducer from '../features/adminShelter/redux/historiLaporanSlice';
 import notificationReducer from '../features/adminShelter/redux/notificationSlice';
 
 // Admin Cabang reducers
@@ -53,13 +46,6 @@ const appReducer = combineReducers({
   semester: semesterReducer,
   kurikulumShelter: kurikulumShelterReducer,
   tutorAttendance: tutorAttendaceReducer,
-  laporan: laporanReducer,
-  tutorLaporan: tutorLaporanReducer,
-  cpbLaporan: cpbLaporanReducer,
-  raportLaporan: raportLaporanReducer,
-  laporanSurat: laporanSuratReducer,
-  laporanAktivitas: laporanAktivitasReducer,
-  historiLaporan: historiLaporanReducer,
   notification: notificationReducer,
   
   // Admin Cabang reducers
