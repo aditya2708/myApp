@@ -43,8 +43,8 @@ class AdminPusatUserController extends Controller
             'password' => 'required|string|min:6',
             'level' => 'required|string|in:admin_pusat,admin_cabang,admin_shelter',
             'nama_lengkap' => 'required|string|max:255',
-            'alamat' => 'required|string|max:500',
-            'no_hp' => 'required|string|max:20',
+            'alamat' => 'required_if:level,admin_cabang,admin_shelter|string|max:500',
+            'no_hp' => 'required_if:level,admin_cabang,admin_shelter|string|max:20',
             'id_kacab' => 'required_if:level,admin_cabang,admin_shelter|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'required_if:level,admin_shelter|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'required_if:level,admin_shelter|integer|exists:shelter,id_shelter',
@@ -124,8 +124,8 @@ class AdminPusatUserController extends Controller
             'password' => 'nullable|string|min:6',
             'level' => 'sometimes|required|string|in:admin_pusat,admin_cabang,admin_shelter',
             'nama_lengkap' => 'sometimes|required|string|max:255',
-            'alamat' => 'sometimes|required|string|max:500',
-            'no_hp' => 'sometimes|required|string|max:20',
+            'alamat' => 'sometimes|string|max:500',
+            'no_hp' => 'sometimes|string|max:20',
             'id_kacab' => 'sometimes|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'sometimes|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'sometimes|integer|exists:shelter,id_shelter',
@@ -223,7 +223,12 @@ class AdminPusatUserController extends Controller
                 $user->adminShelter()->delete();
             }
         } elseif ($targetLevel === 'admin_cabang') {
-            $payload = $this->extractProfilePayload($profileData, ['id_kacab', 'nama_lengkap', 'alamat', 'no_hp']);
+            $payload = $this->extractProfilePayload($profileData, [
+                'id_kacab',
+                'nama_lengkap',
+                'alamat',
+                'no_hp',
+            ]);
 
             $user->adminCabang()->updateOrCreate(
                 ['user_id' => $user->id_users],
@@ -235,7 +240,13 @@ class AdminPusatUserController extends Controller
                 $user->adminShelter()->delete();
             }
         } elseif ($targetLevel === 'admin_shelter') {
-            $payload = $this->extractProfilePayload($profileData, ['id_kacab', 'id_wilbin', 'id_shelter', 'nama_lengkap', 'no_hp']);
+            $payload = $this->extractProfilePayload($profileData, [
+                'id_kacab',
+                'id_wilbin',
+                'id_shelter',
+                'nama_lengkap',
+                'no_hp',
+            ]);
 
             if (array_key_exists('alamat', $profileData)) {
                 $payload['alamat_adm'] = $profileData['alamat'];
@@ -261,29 +272,11 @@ class AdminPusatUserController extends Controller
             $namaLengkap = array_key_exists('nama_lengkap', $profileData)
                 ? $profileData['nama_lengkap']
                 : $existing?->nama_lengkap;
-            $alamat = array_key_exists('alamat', $profileData)
-                ? $profileData['alamat']
-                : $existing?->alamat;
-            $noHp = array_key_exists('no_hp', $profileData)
-                ? $profileData['no_hp']
-                : $existing?->no_hp;
-
-            $messages = [];
 
             if ($this->isBlank($namaLengkap)) {
-                $messages['nama_lengkap'] = __('Nama lengkap wajib diisi.');
-            }
-
-            if ($this->isBlank($alamat)) {
-                $messages['alamat'] = __('Alamat wajib diisi.');
-            }
-
-            if ($this->isBlank($noHp)) {
-                $messages['no_hp'] = __('Nomor HP wajib diisi.');
-            }
-
-            if (!empty($messages)) {
-                throw ValidationException::withMessages($messages);
+                throw ValidationException::withMessages([
+                    'nama_lengkap' => __('Nama lengkap wajib diisi.'),
+                ]);
             }
         } elseif ($targetLevel === 'admin_cabang') {
             $existing = $user->adminCabang;
