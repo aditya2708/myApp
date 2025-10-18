@@ -5,6 +5,8 @@ namespace App\Http\Controllers\API\AdminShelter;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityReport;
 use App\Models\Aktivitas;
+use App\Services\AttendanceService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -12,6 +14,13 @@ use Illuminate\Support\Facades\DB;
 
 class ActivityReportController extends Controller
 {
+    protected AttendanceService $attendanceService;
+
+    public function __construct(AttendanceService $attendanceService)
+    {
+        $this->attendanceService = $attendanceService;
+    }
+
     /**
      * Create activity report
      */
@@ -75,6 +84,36 @@ class ActivityReportController extends Controller
 
             // Create report
             $report = ActivityReport::create($reportData);
+
+            if ($aktivitas->id_tutor) {
+                $attendanceResult = $this->attendanceService->recordTutorAttendanceManually(
+                    $aktivitas->id_tutor,
+                    $aktivitas->id_aktivitas,
+                    'present',
+                    'Auto attendance via activity report',
+                    Carbon::now()->toDateTimeString()
+                );
+
+                if (isset($attendanceResult['duplicate']) && $attendanceResult['duplicate'] === true) {
+                    // Ignore duplicate attendance records
+                } elseif (!$attendanceResult['success']) {
+                    DB::rollback();
+
+                    if (($attendanceResult['message'] ?? '') === 'Tutor is not assigned to this activity') {
+                        foreach (['foto_1', 'foto_2', 'foto_3'] as $photoField) {
+                            if (isset($reportData[$photoField]) && Storage::disk('public')->exists($reportData[$photoField])) {
+                                Storage::disk('public')->delete($reportData[$photoField]);
+                            }
+                        }
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Tutor tidak terdaftar pada aktivitas ini'
+                        ], 422);
+                    }
+
+                    throw new \Exception($attendanceResult['message'] ?? 'Gagal mencatat kehadiran tutor');
+                }
+            }
 
             // Update activity status to reported
             $aktivitas->update(['status' => 'reported']);
