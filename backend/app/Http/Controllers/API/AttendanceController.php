@@ -18,6 +18,7 @@ use App\Services\QrTokenService;
 use App\Http\Resources\AttendanceResource;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
 class AttendanceController extends Controller
@@ -578,11 +579,11 @@ class AttendanceController extends Controller
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'status' => 'nullable|in:present,absent,late'
         ]);
-        
+
         try {
             $filters = $request->only(['date_from', 'date_to', 'status']);
             $attendance = $this->attendanceService->getTutorAttendanceByTutor($id_tutor, $filters);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => AttendanceResource::collection($attendance)
@@ -594,7 +595,103 @@ class AttendanceController extends Controller
             ], 500);
         }
     }
-    
+
+    public function getTutorAttendanceSummary(Request $request)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'jenis_kegiatan' => 'nullable|string'
+        ]);
+
+        $user = Auth::user();
+
+        if (!$user || !$user->adminShelter || !$user->adminShelter->shelter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
+        $shelterId = $user->adminShelter->shelter->id_shelter;
+
+        $filters = collect($validated)
+            ->reject(fn($value) => $value === null || $value === '' || $value === 'all')
+            ->all();
+
+        try {
+            $summaryCollection = $this->attendanceService->getTutorAttendanceSummaryForShelter($shelterId, $filters);
+
+            $categoryLabels = [
+                'high' => 'Baik',
+                'medium' => 'Sedang',
+                'low' => 'Rendah',
+                'no_data' => 'Tidak Ada Data',
+            ];
+
+            $distribution = collect(array_fill_keys(array_keys($categoryLabels), 0));
+
+            $tutors = $summaryCollection->map(function ($record) use (&$distribution, $categoryLabels) {
+                $totalActivities = $record['total_activities'] ?? 0;
+                $presentCount = $record['present_count'] ?? 0;
+                $lateCount = $record['late_count'] ?? 0;
+                $absentCount = $record['absent_count'] ?? 0;
+                $attendedCount = $presentCount + $lateCount;
+
+                if ($totalActivities > 0) {
+                    $attendanceRate = round(($attendedCount / $totalActivities) * 100, 2);
+
+                    if ($attendanceRate >= 80) {
+                        $categoryKey = 'high';
+                    } elseif ($attendanceRate >= 60) {
+                        $categoryKey = 'medium';
+                    } else {
+                        $categoryKey = 'low';
+                    }
+                } else {
+                    $attendanceRate = null;
+                    $categoryKey = 'no_data';
+                }
+
+                $distribution[$categoryKey] = $distribution[$categoryKey] + 1;
+
+                return array_merge($record, [
+                    'attended_count' => $attendedCount,
+                    'attendance_rate' => $attendanceRate,
+                    'category' => $categoryKey,
+                    'category_label' => $categoryLabels[$categoryKey],
+                ]);
+            });
+
+            $totalTutors = $tutors->count();
+            $rates = $tutors->pluck('attendance_rate')->filter(fn($rate) => $rate !== null);
+            $averageRate = $rates->isEmpty() ? null : round($rates->avg(), 2);
+
+            $distributionSummary = $distribution->map(function ($count, $key) use ($totalTutors, $categoryLabels) {
+                return [
+                    'count' => $count,
+                    'percentage' => $totalTutors > 0 ? round(($count / $totalTutors) * 100, 2) : 0,
+                    'label' => $categoryLabels[$key],
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $tutors->values(),
+                'summary' => [
+                    'total_tutors' => $totalTutors,
+                    'average_attendance_rate' => $averageRate,
+                    'distribution' => $distributionSummary,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve tutor attendance summary: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function getGpsConfig($id_aktivitas)
     {
         try {

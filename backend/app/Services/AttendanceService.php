@@ -1204,4 +1204,85 @@ class AttendanceService
             'source' => 'none'
         ];
     }
+
+    public function getTutorAttendanceSummaryForShelter(int $shelterId, array $filters = [])
+    {
+        $activityQuery = Aktivitas::query()
+            ->select([
+                'id_aktivitas',
+                'id_tutor',
+                'id_shelter',
+                'jenis_kegiatan',
+                'tanggal'
+            ])
+            ->where('id_shelter', $shelterId);
+
+        if (!empty($filters['date_from'])) {
+            $activityQuery->whereDate('tanggal', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $activityQuery->whereDate('tanggal', '<=', $filters['date_to']);
+        }
+
+        if (!empty($filters['jenis_kegiatan'])) {
+            $activityQuery->where('jenis_kegiatan', $filters['jenis_kegiatan']);
+        }
+
+        $tutors = Tutor::query()
+            ->select([
+                'tutor.id_tutor',
+                'tutor.nama',
+                'tutor.email',
+                'tutor.no_hp',
+                'tutor.foto',
+                'tutor.maple',
+                DB::raw('COUNT(DISTINCT activities.id_aktivitas) as total_activities'),
+                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_YA . "' THEN 1 ELSE 0 END) as present_count"),
+                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_TERLAMBAT . "' THEN 1 ELSE 0 END) as late_count"),
+                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_TIDAK . "' THEN 1 ELSE 0 END) as absent_count")
+            ])
+            ->where('tutor.id_shelter', $shelterId)
+            ->leftJoinSub($activityQuery, 'activities', function ($join) {
+                $join->on('activities.id_tutor', '=', 'tutor.id_tutor');
+            })
+            ->leftJoin('absen', function ($join) {
+                $join->on('absen.id_aktivitas', '=', 'activities.id_aktivitas');
+            })
+            ->leftJoin('absen_user', function ($join) {
+                $join->on('absen_user.id_absen_user', '=', 'absen.id_absen_user')
+                    ->whereColumn('absen_user.id_tutor', 'tutor.id_tutor');
+            })
+            ->groupBy([
+                'tutor.id_tutor',
+                'tutor.nama',
+                'tutor.email',
+                'tutor.no_hp',
+                'tutor.foto',
+                'tutor.maple'
+            ])
+            ->orderBy('tutor.nama')
+            ->get();
+
+        return $tutors->map(function ($tutor) {
+            $totalActivities = (int) ($tutor->total_activities ?? 0);
+            $presentCount = (int) ($tutor->present_count ?? 0);
+            $lateCount = (int) ($tutor->late_count ?? 0);
+            $absentCount = (int) ($tutor->absent_count ?? 0);
+
+            return [
+                'id_tutor' => $tutor->id_tutor,
+                'nama' => $tutor->nama,
+                'email' => $tutor->email,
+                'no_hp' => $tutor->no_hp,
+                'foto' => $tutor->foto,
+                'foto_url' => method_exists($tutor, 'getFotoUrlAttribute') ? $tutor->foto_url : null,
+                'maple' => $tutor->maple,
+                'total_activities' => $totalActivities,
+                'present_count' => $presentCount,
+                'late_count' => $lateCount,
+                'absent_count' => $absentCount,
+            ];
+        });
+    }
 }
