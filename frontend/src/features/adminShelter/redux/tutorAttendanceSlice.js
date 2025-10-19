@@ -80,6 +80,18 @@ export const getTutorAttendanceHistory = createAsyncThunk(
   }
 );
 
+export const fetchTutorAttendanceSummary = createAsyncThunk(
+  'tutorAttendance/fetchSummary',
+  async (filters = {}, { rejectWithValue }) => {
+    try {
+      const response = await tutorAttendanceApi.getTutorAttendanceSummary(filters);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: error.message });
+    }
+  }
+);
+
 export const generateTutorToken = createAsyncThunk(
   'tutorAttendance/generateToken',
   async ({ id_tutor, validDays = 30 }, { rejectWithValue }) => {
@@ -104,7 +116,11 @@ const initialState = {
   dateValidationError: null,
   lastUpdated: null,
   offlineQueue: [],
-  isSyncing: false
+  isSyncing: false,
+  summary: [],
+  summaryStats: null,
+  summaryLoading: false,
+  summaryError: null
 };
 
 const tutorAttendanceSlice = createSlice({
@@ -255,6 +271,19 @@ const tutorAttendanceSlice = createSlice({
       .addCase(generateTutorToken.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || 'Failed to generate tutor token';
+      })
+      .addCase(fetchTutorAttendanceSummary.pending, (state) => {
+        state.summaryLoading = true;
+        state.summaryError = null;
+      })
+      .addCase(fetchTutorAttendanceSummary.fulfilled, (state, action) => {
+        state.summaryLoading = false;
+        state.summary = Array.isArray(action.payload?.data) ? action.payload.data : [];
+        state.summaryStats = action.payload?.summary || null;
+      })
+      .addCase(fetchTutorAttendanceSummary.rejected, (state, action) => {
+        state.summaryLoading = false;
+        state.summaryError = action.payload?.message || 'Failed to load tutor attendance summary';
       });
   }
 });
@@ -281,6 +310,10 @@ export const selectTutorDateValidationError = (state) => state.tutorAttendance.d
 export const selectTutorAttendanceRecords = (state) => state.tutorAttendance.attendanceRecords;
 export const selectTutorTokens = (state) => state.tutorAttendance.tokens;
 export const selectCurrentTutorToken = (state) => state.tutorAttendance.currentToken;
+export const selectTutorAttendanceSummary = (state) => state.tutorAttendance.summary;
+export const selectTutorAttendanceSummaryStats = (state) => state.tutorAttendance.summaryStats;
+export const selectTutorAttendanceSummaryLoading = (state) => state.tutorAttendance.summaryLoading;
+export const selectTutorAttendanceSummaryError = (state) => state.tutorAttendance.summaryError;
 
 export const selectTutorAttendanceByActivity = createSelector(
   [selectActivityRecords, (_, id_aktivitas) => id_aktivitas],

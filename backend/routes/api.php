@@ -384,6 +384,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/generate-tutor-token', [App\Http\Controllers\API\AttendanceController::class, 'generateTutorToken']);
             Route::post('/validate-tutor-token', [App\Http\Controllers\API\AttendanceController::class, 'validateTutorToken']);
             Route::get('/tutor/{id_tutor}/history', [App\Http\Controllers\API\AttendanceController::class, 'getTutorAttendanceHistory']);
+            Route::get('/tutor/summary', [App\Http\Controllers\API\AttendanceController::class, 'getTutorAttendanceSummary']);
         });
 
         // Tutor Honor Management

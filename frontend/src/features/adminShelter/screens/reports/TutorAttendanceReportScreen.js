@@ -24,10 +24,24 @@ import {
   selectAktivitasLoading
 } from '../../redux/aktivitasSlice';
 import {
-  getTutorAttendanceByActivity
+  fetchTutorAttendanceSummary,
+  getTutorAttendanceByActivity,
+  selectTutorAttendanceSummary,
+  selectTutorAttendanceSummaryError,
+  selectTutorAttendanceSummaryLoading,
+  selectTutorAttendanceSummaryStats
 } from '../../redux/tutorAttendanceSlice';
+import TutorAttendanceCard from '../../components/TutorAttendanceCard';
+import TutorAttendanceSummary from '../../components/TutorAttendanceSummary';
 
-const DEFAULT_FILTERS = {
+const DEFAULT_TUTOR_FILTERS = {
+  date_from: null,
+  date_to: null,
+  jenis_kegiatan: 'all',
+  performance: 'all'
+};
+
+const DEFAULT_ACTIVITY_FILTERS = {
   date_from: null,
   date_to: null,
   jenis_kegiatan: 'all',
@@ -40,6 +54,14 @@ const statusOptions = [
   { key: 'Terlambat', label: 'Terlambat' },
   { key: 'Tidak', label: 'Tidak Hadir' },
   { key: 'none', label: 'Belum Ada Absen' }
+];
+
+const performanceOptions = [
+  { key: 'all', label: 'Semua Kinerja' },
+  { key: 'high', label: 'Baik' },
+  { key: 'medium', label: 'Sedang' },
+  { key: 'low', label: 'Rendah' },
+  { key: 'no_data', label: 'Tidak Ada Data' }
 ];
 
 const getStatusColor = (status) => {
@@ -105,11 +127,15 @@ const formatDate = (value) => {
 
 const ReportFilterModal = ({
   visible,
-  onClose,
+  mode,
   filters,
+  defaults,
+  onClose,
   onApply,
   onClear,
-  typeOptions
+  typeOptions,
+  statusOptions: statusList,
+  performanceOptions: performanceList
 }) => {
   const [localFilters, setLocalFilters] = useState(filters);
   const [activeDatePicker, setActiveDatePicker] = useState(null);
@@ -135,9 +161,11 @@ const ReportFilterModal = ({
   };
 
   const handleClear = () => {
-    setLocalFilters(DEFAULT_FILTERS);
-    onClear();
+    setLocalFilters(defaults);
+    onClear(defaults);
   };
+
+  const headerTitle = mode === 'tutor' ? 'Filter Tutor' : 'Filter Aktivitas';
 
   return (
     <Modal
@@ -149,7 +177,7 @@ const ReportFilterModal = ({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filter Aktivitas</Text>
+            <Text style={styles.modalTitle}>{headerTitle}</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
@@ -209,33 +237,63 @@ const ReportFilterModal = ({
             </View>
           </View>
 
-          <View style={styles.modalSection}>
-            <Text style={styles.modalLabel}>Status Kehadiran Tutor</Text>
-            <View style={styles.modalOptionGrid}>
-              {statusOptions.map(option => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[
-                    styles.modalOptionButton,
-                    localFilters.status === option.key && styles.modalOptionButtonActive
-                  ]}
-                  onPress={() => setLocalFilters(prev => ({
-                    ...prev,
-                    status: option.key
-                  }))}
-                >
-                  <Text
+          {mode === 'activity' ? (
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Status Kehadiran Tutor</Text>
+              <View style={styles.modalOptionGrid}>
+                {statusList.map(option => (
+                  <TouchableOpacity
+                    key={option.key}
                     style={[
-                      styles.modalOptionText,
-                      localFilters.status === option.key && styles.modalOptionTextActive
+                      styles.modalOptionButton,
+                      localFilters.status === option.key && styles.modalOptionButtonActive
                     ]}
+                    onPress={() => setLocalFilters(prev => ({
+                      ...prev,
+                      status: option.key
+                    }))}
                   >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        localFilters.status === option.key && styles.modalOptionTextActive
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Kategori Kinerja</Text>
+              <View style={styles.modalOptionGrid}>
+                {performanceList.map(option => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.modalOptionButton,
+                      localFilters.performance === option.key && styles.modalOptionButtonActive
+                    ]}
+                    onPress={() => setLocalFilters(prev => ({
+                      ...prev,
+                      performance: option.key
+                    }))}
+                  >
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        localFilters.performance === option.key && styles.modalOptionTextActive
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
           <View style={styles.modalActions}>
             <Button
@@ -269,13 +327,21 @@ const TutorAttendanceReportScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
+  const summary = useSelector(selectTutorAttendanceSummary);
+  const summaryStats = useSelector(selectTutorAttendanceSummaryStats);
+  const summaryLoading = useSelector(selectTutorAttendanceSummaryLoading);
+  const summaryError = useSelector(selectTutorAttendanceSummaryError);
+
   const activities = useSelector(selectAktivitasList);
   const activitiesLoading = useSelector(selectAktivitasLoading);
   const activitiesError = useSelector(selectAktivitasError);
 
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [activeTab, setActiveTab] = useState('tutor');
   const [showFilters, setShowFilters] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [tutorFilters, setTutorFilters] = useState(DEFAULT_TUTOR_FILTERS);
+  const [activityFilters, setActivityFilters] = useState(DEFAULT_ACTIVITY_FILTERS);
+  const [summaryRefreshing, setSummaryRefreshing] = useState(false);
+  const [activityRefreshing, setActivityRefreshing] = useState(false);
   const [expandedActivityId, setExpandedActivityId] = useState(null);
   const [attendanceCache, setAttendanceCache] = useState({});
 
@@ -303,29 +369,41 @@ const TutorAttendanceReportScreen = () => {
     });
   }, [navigation]);
 
-  const fetchActivities = useCallback(async () => {
+  const buildSummaryParams = useCallback(() => {
+    const params = {};
+    if (tutorFilters.date_from) {
+      params.date_from = tutorFilters.date_from;
+    }
+    if (tutorFilters.date_to) {
+      params.date_to = tutorFilters.date_to;
+    }
+    if (tutorFilters.jenis_kegiatan && tutorFilters.jenis_kegiatan !== 'all') {
+      params.jenis_kegiatan = tutorFilters.jenis_kegiatan;
+    }
+    return params;
+  }, [tutorFilters]);
+
+  const buildActivityParams = useCallback(() => {
     const params = { page: 1, per_page: 20 };
 
-    if (filters.date_from) {
-      params.date_from = filters.date_from;
+    if (activityFilters.date_from) {
+      params.date_from = activityFilters.date_from;
     }
 
-    if (filters.date_to) {
-      params.date_to = filters.date_to;
+    if (activityFilters.date_to) {
+      params.date_to = activityFilters.date_to;
     }
 
-    if (filters.jenis_kegiatan && filters.jenis_kegiatan !== 'all') {
-      params.jenis_kegiatan = filters.jenis_kegiatan;
+    if (activityFilters.jenis_kegiatan && activityFilters.jenis_kegiatan !== 'all') {
+      params.jenis_kegiatan = activityFilters.jenis_kegiatan;
     }
 
-    try {
-      await dispatch(fetchAllAktivitas(params)).unwrap();
-    } catch (err) {
-      console.error('Failed to fetch activities', err);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [dispatch, filters.date_from, filters.date_to, filters.jenis_kegiatan]);
+    return params;
+  }, [activityFilters]);
+
+  useEffect(() => {
+    dispatch(fetchTutorAttendanceSummary(buildSummaryParams()));
+  }, [dispatch, buildSummaryParams]);
 
   const fetchAttendanceForActivity = useCallback(async (id_aktivitas, { force = false, silent = false } = {}) => {
     setAttendanceCache(prev => {
@@ -371,18 +449,28 @@ const TutorAttendanceReportScreen = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    setRefreshing(true);
-    setAttendanceCache({});
-    setExpandedActivityId(null);
-    fetchActivities();
-  }, [fetchActivities]);
+    const load = async () => {
+      setActivityRefreshing(true);
+      setAttendanceCache({});
+      setExpandedActivityId(null);
+      try {
+        await dispatch(fetchAllAktivitas(buildActivityParams())).unwrap();
+      } catch (err) {
+        console.error('Failed to fetch activities', err);
+      } finally {
+        setActivityRefreshing(false);
+      }
+    };
+
+    load();
+  }, [dispatch, buildActivityParams]);
 
   useEffect(() => () => {
     dispatch(resetAktivitasError());
   }, [dispatch]);
 
   useEffect(() => {
-    if (filters.status !== 'all' && activities.length) {
+    if (activityFilters.status !== 'all' && activities.length) {
       activities.forEach(activity => {
         const cached = attendanceCache[activity.id_aktivitas];
         if (!cached || cached.status === 'error') {
@@ -390,20 +478,45 @@ const TutorAttendanceReportScreen = () => {
         }
       });
     }
-  }, [activities, attendanceCache, fetchAttendanceForActivity, filters.status]);
+  }, [activities, attendanceCache, activityFilters.status, fetchAttendanceForActivity]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchActivities();
-  };
+  const handleSummaryRefresh = useCallback(async () => {
+    setSummaryRefreshing(true);
+    try {
+      await dispatch(fetchTutorAttendanceSummary(buildSummaryParams())).unwrap();
+    } catch (error) {
+      console.error('Failed to refresh summary', error);
+    } finally {
+      setSummaryRefreshing(false);
+    }
+  }, [dispatch, buildSummaryParams]);
+
+  const handleActivityRefresh = useCallback(async () => {
+    setActivityRefreshing(true);
+    try {
+      await dispatch(fetchAllAktivitas(buildActivityParams())).unwrap();
+    } catch (error) {
+      console.error('Failed to fetch activities', error);
+    } finally {
+      setActivityRefreshing(false);
+    }
+  }, [dispatch, buildActivityParams]);
 
   const handleApplyFilters = (newFilters) => {
-    setFilters(newFilters);
+    if (activeTab === 'tutor') {
+      setTutorFilters(prev => ({ ...prev, ...newFilters }));
+    } else {
+      setActivityFilters(prev => ({ ...prev, ...newFilters }));
+    }
     setShowFilters(false);
   };
 
-  const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
+  const handleClearFilters = (defaults) => {
+    if (activeTab === 'tutor') {
+      setTutorFilters(defaults || DEFAULT_TUTOR_FILTERS);
+    } else {
+      setActivityFilters(defaults || DEFAULT_ACTIVITY_FILTERS);
+    }
     setShowFilters(false);
   };
 
@@ -416,11 +529,11 @@ const TutorAttendanceReportScreen = () => {
   };
 
   const filteredActivities = useMemo(() => {
-    if (filters.status === 'all') {
+    if (activityFilters.status === 'all') {
       return activities;
     }
 
-    if (filters.status === 'none') {
+    if (activityFilters.status === 'none') {
       return activities.filter(activity => {
         const cached = attendanceCache[activity.id_aktivitas];
         return cached?.status === 'loaded' && !cached.data;
@@ -429,9 +542,21 @@ const TutorAttendanceReportScreen = () => {
 
     return activities.filter(activity => {
       const cached = attendanceCache[activity.id_aktivitas];
-      return cached?.status === 'loaded' && cached.data?.absen === filters.status;
+      return cached?.status === 'loaded' && cached.data?.absen === activityFilters.status;
     });
-  }, [activities, attendanceCache, filters.status]);
+  }, [activities, attendanceCache, activityFilters.status]);
+
+  const filteredSummary = useMemo(() => {
+    if (!Array.isArray(summary)) {
+      return [];
+    }
+
+    if (tutorFilters.performance === 'all') {
+      return summary;
+    }
+
+    return summary.filter(item => item.category === tutorFilters.performance);
+  }, [summary, tutorFilters.performance]);
 
   const renderAttendanceDetails = (activity) => {
     const cached = attendanceCache[activity.id_aktivitas];
@@ -503,7 +628,7 @@ const TutorAttendanceReportScreen = () => {
 
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Verifikasi</Text>
-          <Text style={[styles.detailValue, { color: record.is_verified ? '#27ae60' : '#f39c12' }]}>
+          <Text style={[styles.detailValue, { color: record.is_verified ? '#27ae60' : '#f39c12' }]}> 
             {record.is_verified ? 'Terverifikasi' : 'Belum Diverifikasi'}
           </Text>
         </View>
@@ -520,37 +645,33 @@ const TutorAttendanceReportScreen = () => {
 
   const renderActivityItem = ({ item }) => {
     const cached = attendanceCache[item.id_aktivitas];
+    const status = cached?.data?.absen || (cached?.status === 'loaded' ? 'none' : null);
     const isExpanded = expandedActivityId === item.id_aktivitas;
-    const status = cached?.data?.absen ?? (cached?.status === 'loaded' ? null : undefined);
 
     return (
       <View style={styles.activityCard}>
         <TouchableOpacity
           style={styles.activityHeader}
           onPress={() => handleToggleActivity(item.id_aktivitas)}
-          activeOpacity={0.8}
         >
           <View style={styles.activityInfo}>
-            <Text style={styles.activityType}>{item.jenis_kegiatan || 'Aktivitas'}</Text>
-            <Text style={styles.activityTitle}>{item.materi || 'Tanpa materi'}</Text>
+            <Text style={styles.activityTitle}>{item.jenis_kegiatan || 'Aktivitas Shelter'}</Text>
             <Text style={styles.activityDate}>{formatDate(item.tanggal)}</Text>
             {item.nama_kelompok ? (
-              <Text style={styles.activityGroup}>Kelompok: {item.nama_kelompok}</Text>
+              <Text style={styles.activityGroup}>{item.nama_kelompok}</Text>
             ) : null}
           </View>
 
           <View style={styles.activityStatusContainer}>
-            {cached && (cached.status === 'loading' || cached.status === 'prefetching') ? (
-              <LoadingSpinner size="small" message="" />
-            ) : status ? (
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
-                <Text style={styles.statusText}>{getStatusLabel(status)}</Text>
-              </View>
-            ) : (
-              <View style={[styles.statusBadge, styles.statusBadgeEmpty]}>
-                <Text style={styles.statusText}>Belum Ada</Text>
-              </View>
-            )}
+            <View style={[
+              styles.statusBadge,
+              !status && styles.statusBadgeEmpty,
+              status && { backgroundColor: getStatusColor(status) }
+            ]}>
+              <Text style={styles.statusText}>
+                {status ? getStatusLabel(status) : 'Lihat Detail'}
+              </Text>
+            </View>
             <Ionicons
               name={isExpanded ? 'chevron-up' : 'chevron-down'}
               size={20}
@@ -568,106 +689,237 @@ const TutorAttendanceReportScreen = () => {
     );
   };
 
-  if (activitiesLoading && !activities.length) {
-    return <LoadingSpinner fullScreen message="Memuat daftar aktivitas..." />;
-  }
+  const renderTutorTab = () => {
+    if (summaryLoading && (!summary || summary.length === 0)) {
+      return (
+        <View style={styles.loadingContainer}>
+          <LoadingSpinner message="Memuat ringkasan kehadiran tutor..." />
+        </View>
+      );
+    }
 
-  if (activitiesError) {
-    return (
-      <View style={styles.screenContainer}>
+    if (summaryError) {
+      return (
         <ErrorMessage
-          message={activitiesError}
-          onRetry={() => {
-            dispatch(resetAktivitasError());
-            handleRefresh();
-          }}
+          message={summaryError}
+          onRetry={() => dispatch(fetchTutorAttendanceSummary(buildSummaryParams()))}
         />
-      </View>
-    );
-  }
+      );
+    }
 
-  return (
-    <View style={styles.screenContainer}>
-      {filteredActivities.length === 0 ? (
-        <View style={styles.emptyListState}>
-          <Ionicons name="clipboard-outline" size={64} color="#bdc3c7" />
-          <Text style={styles.emptyListTitle}>Tidak ada aktivitas</Text>
-          <Text style={styles.emptyListMessage}>
-            Sesuaikan filter untuk menemukan aktivitas yang membutuhkan laporan kehadiran tutor.
+    if (!summaryLoading && filteredSummary.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="school-outline" size={48} color="#bdc3c7" />
+          <Text style={styles.emptyTitle}>Belum ada data kehadiran tutor</Text>
+          <Text style={styles.emptySubtitle}>
+            Coba ubah filter waktu atau jenis kegiatan untuk melihat data lainnya.
           </Text>
         </View>
-      ) : (
-        <FlatList
-          data={filteredActivities}
-          keyExtractor={(item) => item.id_aktivitas?.toString() ?? String(item.id_aktivitas)}
-          renderItem={renderActivityItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={(
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={["#3498db"]}
-            />
-          )}
-          showsVerticalScrollIndicator={false}
+      );
+    }
+
+    return (
+      <FlatList
+        data={filteredSummary}
+        keyExtractor={(item, index) => item.id_tutor ? item.id_tutor.toString() : `tutor-${index}`}
+        contentContainerStyle={styles.listContainer}
+        renderItem={({ item }) => (
+          <TutorAttendanceCard
+            tutor={item}
+            onPress={() => navigation.navigate('TutorActivityHistory', {
+              id_tutor: item.id_tutor,
+              nama: item.nama
+            })}
+          />
+        )}
+        ListHeaderComponent={summaryStats ? (
+          <TutorAttendanceSummary summary={summaryStats} />
+        ) : null}
+        refreshControl={(
+          <RefreshControl
+            refreshing={summaryRefreshing}
+            onRefresh={handleSummaryRefresh}
+          />
+        )}
+      />
+    );
+  };
+
+  const renderActivityTab = () => {
+    if (activitiesLoading && (!activities || activities.length === 0)) {
+      return (
+        <View style={styles.loadingContainer}>
+          <LoadingSpinner message="Memuat daftar aktivitas..." />
+        </View>
+      );
+    }
+
+    if (activitiesError) {
+      return (
+        <ErrorMessage
+          message={activitiesError}
+          onRetry={handleActivityRefresh}
         />
-      )}
+      );
+    }
+
+    if (!activitiesLoading && filteredActivities.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="calendar-outline" size={48} color="#bdc3c7" />
+          <Text style={styles.emptyTitle}>Belum ada aktivitas yang sesuai</Text>
+          <Text style={styles.emptySubtitle}>
+            Atur kembali filter status atau tanggal untuk melihat aktivitas lainnya.
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={filteredActivities}
+        keyExtractor={(item) => item.id_aktivitas.toString()}
+        contentContainerStyle={styles.listContainer}
+        renderItem={renderActivityItem}
+        refreshControl={(
+          <RefreshControl
+            refreshing={activityRefreshing}
+            onRefresh={handleActivityRefresh}
+          />
+        )}
+      />
+    );
+  };
+
+  const currentFilters = activeTab === 'tutor' ? tutorFilters : activityFilters;
+  const currentDefaults = activeTab === 'tutor' ? DEFAULT_TUTOR_FILTERS : DEFAULT_ACTIVITY_FILTERS;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'tutor' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('tutor')}
+        >
+          <Text style={[styles.tabButtonLabel, activeTab === 'tutor' && styles.tabButtonLabelActive]}>
+            Per Tutor
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'activity' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('activity')}
+        >
+          <Text style={[styles.tabButtonLabel, activeTab === 'activity' && styles.tabButtonLabelActive]}>
+            Per Aktivitas
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'tutor' ? renderTutorTab() : renderActivityTab()}
 
       <ReportFilterModal
         visible={showFilters}
+        mode={activeTab === 'tutor' ? 'tutor' : 'activity'}
+        filters={currentFilters}
+        defaults={currentDefaults}
         onClose={() => setShowFilters(false)}
-        filters={filters}
         onApply={handleApplyFilters}
         onClear={handleClearFilters}
         typeOptions={typeOptions}
+        statusOptions={statusOptions}
+        performanceOptions={performanceOptions}
       />
     </View>
   );
 };
 
-export default TutorAttendanceReportScreen;
-
 const styles = StyleSheet.create({
-  screenContainer: {
+  container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 16
+    backgroundColor: '#f4f7fb'
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#e0e6ed',
+    margin: 16,
+    padding: 4,
+    borderRadius: 12
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  tabButtonActive: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2
+  },
+  tabButtonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5d6d7e'
+  },
+  tabButtonLabelActive: {
+    color: '#2c3e50'
   },
   headerFilterButton: {
-    marginRight: 12,
-    padding: 6,
-    backgroundColor: '#3498db',
-    borderRadius: 16
+    marginRight: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 8,
+    borderRadius: 20
   },
-  listContent: {
-    paddingBottom: 24
+  listContainer: {
+    padding: 16,
+    paddingBottom: 80
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    gap: 12
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50'
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    textAlign: 'center'
   },
   activityCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2
   },
   activityHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     padding: 16
   },
   activityInfo: {
     flex: 1,
     gap: 4
-  },
-  activityType: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#3498db',
-    textTransform: 'uppercase'
   },
   activityTitle: {
     fontSize: 16,
@@ -740,23 +992,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2c3e50'
   },
-  emptyListState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    gap: 12
-  },
-  emptyListTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50'
-  },
-  emptyListMessage: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    textAlign: 'center'
-  },
   emptyAttendanceState: {
     alignItems: 'center',
     gap: 8
@@ -802,21 +1037,20 @@ const styles = StyleSheet.create({
     color: '#2c3e50'
   },
   modalSection: {
-    gap: 12
+    gap: 8
   },
   modalLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#2c3e50'
+    color: '#7f8c8d'
   },
   modalDateButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#ecf0f1'
+    borderColor: '#ecf0f1',
+    borderRadius: 12,
+    padding: 12
   },
   modalDateText: {
     fontSize: 14,
@@ -828,26 +1062,26 @@ const styles = StyleSheet.create({
     gap: 8
   },
   modalOptionButton: {
-    paddingHorizontal: 14,
     paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#dfe6e9',
-    backgroundColor: '#fff'
+    borderColor: '#ecf0f1'
   },
   modalOptionButtonActive: {
     backgroundColor: '#3498db',
-    borderColor: '#3498db'
+    borderColor: '#2980b9'
   },
   modalOptionText: {
     fontSize: 13,
-    color: '#2c3e50'
+    color: '#7f8c8d'
   },
   modalOptionTextActive: {
     color: '#fff'
   },
   modalActions: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 12
   },
   modalClearButton: {
@@ -857,3 +1091,5 @@ const styles = StyleSheet.create({
     flex: 1
   }
 });
+
+export default TutorAttendanceReportScreen;

@@ -81,5 +81,11 @@ export const tutorAttendanceApi = {
     return await api.get(`/admin-shelter/attendance/tutor/${id_tutor}/history`, {
       params: filters
     });
+  },
+
+  getTutorAttendanceSummary: async (filters = {}) => {
+    return await api.get('/admin-shelter/attendance/tutor/summary', {
+      params: filters
+    });
   }
 };
