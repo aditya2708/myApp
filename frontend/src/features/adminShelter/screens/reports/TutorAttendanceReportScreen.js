@@ -74,9 +74,9 @@ const normalizeTutorRecord = (record = {}) => {
   const verifiedAttendanceCount = Number(
     record.verified_attendance_count ?? (verifiedPresent + verifiedLate + verifiedAbsent)
   ) || 0;
-  const attendedCount = verifiedPresent + verifiedLate;
+  const attendedCount = Math.min(verifiedPresent + verifiedLate, totalActivities);
   const attendanceRate = totalActivities > 0
-    ? Number((((attendedCount) / totalActivities) * 100).toFixed(1))
+    ? Number(((attendedCount / totalActivities) * 100).toFixed(2))
     : null;
   const category = record.category || deriveCategoryFromRate(attendanceRate);
   const categoryLabel = record.category_label || deriveCategoryLabel(category);
@@ -118,12 +118,21 @@ const summarizeTutorMetrics = (tutorMetrics = []) => {
   }
 
   const totalTutors = tutorMetrics.length;
-  const totalRate = tutorMetrics.reduce((acc, tutor) => (
-    typeof tutor.attendance_rate === 'number' ? acc + tutor.attendance_rate : acc
-  ), 0);
-  const averageAttendanceRate = Number((totalRate / totalTutors).toFixed(1));
+  let totalAssignments = 0;
+  let totalAttended = 0;
 
   const distributionCounts = tutorMetrics.reduce((acc, tutor) => {
+    const totalActivities = Number(tutor.total_activities ?? tutor.total_assignments ?? 0) || 0;
+    const attendedCount = Number(
+      tutor.verified_attended_count
+      ?? tutor.attended_count
+      ?? ((Number(tutor.verified_present_count ?? tutor.present_count ?? 0) || 0)
+        + (Number(tutor.verified_late_count ?? tutor.late_count ?? 0) || 0))
+    ) || 0;
+
+    totalAssignments += totalActivities;
+    totalAttended += Math.min(attendedCount, totalActivities);
+
     const category = tutor.category || deriveCategoryFromRate(tutor.attendance_rate);
     if (!acc[category]) {
       acc[category] = 0;
@@ -137,6 +146,10 @@ const summarizeTutorMetrics = (tutorMetrics = []) => {
     acc[key] = { count, percentage };
     return acc;
   }, {});
+
+  const averageAttendanceRate = totalAssignments > 0
+    ? Number(((totalAttended / totalAssignments) * 100).toFixed(2))
+    : 0;
 
   return {
     total_tutors: totalTutors,
