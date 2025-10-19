@@ -260,7 +260,7 @@ const TutorAttendanceReportScreen = () => {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity style={styles.headerFilterButton} onPress={() => setShowFilters(true)}>
-          <Ionicons name="filter" size={22} color="#fff" />
+          <Ionicons name="filter" size={22} color="#1f2933" />
         </TouchableOpacity>
       )
     });
