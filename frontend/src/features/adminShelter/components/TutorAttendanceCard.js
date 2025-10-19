@@ -18,7 +18,7 @@ const formatRate = (rate) => {
     return '-';
   }
 
-  return `${Number.isInteger(numericRate) ? numericRate : numericRate.toFixed(1)}%`;
+  return `${numericRate.toFixed(2)}%`;
 };
 
 const TutorAttendanceCard = ({ tutor, onPress }) => {
@@ -62,7 +62,7 @@ const TutorAttendanceCard = ({ tutor, onPress }) => {
       <View style={styles.body}>
         <View style={styles.rateContainer}>
           <Text style={styles.rateValue}>{formatRate(attendance_rate)}</Text>
-          <Text style={styles.rateLabel}>Tingkat Kehadiran</Text>
+          <Text style={styles.rateLabel}>Rata-rata Kehadiran</Text>
         </View>
 
         <View style={styles.divider} />
