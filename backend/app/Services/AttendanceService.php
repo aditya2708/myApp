@@ -1207,29 +1207,62 @@ class AttendanceService
 
     public function getTutorAttendanceSummaryForShelter(int $shelterId, array $filters = [])
     {
-        $activityQuery = Aktivitas::query()
-            ->select([
-                'id_aktivitas',
-                'id_tutor',
-                'id_shelter',
-                'jenis_kegiatan',
-                'tanggal'
-            ])
+        $baseActivityQuery = Aktivitas::query()
             ->where('id_shelter', $shelterId);
 
         if (!empty($filters['date_from'])) {
-            $activityQuery->whereDate('tanggal', '>=', $filters['date_from']);
+            $baseActivityQuery->whereDate('tanggal', '>=', $filters['date_from']);
         }
 
         if (!empty($filters['date_to'])) {
-            $activityQuery->whereDate('tanggal', '<=', $filters['date_to']);
+            $baseActivityQuery->whereDate('tanggal', '<=', $filters['date_to']);
         }
 
         if (!empty($filters['jenis_kegiatan'])) {
-            $activityQuery->where('jenis_kegiatan', $filters['jenis_kegiatan']);
+            $baseActivityQuery->where('jenis_kegiatan', $filters['jenis_kegiatan']);
         }
 
+        $activityStatsQuery = (clone $baseActivityQuery)
+            ->select([
+                'id_tutor',
+                DB::raw('COUNT(DISTINCT id_aktivitas) as total_activities'),
+                DB::raw("GROUP_CONCAT(DISTINCT jenis_kegiatan ORDER BY jenis_kegiatan SEPARATOR ',') as activity_types"),
+            ])
+            ->groupBy('id_tutor');
+
+        $filteredActivitiesForAttendance = (clone $baseActivityQuery)
+            ->select([
+                'id_aktivitas',
+                'id_tutor',
+            ]);
+
+        $attendanceStatsQuery = Absen::query()
+            ->select([
+                'absen_user.id_tutor',
+                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_YA . "' THEN 1 ELSE 0 END) as present_count"),
+                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_TERLAMBAT . "' THEN 1 ELSE 0 END) as late_count"),
+                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_TIDAK . "' THEN 1 ELSE 0 END) as absent_count"),
+                DB::raw('COUNT(*) as verified_attendance_count'),
+            ])
+            ->join('absen_user', function ($join) {
+                $join->on('absen_user.id_absen_user', '=', 'absen.id_absen_user')
+                    ->whereNotNull('absen_user.id_tutor');
+            })
+            ->joinSub($filteredActivitiesForAttendance, 'filtered_activities', function ($join) {
+                $join->on('filtered_activities.id_aktivitas', '=', 'absen.id_aktivitas')
+                    ->whereColumn('filtered_activities.id_tutor', 'absen_user.id_tutor');
+            })
+            ->where('absen.is_verified', true)
+            ->groupBy('absen_user.id_tutor');
+
         $tutors = Tutor::query()
+            ->where('tutor.id_shelter', $shelterId)
+            ->leftJoinSub($activityStatsQuery, 'activity_stats', function ($join) {
+                $join->on('activity_stats.id_tutor', '=', 'tutor.id_tutor');
+            })
+            ->leftJoinSub($attendanceStatsQuery, 'attendance_stats', function ($join) {
+                $join->on('attendance_stats.id_tutor', '=', 'tutor.id_tutor');
+            })
             ->select([
                 'tutor.id_tutor',
                 'tutor.nama',
@@ -1237,31 +1270,12 @@ class AttendanceService
                 'tutor.no_hp',
                 'tutor.foto',
                 'tutor.maple',
-                DB::raw('COUNT(DISTINCT activities.id_aktivitas) as total_activities'),
-                DB::raw("GROUP_CONCAT(DISTINCT activities.jenis_kegiatan ORDER BY activities.jenis_kegiatan SEPARATOR ',') as activity_types"),
-                DB::raw("SUM(CASE WHEN absen.is_verified = true THEN 1 ELSE 0 END) as verified_attendance_count"),
-                DB::raw("SUM(CASE WHEN absen.is_verified = true AND absen.absen = '" . Absen::TEXT_YA . "' THEN 1 ELSE 0 END) as present_count"),
-                DB::raw("SUM(CASE WHEN absen.is_verified = true AND absen.absen = '" . Absen::TEXT_TERLAMBAT . "' THEN 1 ELSE 0 END) as late_count"),
-                DB::raw("SUM(CASE WHEN absen.is_verified = true AND absen.absen = '" . Absen::TEXT_TIDAK . "' THEN 1 ELSE 0 END) as absent_count")
-            ])
-            ->where('tutor.id_shelter', $shelterId)
-            ->leftJoinSub($activityQuery, 'activities', function ($join) {
-                $join->on('activities.id_tutor', '=', 'tutor.id_tutor');
-            })
-            ->leftJoin('absen', function ($join) {
-                $join->on('absen.id_aktivitas', '=', 'activities.id_aktivitas');
-            })
-            ->leftJoin('absen_user', function ($join) {
-                $join->on('absen_user.id_absen_user', '=', 'absen.id_absen_user')
-                    ->whereColumn('absen_user.id_tutor', 'tutor.id_tutor');
-            })
-            ->groupBy([
-                'tutor.id_tutor',
-                'tutor.nama',
-                'tutor.email',
-                'tutor.no_hp',
-                'tutor.foto',
-                'tutor.maple'
+                DB::raw('COALESCE(activity_stats.total_activities, 0) as total_activities'),
+                'activity_stats.activity_types',
+                DB::raw('COALESCE(attendance_stats.present_count, 0) as present_count'),
+                DB::raw('COALESCE(attendance_stats.late_count, 0) as late_count'),
+                DB::raw('COALESCE(attendance_stats.absent_count, 0) as absent_count'),
+                DB::raw('COALESCE(attendance_stats.verified_attendance_count, 0) as verified_attendance_count'),
             ])
             ->orderBy('tutor.nama')
             ->get();
@@ -1271,7 +1285,21 @@ class AttendanceService
             $presentCount = (int) ($tutor->present_count ?? 0);
             $lateCount = (int) ($tutor->late_count ?? 0);
             $absentCount = (int) ($tutor->absent_count ?? 0);
-            $verifiedAttendanceCount = (int) ($tutor->verified_attendance_count ?? ($presentCount + $lateCount + $absentCount));
+            $verifiedAttendanceCount = (int) ($tutor->verified_attendance_count ?? 0);
+            $totalVerifiedSessions = $presentCount + $lateCount + $absentCount;
+
+            if ($verifiedAttendanceCount === 0) {
+                $verifiedAttendanceCount = $totalVerifiedSessions;
+            }
+
+            $attendanceRate = null;
+
+            if ($totalActivities > 0) {
+                $attendanceRate = $totalVerifiedSessions > 0
+                    ? round((($presentCount + $lateCount) / $totalActivities) * 100, 2)
+                    : 0;
+            }
+
             $activityTypes = collect(explode(',', (string) ($tutor->activity_types ?? '')))
                 ->map(fn ($type) => trim($type))
                 ->filter()
@@ -1295,6 +1323,8 @@ class AttendanceService
                 'verified_present_count' => $presentCount,
                 'verified_late_count' => $lateCount,
                 'verified_absent_count' => $absentCount,
+                'attendance_total' => $totalVerifiedSessions,
+                'attendance_rate' => $attendanceRate,
                 'activity_types' => $activityTypes,
             ];
         });
