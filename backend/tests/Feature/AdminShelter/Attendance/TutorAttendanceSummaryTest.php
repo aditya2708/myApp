@@ -98,6 +98,7 @@ class TutorAttendanceSummaryTest extends TestCase
             $table->string('absen');
             $table->unsignedBigInteger('id_absen_user');
             $table->unsignedBigInteger('id_aktivitas');
+            $table->boolean('is_verified')->default(false);
             $table->timestamps();
         });
     }
@@ -183,8 +184,11 @@ class TutorAttendanceSummaryTest extends TestCase
 
         $baseDate = Carbon::parse('2024-01-01');
 
-        $createActivity = function (Tutor $tutor, AbsenUser $absenUser, array $statuses) use ($shelter, $baseDate) {
-            foreach ($statuses as $index => $status) {
+        $createActivity = function (Tutor $tutor, AbsenUser $absenUser, array $records) use ($shelter, $baseDate) {
+            foreach ($records as $index => $record) {
+                $status = is_array($record) ? ($record['status'] ?? Absen::TEXT_YA) : $record;
+                $isVerified = is_array($record) ? ($record['is_verified'] ?? true) : true;
+
                 $aktivitas = Aktivitas::create([
                     'id_shelter' => $shelter->id_shelter,
                     'id_tutor' => $tutor->id_tutor,
@@ -196,38 +200,55 @@ class TutorAttendanceSummaryTest extends TestCase
                     'absen' => $status,
                     'id_absen_user' => $absenUser->id_absen_user,
                     'id_aktivitas' => $aktivitas->id_aktivitas,
+                    'is_verified' => $isVerified,
                 ]);
             }
         };
 
         $createActivity($highTutor, $highUser, [
-            Absen::TEXT_YA,
-            Absen::TEXT_YA,
-            Absen::TEXT_YA,
-            Absen::TEXT_YA,
-            Absen::TEXT_TERLAMBAT,
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_TERLAMBAT, 'is_verified' => true],
         ]);
 
         $createActivity($mediumTutor, $mediumUser, [
-            Absen::TEXT_YA,
-            Absen::TEXT_YA,
-            Absen::TEXT_TIDAK,
-            Absen::TEXT_YA,
-            Absen::TEXT_TIDAK,
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_TIDAK, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_TIDAK, 'is_verified' => false],
         ]);
 
         $createActivity($lowTutor, $lowUser, [
-            Absen::TEXT_YA,
-            Absen::TEXT_TIDAK,
-            Absen::TEXT_TIDAK,
-            Absen::TEXT_TIDAK,
-            Absen::TEXT_TIDAK,
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_TIDAK, 'is_verified' => true],
+            ['status' => Absen::TEXT_TIDAK, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => false],
+            ['status' => Absen::TEXT_TIDAK, 'is_verified' => false],
         ]);
 
         $createActivity($externalTutor, $externalUser, [
-            Absen::TEXT_YA,
-            Absen::TEXT_YA,
-            Absen::TEXT_YA,
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+            ['status' => Absen::TEXT_YA, 'is_verified' => true],
+        ]);
+
+        $noTutorUser = AbsenUser::create(['id_tutor' => null]);
+
+        $orphanActivity = Aktivitas::create([
+            'id_shelter' => $shelter->id_shelter,
+            'id_tutor' => null,
+            'jenis_kegiatan' => 'Bimbel',
+            'tanggal' => $baseDate->copy()->addDays(10)->toDateString(),
+        ]);
+
+        Absen::create([
+            'absen' => Absen::TEXT_YA,
+            'id_absen_user' => $noTutorUser->id_absen_user,
+            'id_aktivitas' => $orphanActivity->id_aktivitas,
+            'is_verified' => true,
         ]);
 
         $response = $this->getJson('/api/admin-shelter/attendance/tutor/summary');
