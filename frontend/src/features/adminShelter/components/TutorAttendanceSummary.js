@@ -25,7 +25,7 @@ const formatRate = (rate) => {
     return '-';
   }
 
-  return `${Number.isInteger(numericRate) ? numericRate : numericRate.toFixed(1)}%`;
+  return `${numericRate.toFixed(2)}%`;
 };
 
 const TutorAttendanceSummary = ({ summary }) => {
