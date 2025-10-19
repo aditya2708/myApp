@@ -1238,9 +1238,11 @@ class AttendanceService
                 'tutor.foto',
                 'tutor.maple',
                 DB::raw('COUNT(DISTINCT activities.id_aktivitas) as total_activities'),
-                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_YA . "' THEN 1 ELSE 0 END) as present_count"),
-                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_TERLAMBAT . "' THEN 1 ELSE 0 END) as late_count"),
-                DB::raw("SUM(CASE WHEN absen.absen = '" . Absen::TEXT_TIDAK . "' THEN 1 ELSE 0 END) as absent_count")
+                DB::raw("GROUP_CONCAT(DISTINCT activities.jenis_kegiatan ORDER BY activities.jenis_kegiatan SEPARATOR ',') as activity_types"),
+                DB::raw("SUM(CASE WHEN absen.is_verified = true THEN 1 ELSE 0 END) as verified_attendance_count"),
+                DB::raw("SUM(CASE WHEN absen.is_verified = true AND absen.absen = '" . Absen::TEXT_YA . "' THEN 1 ELSE 0 END) as present_count"),
+                DB::raw("SUM(CASE WHEN absen.is_verified = true AND absen.absen = '" . Absen::TEXT_TERLAMBAT . "' THEN 1 ELSE 0 END) as late_count"),
+                DB::raw("SUM(CASE WHEN absen.is_verified = true AND absen.absen = '" . Absen::TEXT_TIDAK . "' THEN 1 ELSE 0 END) as absent_count")
             ])
             ->where('tutor.id_shelter', $shelterId)
             ->leftJoinSub($activityQuery, 'activities', function ($join) {
@@ -1269,6 +1271,13 @@ class AttendanceService
             $presentCount = (int) ($tutor->present_count ?? 0);
             $lateCount = (int) ($tutor->late_count ?? 0);
             $absentCount = (int) ($tutor->absent_count ?? 0);
+            $verifiedAttendanceCount = (int) ($tutor->verified_attendance_count ?? ($presentCount + $lateCount + $absentCount));
+            $activityTypes = collect(explode(',', (string) ($tutor->activity_types ?? '')))
+                ->map(fn ($type) => trim($type))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
 
             return [
                 'id_tutor' => $tutor->id_tutor,
@@ -1282,6 +1291,11 @@ class AttendanceService
                 'present_count' => $presentCount,
                 'late_count' => $lateCount,
                 'absent_count' => $absentCount,
+                'verified_attendance_count' => $verifiedAttendanceCount,
+                'verified_present_count' => $presentCount,
+                'verified_late_count' => $lateCount,
+                'verified_absent_count' => $absentCount,
+                'activity_types' => $activityTypes,
             ];
         });
     }

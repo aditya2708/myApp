@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render } from '@testing-library/react-native';
+import { act, render, within } from '@testing-library/react-native';
 
 import TutorAttendanceReportScreen from '../TutorAttendanceReportScreen';
 
@@ -63,21 +63,22 @@ describe('TutorAttendanceReportScreen', () => {
             nama: 'Tutor A',
             maple: 'Matematika',
             total_activities: 3,
-            attendance_details: [
-              { id: 1, absen: 'Ya', is_verified: true, jenis_kegiatan: 'Matematika' },
-              { id: 2, absen: 'Terlambat', is_verified: true, jenis_kegiatan: 'Matematika' },
-              { id: 3, absen: 'Ya', is_verified: false, jenis_kegiatan: 'Matematika' }
-            ]
+            verified_present_count: 1,
+            verified_late_count: 1,
+            verified_absent_count: 1,
+            verified_attendance_count: 3,
+            activity_types: ['Matematika']
           },
           {
             id_tutor: 2,
             nama: 'Tutor B',
             maple: 'IPA',
             total_activities: 2,
-            attendance_details: [
-              { id: 4, absen: 'Ya', is_verified: true, jenis_kegiatan: 'IPA' },
-              { id: 5, absen: 'Tidak', is_verified: true, jenis_kegiatan: 'IPA' }
-            ]
+            verified_present_count: 1,
+            verified_late_count: 0,
+            verified_absent_count: 1,
+            verified_attendance_count: 2,
+            activity_types: ['IPA']
           }
         ]
       }
@@ -93,6 +94,15 @@ describe('TutorAttendanceReportScreen', () => {
     expect(screen.getByText('Ringkasan Kehadiran Tutor')).toBeTruthy();
     expect(screen.getByText('Tutor A')).toBeTruthy();
     expect(screen.getByText('Tutor B')).toBeTruthy();
+
+    const tutorACard = screen.getByText('Tutor A').parent.parent.parent;
+    const tutorBCard = screen.getByText('Tutor B').parent.parent.parent;
+
+    expect(within(tutorACard).getAllByText('1')).toHaveLength(3);
+    expect(within(tutorACard).getByText('3')).toBeTruthy();
+
+    expect(within(tutorBCard).getAllByText('1')).toHaveLength(2);
+    expect(within(tutorBCard).getByText('2')).toBeTruthy();
   });
 
   it('shows empty state when there is no verified attendance data', async () => {

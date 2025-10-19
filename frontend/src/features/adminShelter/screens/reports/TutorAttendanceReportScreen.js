@@ -29,36 +29,6 @@ const CATEGORY_LABELS = {
   no_data: 'Tidak Ada Data'
 };
 
-const KNOWN_ATTENDANCE_KEYS = [
-  'verified_records',
-  'attendance_details',
-  'attendance_records',
-  'attendance_history',
-  'attendances',
-  'records',
-  'activities',
-  'activity_records',
-  'detail'
-];
-
-const normalizeStatus = (value) => {
-  if (!value) {
-    return null;
-  }
-
-  const text = String(value).toLowerCase();
-
-  if (['ya', 'hadir', 'present', '1'].includes(text)) {
-    return 'present';
-  }
-
-  if (['terlambat', 'late'].includes(text)) {
-    return 'late';
-  }
-
-  return 'absent';
-};
-
 const deriveCategoryFromRate = (rate) => {
   if (typeof rate !== 'number' || Number.isNaN(rate)) {
     return 'no_data';
@@ -79,102 +49,61 @@ const deriveCategoryFromRate = (rate) => {
   return 'no_data';
 };
 
-const extractAttendanceDetails = (record) => {
-  if (!record || typeof record !== 'object') {
-    return [];
+const deriveCategoryLabel = (category) => CATEGORY_LABELS[category] || CATEGORY_LABELS.no_data;
+
+const normalizeActivityTypes = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
   }
 
-  if (Array.isArray(record.verified_attendance)) {
-    return record.verified_attendance;
-  }
-
-  for (const key of KNOWN_ATTENDANCE_KEYS) {
-    if (Array.isArray(record[key])) {
-      return record[key];
-    }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean);
   }
 
   return [];
 };
 
-const filterVerifiedAttendance = (records = []) => (
-  Array.isArray(records)
-    ? records.map(record => {
-      const attendanceDetails = extractAttendanceDetails(record);
-      const verifiedAttendance = attendanceDetails.filter(detail => detail?.is_verified);
+const normalizeTutorRecord = (record = {}) => {
+  const totalActivities = Number(record.total_activities ?? record.total_assignments ?? 0) || 0;
+  const verifiedPresent = Number(record.verified_present_count ?? record.present_count ?? 0) || 0;
+  const verifiedLate = Number(record.verified_late_count ?? record.late_count ?? 0) || 0;
+  const verifiedAbsent = Number(record.verified_absent_count ?? record.absent_count ?? 0) || 0;
+  const verifiedAttendanceCount = Number(
+    record.verified_attendance_count ?? (verifiedPresent + verifiedLate + verifiedAbsent)
+  ) || 0;
+  const attendedCount = verifiedPresent + verifiedLate;
+  const attendanceRate = totalActivities > 0
+    ? Number((((attendedCount) / totalActivities) * 100).toFixed(1))
+    : null;
+  const category = record.category || deriveCategoryFromRate(attendanceRate);
+  const categoryLabel = record.category_label || deriveCategoryLabel(category);
+  const maple = record.maple || record.mata_pelajaran || record.subject || null;
+  const activityTypes = normalizeActivityTypes(record.activity_types);
 
-      return {
-        record,
-        attendanceDetails,
-        verifiedAttendance
-      };
-    })
-    : []
-);
-
-const countByStatus = (records, status) => (
-  records.filter(item => normalizeStatus(item?.absen ?? item?.status) === status).length
-);
-
-const resolveTotalActivities = (record, attendanceDetails, verifiedAttendance) => {
-  const candidates = [
-    record?.total_activities,
-    record?.total_assignments,
-    record?.assignment_count,
-    record?.total_penugasan
-  ];
-
-  const firstValid = candidates.find(value => typeof value === 'number' && !Number.isNaN(value));
-  if (typeof firstValid === 'number') {
-    return firstValid;
-  }
-
-  if (Array.isArray(attendanceDetails) && attendanceDetails.length > 0) {
-    return attendanceDetails.length;
-  }
-
-  if (Array.isArray(record?.activities) && record.activities.length > 0) {
-    return record.activities.length;
-  }
-
-  return verifiedAttendance.length;
+  return {
+    ...record,
+    maple,
+    activity_types: activityTypes,
+    total_activities: totalActivities,
+    present_count: verifiedPresent,
+    late_count: verifiedLate,
+    absent_count: verifiedAbsent,
+    verified_present_count: verifiedPresent,
+    verified_late_count: verifiedLate,
+    verified_absent_count: verifiedAbsent,
+    verified_attendance_count: verifiedAttendanceCount,
+    verified_attended_count: attendedCount,
+    attended_count: attendedCount,
+    attendance_rate: attendanceRate,
+    category,
+    category_label: categoryLabel
+  };
 };
 
-const deriveCategoryLabel = (category) => CATEGORY_LABELS[category] || CATEGORY_LABELS.no_data;
-
-const buildTutorMetrics = (verifiedRecords = []) => (
-  verifiedRecords.map(({ record, attendanceDetails, verifiedAttendance }) => {
-    const totalActivities = resolveTotalActivities(record, attendanceDetails, verifiedAttendance);
-    const presentCount = countByStatus(verifiedAttendance, 'present');
-    const lateCount = countByStatus(verifiedAttendance, 'late');
-    const verifiedAbsent = countByStatus(verifiedAttendance, 'absent');
-    const unverifiedCount = Math.max(totalActivities - verifiedAttendance.length, 0);
-    const absentCount = verifiedAbsent + unverifiedCount;
-    const attendanceRate = totalActivities > 0
-      ? Number((((presentCount + lateCount) / totalActivities) * 100).toFixed(1))
-      : null;
-
-    const category = record?.category || deriveCategoryFromRate(attendanceRate);
-    const categoryLabel = record?.category_label || deriveCategoryLabel(category);
-    const maple = record?.maple || record?.mata_pelajaran || record?.subject || null;
-
-    return {
-      ...record,
-      maple,
-      category,
-      category_label: categoryLabel,
-      total_activities: totalActivities,
-      present_count: presentCount,
-      late_count: lateCount,
-      absent_count: absentCount,
-      attendance_rate: attendanceRate,
-      verified_attendance: verifiedAttendance,
-      attendance_details: attendanceDetails
-    };
-  })
-);
-
-const summarizeVerifiedTutors = (tutorMetrics = []) => {
+const summarizeTutorMetrics = (tutorMetrics = []) => {
   if (!Array.isArray(tutorMetrics) || tutorMetrics.length === 0) {
     return {
       total_tutors: 0,
@@ -219,6 +148,18 @@ const summarizeVerifiedTutors = (tutorMetrics = []) => {
       no_data: distribution.no_data || { count: 0, percentage: 0 }
     }
   };
+};
+
+const buildJenisOptions = (tutorMetrics = []) => {
+  const optionsSet = new Set();
+
+  tutorMetrics.forEach((tutor) => {
+    normalizeActivityTypes(tutor.activity_types).forEach((item) => optionsSet.add(item));
+  });
+
+  return Array.from(optionsSet)
+    .filter(Boolean)
+    .map(item => ({ key: item, label: item }));
 };
 
 const composeQueryParams = ({ dateRange, activityType }) => {
@@ -270,14 +211,9 @@ const TutorAttendanceReportScreen = () => {
     dispatch(fetchTutorAttendanceSummary(queryParams));
   }, [dispatch, queryParams]);
 
-  const verifiedAttendance = useMemo(
-    () => filterVerifiedAttendance(summary),
-    [summary]
-  );
-
   const tutorMetrics = useMemo(
-    () => buildTutorMetrics(verifiedAttendance),
-    [verifiedAttendance]
+    () => (Array.isArray(summary) ? summary.map(normalizeTutorRecord) : []),
+    [summary]
   );
 
   const filteredTutorMetrics = useMemo(() => {
@@ -285,51 +221,22 @@ const TutorAttendanceReportScreen = () => {
       return tutorMetrics;
     }
 
-    return tutorMetrics.filter(tutor => {
-      if (tutor.jenis_kegiatan === filters.jenis_kegiatan) {
-        return true;
-      }
-
-      const allAttendance = Array.isArray(tutor.attendance_details) ? tutor.attendance_details : [];
-      const verifiedOnly = Array.isArray(tutor.verified_attendance) ? tutor.verified_attendance : [];
-
-      return (
-        allAttendance.some(item => item?.jenis_kegiatan === filters.jenis_kegiatan)
-        || verifiedOnly.some(item => item?.jenis_kegiatan === filters.jenis_kegiatan)
-      );
+    return tutorMetrics.filter((tutor) => {
+      const activityTypes = normalizeActivityTypes(tutor.activity_types);
+      return activityTypes.includes(filters.jenis_kegiatan)
+        || tutor.jenis_kegiatan === filters.jenis_kegiatan;
     });
   }, [filters.jenis_kegiatan, tutorMetrics]);
 
   const attendanceSummary = useMemo(
-    () => summarizeVerifiedTutors(filteredTutorMetrics),
+    () => summarizeTutorMetrics(filteredTutorMetrics),
     [filteredTutorMetrics]
   );
 
-  const jenisOptions = useMemo(() => {
-    const optionsSet = new Set();
-
-    verifiedAttendance.forEach(({ record, attendanceDetails, verifiedAttendance: verifiedOnly }) => {
-      if (record?.jenis_kegiatan) {
-        optionsSet.add(record.jenis_kegiatan);
-      }
-
-      attendanceDetails.forEach(detail => {
-        if (detail?.jenis_kegiatan) {
-          optionsSet.add(detail.jenis_kegiatan);
-        }
-      });
-
-      verifiedOnly.forEach(detail => {
-        if (detail?.jenis_kegiatan) {
-          optionsSet.add(detail.jenis_kegiatan);
-        }
-      });
-    });
-
-    return Array.from(optionsSet)
-      .filter(Boolean)
-      .map(item => ({ key: item, label: item }));
-  }, [verifiedAttendance]);
+  const jenisOptions = useMemo(
+    () => buildJenisOptions(tutorMetrics),
+    [tutorMetrics]
+  );
 
   const isInitialLoading = summaryLoading && (!summary || summary.length === 0);
 
