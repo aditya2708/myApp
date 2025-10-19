@@ -632,10 +632,11 @@ class AttendanceController extends Controller
             $distribution = collect(array_fill_keys(array_keys($categoryLabels), 0));
 
             $tutors = $summaryCollection->map(function ($record) use (&$distribution, $categoryLabels) {
-                $totalActivities = $record['total_activities'] ?? 0;
-                $presentCount = $record['present_count'] ?? 0;
-                $lateCount = $record['late_count'] ?? 0;
-                $absentCount = $record['absent_count'] ?? 0;
+                $totalActivities = (int) ($record['total_activities'] ?? 0);
+                $presentCount = (int) ($record['verified_present_count'] ?? $record['present_count'] ?? 0);
+                $lateCount = (int) ($record['verified_late_count'] ?? $record['late_count'] ?? 0);
+                $absentCount = (int) ($record['verified_absent_count'] ?? $record['absent_count'] ?? 0);
+                $verifiedAttendanceCount = (int) ($record['verified_attendance_count'] ?? ($presentCount + $lateCount + $absentCount));
                 $attendedCount = $presentCount + $lateCount;
 
                 if ($totalActivities > 0) {
@@ -656,7 +657,15 @@ class AttendanceController extends Controller
                 $distribution[$categoryKey] = $distribution[$categoryKey] + 1;
 
                 return array_merge($record, [
+                    'present_count' => $presentCount,
+                    'late_count' => $lateCount,
+                    'absent_count' => $absentCount,
+                    'verified_present_count' => $presentCount,
+                    'verified_late_count' => $lateCount,
+                    'verified_absent_count' => $absentCount,
+                    'verified_attendance_count' => $verifiedAttendanceCount,
                     'attended_count' => $attendedCount,
+                    'verified_attended_count' => $attendedCount,
                     'attendance_rate' => $attendanceRate,
                     'category' => $categoryKey,
                     'category_label' => $categoryLabels[$categoryKey],
