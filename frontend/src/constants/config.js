@@ -3,6 +3,36 @@ export const API_BASE_URL = 'http://10.132.12.166:8000/api';
 //export const API_BASE_URL = 'http://192.168.8.105:8000/api';
 //export const API_BASE_URL = 'https://bp.berbagipendidikan.org/api';
 
+const sanitizeUrlValue = (value) =>
+  typeof value === 'string' ? value.trim() : '';
+
+const removeTrailingSlashes = (value) =>
+  typeof value === 'string' ? value.replace(/\/+$/, '') : '';
+
+const resolveApiOrigin = () => {
+  const baseUrl = sanitizeUrlValue(API_BASE_URL);
+
+  if (!baseUrl) {
+    return '';
+  }
+
+  try {
+    return new URL(baseUrl).origin;
+  } catch (error) {
+    // Fallback for cases where API_BASE_URL might be relative or missing protocol
+    const match = baseUrl.match(/^(https?:\/\/[^/]+)/i);
+    return match ? match[1] : '';
+  }
+};
+
+export const API_ORIGIN = resolveApiOrigin();
+export const STORAGE_BASE_URL = API_ORIGIN
+  ? `${removeTrailingSlashes(API_ORIGIN)}/storage`
+  : '';
+export const STORAGE_CHILD_PHOTO_BASE_URL = STORAGE_BASE_URL
+  ? `${removeTrailingSlashes(STORAGE_BASE_URL)}/Anak`
+  : '';
+
 // Asset URLs
 const resolveDonationAssetBaseUrl = () => {
   const env =

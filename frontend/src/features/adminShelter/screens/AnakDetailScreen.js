@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../../../common/components/Button';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
+import { resolveChildPhotoUrl } from '../../../common/utils/imageUrlResolver';
 
 import { adminShelterAnakApi } from '../api/adminShelterAnakApi';
 
@@ -247,6 +248,12 @@ const AnakDetailScreen = () => {
     );
   }
 
+  const childPhotoUrl = resolveChildPhotoUrl({
+    foto_url: anakData?.foto_url,
+    foto: anakData?.foto,
+    id_anak: anakData?.id_anak ?? id
+  });
+
   return (
     <ScrollView style={styles.container}>
       {error && (
@@ -259,9 +266,9 @@ const AnakDetailScreen = () => {
 
       <View style={styles.profileHeader}>
         <View style={styles.profileImageContainer}>
-          {anakData?.foto_url ? (
+          {childPhotoUrl ? (
             <Image
-              source={{ uri: anakData.foto_url }}
+              source={{ uri: childPhotoUrl }}
               style={styles.profileImage}
               defaultSource={require('../../../assets/images/logo.png')}
             />
