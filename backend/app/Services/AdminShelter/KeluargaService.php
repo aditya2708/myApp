@@ -315,13 +315,18 @@ class KeluargaService
             'status_cpb' => 'BCPB',
         ];
 
-        // Handle photo upload
+        $anak = Anak::create($childData);
+
         if (isset($data['foto'])) {
-            $path = $data['foto']->store('photos/children', 'public');
-            $childData['foto_url'] = Storage::url($path);
+            $directory = "Anak/{$anak->id_anak}";
+            $filename = $data['foto']->hashName();
+
+            Storage::disk('public')->putFileAs($directory, $data['foto'], $filename);
+
+            $anak->update(['foto' => $filename]);
         }
 
-        return Anak::create($childData);
+        return $anak;
     }
 
     private function updateChildData($keluargaId, array $data): void
@@ -357,14 +362,16 @@ class KeluargaService
 
             // Handle photo upload
             if (isset($data['foto'])) {
-                // Delete old photo
-                if ($anak->foto_url) {
-                    $oldPath = str_replace('/storage/', '', $anak->foto_url);
-                    Storage::disk('public')->delete($oldPath);
+                if ($anak->foto) {
+                    Storage::disk('public')->delete("Anak/{$anak->id_anak}/{$anak->foto}");
                 }
-                
-                $path = $data['foto']->store('photos/children', 'public');
-                $childData['foto_url'] = Storage::url($path);
+
+                $directory = "Anak/{$anak->id_anak}";
+                $filename = $data['foto']->hashName();
+
+                Storage::disk('public')->putFileAs($directory, $data['foto'], $filename);
+
+                $childData['foto'] = $filename;
             }
 
             $anak->update($childData);
