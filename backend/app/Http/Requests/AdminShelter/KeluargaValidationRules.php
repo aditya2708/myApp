@@ -185,13 +185,18 @@ class KeluargaValidationRules
     {
         $rules = [];
         
-        // Bank fields if bank is chosen
+        // Bank fields: keep supporting explicit choice flag, but also require
+        // account details when an ID is provided without the flag (new flow).
         if (isset($data['bank_choice']) && $data['bank_choice'] === 'yes') {
             $rules['id_bank'] = 'required|exists:bank,id_bank';
             $rules['no_rek'] = 'required|string|max:255';
             $rules['an_rek'] = 'required|string|max:255';
+        } elseif (!empty($data['id_bank'])) {
+            $rules['id_bank'] = 'exists:bank,id_bank';
+            $rules['no_rek'] = 'required|string|max:255';
+            $rules['an_rek'] = 'required|string|max:255';
         }
-        
+
         // Phone fields if phone is chosen
         if (isset($data['telp_choice']) && $data['telp_choice'] === 'yes') {
             $rules['no_tlp'] = 'required|string|max:255';
