@@ -401,20 +401,19 @@ export const validateStep = (step, formData) => {
 };
 
 const validateFamilyStep = (data) => {
-  const familyRequired = !!(
+  const hasValidFamilyData = !!(
     data.no_kk &&
     data.no_kk.length === 16 &&
     data.kepala_keluarga &&
     data.status_ortu
   );
 
-  return familyRequired && !!(
-    data.id_bank &&
-    data.no_rek &&
-    data.an_rek &&
-    data.no_tlp &&
-    data.an_tlp
-  );
+  const hasContact = !!(data.no_tlp && data.an_tlp);
+
+  const requiresBankVerification = !!data.id_bank;
+  const hasValidBankData = !requiresBankVerification || !!(data.no_rek && data.an_rek);
+
+  return hasValidFamilyData && hasContact && hasValidBankData;
 };
 
 const validateParentsStep = (data) => {
