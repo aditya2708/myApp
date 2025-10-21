@@ -313,6 +313,13 @@ class KeluargaConstants
     ];
 
     // Conditional field requirements
+    // Notes for consumers:
+    // - Array keys under each field indicate the trigger value (or wildcard) that
+    //   will enforce additional required fields.
+    // - The special trigger `filled` means the base field has any non-empty value
+    //   and should be interpreted as "when this field is provided".
+    // - Bank data is optional by default and only becomes mandatory when the
+    //   applicant explicitly opts in via the `bank_choice` flag.
     const CONDITIONAL_REQUIREMENTS = [
         'kondisi_fisik_anak' => [
             self::KONDISI_DISABILITAS => ['keterangan_disabilitas'],
@@ -325,6 +332,11 @@ class KeluargaConstants
         ],
         'bank_choice' => [
             'yes' => ['id_bank', 'no_rek', 'an_rek'],
+            'no' => [],
+            '' => [],
+        ],
+        'id_bank' => [
+            'filled' => ['no_rek', 'an_rek'],
         ],
         'telp_choice' => [
             'yes' => ['no_tlp', 'an_tlp'],
