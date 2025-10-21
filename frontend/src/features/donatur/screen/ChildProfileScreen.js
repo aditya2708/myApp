@@ -115,7 +115,7 @@ const ChildProfileScreen = () => {
         <View style={styles.profileSection}>
           {child.foto ? (
             <Image 
-              source={{ uri: `http://192.168.8.105:8000/storage/Anak/${child.id_anak}/${child.foto}` }}
+              source={{ uri: `https://bp.berbagipendidikan.org/storage/Anak/${child.id_anak}/${child.foto}` }}
               style={styles.profileImage}
             />
           ) : (

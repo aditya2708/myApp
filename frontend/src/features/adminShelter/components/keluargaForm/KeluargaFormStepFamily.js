@@ -88,7 +88,7 @@ const KeluargaFormStepFamily = ({
       />
       
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Status Orang Tua*</Text>
+        <Text style={styles.label}>Status Anak*</Text>
         <View style={[
           styles.pickerContainer,
           fieldErrors.status_ortu && styles.pickerContainerError

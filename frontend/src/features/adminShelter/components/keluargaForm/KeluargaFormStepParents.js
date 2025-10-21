@@ -309,7 +309,7 @@ const KeluargaFormStepParents = ({
       
       <View style={styles.helperTextContainer}>
         <Text style={styles.helperText}>
-          * Field yang ditampilkan disesuaikan dengan status orang tua.
+          * Field yang ditampilkan disesuaikan dengan status anak.
         </Text>
       </View>
     </ScrollView>
