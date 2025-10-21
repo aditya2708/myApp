@@ -60,6 +60,18 @@ const KeluargaFormStepFamily = ({
     handleFieldChange('no_rek', numericValue);
   };
 
+  const handleBankChange = (value) => {
+    handleFieldChange('id_bank', value);
+
+    if (value === '') {
+      onChange('no_rek', '');
+      onChange('an_rek', '');
+    }
+
+    clearFieldError('no_rek');
+    clearFieldError('an_rek');
+  };
+
   if (isLoadingDropdowns) {
     return <LoadingSpinner message="Memuat data form..." />;
   }
@@ -115,22 +127,22 @@ const KeluargaFormStepFamily = ({
       <Text style={styles.sectionTitle}>Data Akun Bank</Text>
       
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Bank*</Text>
+        <Text style={styles.label}>Bank (Opsional)</Text>
         <View style={[
           styles.pickerContainer,
           fieldErrors.id_bank && styles.pickerContainerError
         ]}>
           <Picker
             selectedValue={formData.id_bank}
-            onValueChange={(value) => handleFieldChange('id_bank', value)}
+            onValueChange={handleBankChange}
             style={styles.picker}
           >
             <Picker.Item label="-- Pilih Bank --" value="" />
             {dropdownData.bank.map((bank) => (
-              <Picker.Item 
+              <Picker.Item
                 key={bank.id_bank}
-                label={bank.nama_bank} 
-                value={bank.id_bank.toString()} 
+                label={bank.nama_bank}
+                value={bank.id_bank.toString()}
               />
             ))}
           </Picker>
@@ -139,25 +151,29 @@ const KeluargaFormStepFamily = ({
           <Text style={styles.errorText}>{fieldErrors.id_bank}</Text>
         )}
       </View>
-      
-      <TextInput
-        label="Nomor Rekening Bank*"
-        value={formData.no_rek}
-        onChangeText={handleRekChange}
-        placeholder="Masukkan nomor rekening"
-        leftIcon={<Ionicons name="card-outline" size={20} color="#777" />}
-        inputProps={{ keyboardType: 'numeric' }}
-        error={fieldErrors.no_rek}
-      />
-      
-      <TextInput
-        label="Atas Nama Rekening*"
-        value={formData.an_rek}
-        onChangeText={(value) => handleFieldChange('an_rek', value)}
-        placeholder="Masukkan nama pemilik rekening"
-        leftIcon={<Ionicons name="person-outline" size={20} color="#777" />}
-        error={fieldErrors.an_rek}
-      />
+
+      {formData.id_bank ? (
+        <>
+          <TextInput
+            label="Nomor Rekening Bank"
+            value={formData.no_rek}
+            onChangeText={handleRekChange}
+            placeholder="Masukkan nomor rekening"
+            leftIcon={<Ionicons name="card-outline" size={20} color="#777" />}
+            inputProps={{ keyboardType: 'numeric' }}
+            error={fieldErrors.no_rek}
+          />
+
+          <TextInput
+            label="Atas Nama Rekening"
+            value={formData.an_rek}
+            onChangeText={(value) => handleFieldChange('an_rek', value)}
+            placeholder="Masukkan nama pemilik rekening"
+            leftIcon={<Ionicons name="person-outline" size={20} color="#777" />}
+            error={fieldErrors.an_rek}
+          />
+        </>
+      ) : null}
       
       <Text style={styles.sectionTitle}>Data Kontak</Text>
       
