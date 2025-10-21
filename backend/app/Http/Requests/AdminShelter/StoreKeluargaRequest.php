@@ -37,7 +37,18 @@ class StoreKeluargaRequest extends FormRequest
         
         // Add bank/phone rules
         $rules = array_merge($rules, KeluargaValidationRules::getBankPhoneRules($data));
-        
+
+        $bankSelected = (!empty($data['bank_choice']) && $data['bank_choice'] === 'yes')
+            || !empty($data['id_bank'])
+            || !empty($data['no_rek'])
+            || !empty($data['an_rek']);
+
+        $rules = array_merge($rules, [
+            'id_bank' => $bankSelected ? 'required|exists:bank,id_bank' : 'nullable|exists:bank,id_bank',
+            'no_rek' => $bankSelected ? 'required_with:id_bank|string|max:255' : 'nullable|string|max:255',
+            'an_rek' => $bankSelected ? 'required_with:id_bank|string|max:255' : 'nullable|string|max:255',
+        ]);
+
         return $rules;
     }
 
@@ -85,8 +96,8 @@ class StoreKeluargaRequest extends FormRequest
             'foto.max' => 'Ukuran foto maksimal 2MB',
             
             'id_bank.exists' => 'Bank yang dipilih tidak valid',
-            'no_rek.required' => 'Nomor rekening harus diisi jika memilih bank',
-            'an_rek.required' => 'Atas nama rekening harus diisi jika memilih bank',
+            'no_rek.required_with' => 'Nomor rekening wajib diisi ketika bank dipilih.',
+            'an_rek.required_with' => 'Atas nama rekening wajib diisi ketika bank dipilih.',
             'no_tlp.required' => 'Nomor telepon harus diisi jika memilih telepon',
             'an_tlp.required' => 'Atas nama telepon harus diisi jika memilih telepon',
         ];
@@ -102,7 +113,15 @@ class StoreKeluargaRequest extends FormRequest
                 'an_rek' => null
             ]);
         }
-        
+
+        if (!$this->filled('id_bank') && !$this->filled('no_rek') && !$this->filled('an_rek')) {
+            $this->merge([
+                'id_bank' => null,
+                'no_rek' => null,
+                'an_rek' => null,
+            ]);
+        }
+
         if ($this->has('telp_choice') && $this->telp_choice == 'no') {
             $this->merge([
                 'no_tlp' => null,
