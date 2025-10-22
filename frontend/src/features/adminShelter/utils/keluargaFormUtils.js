@@ -558,45 +558,20 @@ const validateSurveyFinancialStep = (data) => {
   return true;
 };
 
-const validateSurveyAssetsStep = (data) => {
-  return !!(
-    data.kepemilikan_tanah &&
-    data.kepemilikan_rumah &&
-    data.kondisi_rumah_dinding &&
-    data.kondisi_rumah_lantai &&
-    data.kepemilikan_kendaraan &&
-    data.kepemilikan_elektronik
-  );
+const validateSurveyAssetsStep = () => {
+  return true;
 };
 
-const validateSurveyHealthStep = (data) => {
-  return !!(
-    data.jumlah_makan &&
-    data.sumber_air_bersih &&
-    data.jamban_limbah &&
-    data.tempat_sampah &&
-    data.perokok &&
-    data.konsumen_miras &&
-    data.persediaan_p3k &&
-    data.makan_buah_sayur
-  );
+const validateSurveyHealthStep = () => {
+  return true;
 };
 
 const validateSurveyReligiousStep = (data) => {
-  const religiousRequired = !!(
-    data.solat_lima_waktu &&
-    data.membaca_alquran &&
-    data.majelis_taklim &&
-    data.membaca_koran &&
-    data.pengurus_organisasi &&
-    data.kondisi_penerima_manfaat
-  );
-
   if (data.pengurus_organisasi === 'Ya') {
-    return religiousRequired && !!data.pengurus_organisasi_sebagai;
+    return !!data.pengurus_organisasi_sebagai;
   }
 
-  return religiousRequired;
+  return true;
 };
 
 // Field validation helpers
