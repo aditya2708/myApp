@@ -41,6 +41,7 @@ const AnakFormScreen = () => {
     nik_anak: '',
     tempat_lahir: '',
     tanggal_lahir: '',
+    alamat: '',
     jenis_kelamin: 'Laki-laki',
     agama: 'Islam',
     anak_ke: '',
@@ -48,6 +49,14 @@ const AnakFormScreen = () => {
     tinggal_bersama: 'Ayah',
     jenis_anak_binaan: 'BCPB',
     hafalan: 'Tahfidz',
+    jenjang: '',
+    kelas: '',
+    nama_sekolah: '',
+    alamat_sekolah: '',
+    jurusan: '',
+    semester: '',
+    nama_pt: '',
+    alamat_pt: '',
     pelajaran_favorit: '',
     hobi: '',
     prestasi: '',
@@ -95,14 +104,50 @@ const AnakFormScreen = () => {
     { label: 'Non-Tahfidz', value: 'Non-Tahfidz' },
   ];
 
+  const educationLevelOptions = [
+    { label: 'Belum Sekolah', value: 'belum_sd' },
+    { label: 'SD / Sederajat', value: 'sd' },
+    { label: 'SMP / Sederajat', value: 'smp' },
+    { label: 'SMA / Sederajat', value: 'sma' },
+    { label: 'Perguruan Tinggi', value: 'perguruan_tinggi' },
+  ];
+
+  const getGradeOptions = () => {
+    const grades = {
+      sd: ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'],
+      smp: ['Kelas 7', 'Kelas 8', 'Kelas 9'],
+      sma: ['Kelas 10', 'Kelas 11', 'Kelas 12'],
+    };
+
+    return (grades[formData.jenjang] || []).map(grade => ({
+      label: grade,
+      value: grade,
+    }));
+  };
+
+  const smaMajorOptions = [
+    { label: 'IPA', value: 'IPA' },
+    { label: 'IPS', value: 'IPS' },
+    { label: 'Bahasa', value: 'Bahasa' },
+    { label: 'Agama', value: 'Agama' },
+    { label: 'Kejuruan', value: 'Kejuruan' },
+  ];
+
+  const semesterOptions = Array.from({ length: 9 }, (_, index) => ({
+    label: index === 8 ? '> Semester 8' : `Semester ${index + 1}`,
+    value: (index + 1).toString(),
+  }));
+
   useEffect(() => {
     if (anakData) {
+      const pendidikan = anakData.anakPendidikan || {};
       setFormData({
         full_name: anakData.full_name || '',
         nick_name: anakData.nick_name || '',
         nik_anak: anakData.nik_anak || '',
         tempat_lahir: anakData.tempat_lahir || '',
         tanggal_lahir: anakData.tanggal_lahir || '',
+        alamat: anakData.alamat || '',
         jenis_kelamin: anakData.jenis_kelamin || 'Laki-laki',
         agama: anakData.agama || 'Islam',
         anak_ke: anakData.anak_ke?.toString() || '',
@@ -110,6 +155,14 @@ const AnakFormScreen = () => {
         tinggal_bersama: anakData.tinggal_bersama || 'Ayah',
         jenis_anak_binaan: anakData.jenis_anak_binaan || 'BCPB',
         hafalan: anakData.hafalan || 'Tahfidz',
+        jenjang: pendidikan.jenjang || '',
+        kelas: pendidikan.kelas || '',
+        nama_sekolah: pendidikan.nama_sekolah || '',
+        alamat_sekolah: pendidikan.alamat_sekolah || '',
+        jurusan: pendidikan.jurusan || '',
+        semester: pendidikan.semester?.toString() || '',
+        nama_pt: pendidikan.nama_pt || '',
+        alamat_pt: pendidikan.alamat_pt || '',
         pelajaran_favorit: anakData.pelajaran_favorit || '',
         hobi: anakData.hobi || '',
         prestasi: anakData.prestasi || '',
@@ -119,7 +172,10 @@ const AnakFormScreen = () => {
           ? anakData.personality_traits.join(', ') 
           : anakData.personality_traits || '',
         special_needs: anakData.special_needs || '',
-        marketplace_featured: anakData.marketplace_featured || false,
+        marketplace_featured:
+          anakData.marketplace_featured === true ||
+          anakData.marketplace_featured === 1 ||
+          anakData.marketplace_featured === '1',
         foto: null
       });
       setImageUri(anakData.foto_url);
@@ -128,7 +184,23 @@ const AnakFormScreen = () => {
   }, [anakData]);
 
   const updateField = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      if (field === 'jenjang') {
+        return {
+          ...prev,
+          jenjang: value,
+          kelas: '',
+          nama_sekolah: '',
+          alamat_sekolah: '',
+          jurusan: '',
+          semester: '',
+          nama_pt: '',
+          alamat_pt: '',
+        };
+      }
+
+      return { ...prev, [field]: value };
+    });
   };
 
   const pickImage = async () => {
@@ -150,8 +222,26 @@ const AnakFormScreen = () => {
       setLoading(true);
 
       const submitData = new FormData();
+      const parseIntegerField = (value) => {
+        if (value === null || value === undefined || value === '') return '';
+        const normalizedValue = String(value).trim();
+        if (!/^\d+$/.test(normalizedValue)) {
+          return '';
+        }
+        return Number(normalizedValue);
+      };
 
-      Object.entries(formData).forEach(([key, value]) => {
+      const sanitizedData = {
+        ...formData,
+        anak_ke: parseIntegerField(formData.anak_ke),
+        dari_bersaudara: parseIntegerField(formData.dari_bersaudara),
+        semester:
+          formData.jenjang === 'perguruan_tinggi'
+            ? parseIntegerField(formData.semester)
+            : '',
+      };
+
+      Object.entries(sanitizedData).forEach(([key, value]) => {
         if (key === 'foto') {
           if (value) {
             submitData.append('foto', {
@@ -277,6 +367,18 @@ const AnakFormScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
+          <Text style={styles.label}>Alamat</Text>
+          <TextInput
+            style={styles.textArea}
+            value={formData.alamat}
+            onChangeText={(text) => updateField('alamat', text)}
+            placeholder="Masukkan alamat lengkap"
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Tanggal Lahir</Text>
           <TouchableOpacity
             style={styles.dateInput}
@@ -379,8 +481,114 @@ const AnakFormScreen = () => {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Informasi Pendidikan</Text>
+
+        <PickerInput
+          label="Jenjang Pendidikan"
+          value={formData.jenjang}
+          onValueChange={(value) => updateField('jenjang', value)}
+          items={educationLevelOptions}
+          placeholder="Pilih Jenjang Pendidikan"
+          style={styles.pickerGroup}
+        />
+
+        {formData.jenjang &&
+          formData.jenjang !== 'belum_sd' &&
+          formData.jenjang !== 'perguruan_tinggi' && (
+            <>
+              <PickerInput
+                label="Kelas"
+                value={formData.kelas}
+                onValueChange={(value) => updateField('kelas', value)}
+                items={getGradeOptions()}
+                placeholder="Pilih Kelas"
+                style={styles.pickerGroup}
+              />
+
+              {formData.jenjang === 'sma' && (
+                <PickerInput
+                  label="Jurusan"
+                  value={formData.jurusan}
+                  onValueChange={(value) => updateField('jurusan', value)}
+                  items={smaMajorOptions}
+                  placeholder="Pilih Jurusan"
+                  style={styles.pickerGroup}
+                />
+              )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nama Sekolah</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.nama_sekolah}
+                  onChangeText={(text) => updateField('nama_sekolah', text)}
+                  placeholder="Masukkan nama sekolah"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Alamat Sekolah</Text>
+                <TextInput
+                  style={styles.textArea}
+                  value={formData.alamat_sekolah}
+                  onChangeText={(text) => updateField('alamat_sekolah', text)}
+                  placeholder="Masukkan alamat sekolah"
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            </>
+          )}
+
+        {formData.jenjang === 'perguruan_tinggi' && (
+          <>
+            <PickerInput
+              label="Semester"
+              value={formData.semester}
+              onValueChange={(value) => updateField('semester', value)}
+              items={semesterOptions}
+              placeholder="Pilih Semester"
+              style={styles.pickerGroup}
+            />
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Jurusan</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.jurusan}
+                onChangeText={(text) => updateField('jurusan', text)}
+                placeholder="Masukkan jurusan"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Perguruan Tinggi</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.nama_pt}
+                onChangeText={(text) => updateField('nama_pt', text)}
+                placeholder="Masukkan nama perguruan tinggi"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Alamat Perguruan Tinggi</Text>
+              <TextInput
+                style={styles.textArea}
+                value={formData.alamat_pt}
+                onChangeText={(text) => updateField('alamat_pt', text)}
+                placeholder="Masukkan alamat perguruan tinggi"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          </>
+        )}
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Informasi Tambahan</Text>
-        
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Pelajaran Favorit</Text>
           <TextInput
