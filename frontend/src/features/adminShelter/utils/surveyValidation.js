@@ -92,48 +92,6 @@ export const validateFinancialStep = (formData) => {
  * @returns {Object} - Validation result { isValid, errorMessage }
  */
 export const validateAssetsStep = (formData) => {
-  if (!formData.kepemilikan_tanah) {
-    return {
-      isValid: false,
-      errorMessage: 'Please indicate if the family owns land'
-    };
-  }
-  
-  if (!formData.kepemilikan_rumah) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the house ownership status'
-    };
-  }
-  
-  if (!formData.kondisi_rumah_dinding) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the house wall material'
-    };
-  }
-  
-  if (!formData.kondisi_rumah_lantai) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the house floor material'
-    };
-  }
-  
-  if (!formData.kepemilikan_kendaraan) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the vehicle ownership'
-    };
-  }
-  
-  if (!formData.kepemilikan_elektronik) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the electronics ownership'
-    };
-  }
-  
   return { isValid: true };
 };
 
@@ -143,55 +101,6 @@ export const validateAssetsStep = (formData) => {
  * @returns {Object} - Validation result { isValid, errorMessage }
  */
 export const validateHealthStep = (formData) => {
-  if (!formData.sumber_air_bersih) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the clean water source'
-    };
-  }
-  
-  if (!formData.jamban_limbah) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the toilet/waste system'
-    };
-  }
-  
-  if (!formData.tempat_sampah) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the garbage disposal method'
-    };
-  }
-  
-  if (!formData.perokok) {
-    return {
-      isValid: false,
-      errorMessage: 'Please indicate if anyone in the family is a smoker'
-    };
-  }
-  
-  if (!formData.konsumen_miras) {
-    return {
-      isValid: false,
-      errorMessage: 'Please indicate if anyone in the family consumes alcohol'
-    };
-  }
-  
-  if (!formData.persediaan_p3k) {
-    return {
-      isValid: false,
-      errorMessage: 'Please indicate if the family has a first aid kit'
-    };
-  }
-  
-  if (!formData.makan_buah_sayur) {
-    return {
-      isValid: false,
-      errorMessage: 'Please indicate if the family eats fruits and vegetables'
-    };
-  }
-  
   return { isValid: true };
 };
 
@@ -201,48 +110,13 @@ export const validateHealthStep = (formData) => {
  * @returns {Object} - Validation result { isValid, errorMessage }
  */
 export const validateReligiousStep = (formData) => {
-  if (!formData.solat_lima_waktu) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the daily prayer consistency'
-    };
-  }
-  
-  if (!formData.membaca_alquran) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the Quran reading ability'
-    };
-  }
-  
-  if (!formData.majelis_taklim) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the attendance at religious study'
-    };
-  }
-  
-  if (!formData.membaca_koran) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the newspaper/news reading habit'
-    };
-  }
-  
-  if (!formData.pengurus_organisasi) {
-    return {
-      isValid: false,
-      errorMessage: 'Please indicate if member of any organization'
-    };
-  }
-  
   if (formData.pengurus_organisasi === 'Ya' && !formData.pengurus_organisasi_sebagai) {
     return {
       isValid: false,
-      errorMessage: 'Please enter the position in organization'
+      errorMessage: "Please enter the organization role when selecting 'Ya'"
     };
   }
-  
+
   return { isValid: true };
 };
 
