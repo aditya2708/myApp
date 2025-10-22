@@ -258,25 +258,25 @@ const KeluargaFormStepChild = ({
       {renderPicker('Jenis Pembinaan*', formData.hafalan, HAFALAN_OPTIONS, 'hafalan', true)}
       
       <TextInput
-        label="Pelajaran Favorit*"
+        label="Pelajaran Favorit"
         value={formData.pelajaran_favorit}
         onChangeText={(value) => handleFieldChange('pelajaran_favorit', value)}
         placeholder="Masukkan pelajaran favorit"
         leftIcon={<Ionicons name="book-outline" size={20} color="#777" />}
         error={fieldErrors.pelajaran_favorit}
       />
-      
+
       <TextInput
-        label="Hobi*"
+        label="Hobi"
         value={formData.hobi}
         onChangeText={(value) => handleFieldChange('hobi', value)}
         placeholder="Masukkan hobi anak"
         leftIcon={<Ionicons name="happy-outline" size={20} color="#777" />}
         error={fieldErrors.hobi}
       />
-      
+
       <TextInput
-        label="Prestasi*"
+        label="Prestasi"
         value={formData.prestasi}
         onChangeText={(value) => handleFieldChange('prestasi', value)}
         placeholder="Masukkan prestasi anak"

@@ -517,9 +517,6 @@ const validateChildStep = (data) => {
     data.jenis_kelamin &&
     data.tinggal_bersama &&
     data.hafalan &&
-    data.pelajaran_favorit &&
-    data.hobi &&
-    data.prestasi &&
     data.jarak_rumah &&
     data.transportasi
   );
