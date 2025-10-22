@@ -154,42 +154,47 @@ class AdminShelterAnakController extends Controller
             'nik_anak' => 'nullable|unique:anak,nik_anak|max:16',
             'anak_ke' => 'nullable|integer',
             'dari_bersaudara' => 'nullable|integer',
-            'nick_name' => 'required|string|max:255',
-            'full_name' => 'required|string|max:255',
-            'agama' => 'required|in:Islam,Kristen,Katolik,Buddha,Hindu,Konghucu',
-            'tempat_lahir' => 'required|string|max:255',
-            'tanggal_lahir' => 'required|date',
-            'jenis_kelamin' => 'sometimes|in:Laki-laki,Perempuan',
-            'tinggal_bersama' => 'required|in:Ayah,Ibu,Ayah dan Ibu,Wali',
-            'jenis_anak_binaan' => 'required|in:BCPB,NPB',
-            'hafalan' => 'required|in:Tahfidz,Non-Tahfidz',
+            'nick_name' => 'nullable|string|max:255',
+            'full_name' => 'nullable|string|max:255',
+            'agama' => 'nullable|in:Islam,Kristen,Katolik,Buddha,Hindu,Konghucu',
+            'tempat_lahir' => 'nullable|string|max:255',
+            'tanggal_lahir' => 'nullable|date',
+            'jenis_kelamin' => 'nullable|in:Laki-laki,Perempuan',
+            'tinggal_bersama' => 'nullable|in:Ayah,Ibu,Ayah dan Ibu,Wali',
+            'jenis_anak_binaan' => 'nullable|in:BCPB,NPB',
+            'hafalan' => 'nullable|in:Tahfidz,Non-Tahfidz',
             'status_validasi' => 'nullable|in:aktif,non-aktif,Ditolak,Ditangguhkan',
             'foto' => 'nullable|image|max:2048',
             'background_story' => 'nullable|string',
             'educational_goals' => 'nullable|string',
-            'personality_traits' => 'nullable|string',
+            'personality_traits' => 'nullable',
             'special_needs' => 'nullable|string',
             'marketplace_featured' => 'nullable|boolean',
         ]);
 
+        $validatedData = $this->normalizeAnakPayload($validatedData);
         $validatedData['id_shelter'] = $user->adminShelter->id_shelter;
 
-        if (isset($validatedData['personality_traits'])) {
-            $validatedData['personality_traits'] = $validatedData['personality_traits'] 
-                ? explode(',', $validatedData['personality_traits']) 
-                : null;
-        }
-
-        if (isset($validatedData['id_kelompok'])) {
-            $kelompok = \App\Models\Kelompok::findOrFail($validatedData['id_kelompok']);
-            $validatedData['id_level_anak_binaan'] = $kelompok->id_level_anak_binaan;
+        if (array_key_exists('id_kelompok', $validatedData)) {
+            if ($validatedData['id_kelompok']) {
+                $kelompok = \App\Models\Kelompok::findOrFail($validatedData['id_kelompok']);
+                $validatedData['id_level_anak_binaan'] = $kelompok->id_level_anak_binaan;
+            } else {
+                $validatedData['id_level_anak_binaan'] = null;
+            }
         }
 
         $anak = new Anak($validatedData);
 
         $anak->status_validasi = $validatedData['status_validasi'] ?? 'non-aktif';
 
-        $anak->status_cpb = Anak::STATUS_CPB_BCPB;
+        if (array_key_exists('jenis_anak_binaan', $validatedData)) {
+            $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BCPB'
+                ? Anak::STATUS_CPB_BCPB
+                : ($validatedData['jenis_anak_binaan'] === 'NPB'
+                    ? Anak::STATUS_CPB_NPB
+                    : null);
+        }
 
         $anak->save();
 
@@ -223,51 +228,49 @@ class AdminShelterAnakController extends Controller
                     ->findOrFail($id);
 
         $validatedData = $request->validate([
-            'id_keluarga' => 'sometimes|exists:keluarga,id_keluarga',
+            'id_keluarga' => 'sometimes|nullable|exists:keluarga,id_keluarga',
             'id_anak_pend' => 'nullable|exists:anak_pendidikan,id_anak_pend',
             'id_kelompok' => 'nullable|exists:kelompok,id_kelompok',
             'nik_anak' => 'nullable|unique:anak,nik_anak,' . $anak->id_anak . ',id_anak|max:16',
             'anak_ke' => 'nullable|integer',
             'dari_bersaudara' => 'nullable|integer',
-            'nick_name' => 'sometimes|string|max:255',
-            'full_name' => 'sometimes|string|max:255',
-            'agama' => 'sometimes|in:Islam,Kristen,Katolik,Buddha,Hindu,Konghucu',
-            'tempat_lahir' => 'sometimes|string|max:255',
-            'tanggal_lahir' => 'sometimes|date',
-            'jenis_kelamin' => 'sometimes|in:Laki-laki,Perempuan',
-            'tinggal_bersama' => 'sometimes|in:Ayah,Ibu,Ayah dan Ibu,Wali',
-            'jenis_anak_binaan' => 'sometimes|in:BCPB,NPB',
-            'hafalan' => 'sometimes|in:Tahfidz,Non-Tahfidz',
-            'status_validasi' => 'sometimes|in:aktif,non-aktif,Ditolak,Ditangguhkan',
+            'nick_name' => 'sometimes|nullable|string|max:255',
+            'full_name' => 'sometimes|nullable|string|max:255',
+            'agama' => 'sometimes|nullable|in:Islam,Kristen,Katolik,Buddha,Hindu,Konghucu',
+            'tempat_lahir' => 'sometimes|nullable|string|max:255',
+            'tanggal_lahir' => 'sometimes|nullable|date',
+            'jenis_kelamin' => 'sometimes|nullable|in:Laki-laki,Perempuan',
+            'tinggal_bersama' => 'sometimes|nullable|in:Ayah,Ibu,Ayah dan Ibu,Wali',
+            'jenis_anak_binaan' => 'sometimes|nullable|in:BCPB,NPB',
+            'hafalan' => 'sometimes|nullable|in:Tahfidz,Non-Tahfidz',
+            'status_validasi' => 'sometimes|nullable|in:aktif,non-aktif,Ditolak,Ditangguhkan',
             'foto' => 'nullable|image|max:2048',
             'background_story' => 'nullable|string',
             'educational_goals' => 'nullable|string',
-            'personality_traits' => 'nullable|string',
+            'personality_traits' => 'nullable',
             'special_needs' => 'nullable|string',
             'marketplace_featured' => 'nullable|boolean',
         ]);
 
-        if (isset($validatedData['personality_traits'])) {
-            $validatedData['personality_traits'] = $validatedData['personality_traits'] 
-                ? explode(',', $validatedData['personality_traits']) 
-                : null;
-        }
+        $validatedData = $this->normalizeAnakPayload($validatedData);
 
-        if (isset($validatedData['id_kelompok'])) {
-            if ($validatedData['id_kelompok'] === null) {
-                $validatedData['id_level_anak_binaan'] = null;
-            } else {
+        if (array_key_exists('id_kelompok', $validatedData)) {
+            if ($validatedData['id_kelompok']) {
                 $kelompok = \App\Models\Kelompok::findOrFail($validatedData['id_kelompok']);
                 $validatedData['id_level_anak_binaan'] = $kelompok->id_level_anak_binaan;
+            } else {
+                $validatedData['id_level_anak_binaan'] = null;
             }
         }
 
         $anak->fill($validatedData);
 
-        if (isset($validatedData['jenis_anak_binaan'])) {
-            $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BCPB' 
-                ? Anak::STATUS_CPB_BCPB 
-                : Anak::STATUS_CPB_NPB;
+        if (array_key_exists('jenis_anak_binaan', $validatedData)) {
+            $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BCPB'
+                ? Anak::STATUS_CPB_BCPB
+                : ($validatedData['jenis_anak_binaan'] === 'NPB'
+                    ? Anak::STATUS_CPB_NPB
+                    : null);
         }
 
         if ($request->hasFile('foto')) {
@@ -289,11 +292,84 @@ class AdminShelterAnakController extends Controller
             'data' => new AnakCollection($anak)
         ], 200);
     }
-    
+
+    private function normalizeAnakPayload(array $data): array
+    {
+        $numericFields = [
+            'id_anak_pend',
+            'id_kelompok',
+            'id_level_anak_binaan',
+            'anak_ke',
+            'dari_bersaudara',
+        ];
+
+        foreach ($numericFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $value = $data[$field];
+
+                if ($value === '' || $value === null || $value === '0' || $value === 'null') {
+                    $data[$field] = null;
+                } elseif ($value !== null && $value !== '') {
+                    $data[$field] = is_numeric($value) ? (int) $value : $value;
+                }
+            }
+        }
+
+        $stringFields = [
+            'nik_anak',
+            'nick_name',
+            'full_name',
+            'agama',
+            'tempat_lahir',
+            'tanggal_lahir',
+            'jenis_kelamin',
+            'tinggal_bersama',
+            'jenis_anak_binaan',
+            'hafalan',
+            'status_validasi',
+            'background_story',
+            'educational_goals',
+            'special_needs',
+        ];
+
+        foreach ($stringFields as $field) {
+            if (array_key_exists($field, $data) && ($data[$field] === '' || $data[$field] === 'null' || $data[$field] === '0')) {
+                $data[$field] = null;
+            }
+        }
+
+        if (array_key_exists('marketplace_featured', $data)) {
+            $value = $data['marketplace_featured'];
+
+            if ($value === '' || $value === null || $value === 'null') {
+                $data['marketplace_featured'] = null;
+            } else {
+                $booleanValue = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                $data['marketplace_featured'] = $booleanValue;
+            }
+        }
+
+        if (array_key_exists('personality_traits', $data)) {
+            $traits = $data['personality_traits'];
+
+            if ($traits === '' || $traits === null || $traits === '[]' || $traits === 'null') {
+                $data['personality_traits'] = null;
+            } elseif (is_string($traits)) {
+                $values = array_filter(array_map('trim', explode(',', $traits)), fn ($trait) => $trait !== '');
+                $data['personality_traits'] = $values ? array_values($values) : null;
+            } elseif (is_array($traits)) {
+                $values = array_filter(array_map('trim', $traits), fn ($trait) => $trait !== '');
+                $data['personality_traits'] = $values ? array_values($values) : null;
+            }
+        }
+
+        return $data;
+    }
+
     public function toggleStatus($id)
     {
         $user = Auth::user();
-        
+
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
