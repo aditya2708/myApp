@@ -130,7 +130,6 @@ class KeluargaValidationRules
     {
         return [
             'pekerjaan_kepala_keluarga' => 'nullable|string|max:255',
-            'penghasilan' => 'nullable|string|max:255',
             'pendidikan_kepala_keluarga' => 'nullable|string|max:255',
             'jumlah_tanggungan' => 'nullable|integer',
             'kepemilikan_tabungan' => 'nullable|string|in:Ada,Tidak Ada',
