@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,18 +20,19 @@ const KeluargaFormStepSurveyReligious = ({
   onChange,
   setStepValid
 }) => {
+  const requiresRole = useMemo(
+    () => formData.pengurus_organisasi === 'Ya',
+    [formData.pengurus_organisasi]
+  );
+
+  const isValid = useMemo(
+    () => !requiresRole || Boolean(formData.pengurus_organisasi_sebagai?.trim()),
+    [requiresRole, formData.pengurus_organisasi_sebagai]
+  );
+
   useEffect(() => {
-    if (formData.pengurus_organisasi === 'Ya') {
-      const hasRole = Boolean(formData.pengurus_organisasi_sebagai?.trim());
-      setStepValid(hasRole);
-    } else {
-      setStepValid(true);
-    }
-  }, [
-    formData.pengurus_organisasi,
-    formData.pengurus_organisasi_sebagai,
-    setStepValid
-  ]);
+    setStepValid(Boolean(isValid));
+  }, [isValid, setStepValid]);
 
   const renderPicker = (label, value, options, field) => (
     <View style={styles.inputContainer}>
