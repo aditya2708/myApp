@@ -100,47 +100,50 @@ const AnakFormScreen = () => {
     }
   };
 
-  const validateForm = () => {
-    if (!formData.full_name.trim()) {
-      Alert.alert('Error', 'Nama lengkap harus diisi');
-      return false;
-    }
-    if (!formData.nick_name.trim()) {
-      Alert.alert('Error', 'Nama panggilan harus diisi');
-      return false;
-    }
-    if (!formData.tempat_lahir.trim()) {
-      Alert.alert('Error', 'Tempat lahir harus diisi');
-      return false;
-    }
-    if (!formData.tanggal_lahir) {
-      Alert.alert('Error', 'Tanggal lahir harus diisi');
-      return false;
-    }
-    return true;
-  };
-
   const handleSubmit = async () => {
-    if (!validateForm()) return;
-
     try {
       setLoading(true);
 
       const submitData = new FormData();
-      
-      Object.keys(formData).forEach(key => {
-        if (key === 'foto' && formData[key]) {
-          submitData.append('foto', {
-            uri: formData[key].uri,
-            type: 'image/jpeg',
-            name: 'photo.jpg',
-          });
-        } else if (key === 'personality_traits') {
-          submitData.append(key, formData[key]);
-        } else if (key === 'marketplace_featured') {
-          submitData.append(key, formData[key] ? '1' : '0');
-        } else if (formData[key] !== null && formData[key] !== '') {
-          submitData.append(key, formData[key].toString());
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === 'foto') {
+          if (value) {
+            submitData.append('foto', {
+              uri: value.uri,
+              type: 'image/jpeg',
+              name: 'photo.jpg',
+            });
+          }
+          return;
+        }
+
+        if (key === 'marketplace_featured') {
+          submitData.append(key, value ? '1' : '0');
+          return;
+        }
+
+        if (key === 'personality_traits') {
+          const formattedTraits = value
+            ? value
+                .split(',')
+                .map(trait => trait.trim())
+                .filter(Boolean)
+                .join(',')
+            : '';
+          submitData.append(key, formattedTraits);
+          return;
+        }
+
+        if (value === null || value === undefined) {
+          submitData.append(key, '');
+          return;
+        }
+
+        if (typeof value === 'string') {
+          submitData.append(key, value);
+        } else {
+          submitData.append(key, value.toString());
         }
       });
 
@@ -187,7 +190,7 @@ const AnakFormScreen = () => {
         <Text style={styles.sectionTitle}>Informasi Dasar</Text>
         
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Nama Lengkap *</Text>
+          <Text style={styles.label}>Nama Lengkap</Text>
           <TextInput
             style={styles.input}
             value={formData.full_name}
@@ -197,7 +200,7 @@ const AnakFormScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Nama Panggilan *</Text>
+          <Text style={styles.label}>Nama Panggilan</Text>
           <TextInput
             style={styles.input}
             value={formData.nick_name}
@@ -219,7 +222,7 @@ const AnakFormScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Tempat Lahir *</Text>
+          <Text style={styles.label}>Tempat Lahir</Text>
           <TextInput
             style={styles.input}
             value={formData.tempat_lahir}
@@ -229,7 +232,7 @@ const AnakFormScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Tanggal Lahir * (YYYY-MM-DD)</Text>
+          <Text style={styles.label}>Tanggal Lahir (YYYY-MM-DD)</Text>
           <TextInput
             style={styles.input}
             value={formData.tanggal_lahir}
