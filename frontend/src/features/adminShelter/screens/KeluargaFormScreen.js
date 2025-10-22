@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -324,12 +324,23 @@ const KeluargaFormScreen = () => {
     }
   };
 
+  const handleSetStepValid = useCallback(
+    (isValid) => {
+      updateStepValidity(currentStep, isValid);
+    },
+    [currentStep, updateStepValidity]
+  );
+
+  const handleValidateStep = useCallback(() => {
+    return validateStepData(currentStep);
+  }, [currentStep, validateStepData]);
+
   const renderCurrentStep = () => {
     const stepProps = {
       formData,
       onChange: setField,
-      setStepValid: (isValid) => updateStepValidity(currentStep, isValid),
-      validateStep: () => validateStepData(currentStep),
+      setStepValid: handleSetStepValid,
+      validateStep: handleValidateStep,
     };
 
     switch (currentStep) {
