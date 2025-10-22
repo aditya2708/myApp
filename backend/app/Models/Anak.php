@@ -60,6 +60,7 @@ class Anak extends Model
         'prestasi',
         'jarak_rumah',
         'transportasi',
+        'alamat',
         'foto',
         'status',
         'background_story',
