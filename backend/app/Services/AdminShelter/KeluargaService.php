@@ -432,7 +432,6 @@ class KeluargaService
     {
         $surveyData = [
             'pekerjaan_kepala_keluarga' => $this->getSurveyInput($data, 'pekerjaan_kepala_keluarga'),
-            'penghasilan' => $this->getSurveyInput($data, 'penghasilan'),
             'pendidikan_kepala_keluarga' => $this->getSurveyInput($data, 'pendidikan_kepala_keluarga'),
             'jumlah_tanggungan' => $this->getSurveyInput($data, 'jumlah_tanggungan'),
             'kepemilikan_tabungan' => $this->getSurveyInput($data, 'kepemilikan_tabungan'),
