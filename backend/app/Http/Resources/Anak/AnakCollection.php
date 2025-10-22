@@ -31,6 +31,7 @@ class AnakCollection extends JsonResource
             'tempat_lahir' => $this->tempat_lahir,
             'tanggal_lahir' => $this->tanggal_lahir,
             'jenis_kelamin' => $this->jenis_kelamin,
+            'alamat' => $this->alamat,
             'tinggal_bersama' => $this->tinggal_bersama,
             'status_validasi' => $this->status_validasi,
             'status_cpb' => $this->status_cpb,
@@ -60,7 +61,21 @@ class AnakCollection extends JsonResource
             'kelompok' => $this->whenLoaded('kelompok'),
             'shelter' => $this->whenLoaded('shelter'),
             'donatur' => $this->whenLoaded('donatur'),
-            'anakPendidikan' => $this->whenLoaded('anakPendidikan'),
+            'anakPendidikan' => $this->whenLoaded('anakPendidikan', function () {
+                $education = $this->anakPendidikan;
+
+                return [
+                    'id_anak_pend' => $education->id_anak_pend ?? null,
+                    'jenjang' => $education->jenjang ?? null,
+                    'kelas' => $education->kelas ?? null,
+                    'nama_sekolah' => $education->nama_sekolah ?? null,
+                    'alamat_sekolah' => $education->alamat_sekolah ?? null,
+                    'jurusan' => $education->jurusan ?? null,
+                    'semester' => $education->semester ?? null,
+                    'nama_pt' => $education->nama_pt ?? null,
+                    'alamat_pt' => $education->alamat_pt ?? null,
+                ];
+            }),
             'levelAnakBinaan' => $this->whenLoaded('levelAnakBinaan'),
             
             // Status ortu dari keluarga
