@@ -163,16 +163,6 @@ export const EDUCATION_OPTIONS = [
   { label: 'Pascasarjana', value: 'Pascasarjana' },
 ];
 
-export const FINANCIAL_INCOME_OPTIONS = [
-  { label: '-- Pilih Penghasilan --', value: '' },
-  { label: 'Kurang dari Rp 500.000', value: 'Kurang dari Rp 500.000' },
-  { label: 'Rp 500.000 - Rp 1.000.000', value: 'Rp 500.000 - Rp 1.000.000' },
-  { label: 'Rp 1.000.000 - Rp 2.000.000', value: 'Rp 1.000.000 - Rp 2.000.000' },
-  { label: 'Rp 2.000.000 - Rp 3.000.000', value: 'Rp 2.000.000 - Rp 3.000.000' },
-  { label: 'Rp 3.000.000 - Rp 5.000.000', value: 'Rp 3.000.000 - Rp 5.000.000' },
-  { label: 'Lebih dari Rp 5.000.000', value: 'Lebih dari Rp 5.000.000' },
-];
-
 export const SAVINGS_OPTIONS = [
   { label: '-- Pilih Kepemilikan Tabungan --', value: '' },
   { label: 'Ada', value: 'Ada' },
@@ -673,7 +663,6 @@ export const getInitialFormData = () => ({
   alamat_pt: '',
 
   pekerjaan_kepala_keluarga: '',
-  penghasilan: '',
   pendidikan_kepala_keluarga: '',
   jumlah_tanggungan: '',
   kepemilikan_tabungan: '',
