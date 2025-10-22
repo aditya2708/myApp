@@ -116,7 +116,6 @@ class KeluargaResource extends JsonResource
                     return [
                         'id_survey' => $survey->id_survey,
                         'pekerjaan_kepala_keluarga' => $survey->pekerjaan_kepala_keluarga,
-                        'penghasilan' => $survey->penghasilan,
                         'pendidikan_kepala_keluarga' => $survey->pendidikan_kepala_keluarga,
                         'jumlah_tanggungan' => $survey->jumlah_tanggungan,
                         'kepemilikan_tabungan' => $survey->kepemilikan_tabungan,
