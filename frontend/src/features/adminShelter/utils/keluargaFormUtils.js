@@ -543,34 +543,19 @@ const validateEducationStep = (data) => {
 };
 
 const validateSurveyBasicStep = (data) => {
-  const basicRequired = !!(
-    data.pekerjaan_kepala_keluarga &&
-    data.pendidikan_kepala_keluarga &&
-    data.jumlah_tanggungan &&
-    data.kondisi_fisik_anak &&
-    data.kepribadian_anak
-  );
-
   if (data.kondisi_fisik_anak === 'Disabilitas') {
-    return basicRequired && !!data.keterangan_disabilitas;
+    return !!data.keterangan_disabilitas;
   }
 
-  return basicRequired;
+  return true;
 };
 
 const validateSurveyFinancialStep = (data) => {
-  const financialRequired = !!(
-    data.penghasilan &&
-    data.kepemilikan_tabungan &&
-    data.biaya_pendidikan_perbulan &&
-    data.bantuan_lembaga_formal_lain
-  );
-
   if (data.bantuan_lembaga_formal_lain === 'Ya') {
-    return financialRequired && !!data.bantuan_lembaga_formal_lain_sebesar;
+    return !!data.bantuan_lembaga_formal_lain_sebesar;
   }
 
-  return financialRequired;
+  return true;
 };
 
 const validateSurveyAssetsStep = (data) => {
