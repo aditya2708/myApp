@@ -277,7 +277,6 @@ const SurveyApprovalDetailScreen = () => {
   sections.push({
     title: 'Survei - Informasi Keuangan',
     rows: [
-      { label: 'Penghasilan', value: survey.penghasilan },
       { label: 'Kepemilikan Tabungan', value: survey.kepemilikan_tabungan },
       {
         label: 'Biaya Pendidikan Per Bulan',
