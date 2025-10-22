@@ -156,6 +156,7 @@ class AdminShelterAnakController extends Controller
             'dari_bersaudara' => 'nullable|integer',
             'nick_name' => 'nullable|string|max:255',
             'full_name' => 'nullable|string|max:255',
+            'alamat' => 'nullable|string|max:255',
             'agama' => 'nullable|in:Islam,Kristen,Katolik,Buddha,Hindu,Konghucu',
             'tempat_lahir' => 'nullable|string|max:255',
             'tanggal_lahir' => 'nullable|date',
@@ -170,10 +171,33 @@ class AdminShelterAnakController extends Controller
             'personality_traits' => 'nullable',
             'special_needs' => 'nullable|string',
             'marketplace_featured' => 'nullable|boolean',
+            'jenjang' => 'nullable|string|in:belum_sd,sd,smp,sma,perguruan_tinggi',
+            'kelas' => 'nullable|string|max:255',
+            'nama_sekolah' => 'nullable|string|max:255',
+            'alamat_sekolah' => 'nullable|string|max:255',
+            'jurusan' => 'nullable|string|max:255',
+            'semester' => 'nullable|integer',
+            'nama_pt' => 'nullable|string|max:255',
+            'alamat_pt' => 'nullable|string|max:255',
         ]);
 
         $validatedData = $this->normalizeAnakPayload($validatedData);
         $validatedData['id_shelter'] = $user->adminShelter->id_shelter;
+
+        $educationFields = ['jenjang', 'kelas', 'nama_sekolah', 'alamat_sekolah', 'jurusan', 'semester', 'nama_pt', 'alamat_pt'];
+        $educationData = [];
+
+        foreach ($educationFields as $field) {
+            if (array_key_exists($field, $validatedData)) {
+                $educationData[$field] = $validatedData[$field];
+                unset($validatedData[$field]);
+            }
+        }
+
+        $educationData = array_filter(
+            $educationData,
+            static fn ($value) => $value !== null && $value !== ''
+        );
 
         if (array_key_exists('id_kelompok', $validatedData)) {
             if ($validatedData['id_kelompok']) {
@@ -185,6 +209,10 @@ class AdminShelterAnakController extends Controller
         }
 
         $anak = new Anak($validatedData);
+
+        if (array_key_exists('alamat', $validatedData)) {
+            $anak->alamat = $validatedData['alamat'];
+        }
 
         $anak->status_validasi = $validatedData['status_validasi'] ?? 'non-aktif';
 
@@ -198,6 +226,28 @@ class AdminShelterAnakController extends Controller
 
         $anak->save();
 
+        if (!empty($educationData)) {
+            $educationPayload = array_merge(
+                ['id_keluarga' => $anak->id_keluarga],
+                $educationData
+            );
+
+            $educationAttributes = [];
+
+            if ($anak->id_anak_pend) {
+                $educationAttributes['id_anak_pend'] = $anak->id_anak_pend;
+            }
+
+            $pendidikan = $educationAttributes
+                ? $anak->anakPendidikan()->updateOrCreate($educationAttributes, $educationPayload)
+                : $anak->anakPendidikan()->create($educationPayload);
+
+            if ($anak->id_anak_pend !== $pendidikan->id_anak_pend) {
+                $anak->id_anak_pend = $pendidikan->id_anak_pend;
+                $anak->save();
+            }
+        }
+
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
             $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
@@ -205,6 +255,8 @@ class AdminShelterAnakController extends Controller
             $anak->foto = $filename;
             $anak->save();
         }
+
+        $anak->load('anakPendidikan');
 
         return response()->json([
             'success' => true,
@@ -236,6 +288,7 @@ class AdminShelterAnakController extends Controller
             'dari_bersaudara' => 'nullable|integer',
             'nick_name' => 'sometimes|nullable|string|max:255',
             'full_name' => 'sometimes|nullable|string|max:255',
+            'alamat' => 'sometimes|nullable|string|max:255',
             'agama' => 'sometimes|nullable|in:Islam,Kristen,Katolik,Buddha,Hindu,Konghucu',
             'tempat_lahir' => 'sometimes|nullable|string|max:255',
             'tanggal_lahir' => 'sometimes|nullable|date',
@@ -250,9 +303,32 @@ class AdminShelterAnakController extends Controller
             'personality_traits' => 'nullable',
             'special_needs' => 'nullable|string',
             'marketplace_featured' => 'nullable|boolean',
+            'jenjang' => 'sometimes|nullable|string|in:belum_sd,sd,smp,sma,perguruan_tinggi',
+            'kelas' => 'sometimes|nullable|string|max:255',
+            'nama_sekolah' => 'sometimes|nullable|string|max:255',
+            'alamat_sekolah' => 'sometimes|nullable|string|max:255',
+            'jurusan' => 'sometimes|nullable|string|max:255',
+            'semester' => 'sometimes|nullable|integer',
+            'nama_pt' => 'sometimes|nullable|string|max:255',
+            'alamat_pt' => 'sometimes|nullable|string|max:255',
         ]);
 
         $validatedData = $this->normalizeAnakPayload($validatedData);
+
+        $educationFields = ['jenjang', 'kelas', 'nama_sekolah', 'alamat_sekolah', 'jurusan', 'semester', 'nama_pt', 'alamat_pt'];
+        $educationData = [];
+
+        foreach ($educationFields as $field) {
+            if (array_key_exists($field, $validatedData)) {
+                $educationData[$field] = $validatedData[$field];
+                unset($validatedData[$field]);
+            }
+        }
+
+        $educationData = array_filter(
+            $educationData,
+            static fn ($value) => $value !== null && $value !== ''
+        );
 
         if (array_key_exists('id_kelompok', $validatedData)) {
             if ($validatedData['id_kelompok']) {
@@ -264,6 +340,10 @@ class AdminShelterAnakController extends Controller
         }
 
         $anak->fill($validatedData);
+
+        if (array_key_exists('alamat', $validatedData)) {
+            $anak->alamat = $validatedData['alamat'];
+        }
 
         if (array_key_exists('jenis_anak_binaan', $validatedData)) {
             $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BCPB'
@@ -286,6 +366,30 @@ class AdminShelterAnakController extends Controller
 
         $anak->save();
 
+        if (!empty($educationData)) {
+            $educationPayload = array_merge(
+                ['id_keluarga' => $anak->id_keluarga],
+                $educationData
+            );
+
+            $educationAttributes = [];
+
+            if ($anak->id_anak_pend) {
+                $educationAttributes['id_anak_pend'] = $anak->id_anak_pend;
+            }
+
+            $pendidikan = $educationAttributes
+                ? $anak->anakPendidikan()->updateOrCreate($educationAttributes, $educationPayload)
+                : $anak->anakPendidikan()->create($educationPayload);
+
+            if ($anak->id_anak_pend !== $pendidikan->id_anak_pend) {
+                $anak->id_anak_pend = $pendidikan->id_anak_pend;
+                $anak->save();
+            }
+        }
+
+        $anak->load('anakPendidikan');
+
         return response()->json([
             'success' => true,
             'message' => 'Anak berhasil diperbarui',
@@ -301,6 +405,7 @@ class AdminShelterAnakController extends Controller
             'id_level_anak_binaan',
             'anak_ke',
             'dari_bersaudara',
+            'semester',
         ];
 
         foreach ($numericFields as $field) {
@@ -319,6 +424,7 @@ class AdminShelterAnakController extends Controller
             'nik_anak',
             'nick_name',
             'full_name',
+            'alamat',
             'agama',
             'tempat_lahir',
             'tanggal_lahir',
@@ -330,6 +436,13 @@ class AdminShelterAnakController extends Controller
             'background_story',
             'educational_goals',
             'special_needs',
+            'jenjang',
+            'kelas',
+            'nama_sekolah',
+            'alamat_sekolah',
+            'jurusan',
+            'nama_pt',
+            'alamat_pt',
         ];
 
         foreach ($stringFields as $field) {
