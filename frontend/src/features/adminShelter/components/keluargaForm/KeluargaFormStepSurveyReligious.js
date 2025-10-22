@@ -18,24 +18,24 @@ import {
 const KeluargaFormStepSurveyReligious = ({
   formData,
   onChange,
-  setStepValid,
-  validateStep
+  setStepValid
 }) => {
   useEffect(() => {
-    const isValid = validateStep();
-    setStepValid(isValid);
+    if (formData.pengurus_organisasi === 'Ya') {
+      const hasRole = Boolean(formData.pengurus_organisasi_sebagai?.trim());
+      setStepValid(hasRole);
+    } else {
+      setStepValid(true);
+    }
   }, [
-    formData.solat_lima_waktu,
-    formData.membaca_alquran,
-    formData.majelis_taklim,
-    formData.membaca_koran,
     formData.pengurus_organisasi,
-    formData.kondisi_penerima_manfaat
+    formData.pengurus_organisasi_sebagai,
+    setStepValid
   ]);
 
   const renderPicker = (label, value, options, field) => (
     <View style={styles.inputContainer}>
-      <Text style={styles.label}>{label}*</Text>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={value}
