@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,10 +36,13 @@ import { STEPS } from '../utils/keluargaFormUtils';
 const KeluargaFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  
+
   const existingKeluarga = route.params?.keluarga;
   const isEditMode = !!existingKeluarga;
-  
+
+  const initialFormSnapshotRef = useRef(null);
+  const skipConfirmationRef = useRef(false);
+
   const SHOW_STEP_INDICATOR = false;
   
   const {
@@ -66,6 +70,11 @@ const KeluargaFormScreen = () => {
     bank: [],
   });
   const [loadingDropdowns, setLoadingDropdowns] = React.useState(true);
+
+  useEffect(() => {
+    initialFormSnapshotRef.current = null;
+    skipConfirmationRef.current = false;
+  }, [existingKeluarga]);
 
   // Fetch dropdown data
   useEffect(() => {
@@ -255,6 +264,51 @@ const KeluargaFormScreen = () => {
     }
   }, [isEditMode, existingKeluarga]);
 
+  useEffect(() => {
+    if (!loading && initialFormSnapshotRef.current === null) {
+      initialFormSnapshotRef.current = JSON.parse(JSON.stringify(formData || {}));
+    }
+  }, [loading, formData]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!initialFormSnapshotRef.current) {
+      return false;
+    }
+
+    return (
+      JSON.stringify(initialFormSnapshotRef.current) !==
+      JSON.stringify(formData || {})
+    );
+  }, [formData]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (!hasUnsavedChanges || submitting || skipConfirmationRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+
+      Alert.alert(
+        'Keluar tanpa menyimpan?',
+        'Perubahan yang belum disimpan akan hilang. Apakah Anda ingin keluar?',
+        [
+          { text: 'Batal', style: 'cancel' },
+          {
+            text: 'Keluar',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(event.data.action),
+          },
+        ],
+        { cancelable: true }
+      );
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [navigation, hasUnsavedChanges, submitting]);
+
   // Set screen title
   useEffect(() => {
     navigation.setOptions({
@@ -266,6 +320,7 @@ const KeluargaFormScreen = () => {
   const onSubmit = async () => {
     const result = await handleSubmit();
     if (result.success) {
+      skipConfirmationRef.current = true;
       navigation.goBack();
     }
   };
