@@ -8,7 +8,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 
 import TextInput from '../../../../common/components/TextInput';
-import { FINANCIAL_INCOME_OPTIONS, SAVINGS_OPTIONS, ASSISTANCE_OPTIONS } from '../../utils/keluargaFormUtils';
+import { SAVINGS_OPTIONS, ASSISTANCE_OPTIONS } from '../../utils/keluargaFormUtils';
 
 const KeluargaFormStepSurveyFinancial = ({
   formData,
@@ -20,7 +20,6 @@ const KeluargaFormStepSurveyFinancial = ({
     const validationResult = validateStep();
     setStepValid(validationResult === undefined ? true : !!validationResult);
   }, [
-    formData.penghasilan,
     formData.kepemilikan_tabungan,
     formData.biaya_pendidikan_perbulan,
     formData.bantuan_lembaga_formal_lain,
@@ -48,7 +47,6 @@ const KeluargaFormStepSurveyFinancial = ({
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Data Keuangan</Text>
 
-      {renderPicker('Penghasilan Bulanan', formData.penghasilan, FINANCIAL_INCOME_OPTIONS, 'penghasilan')}
       {renderPicker('Kepemilikan Tabungan', formData.kepemilikan_tabungan, SAVINGS_OPTIONS, 'kepemilikan_tabungan')}
 
       <TextInput
