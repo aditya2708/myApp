@@ -217,7 +217,6 @@ const KeluargaFormScreen = () => {
 
               // Survey data
               pekerjaan_kepala_keluarga: surveyData.pekerjaan_kepala_keluarga || '',
-              penghasilan: surveyData.penghasilan || '',
               pendidikan_kepala_keluarga: surveyData.pendidikan_kepala_keluarga || '',
               jumlah_tanggungan: surveyData.jumlah_tanggungan?.toString() || '',
               kepemilikan_tabungan: surveyData.kepemilikan_tabungan || '',
