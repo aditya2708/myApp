@@ -105,6 +105,16 @@ class StoreKeluargaRequest extends FormRequest
 
     public function prepareForValidation(): void
     {
+        $normalized = array_map(function ($value) {
+            if (is_string($value) && trim($value) === '') {
+                return null;
+            }
+
+            return $value;
+        }, $this->all());
+
+        $this->merge($normalized);
+
         // Clean bank and phone data based on choices
         if ($this->has('bank_choice') && $this->bank_choice == 'no') {
             $this->merge([

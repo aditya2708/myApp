@@ -159,6 +159,16 @@ class UpdateKeluargaRequest extends FormRequest
 
     public function prepareForValidation(): void
     {
+        $normalized = array_map(function ($value) {
+            if (is_string($value) && trim($value) === '') {
+                return null;
+            }
+
+            return $value;
+        }, $this->all());
+
+        $this->merge($normalized);
+
         if ($this->has('bank_choice') && $this->bank_choice == 'no') {
             $this->merge([
                 'id_bank' => null,
@@ -214,17 +224,17 @@ class UpdateKeluargaRequest extends FormRequest
         $rules = [];
         
         if (isset($data['kondisi_fisik_anak']) && $data['kondisi_fisik_anak'] === 'Disabilitas') {
-            $rules['keterangan_disabilitas'] = 'required|string';
+            $rules['keterangan_disabilitas'] = 'nullable|string';
         }
-        
+
         if (isset($data['bantuan_lembaga_formal_lain']) && $data['bantuan_lembaga_formal_lain'] === 'Ya') {
-            $rules['bantuan_lembaga_formal_lain_sebesar'] = 'required|numeric';
+            $rules['bantuan_lembaga_formal_lain_sebesar'] = 'nullable|numeric';
         }
-        
+
         if (isset($data['pengurus_organisasi']) && $data['pengurus_organisasi'] === 'Ya') {
-            $rules['pengurus_organisasi_sebagai'] = 'required|string|max:255';
+            $rules['pengurus_organisasi_sebagai'] = 'nullable|string|max:255';
         }
-        
+
         return $rules;
     }
 }
