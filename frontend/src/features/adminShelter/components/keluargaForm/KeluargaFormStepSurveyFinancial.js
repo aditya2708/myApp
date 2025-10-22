@@ -17,18 +17,19 @@ const KeluargaFormStepSurveyFinancial = ({
   validateStep
 }) => {
   useEffect(() => {
-    const isValid = validateStep();
-    setStepValid(isValid);
+    const validationResult = validateStep();
+    setStepValid(validationResult === undefined ? true : !!validationResult);
   }, [
     formData.penghasilan,
     formData.kepemilikan_tabungan,
     formData.biaya_pendidikan_perbulan,
-    formData.bantuan_lembaga_formal_lain
+    formData.bantuan_lembaga_formal_lain,
+    formData.bantuan_lembaga_formal_lain_sebesar
   ]);
 
   const renderPicker = (label, value, options, field) => (
     <View style={styles.inputContainer}>
-      <Text style={styles.label}>{label}*</Text>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={value}
@@ -51,7 +52,7 @@ const KeluargaFormStepSurveyFinancial = ({
       {renderPicker('Kepemilikan Tabungan', formData.kepemilikan_tabungan, SAVINGS_OPTIONS, 'kepemilikan_tabungan')}
 
       <TextInput
-        label="Biaya Pendidikan per Bulan*"
+        label="Biaya Pendidikan per Bulan"
         value={formData.biaya_pendidikan_perbulan}
         onChangeText={(value) => onChange('biaya_pendidikan_perbulan', value)}
         placeholder="Contoh: 500000"
