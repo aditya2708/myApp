@@ -31,14 +31,6 @@ export const validateBasicStep = (formData) => {
     };
   }
   
-  if (!formData.penghasilan) {
-    return {
-      isValid: false,
-      errorMessage: 'Please select the monthly income range'
-    };
-  }
-  
-  
   return { isValid: true };
 };
 
@@ -151,10 +143,9 @@ export const validateStep = (stepId, formData) => {
  * @returns {Object} - Validation result { isValid, errorMessage }
  */
 export const validateSubmission = (formData) => {
-  if (!formData.pendidikan_kepala_keluarga || 
-      !formData.jumlah_tanggungan || 
-      !formData.pekerjaan_kepala_keluarga || 
-      !formData.penghasilan) {
+  if (!formData.pendidikan_kepala_keluarga ||
+      !formData.jumlah_tanggungan ||
+      !formData.pekerjaan_kepala_keluarga) {
     return {
       isValid: false,
       errorMessage: 'Please complete the Basic Information section'
