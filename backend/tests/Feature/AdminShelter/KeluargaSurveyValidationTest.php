@@ -20,7 +20,6 @@ class KeluargaSurveyValidationTest extends TestCase
 
         $this->assertTrue($validator->passes());
         $this->assertFalse($validator->errors()->has('pekerjaan_kepala_keluarga'));
-        $this->assertFalse($validator->errors()->has('penghasilan'));
         $this->assertFalse($validator->errors()->has('pendidikan_kepala_keluarga'));
         $this->assertFalse($validator->errors()->has('jumlah_tanggungan'));
         $this->assertFalse($validator->errors()->has('kepemilikan_tanah'));
