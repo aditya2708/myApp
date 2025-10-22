@@ -19,7 +19,7 @@ class KeluargaValidationRules
             'no_tlp' => 'nullable|string|max:255',
             'an_tlp' => 'nullable|string|max:255',
 
-            // Child data - ALL required (no conditionals)
+            // Child data - mostly required (pelajaran_favorit, hobi, dan prestasi opsional)
             'nik_anak' => 'required|regex:/^[0-9]{16}$/',
             'anak_ke' => 'required|integer',
             'dari_bersaudara' => 'required|integer',
@@ -31,9 +31,9 @@ class KeluargaValidationRules
             'jenis_kelamin' => 'required|string|in:Laki-laki,Perempuan',
             'tinggal_bersama' => 'required|string|in:Ayah,Ibu,Ayah dan Ibu,Wali',
             'hafalan' => 'required|string|in:Tahfidz,Non-Tahfidz',
-            'pelajaran_favorit' => 'required|string|max:255',
-            'hobi' => 'required|string|max:255',
-            'prestasi' => 'required|string|max:255',
+            'pelajaran_favorit' => 'nullable|string|max:255',
+            'hobi' => 'nullable|string|max:255',
+            'prestasi' => 'nullable|string|max:255',
             'jarak_rumah' => 'required|numeric',
             'transportasi' => 'required|string',
             'foto' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
