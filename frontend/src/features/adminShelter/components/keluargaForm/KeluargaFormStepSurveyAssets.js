@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,9 +20,15 @@ const KeluargaFormStepSurveyAssets = ({
   onChange,
   setStepValid
 }) => {
+  const setStepValidRef = useRef(setStepValid);
+
   useEffect(() => {
-    setStepValid(true);
+    setStepValidRef.current = setStepValid;
   }, [setStepValid]);
+
+  useEffect(() => {
+    setStepValidRef.current?.(true);
+  }, []);
 
   const renderPicker = (label, value, options, field) => (
     <View style={styles.inputContainer}>
