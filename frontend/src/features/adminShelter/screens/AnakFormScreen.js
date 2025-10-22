@@ -14,10 +14,20 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 import Button from '../../../common/components/Button';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
+import DatePicker from '../../../common/components/DatePicker';
+import PickerInput from '../../../common/components/PickerInput';
 import { adminShelterAnakApi } from '../api/adminShelterAnakApi';
+
+const parseDateValue = (dateString) => {
+  if (!dateString) return null;
+  const parsed = new Date(dateString);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
 const AnakFormScreen = () => {
   const navigation = useNavigation();
@@ -50,6 +60,40 @@ const AnakFormScreen = () => {
   });
 
   const [imageUri, setImageUri] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedBirthDate, setSelectedBirthDate] = useState(
+    () => parseDateValue(anakData?.tanggal_lahir) || null
+  );
+
+  const genderOptions = [
+    { label: 'Laki-laki', value: 'Laki-laki' },
+    { label: 'Perempuan', value: 'Perempuan' },
+  ];
+
+  const religionOptions = [
+    { label: 'Islam', value: 'Islam' },
+    { label: 'Kristen', value: 'Kristen' },
+    { label: 'Budha', value: 'Budha' },
+    { label: 'Hindu', value: 'Hindu' },
+    { label: 'Konghucu', value: 'Konghucu' },
+  ];
+
+  const livingWithOptions = [
+    { label: 'Ayah dan Ibu', value: 'Ayah dan Ibu' },
+    { label: 'Ayah', value: 'Ayah' },
+    { label: 'Ibu', value: 'Ibu' },
+    { label: 'Wali', value: 'Wali' },
+  ];
+
+  const childTypeOptions = [
+    { label: 'BCPB', value: 'BCPB' },
+    { label: 'NPB', value: 'NPB' },
+  ];
+
+  const hafalanOptions = [
+    { label: 'Tahfidz', value: 'Tahfidz' },
+    { label: 'Non-Tahfidz', value: 'Non-Tahfidz' },
+  ];
 
   useEffect(() => {
     if (anakData) {
@@ -79,6 +123,7 @@ const AnakFormScreen = () => {
         foto: null
       });
       setImageUri(anakData.foto_url);
+      setSelectedBirthDate(parseDateValue(anakData.tanggal_lahir) || null);
     }
   }, [anakData]);
 
@@ -232,54 +277,55 @@ const AnakFormScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Tanggal Lahir (YYYY-MM-DD)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.tanggal_lahir}
-            onChangeText={(text) => updateField('tanggal_lahir', text)}
-            placeholder="2010-01-01"
-          />
+          <Text style={styles.label}>Tanggal Lahir</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text
+              style={[
+                styles.dateText,
+                !selectedBirthDate && styles.placeholderText,
+              ]}
+            >
+              {selectedBirthDate
+                ? format(selectedBirthDate, 'dd MMMM yyyy', { locale: id })
+                : 'Pilih tanggal lahir'}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DatePicker
+              value={selectedBirthDate || new Date()}
+              onChange={(date) => {
+                if (date) {
+                  setSelectedBirthDate(date);
+                  updateField('tanggal_lahir', format(date, 'yyyy-MM-dd'));
+                }
+                setShowDatePicker(false);
+              }}
+              onCancel={() => setShowDatePicker(false)}
+              title="Pilih Tanggal Lahir"
+            />
+          )}
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Jenis Kelamin</Text>
-          <View style={styles.radioGroup}>
-            {['Laki-laki', 'Perempuan'].map(option => (
-              <TouchableOpacity
-                key={option}
-                style={styles.radioOption}
-                onPress={() => updateField('jenis_kelamin', option)}
-              >
-                <View style={[
-                  styles.radio,
-                  formData.jenis_kelamin === option && styles.radioSelected
-                ]} />
-                <Text style={styles.radioText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <PickerInput
+          label="Jenis Kelamin"
+          value={formData.jenis_kelamin}
+          onValueChange={(value) => updateField('jenis_kelamin', value)}
+          items={genderOptions}
+          placeholder="Pilih Jenis Kelamin"
+          style={styles.pickerGroup}
+        />
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Agama</Text>
-          <View style={styles.selectGroup}>
-            {['Islam', 'Kristen', 'Budha', 'Hindu', 'Konghucu'].map(option => (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.selectOption,
-                  formData.agama === option && styles.selectOptionSelected
-                ]}
-                onPress={() => updateField('agama', option)}
-              >
-                <Text style={[
-                  styles.selectOptionText,
-                  formData.agama === option && styles.selectOptionTextSelected
-                ]}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <PickerInput
+          label="Agama"
+          value={formData.agama}
+          onValueChange={(value) => updateField('agama', value)}
+          items={religionOptions}
+          placeholder="Pilih Agama"
+          style={styles.pickerGroup}
+        />
 
         <View style={styles.row}>
           <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
@@ -304,64 +350,32 @@ const AnakFormScreen = () => {
           </View>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Tinggal Bersama</Text>
-          <View style={styles.selectGroup}>
-            {['Ayah', 'Ibu', 'Wali'].map(option => (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.selectOption,
-                  formData.tinggal_bersama === option && styles.selectOptionSelected
-                ]}
-                onPress={() => updateField('tinggal_bersama', option)}
-              >
-                <Text style={[
-                  styles.selectOptionText,
-                  formData.tinggal_bersama === option && styles.selectOptionTextSelected
-                ]}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <PickerInput
+          label="Tinggal Bersama"
+          value={formData.tinggal_bersama}
+          onValueChange={(value) => updateField('tinggal_bersama', value)}
+          items={livingWithOptions}
+          placeholder="Pilih Tinggal Bersama"
+          style={styles.pickerGroup}
+        />
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Jenis Anak Binaan</Text>
-          <View style={styles.radioGroup}>
-            {['BCPB', 'NPB'].map(option => (
-              <TouchableOpacity
-                key={option}
-                style={styles.radioOption}
-                onPress={() => updateField('jenis_anak_binaan', option)}
-              >
-                <View style={[
-                  styles.radio,
-                  formData.jenis_anak_binaan === option && styles.radioSelected
-                ]} />
-                <Text style={styles.radioText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <PickerInput
+          label="Jenis Anak Binaan"
+          value={formData.jenis_anak_binaan}
+          onValueChange={(value) => updateField('jenis_anak_binaan', value)}
+          items={childTypeOptions}
+          placeholder="Pilih Jenis Anak Binaan"
+          style={styles.pickerGroup}
+        />
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Hafalan</Text>
-          <View style={styles.radioGroup}>
-            {['Tahfidz', 'Non-Tahfidz'].map(option => (
-              <TouchableOpacity
-                key={option}
-                style={styles.radioOption}
-                onPress={() => updateField('hafalan', option)}
-              >
-                <View style={[
-                  styles.radio,
-                  formData.hafalan === option && styles.radioSelected
-                ]} />
-                <Text style={styles.radioText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <PickerInput
+          label="Hafalan"
+          value={formData.hafalan}
+          onValueChange={(value) => updateField('hafalan', value)}
+          items={hafalanOptions}
+          placeholder="Pilih Hafalan"
+          style={styles.pickerGroup}
+        />
       </View>
 
       <View style={styles.section}>
@@ -572,53 +586,22 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
   },
-  radioGroup: {
-    flexDirection: 'row',
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 24,
-  },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
+  dateInput: {
+    borderWidth: 1,
     borderColor: '#ddd',
-    marginRight: 8,
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
   },
-  radioSelected: {
-    borderColor: '#e74c3c',
-    backgroundColor: '#e74c3c',
-  },
-  radioText: {
+  dateText: {
     fontSize: 16,
     color: '#333',
   },
-  selectGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  placeholderText: {
+    color: '#999',
   },
-  selectOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  selectOptionSelected: {
-    backgroundColor: '#e74c3c',
-    borderColor: '#e74c3c',
-  },
-  selectOptionText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  selectOptionTextSelected: {
-    color: '#fff',
+  pickerGroup: {
+    marginBottom: 16,
   },
   switchGroup: {
     flexDirection: 'row',
