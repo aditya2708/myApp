@@ -504,22 +504,24 @@ const validateGuardianStep = (data) => {
 };
 
 const validateChildStep = (data) => {
-  return !!(
-    data.nik_anak &&
-    data.nik_anak.length === 16 &&
-    data.anak_ke &&
-    data.dari_bersaudara &&
-    data.nick_name &&
-    data.full_name &&
-    data.agama &&
-    data.tempat_lahir &&
-    data.tanggal_lahir &&
-    data.jenis_kelamin &&
-    data.tinggal_bersama &&
-    data.hafalan &&
-    data.jarak_rumah &&
-    data.transportasi
-  );
+  const requiredFields = [
+    'anak_ke',
+    'dari_bersaudara',
+    'nick_name',
+    'full_name',
+    'agama',
+    'tempat_lahir',
+    'tanggal_lahir',
+    'jenis_kelamin',
+    'tinggal_bersama',
+    'hafalan',
+    'jarak_rumah',
+    'transportasi',
+  ];
+
+  const hasRequiredValues = requiredFields.every((field) => !!data[field]);
+
+  return !!data.nik_anak && data.nik_anak.length === 16 && hasRequiredValues;
 };
 
 const validateEducationStep = (data) => {
