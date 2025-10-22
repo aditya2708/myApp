@@ -18,24 +18,15 @@ import {
 const KeluargaFormStepSurveyAssets = ({
   formData,
   onChange,
-  setStepValid,
-  validateStep
+  setStepValid
 }) => {
   useEffect(() => {
-    const isValid = validateStep();
-    setStepValid(isValid);
-  }, [
-    formData.kepemilikan_tanah,
-    formData.kepemilikan_rumah,
-    formData.kondisi_rumah_dinding,
-    formData.kondisi_rumah_lantai,
-    formData.kepemilikan_kendaraan,
-    formData.kepemilikan_elektronik
-  ]);
+    setStepValid(true);
+  }, [setStepValid]);
 
   const renderPicker = (label, value, options, field) => (
     <View style={styles.inputContainer}>
-      <Text style={styles.label}>{label}*</Text>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={value}

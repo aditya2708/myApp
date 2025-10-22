@@ -19,26 +19,15 @@ import {
 const KeluargaFormStepSurveyHealth = ({
   formData,
   onChange,
-  setStepValid,
-  validateStep
+  setStepValid
 }) => {
   useEffect(() => {
-    const isValid = validateStep();
-    setStepValid(isValid);
-  }, [
-    formData.jumlah_makan,
-    formData.sumber_air_bersih,
-    formData.jamban_limbah,
-    formData.tempat_sampah,
-    formData.perokok,
-    formData.konsumen_miras,
-    formData.persediaan_p3k,
-    formData.makan_buah_sayur
-  ]);
+    setStepValid(true);
+  }, [setStepValid]);
 
   const renderPicker = (label, value, options, field) => (
     <View style={styles.inputContainer}>
-      <Text style={styles.label}>{label}*</Text>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={value}
