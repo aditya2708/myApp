@@ -134,29 +134,29 @@ class KeluargaValidationRules
             'pendidikan_kepala_keluarga' => 'nullable|string|max:255',
             'jumlah_tanggungan' => 'nullable|integer',
             'kepemilikan_tabungan' => 'nullable|string|in:Ada,Tidak Ada',
-            'jumlah_makan' => 'required|integer',
-            'kepemilikan_tanah' => 'required|string|in:Milik Sendiri,Kontrak,Menumpang,Lainnya',
-            'kepemilikan_rumah' => 'required|string|in:Milik Sendiri,Kontrak,Menumpang,Lainnya',
-            'kondisi_rumah_dinding' => 'required|string|max:255',
-            'kondisi_rumah_lantai' => 'required|string|max:255',
-            'kepemilikan_kendaraan' => 'required|string|max:255',
-            'kepemilikan_elektronik' => 'required|string|max:255',
-            'sumber_air_bersih' => 'required|string|max:255',
-            'jamban_limbah' => 'required|string|max:255',
-            'tempat_sampah' => 'required|string|max:255',
-            'perokok' => 'required|string|in:Ya,Tidak',
-            'konsumen_miras' => 'required|string|in:Ya,Tidak',
-            'persediaan_p3k' => 'required|string|in:Ada,Tidak Ada',
-            'makan_buah_sayur' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
-            'solat_lima_waktu' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
-            'membaca_alquran' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
-            'majelis_taklim' => 'required|string|in:Aktif,Tidak Aktif',
-            'membaca_koran' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
-            'pengurus_organisasi' => 'required|string|in:Ya,Tidak',
+            'jumlah_makan' => 'nullable|integer',
+            'kepemilikan_tanah' => 'nullable|string|in:Milik Sendiri,Kontrak,Menumpang,Lainnya',
+            'kepemilikan_rumah' => 'nullable|string|in:Milik Sendiri,Kontrak,Menumpang,Lainnya',
+            'kondisi_rumah_dinding' => 'nullable|string|max:255',
+            'kondisi_rumah_lantai' => 'nullable|string|max:255',
+            'kepemilikan_kendaraan' => 'nullable|string|max:255',
+            'kepemilikan_elektronik' => 'nullable|string|max:255',
+            'sumber_air_bersih' => 'nullable|string|max:255',
+            'jamban_limbah' => 'nullable|string|max:255',
+            'tempat_sampah' => 'nullable|string|max:255',
+            'perokok' => 'nullable|string|in:Ya,Tidak',
+            'konsumen_miras' => 'nullable|string|in:Ya,Tidak',
+            'persediaan_p3k' => 'nullable|string|in:Ada,Tidak Ada',
+            'makan_buah_sayur' => 'nullable|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'solat_lima_waktu' => 'nullable|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'membaca_alquran' => 'nullable|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'majelis_taklim' => 'nullable|string|in:Aktif,Tidak Aktif',
+            'membaca_koran' => 'nullable|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'pengurus_organisasi' => 'nullable|string|in:Ya,Tidak',
             'kondisi_fisik_anak' => 'nullable|string|in:Normal,Disabilitas',
             'biaya_pendidikan_perbulan' => 'nullable|numeric',
             'bantuan_lembaga_formal_lain' => 'nullable|string|in:Ya,Tidak',
-            'kondisi_penerima_manfaat' => 'required|string|max:255',
+            'kondisi_penerima_manfaat' => 'nullable|string|max:255',
             'kepribadian_anak' => 'nullable|string|max:255',
         ];
     }
@@ -175,9 +175,9 @@ class KeluargaValidationRules
         }
         
         if (isset($data['pengurus_organisasi']) && $data['pengurus_organisasi'] === 'Ya') {
-            $rules['pengurus_organisasi_sebagai'] = 'required|string|max:255';
+            $rules['pengurus_organisasi_sebagai'] = 'nullable|string|max:255';
         }
-        
+
         return $rules;
     }
 
