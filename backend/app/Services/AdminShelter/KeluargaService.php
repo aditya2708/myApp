@@ -291,7 +291,7 @@ class KeluargaService
     {
         $shelterId = Auth::user()->adminShelter->id_shelter;
         
-        $childData = [
+        $childData = $this->sanitizeChildData([
             'id_keluarga' => $keluargaId,
             'id_shelter' => $shelterId,
             'id_anak_pend' => $idAnakPend,
@@ -306,14 +306,14 @@ class KeluargaService
             'jenis_kelamin' => $data['jenis_kelamin'],
             'tinggal_bersama' => $data['tinggal_bersama'],
             'hafalan' => $data['hafalan'],
-            'pelajaran_favorit' => $data['pelajaran_favorit'],
-            'hobi' => $data['hobi'],
-            'prestasi' => $data['prestasi'],
+            'pelajaran_favorit' => $data['pelajaran_favorit'] ?? null,
+            'hobi' => $data['hobi'] ?? null,
+            'prestasi' => $data['prestasi'] ?? null,
             'jarak_rumah' => $data['jarak_rumah'],
             'transportasi' => $data['transportasi'],
             'status_validasi' => 'aktif',
             'status_cpb' => 'BCPB',
-        ];
+        ]);
 
         $anak = Anak::create($childData);
 
@@ -339,7 +339,7 @@ class KeluargaService
             // Get the education record to link with id_anak_pend
             $anakPendidikan = AnakPendidikan::where('id_keluarga', $keluargaId)->first();
             
-            $childData = [
+            $childData = $this->sanitizeChildData([
                 'id_shelter' => $shelterId,
                 'id_anak_pend' => $anakPendidikan ? $anakPendidikan->id_anak_pend : null,
                 'nik_anak' => $data['nik_anak'],
@@ -353,12 +353,12 @@ class KeluargaService
                 'jenis_kelamin' => $data['jenis_kelamin'],
                 'tinggal_bersama' => $data['tinggal_bersama'],
                 'hafalan' => $data['hafalan'],
-                'pelajaran_favorit' => $data['pelajaran_favorit'],
-                'hobi' => $data['hobi'],
-                'prestasi' => $data['prestasi'],
+                'pelajaran_favorit' => $data['pelajaran_favorit'] ?? null,
+                'hobi' => $data['hobi'] ?? null,
+                'prestasi' => $data['prestasi'] ?? null,
                 'jarak_rumah' => $data['jarak_rumah'],
                 'transportasi' => $data['transportasi'],
-            ];
+            ]);
 
             // Handle photo upload
             if (isset($data['foto'])) {
@@ -376,6 +376,17 @@ class KeluargaService
 
             $anak->update($childData);
         }
+    }
+
+    private function sanitizeChildData(array $childData): array
+    {
+        return array_map(function ($value) {
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+
+            return $value === '' ? null : $value;
+        }, $childData);
     }
 
     private function createEducationData($keluargaId, array $data): AnakPendidikan
