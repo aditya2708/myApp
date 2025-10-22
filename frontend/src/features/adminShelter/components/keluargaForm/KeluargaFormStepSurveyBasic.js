@@ -17,8 +17,8 @@ const KeluargaFormStepSurveyBasic = ({
   validateStep
 }) => {
   useEffect(() => {
-    const isValid = validateStep();
-    setStepValid(isValid);
+    const validationResult = validateStep();
+    setStepValid(validationResult === undefined ? true : !!validationResult);
   }, [
     formData.pekerjaan_kepala_keluarga,
     formData.pendidikan_kepala_keluarga,
@@ -30,7 +30,7 @@ const KeluargaFormStepSurveyBasic = ({
 
   const renderPicker = (label, value, options, field) => (
     <View style={styles.inputContainer}>
-      <Text style={styles.label}>{label}*</Text>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={value}
@@ -53,7 +53,7 @@ const KeluargaFormStepSurveyBasic = ({
       {renderPicker('Pendidikan Kepala Keluarga', formData.pendidikan_kepala_keluarga, EDUCATION_OPTIONS, 'pendidikan_kepala_keluarga')}
 
       <TextInput
-        label="Jumlah Tanggungan*"
+        label="Jumlah Tanggungan"
         value={formData.jumlah_tanggungan}
         onChangeText={(value) => onChange('jumlah_tanggungan', value)}
         placeholder="Contoh: 4"
@@ -62,7 +62,7 @@ const KeluargaFormStepSurveyBasic = ({
       />
 
       <TextInput
-        label="Kepribadian Anak*"
+        label="Kepribadian Anak"
         value={formData.kepribadian_anak}
         onChangeText={(value) => onChange('kepribadian_anak', value)}
         placeholder="Masukkan kepribadian anak"
@@ -73,7 +73,7 @@ const KeluargaFormStepSurveyBasic = ({
 
       {formData.kondisi_fisik_anak === 'Disabilitas' && (
         <TextInput
-          label="Keterangan Jenis Disabilitas*"
+          label="Keterangan Jenis Disabilitas"
           value={formData.keterangan_disabilitas}
           onChangeText={(value) => onChange('keterangan_disabilitas', value)}
           placeholder="Jelaskan jenis disabilitas"
