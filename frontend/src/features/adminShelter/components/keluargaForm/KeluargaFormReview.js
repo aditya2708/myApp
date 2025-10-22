@@ -164,11 +164,10 @@ const KeluargaFormReview = ({ formData, dropdownData, isEditMode }) => {
       </Section>
 
       <Section title="Survei - Informasi Keuangan">
-        <InfoRow label="Penghasilan" value={formData.penghasilan} />
         <InfoRow label="Tabungan" value={formData.kepemilikan_tabungan} />
-        <InfoRow 
-          label="Biaya Pendidikan" 
-          value={formData.biaya_pendidikan_perbulan ? `Rp ${formData.biaya_pendidikan_perbulan}` : '-'} 
+        <InfoRow
+          label="Biaya Pendidikan"
+          value={formData.biaya_pendidikan_perbulan ? `Rp ${formData.biaya_pendidikan_perbulan}` : '-'}
         />
         <InfoRow label="Bantuan Lain" value={formData.bantuan_lembaga_formal_lain} />
         {formData.bantuan_lembaga_formal_lain === 'Ya' && (
