@@ -410,90 +410,79 @@ class KeluargaService
 
     private function createSurveyData($keluargaId, array $data): void
     {
-        $surveyData = [
-            'id_keluarga' => $keluargaId,
-            'pekerjaan_kepala_keluarga' => $data['pekerjaan_kepala_keluarga'] ?? null,
-            'penghasilan' => $data['penghasilan'] ?? null,
-            'pendidikan_kepala_keluarga' => $data['pendidikan_kepala_keluarga'] ?? null,
-            'jumlah_tanggungan' => $data['jumlah_tanggungan'] ?? null,
-            'kepemilikan_tabungan' => $data['kepemilikan_tabungan'] ?? null,
-            'jumlah_makan' => $data['jumlah_makan'],
-            'kepemilikan_tanah' => $data['kepemilikan_tanah'],
-            'kepemilikan_rumah' => $data['kepemilikan_rumah'],
-            'kondisi_rumah_dinding' => $data['kondisi_rumah_dinding'],
-            'kondisi_rumah_lantai' => $data['kondisi_rumah_lantai'],
-            'kepemilikan_kendaraan' => $data['kepemilikan_kendaraan'],
-            'kepemilikan_elektronik' => $data['kepemilikan_elektronik'],
-            'sumber_air_bersih' => $data['sumber_air_bersih'],
-            'jamban_limbah' => $data['jamban_limbah'],
-            'tempat_sampah' => $data['tempat_sampah'],
-            'perokok' => $data['perokok'],
-            'konsumen_miras' => $data['konsumen_miras'],
-            'persediaan_p3k' => $data['persediaan_p3k'],
-            'makan_buah_sayur' => $data['makan_buah_sayur'],
-            'solat_lima_waktu' => $data['solat_lima_waktu'],
-            'membaca_alquran' => $data['membaca_alquran'],
-            'majelis_taklim' => $data['majelis_taklim'],
-            'membaca_koran' => $data['membaca_koran'],
-            'pengurus_organisasi' => $data['pengurus_organisasi'],
-            'pengurus_organisasi_sebagai' => $data['pengurus_organisasi_sebagai'] ?? null,
-            'kondisi_fisik_anak' => $data['kondisi_fisik_anak'] ?? null,
-            'keterangan_disabilitas' => $data['keterangan_disabilitas'] ?? null,
-            'kepribadian_anak' => $data['kepribadian_anak'] ?? null,
-            'biaya_pendidikan_perbulan' => $data['biaya_pendidikan_perbulan'] ?? null,
-            'bantuan_lembaga_formal_lain' => $data['bantuan_lembaga_formal_lain'] ?? null,
-            'bantuan_lembaga_formal_lain_sebesar' => $data['bantuan_lembaga_formal_lain_sebesar'] ?? null,
-            'kondisi_penerima_manfaat' => $data['kondisi_penerima_manfaat'],
-            'tanggal_survey' => $data['tanggal_survey'] ?? now()->format('Y-m-d'),
-            'petugas_survey' => $data['petugas_survey'] ?? Auth::user()->name,
-        ];
+        $surveyData = array_merge(
+            ['id_keluarga' => $keluargaId],
+            $this->buildSurveyDataPayload($data)
+        );
 
         Survey::create($surveyData);
     }
 
     private function updateSurveyData($keluargaId, array $data): void
     {
-        $surveyData = [
-            'pekerjaan_kepala_keluarga' => $data['pekerjaan_kepala_keluarga'] ?? null,
-            'penghasilan' => $data['penghasilan'] ?? null,
-            'pendidikan_kepala_keluarga' => $data['pendidikan_kepala_keluarga'] ?? null,
-            'jumlah_tanggungan' => $data['jumlah_tanggungan'] ?? null,
-            'kepemilikan_tabungan' => $data['kepemilikan_tabungan'] ?? null,
-            'jumlah_makan' => $data['jumlah_makan'],
-            'kepemilikan_tanah' => $data['kepemilikan_tanah'],
-            'kepemilikan_rumah' => $data['kepemilikan_rumah'],
-            'kondisi_rumah_dinding' => $data['kondisi_rumah_dinding'],
-            'kondisi_rumah_lantai' => $data['kondisi_rumah_lantai'],
-            'kepemilikan_kendaraan' => $data['kepemilikan_kendaraan'],
-            'kepemilikan_elektronik' => $data['kepemilikan_elektronik'],
-            'sumber_air_bersih' => $data['sumber_air_bersih'],
-            'jamban_limbah' => $data['jamban_limbah'],
-            'tempat_sampah' => $data['tempat_sampah'],
-            'perokok' => $data['perokok'],
-            'konsumen_miras' => $data['konsumen_miras'],
-            'persediaan_p3k' => $data['persediaan_p3k'],
-            'makan_buah_sayur' => $data['makan_buah_sayur'],
-            'solat_lima_waktu' => $data['solat_lima_waktu'],
-            'membaca_alquran' => $data['membaca_alquran'],
-            'majelis_taklim' => $data['majelis_taklim'],
-            'membaca_koran' => $data['membaca_koran'],
-            'pengurus_organisasi' => $data['pengurus_organisasi'],
-            'pengurus_organisasi_sebagai' => $data['pengurus_organisasi_sebagai'] ?? null,
-            'kondisi_fisik_anak' => $data['kondisi_fisik_anak'] ?? null,
-            'keterangan_disabilitas' => $data['keterangan_disabilitas'] ?? null,
-            'kepribadian_anak' => $data['kepribadian_anak'] ?? null,
-            'biaya_pendidikan_perbulan' => $data['biaya_pendidikan_perbulan'] ?? null,
-            'bantuan_lembaga_formal_lain' => $data['bantuan_lembaga_formal_lain'] ?? null,
-            'bantuan_lembaga_formal_lain_sebesar' => $data['bantuan_lembaga_formal_lain_sebesar'] ?? null,
-            'kondisi_penerima_manfaat' => $data['kondisi_penerima_manfaat'],
-            'tanggal_survey' => $data['tanggal_survey'] ?? now()->format('Y-m-d'),
-            'petugas_survey' => $data['petugas_survey'] ?? Auth::user()->name,
-        ];
+        $surveyData = $this->buildSurveyDataPayload($data);
 
         Survey::updateOrCreate(
             ['id_keluarga' => $keluargaId],
             $surveyData
         );
+    }
+
+    private function buildSurveyDataPayload(array $data): array
+    {
+        $surveyData = [
+            'pekerjaan_kepala_keluarga' => $this->getSurveyInput($data, 'pekerjaan_kepala_keluarga'),
+            'penghasilan' => $this->getSurveyInput($data, 'penghasilan'),
+            'pendidikan_kepala_keluarga' => $this->getSurveyInput($data, 'pendidikan_kepala_keluarga'),
+            'jumlah_tanggungan' => $this->getSurveyInput($data, 'jumlah_tanggungan'),
+            'kepemilikan_tabungan' => $this->getSurveyInput($data, 'kepemilikan_tabungan'),
+            'jumlah_makan' => $this->getSurveyInput($data, 'jumlah_makan'),
+            'kepemilikan_tanah' => $this->getSurveyInput($data, 'kepemilikan_tanah'),
+            'kepemilikan_rumah' => $this->getSurveyInput($data, 'kepemilikan_rumah'),
+            'kondisi_rumah_dinding' => $this->getSurveyInput($data, 'kondisi_rumah_dinding'),
+            'kondisi_rumah_lantai' => $this->getSurveyInput($data, 'kondisi_rumah_lantai'),
+            'kepemilikan_kendaraan' => $this->getSurveyInput($data, 'kepemilikan_kendaraan'),
+            'kepemilikan_elektronik' => $this->getSurveyInput($data, 'kepemilikan_elektronik'),
+            'sumber_air_bersih' => $this->getSurveyInput($data, 'sumber_air_bersih'),
+            'jamban_limbah' => $this->getSurveyInput($data, 'jamban_limbah'),
+            'tempat_sampah' => $this->getSurveyInput($data, 'tempat_sampah'),
+            'perokok' => $this->getSurveyInput($data, 'perokok'),
+            'konsumen_miras' => $this->getSurveyInput($data, 'konsumen_miras'),
+            'persediaan_p3k' => $this->getSurveyInput($data, 'persediaan_p3k'),
+            'makan_buah_sayur' => $this->getSurveyInput($data, 'makan_buah_sayur'),
+            'solat_lima_waktu' => $this->getSurveyInput($data, 'solat_lima_waktu'),
+            'membaca_alquran' => $this->getSurveyInput($data, 'membaca_alquran'),
+            'majelis_taklim' => $this->getSurveyInput($data, 'majelis_taklim'),
+            'membaca_koran' => $this->getSurveyInput($data, 'membaca_koran'),
+            'pengurus_organisasi' => $this->getSurveyInput($data, 'pengurus_organisasi'),
+            'pengurus_organisasi_sebagai' => $this->getSurveyInput($data, 'pengurus_organisasi_sebagai'),
+            'kondisi_fisik_anak' => $this->getSurveyInput($data, 'kondisi_fisik_anak'),
+            'keterangan_disabilitas' => $this->getSurveyInput($data, 'keterangan_disabilitas'),
+            'kepribadian_anak' => $this->getSurveyInput($data, 'kepribadian_anak'),
+            'biaya_pendidikan_perbulan' => $this->getSurveyInput($data, 'biaya_pendidikan_perbulan'),
+            'bantuan_lembaga_formal_lain' => $this->getSurveyInput($data, 'bantuan_lembaga_formal_lain'),
+            'bantuan_lembaga_formal_lain_sebesar' => $this->getSurveyInput($data, 'bantuan_lembaga_formal_lain_sebesar'),
+            'kondisi_penerima_manfaat' => $this->getSurveyInput($data, 'kondisi_penerima_manfaat'),
+            'tanggal_survey' => $this->getSurveyInput($data, 'tanggal_survey', now()->format('Y-m-d')),
+            'petugas_survey' => $this->getSurveyInput($data, 'petugas_survey', Auth::user()->name),
+        ];
+
+        $surveyData = array_map(function ($value) {
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+
+            return $value === '' ? null : $value;
+        }, $surveyData);
+
+        return array_filter($surveyData, function ($value) {
+            return !(is_string($value) && $value === '');
+        });
+    }
+
+    private function getSurveyInput(array $data, string $key, $default = null)
+    {
+        return array_key_exists($key, $data) ? $data[$key] : $default;
     }
 
     private function deleteRelatedData($keluargaId): void
