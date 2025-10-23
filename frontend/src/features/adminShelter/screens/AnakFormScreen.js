@@ -14,7 +14,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
+import parse from 'date-fns/parse';
 import { id } from 'date-fns/locale';
 
 import Button from '../../../common/components/Button';
@@ -25,8 +26,14 @@ import { adminShelterAnakApi } from '../api/adminShelterAnakApi';
 
 const parseDateValue = (dateString) => {
   if (!dateString) return null;
-  const parsed = new Date(dateString);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+
+  const parsed = parse(dateString, 'dd/MM/yyyy', new Date());
+  if (isValid(parsed)) {
+    return parsed;
+  }
+
+  const fallback = new Date(dateString);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 };
 
 const AnakFormScreen = () => {
@@ -401,7 +408,7 @@ const AnakFormScreen = () => {
               onChange={(date) => {
                 if (date) {
                   setSelectedBirthDate(date);
-                  updateField('tanggal_lahir', format(date, 'yyyy-MM-dd'));
+                  updateField('tanggal_lahir', format(date, 'dd/MM/yyyy'));
                 }
                 setShowDatePicker(false);
               }}
