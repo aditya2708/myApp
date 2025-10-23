@@ -466,16 +466,26 @@ class KeluargaService
             'petugas_survey' => $this->getSurveyInput($data, 'petugas_survey', Auth::user()->name),
         ];
 
-        $surveyData = array_map(function ($value) {
+        foreach ($surveyData as $key => $value) {
             if (is_string($value)) {
                 $value = trim($value);
             }
 
-            return $value === '' ? null : $value;
-        }, $surveyData);
+            if ($value === '') {
+                $value = null;
+            }
+
+            if ($value === null && in_array($key, ['tanggal_survey', 'petugas_survey'], true)) {
+                $value = $key === 'tanggal_survey'
+                    ? now()->format('Y-m-d')
+                    : Auth::user()->name;
+            }
+
+            $surveyData[$key] = $value;
+        }
 
         return array_filter($surveyData, function ($value) {
-            return !(is_string($value) && $value === '');
+            return $value !== null;
         });
     }
 
