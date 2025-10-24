@@ -27,7 +27,7 @@ import {
   mergeFilters,
   normalizeTutorRecord,
   summarizeTutors,
-} from '../../utils/reports/tutorReportHelpers';
+} from '../../utils/tutorReportHelpers';
 
 const AdminCabangTutorReportScreen = () => {
   const navigation = useNavigation();
