@@ -188,7 +188,7 @@ const TutorAttendanceReportScreen = () => {
   const summaryLoading = useSelector(selectTutorAttendanceSummaryLoading);
   const summaryError = useSelector(selectTutorAttendanceSummaryError);
 
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS }));
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -260,7 +260,8 @@ const TutorAttendanceReportScreen = () => {
   }, []);
 
   const handleClearFilters = useCallback((defaults) => {
-    setFilters(defaults || DEFAULT_FILTERS);
+    const resolvedDefaults = defaults ?? DEFAULT_FILTERS;
+    setFilters({ ...resolvedDefaults });
     setShowFilters(false);
   }, []);
 
@@ -313,10 +314,12 @@ const TutorAttendanceReportScreen = () => {
       <TutorAttendanceFilters
         visible={showFilters}
         filters={filters}
+        defaultFilters={DEFAULT_FILTERS}
         onClose={() => setShowFilters(false)}
         onApply={handleApplyFilters}
         onClear={handleClearFilters}
         jenisOptions={jenisOptions}
+        {/* shelterOptions intentionally omitted - this screen operates without shelter context */}
       />
     </View>
   );
