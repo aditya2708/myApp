@@ -1,11 +1,11 @@
 import React from 'react';
 import { act, render, within } from '@testing-library/react-native';
 
-import TutorAttendanceReportScreen from '../TutorAttendanceReportScreen';
-
 const mockDispatch = jest.fn();
 const mockSetOptions = jest.fn();
 const mockNavigate = jest.fn();
+
+jest.mock('../../components/TutorAttendanceFilters', () => jest.fn(() => null));
 
 jest.mock('react-redux', () => ({
   useDispatch: jest.fn(),
@@ -16,8 +16,23 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: jest.fn()
 }));
 
+jest.mock('../../redux/tutorAttendanceSlice', () => {
+  const actual = jest.requireActual('../../redux/tutorAttendanceSlice');
+  return {
+    ...actual,
+    fetchTutorAttendanceSummary: jest.fn((filters = {}) => ({
+      type: 'tutorAttendance/fetchSummary',
+      payload: filters
+    }))
+  };
+});
+
+import TutorAttendanceReportScreen from '../TutorAttendanceReportScreen';
+
 const { useDispatch, useSelector } = require('react-redux');
 const { useNavigation } = require('@react-navigation/native');
+const TutorAttendanceFilters = require('../../components/TutorAttendanceFilters');
+const { fetchTutorAttendanceSummary } = require('../../redux/tutorAttendanceSlice');
 
 describe('TutorAttendanceReportScreen', () => {
   beforeEach(() => {
@@ -25,6 +40,8 @@ describe('TutorAttendanceReportScreen', () => {
     useDispatch.mockReturnValue(mockDispatch);
     mockDispatch.mockImplementation(() => ({ unwrap: jest.fn().mockResolvedValue({}) }));
     useNavigation.mockReturnValue({ setOptions: mockSetOptions, navigate: mockNavigate });
+    TutorAttendanceFilters.mockClear();
+    fetchTutorAttendanceSummary.mockClear();
   });
 
   const buildState = (overrides = {}) => ({
@@ -116,5 +133,50 @@ describe('TutorAttendanceReportScreen', () => {
     });
 
     expect(screen.getByText('Belum ada kehadiran terverifikasi')).toBeTruthy();
+  });
+
+  it('passes default filters to the filter sheet and clears using provided defaults', async () => {
+    const mockState = buildState();
+
+    useSelector.mockImplementation((selector) => selector(mockState));
+
+    let screen;
+    await act(async () => {
+      screen = render(<TutorAttendanceReportScreen />);
+    });
+
+    expect(TutorAttendanceFilters).toHaveBeenCalled();
+    const filterProps = TutorAttendanceFilters.mock.calls[0][0];
+
+    expect(filterProps.defaultFilters).toEqual({
+      date_from: null,
+      date_to: null,
+      jenis_kegiatan: 'all'
+    });
+    expect(filterProps.shelterOptions).toBeUndefined();
+
+    await act(async () => {
+      filterProps.onApply?.({
+        date_from: '2024-01-01',
+        date_to: '2024-01-31',
+        jenis_kegiatan: 'matematika'
+      });
+    });
+
+    expect(fetchTutorAttendanceSummary).toHaveBeenLastCalledWith({
+      date_from: '2024-01-01',
+      date_to: '2024-01-31',
+      jenis_kegiatan: 'matematika'
+    });
+
+    await act(async () => {
+      filterProps.onClear?.({
+        date_from: null,
+        date_to: null,
+        jenis_kegiatan: 'all'
+      });
+    });
+
+    expect(fetchTutorAttendanceSummary).toHaveBeenLastCalledWith({});
   });
 });
