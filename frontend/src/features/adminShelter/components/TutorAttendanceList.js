@@ -11,7 +11,8 @@ const TutorAttendanceList = ({
   onRefresh,
   onTutorPress,
   ListEmptyComponent,
-  renderHeader
+  renderHeader,
+  showShelter
 }) => {
   const contentStyle = useMemo(() => {
     const base = [styles.content];
@@ -29,6 +30,7 @@ const TutorAttendanceList = ({
         <TutorAttendanceCard
           tutor={item}
           onPress={() => onTutorPress?.(item)}
+          showShelter={showShelter}
         />
       )}
       contentContainerStyle={contentStyle}

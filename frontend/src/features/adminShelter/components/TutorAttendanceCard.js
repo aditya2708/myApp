@@ -21,7 +21,7 @@ const formatRate = (rate) => {
   return `${numericRate.toFixed(2)}%`;
 };
 
-const TutorAttendanceCard = ({ tutor, onPress }) => {
+const TutorAttendanceCard = ({ tutor, onPress, showShelter = false }) => {
   const {
     nama,
     maple,
@@ -31,7 +31,8 @@ const TutorAttendanceCard = ({ tutor, onPress }) => {
     total_activities,
     present_count,
     late_count,
-    absent_count
+    absent_count,
+    shelter
   } = tutor;
 
   const badgeColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.no_data;
@@ -43,15 +44,22 @@ const TutorAttendanceCard = ({ tutor, onPress }) => {
     { label: 'Tidak Hadir', value: absent_count }
   ];
 
+  const isPressable = typeof onPress === 'function';
+  const ContainerComponent = isPressable ? TouchableOpacity : View;
+
   return (
-    <TouchableOpacity
+    <ContainerComponent
       style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.85}
+      {...(isPressable
+        ? { onPress, activeOpacity: 0.85 }
+        : {})}
     >
       <View style={styles.header}>
         <View style={styles.headerInfo}>
           <Text style={styles.name}>{nama}</Text>
+          {showShelter && shelter?.name ? (
+            <Text style={styles.shelter}>{shelter.name}</Text>
+          ) : null}
           {maple ? <Text style={styles.subtitle}>{maple}</Text> : null}
         </View>
         <View style={[styles.badge, { backgroundColor: badgeColor }]}>
@@ -77,8 +85,12 @@ const TutorAttendanceCard = ({ tutor, onPress }) => {
         </View>
       </View>
 
-      <Text style={styles.footerHint}>Ketuk untuk melihat riwayat aktivitas tutor</Text>
-    </TouchableOpacity>
+      {isPressable ? (
+        <Text style={styles.footerHint}>Ketuk untuk melihat riwayat aktivitas tutor</Text>
+      ) : (
+        <View style={styles.footerSpacer} />
+      )}
+    </ContainerComponent>
   );
 };
 
@@ -113,6 +125,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#7f8c8d',
     marginTop: 2
+  },
+  shelter: {
+    fontSize: 13,
+    color: '#2980b9',
+    marginTop: 4
   },
   badge: {
     borderRadius: 14,
@@ -171,6 +188,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#95a5a6',
     textAlign: 'center'
+  },
+  footerSpacer: {
+    minHeight: 16
   }
 });
 
