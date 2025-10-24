@@ -18,7 +18,14 @@ class AdminCabangTutorReportController extends Controller
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'jenis_kegiatan' => 'nullable|string',
             'shelter_id' => 'nullable|integer',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1',
         ]);
+
+        $pagination = [
+            'page' => (int) ($validated['page'] ?? 1),
+            'per_page' => (int) ($validated['per_page'] ?? 20),
+        ];
 
         $user = $request->user();
 
@@ -39,6 +46,7 @@ class AdminCabangTutorReportController extends Controller
         }
 
         $filters = collect($validated)
+            ->except(['page', 'per_page'])
             ->reject(fn($value) => $value === null || $value === '' || $value === 'all')
             ->map(function ($value, $key) {
                 if ($key === 'shelter_id') {
@@ -50,7 +58,7 @@ class AdminCabangTutorReportController extends Controller
             ->all();
 
         try {
-            $report = $reportService->build($adminCabang, $filters);
+            $report = $reportService->build($adminCabang, array_merge($filters, $pagination));
         } catch (RuntimeException $exception) {
             return response()->json([
                 'success' => false,
@@ -63,10 +71,50 @@ class AdminCabangTutorReportController extends Controller
             ], 500);
         }
 
-        /** @var Collection $tutorCollection */
-        $tutorCollection = $report['tutors'] instanceof Collection
-            ? $report['tutors']
-            : collect($report['tutors']);
+        $tutorData = $report['tutors'] ?? collect();
+        $paginationMetadata = [
+            'current_page' => $pagination['page'],
+            'per_page' => $pagination['per_page'],
+            'total' => null,
+            'last_page' => null,
+            'next_page' => null,
+            'prev_page' => null,
+        ];
+
+        if ($tutorData instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
+            $tutorCollection = collect($tutorData->items());
+            $paginationMetadata = [
+                'current_page' => $tutorData->currentPage(),
+                'per_page' => $tutorData->perPage(),
+                'total' => $tutorData->total(),
+                'last_page' => $tutorData->lastPage(),
+                'next_page' => $tutorData->hasMorePages() ? $tutorData->currentPage() + 1 : null,
+                'prev_page' => $tutorData->currentPage() > 1 ? $tutorData->currentPage() - 1 : null,
+            ];
+        } elseif ($tutorData instanceof Collection) {
+            $tutorCollection = $tutorData;
+            $paginationMetadata = array_merge($paginationMetadata, [
+                'total' => $tutorCollection->count(),
+                'last_page' => 1,
+                'next_page' => null,
+                'prev_page' => null,
+            ]);
+        } elseif (is_array($tutorData)) {
+            $tutorCollection = collect($tutorData['data'] ?? $tutorData);
+
+            if (isset($tutorData['pagination']) && is_array($tutorData['pagination'])) {
+                $paginationMetadata = array_merge($paginationMetadata, [
+                    'current_page' => $tutorData['pagination']['current_page'] ?? $paginationMetadata['current_page'],
+                    'per_page' => $tutorData['pagination']['per_page'] ?? $paginationMetadata['per_page'],
+                    'total' => $tutorData['pagination']['total'] ?? $paginationMetadata['total'],
+                    'last_page' => $tutorData['pagination']['last_page'] ?? $paginationMetadata['last_page'],
+                    'next_page' => $tutorData['pagination']['next_page'] ?? $paginationMetadata['next_page'],
+                    'prev_page' => $tutorData['pagination']['prev_page'] ?? $paginationMetadata['prev_page'],
+                ]);
+            }
+        } else {
+            $tutorCollection = collect($tutorData);
+        }
 
         $categoryLabels = [
             'high' => 'Baik',
@@ -153,6 +201,7 @@ class AdminCabangTutorReportController extends Controller
                 $report['metadata'] ?? [],
                 [
                     'filters' => $filters,
+                    'pagination' => $paginationMetadata,
                     'category_labels' => $categoryLabels,
                 ]
             ),
