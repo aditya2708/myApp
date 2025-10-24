@@ -160,7 +160,7 @@ export const ADMIN_CABANG_ENDPOINTS = {
       LIST: '/admin-cabang/laporan/attendance/children',
       DETAIL: (childId) => `/admin-cabang/laporan/attendance/children/${childId}`,
     },
-    TUTORS: '/admin-cabang/reports/tutors',
+    TUTORS: '/admin-cabang/laporan/tutors',
   },
   KURIKULUM: {
     LIST: '/admin-cabang/kurikulum',
