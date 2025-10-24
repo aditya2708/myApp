@@ -26,20 +26,28 @@ const formatDateLabel = (value) => {
   return value;
 };
 
+const withDefaultFilters = (filters = {}) => ({
+  date_from: filters?.date_from ?? null,
+  date_to: filters?.date_to ?? null,
+  jenis_kegiatan: filters?.jenis_kegiatan ?? 'all',
+  shelter_id: filters?.shelter_id ?? 'all'
+});
+
 const TutorAttendanceFilters = ({
   visible,
   filters,
   onClose,
   onApply,
   onClear,
-  jenisOptions
+  jenisOptions,
+  shelterOptions
 }) => {
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [localFilters, setLocalFilters] = useState(withDefaultFilters(filters));
   const [activeDatePicker, setActiveDatePicker] = useState(null);
 
   useEffect(() => {
     if (visible) {
-      setLocalFilters(filters);
+      setLocalFilters(withDefaultFilters(filters));
       setActiveDatePicker(null);
     }
   }, [visible, filters]);
@@ -56,6 +64,19 @@ const TutorAttendanceFilters = ({
 
     return [{ key: 'all', label: 'Semua Jenis' }, ...jenisOptions];
   }, [jenisOptions]);
+
+  const shelters = useMemo(() => {
+    if (!Array.isArray(shelterOptions) || shelterOptions.length === 0) {
+      return [];
+    }
+
+    const hasAll = shelterOptions.some(option => option.key === 'all');
+    if (hasAll) {
+      return shelterOptions;
+    }
+
+    return [{ key: 'all', label: 'Semua Shelter' }, ...shelterOptions];
+  }, [shelterOptions]);
 
   const handleDateChange = (event, selectedDate, key) => {
     if (event.type === 'dismissed') {
@@ -79,7 +100,7 @@ const TutorAttendanceFilters = ({
   };
 
   const handleClear = () => {
-    onClear?.({ date_from: null, date_to: null, jenis_kegiatan: 'all' });
+    onClear?.({ date_from: null, date_to: null, jenis_kegiatan: 'all', shelter_id: 'all' });
   };
 
   return (
@@ -142,6 +163,31 @@ const TutorAttendanceFilters = ({
               })}
             </View>
           </View>
+
+          {shelters.length > 0 ? (
+            <View style={styles.section}>
+              <Text style={styles.label}>Shelter</Text>
+              <View style={styles.optionGrid}>
+                {shelters.map(option => {
+                  const isActive = localFilters.shelter_id === option.key;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      style={[styles.optionButton, isActive && styles.optionButtonActive]}
+                      onPress={() => setLocalFilters(prev => ({
+                        ...prev,
+                        shelter_id: option.key
+                      }))}
+                    >
+                      <Text style={[styles.optionLabel, isActive && styles.optionLabelActive]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.actions}>
             <Button

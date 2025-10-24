@@ -10,7 +10,8 @@ const TutorAttendanceList = ({
   refreshing,
   onRefresh,
   onTutorPress,
-  ListEmptyComponent
+  ListEmptyComponent,
+  renderHeader
 }) => {
   const contentStyle = useMemo(() => {
     const base = [styles.content];
@@ -31,11 +32,13 @@ const TutorAttendanceList = ({
         />
       )}
       contentContainerStyle={contentStyle}
-      ListHeaderComponent={summary ? (
-        <View style={styles.headerWrapper}>
-          <TutorAttendanceSummary summary={summary} />
-        </View>
-      ) : null}
+      ListHeaderComponent={renderHeader
+        ? renderHeader({ summary, tutors })
+        : summary ? (
+          <View style={styles.headerWrapper}>
+            <TutorAttendanceSummary summary={summary} />
+          </View>
+        ) : null}
       ListEmptyComponent={ListEmptyComponent}
       refreshControl={(
         <RefreshControl
