@@ -303,6 +303,7 @@ const TutorAttendanceReportScreen = () => {
         refreshing={refreshing || summaryLoading}
         onRefresh={handleRefresh}
         onTutorPress={handleTutorPress}
+        loadingMore={summaryLoading && !refreshing && filteredTutorMetrics.length > 0}
         ListEmptyComponent={(
           <TutorAttendanceEmptyState
             title="Belum ada kehadiran terverifikasi"
