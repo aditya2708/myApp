@@ -5,6 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 import Button from '../../../common/components/Button';
 
+const DEFAULT_FILTER_VALUES = {
+  date_from: null,
+  date_to: null,
+  jenis_kegiatan: 'all',
+  shelter_id: 'all'
+};
+
 const formatDateLabel = (value) => {
   if (!value) {
     return 'Pilih tanggal';
@@ -26,31 +33,39 @@ const formatDateLabel = (value) => {
   return value;
 };
 
-const withDefaultFilters = (filters = {}) => ({
-  date_from: filters?.date_from ?? null,
-  date_to: filters?.date_to ?? null,
-  jenis_kegiatan: filters?.jenis_kegiatan ?? 'all',
-  shelter_id: filters?.shelter_id ?? 'all'
+const mergeFilters = (filters = {}, defaults = DEFAULT_FILTER_VALUES) => ({
+  date_from: filters?.date_from ?? defaults?.date_from ?? DEFAULT_FILTER_VALUES.date_from,
+  date_to: filters?.date_to ?? defaults?.date_to ?? DEFAULT_FILTER_VALUES.date_to,
+  jenis_kegiatan:
+    filters?.jenis_kegiatan ?? defaults?.jenis_kegiatan ?? DEFAULT_FILTER_VALUES.jenis_kegiatan,
+  shelter_id: filters?.shelter_id ?? defaults?.shelter_id ?? DEFAULT_FILTER_VALUES.shelter_id
 });
 
 const TutorAttendanceFilters = ({
   visible,
   filters,
+  defaultFilters,
   onClose,
   onApply,
   onClear,
   jenisOptions,
-  shelterOptions
+  shelterOptions,
+  onShelterChange
 }) => {
-  const [localFilters, setLocalFilters] = useState(withDefaultFilters(filters));
+  const resolvedDefaultFilters = useMemo(
+    () => mergeFilters(defaultFilters, DEFAULT_FILTER_VALUES),
+    [defaultFilters]
+  );
+
+  const [localFilters, setLocalFilters] = useState(() => mergeFilters(filters, resolvedDefaultFilters));
   const [activeDatePicker, setActiveDatePicker] = useState(null);
 
   useEffect(() => {
     if (visible) {
-      setLocalFilters(withDefaultFilters(filters));
+      setLocalFilters(mergeFilters(filters, resolvedDefaultFilters));
       setActiveDatePicker(null);
     }
-  }, [visible, filters]);
+  }, [visible, filters, resolvedDefaultFilters]);
 
   const options = useMemo(() => {
     if (!Array.isArray(jenisOptions) || jenisOptions.length === 0) {
@@ -100,7 +115,13 @@ const TutorAttendanceFilters = ({
   };
 
   const handleClear = () => {
-    onClear?.({ date_from: null, date_to: null, jenis_kegiatan: 'all', shelter_id: 'all' });
+    const clearedFilters = mergeFilters(undefined, resolvedDefaultFilters);
+    setLocalFilters(clearedFilters);
+    setActiveDatePicker(null);
+    onClear?.(clearedFilters);
+    if (clearedFilters?.shelter_id) {
+      onShelterChange?.(clearedFilters.shelter_id);
+    }
   };
 
   return (
@@ -174,10 +195,13 @@ const TutorAttendanceFilters = ({
                     <TouchableOpacity
                       key={option.key}
                       style={[styles.optionButton, isActive && styles.optionButtonActive]}
-                      onPress={() => setLocalFilters(prev => ({
-                        ...prev,
-                        shelter_id: option.key
-                      }))}
+                      onPress={() => {
+                        setLocalFilters(prev => ({
+                          ...prev,
+                          shelter_id: option.key
+                        }));
+                        onShelterChange?.(option.key);
+                      }}
                     >
                       <Text style={[styles.optionLabel, isActive && styles.optionLabelActive]}>
                         {option.label}
