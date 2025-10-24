@@ -54,17 +54,15 @@ class AdminCabangTutorReportControllerTest extends TestCase
             ->with($user->adminCabang, [], 1, 15)
             ->andReturn([
                 'tutors' => [
-                    'data' => [
-                        ['marker' => 'default'],
-                    ],
-                    'pagination' => [
-                        'current_page' => 1,
-                        'per_page' => 15,
-                        'total' => 100,
-                        'last_page' => 7,
-                        'next_page' => 2,
-                        'prev_page' => null,
-                    ],
+                    ['marker' => 'default'],
+                ],
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 15,
+                    'total' => 100,
+                    'last_page' => 7,
+                    'next_page' => 2,
+                    'prev_page' => null,
                 ],
                 'metadata' => [
                     'from_service' => true,
@@ -86,6 +84,7 @@ class AdminCabangTutorReportControllerTest extends TestCase
         $this->assertSame('default', $payload['data'][0]['marker']);
         $this->assertSame(1, $payload['metadata']['pagination']['current_page']);
         $this->assertSame(15, $payload['metadata']['pagination']['per_page']);
+        $this->assertSame(100, $payload['metadata']['pagination']['total']);
         $this->assertSame([], $payload['metadata']['filters']);
     }
 
@@ -108,19 +107,17 @@ class AdminCabangTutorReportControllerTest extends TestCase
             ->andReturnUsing(function ($adminCabang, $filters, $page, $perPage) {
                 return [
                     'tutors' => [
-                        'data' => [
-                            [
-                                'marker' => "page-{$page}-per-{$perPage}",
-                            ],
+                        [
+                            'marker' => "page-{$page}-per-{$perPage}",
                         ],
-                        'pagination' => [
-                            'current_page' => $page,
-                            'per_page' => $perPage,
-                            'total' => 123,
-                            'last_page' => 5,
-                            'next_page' => $page + 1,
-                            'prev_page' => $page - 1,
-                        ],
+                    ],
+                    'pagination' => [
+                        'current_page' => $page,
+                        'per_page' => $perPage,
+                        'total' => 123,
+                        'last_page' => 5,
+                        'next_page' => $page + 1,
+                        'prev_page' => $page - 1,
                     ],
                     'metadata' => [
                         'from_service' => true,
@@ -147,6 +144,7 @@ class AdminCabangTutorReportControllerTest extends TestCase
         $this->assertSame('page-2-per-50', $payload['data'][0]['marker']);
         $this->assertSame(2, $payload['metadata']['pagination']['current_page']);
         $this->assertSame(50, $payload['metadata']['pagination']['per_page']);
+        $this->assertSame(123, $payload['metadata']['pagination']['total']);
         $this->assertSame(['jenis_kegiatan' => 'kelas'], $payload['metadata']['filters']);
     }
 }
