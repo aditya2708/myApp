@@ -15,7 +15,7 @@ class TutorAttendanceReportService
     /**
      * Build tutor attendance summary for a branch administrator.
      */
-    public function build(AdminCabang $adminCabang, array $filters = []): array
+    public function build(AdminCabang $adminCabang, array $filters = [], int $page = 1, int $perPage = 15): array
     {
         $adminCabang->loadMissing('kacab');
         $kacab = $adminCabang->kacab;
@@ -87,7 +87,7 @@ class TutorAttendanceReportService
             ->where('absen.is_verified', true)
             ->groupBy('absen_user.id_tutor');
 
-        $tutors = Tutor::query()
+        $tutorPaginator = Tutor::query()
             ->leftJoinSub($activityStatsQuery, 'activity_stats', function ($join) {
                 $join->on('activity_stats.id_tutor', '=', 'tutor.id_tutor');
             })
@@ -120,9 +120,9 @@ class TutorAttendanceReportService
                 'shelter.nama_shelter as shelter_name',
             ])
             ->orderBy('tutor.nama')
-            ->get();
+            ->paginate($perPage, ['*'], 'page', $page);
 
-        $tutorSummaries = $tutors->map(function (Tutor $tutor) {
+        $tutorSummaries = $tutorPaginator->getCollection()->map(function (Tutor $tutor) {
             $totalActivities = (int) ($tutor->total_activities ?? 0);
             $presentCount = (int) ($tutor->present_count ?? 0);
             $lateCount = (int) ($tutor->late_count ?? 0);
@@ -165,6 +165,14 @@ class TutorAttendanceReportService
 
         return [
             'tutors' => $tutorSummaries,
+            'pagination' => [
+                'current' => $tutorPaginator->currentPage(),
+                'per_page' => $tutorPaginator->perPage(),
+                'total' => $tutorPaginator->total(),
+                'last_page' => $tutorPaginator->lastPage(),
+                'next_page' => $tutorPaginator->hasMorePages() ? $tutorPaginator->currentPage() + 1 : null,
+                'prev_page' => $tutorPaginator->currentPage() > 1 ? $tutorPaginator->currentPage() - 1 : null,
+            ],
             'metadata' => [
                 'kacab' => [
                     'id' => $kacab->id_kacab,
