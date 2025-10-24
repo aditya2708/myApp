@@ -27,6 +27,8 @@ const TutorAttendanceList = ({
     const base = [styles.content];
     if (!tutors || tutors.length === 0) {
       base.push(styles.emptyContent);
+    } else {
+      base.push(styles.contentWithItems);
     }
     return base;
   }, [tutors]);
@@ -71,17 +73,20 @@ const TutorAttendanceList = ({
 const styles = StyleSheet.create({
   content: {
     padding: 16,
-    paddingBottom: 48,
     gap: 12,
   },
   emptyContent: {
     flexGrow: 1,
+  },
+  contentWithItems: {
+    paddingBottom: 48,
   },
   headerWrapper: {
     marginBottom: 12,
   },
   footerWrapper: {
     paddingVertical: 16,
+    alignItems: 'center',
   },
 });
 

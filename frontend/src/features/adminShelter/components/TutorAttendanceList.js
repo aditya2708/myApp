@@ -1,5 +1,11 @@
 import React, { useMemo } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  View
+} from 'react-native';
 
 import TutorAttendanceCard from './TutorAttendanceCard';
 import TutorAttendanceSummary from './TutorAttendanceSummary';
@@ -11,12 +17,18 @@ const TutorAttendanceList = ({
   onRefresh,
   onTutorPress,
   ListEmptyComponent,
-  renderHeader
+  renderHeader,
+  onEndReached,
+  onEndReachedThreshold,
+  ListFooterComponent,
+  loadingMore
 }) => {
   const contentStyle = useMemo(() => {
     const base = [styles.content];
     if (!tutors || tutors.length === 0) {
       base.push(styles.emptyContent);
+    } else {
+      base.push(styles.contentWithItems);
     }
     return base;
   }, [tutors]);
@@ -40,6 +52,13 @@ const TutorAttendanceList = ({
           </View>
         ) : null}
       ListEmptyComponent={ListEmptyComponent}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={onEndReachedThreshold ?? 0.2}
+      ListFooterComponent={ListFooterComponent ?? (loadingMore ? (
+        <View style={styles.footerWrapper}>
+          <ActivityIndicator size="small" color="#2563eb" />
+        </View>
+      ) : null)}
       refreshControl={(
         <RefreshControl
           refreshing={Boolean(refreshing)}
@@ -54,14 +73,20 @@ const TutorAttendanceList = ({
 const styles = StyleSheet.create({
   content: {
     padding: 16,
-    paddingBottom: 48,
     gap: 12
   },
   emptyContent: {
     flexGrow: 1
   },
+  contentWithItems: {
+    paddingBottom: 48
+  },
   headerWrapper: {
     marginBottom: 12
+  },
+  footerWrapper: {
+    paddingVertical: 16,
+    alignItems: 'center'
   }
 });
 
