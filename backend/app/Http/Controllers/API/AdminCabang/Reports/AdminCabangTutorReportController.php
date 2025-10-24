@@ -77,48 +77,60 @@ class AdminCabangTutorReportController extends Controller
         }
 
         $tutorData = $report['tutors'] ?? collect();
+        $paginationSource = $report['pagination'] ?? null;
+
+        if ($tutorData instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
+            $paginationSource = $paginationSource ?? $tutorData;
+            $tutorCollection = collect($tutorData->items());
+        } elseif ($tutorData instanceof Collection) {
+            $tutorCollection = $tutorData;
+        } elseif (is_array($tutorData)) {
+            $tutorCollection = collect($tutorData['data'] ?? $tutorData);
+
+            if (!$paginationSource && isset($tutorData['pagination'])) {
+                $paginationSource = $tutorData['pagination'];
+            }
+        } else {
+            $tutorCollection = collect($tutorData);
+        }
+
         $paginationMetadata = [
-            'current_page' => $pagination['page'],
-            'per_page' => $pagination['per_page'],
+            'current_page' => null,
+            'per_page' => null,
             'total' => null,
             'last_page' => null,
             'next_page' => null,
             'prev_page' => null,
         ];
 
-        if ($tutorData instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
-            $tutorCollection = collect($tutorData->items());
+        if ($paginationSource instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
             $paginationMetadata = [
-                'current_page' => $tutorData->currentPage(),
-                'per_page' => $tutorData->perPage(),
-                'total' => $tutorData->total(),
-                'last_page' => $tutorData->lastPage(),
-                'next_page' => $tutorData->hasMorePages() ? $tutorData->currentPage() + 1 : null,
-                'prev_page' => $tutorData->currentPage() > 1 ? $tutorData->currentPage() - 1 : null,
+                'current_page' => $paginationSource->currentPage(),
+                'per_page' => $paginationSource->perPage(),
+                'total' => $paginationSource->total(),
+                'last_page' => $paginationSource->lastPage(),
+                'next_page' => $paginationSource->hasMorePages() ? $paginationSource->currentPage() + 1 : null,
+                'prev_page' => $paginationSource->currentPage() > 1 ? $paginationSource->currentPage() - 1 : null,
             ];
-        } elseif ($tutorData instanceof Collection) {
-            $tutorCollection = $tutorData;
+        } elseif (is_array($paginationSource)) {
             $paginationMetadata = array_merge($paginationMetadata, [
-                'total' => $tutorCollection->count(),
-                'last_page' => 1,
-                'next_page' => null,
-                'prev_page' => null,
+                'current_page' => $paginationSource['current_page']
+                    ?? $paginationSource['current']
+                    ?? $paginationMetadata['current_page'],
+                'per_page' => $paginationSource['per_page']
+                    ?? $paginationSource['perPage']
+                    ?? $paginationMetadata['per_page'],
+                'total' => $paginationSource['total'] ?? $paginationMetadata['total'],
+                'last_page' => $paginationSource['last_page']
+                    ?? $paginationSource['lastPage']
+                    ?? $paginationMetadata['last_page'],
+                'next_page' => $paginationSource['next_page']
+                    ?? $paginationSource['nextPage']
+                    ?? $paginationMetadata['next_page'],
+                'prev_page' => $paginationSource['prev_page']
+                    ?? $paginationSource['prevPage']
+                    ?? $paginationMetadata['prev_page'],
             ]);
-        } elseif (is_array($tutorData)) {
-            $tutorCollection = collect($tutorData['data'] ?? $tutorData);
-
-            if (isset($tutorData['pagination']) && is_array($tutorData['pagination'])) {
-                $paginationMetadata = array_merge($paginationMetadata, [
-                    'current_page' => $tutorData['pagination']['current_page'] ?? $paginationMetadata['current_page'],
-                    'per_page' => $tutorData['pagination']['per_page'] ?? $paginationMetadata['per_page'],
-                    'total' => $tutorData['pagination']['total'] ?? $paginationMetadata['total'],
-                    'last_page' => $tutorData['pagination']['last_page'] ?? $paginationMetadata['last_page'],
-                    'next_page' => $tutorData['pagination']['next_page'] ?? $paginationMetadata['next_page'],
-                    'prev_page' => $tutorData['pagination']['prev_page'] ?? $paginationMetadata['prev_page'],
-                ]);
-            }
-        } else {
-            $tutorCollection = collect($tutorData);
         }
 
         $categoryLabels = [
