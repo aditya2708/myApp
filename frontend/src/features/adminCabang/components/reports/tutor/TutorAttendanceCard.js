@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 
 const CATEGORY_COLORS = {
   high: '#16a34a',
@@ -34,6 +34,12 @@ const TutorAttendanceCard = ({ tutor, onPress }) => {
     absent_count,
   } = tutor;
 
+  const { width } = useWindowDimensions();
+  const displayName = tutor.name ?? tutor.nama ?? nama;
+  const isStackedLayout = width < 520;
+  const isCompactSpacing = width < 360;
+  const allowWrappedStats = width < 480;
+
   const badgeColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.no_data;
 
   const stats = [
@@ -45,13 +51,17 @@ const TutorAttendanceCard = ({ tutor, onPress }) => {
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[
+        styles.card,
+        isCompactSpacing && styles.cardCompact,
+        !isCompactSpacing && width > 640 && styles.cardSpacious,
+      ]}
       onPress={onPress}
       activeOpacity={0.85}
     >
       <View style={styles.header}>
         <View style={styles.headerInfo}>
-          <Text style={styles.name}>{nama}</Text>
+          <Text style={styles.name}>{displayName}</Text>
           {maple ? <Text style={styles.subtitle}>{maple}</Text> : null}
         </View>
         <View style={[styles.badge, { backgroundColor: badgeColor }]}>
@@ -59,17 +69,44 @@ const TutorAttendanceCard = ({ tutor, onPress }) => {
         </View>
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.rateContainer}>
+      <View
+        style={[
+          styles.body,
+          isStackedLayout ? styles.bodyStacked : styles.bodyHorizontal,
+          isCompactSpacing && styles.bodyCompact,
+        ]}
+      >
+        <View
+          style={[
+            styles.rateContainer,
+            isStackedLayout ? styles.rateContainerStacked : styles.rateContainerHorizontal,
+          ]}
+        >
           <Text style={styles.rateValue}>{formatRate(attendance_rate)}</Text>
           <Text style={styles.rateLabel}>Rata-rata Kehadiran</Text>
         </View>
 
-        <View style={styles.divider} />
+        <View
+          style={[
+            styles.divider,
+            isStackedLayout ? styles.dividerHorizontal : styles.dividerVertical,
+          ]}
+        />
 
-        <View style={styles.statsRow}>
+        <View
+          style={[
+            styles.statsRow,
+            allowWrappedStats && styles.statsRowWrapped,
+          ]}
+        >
           {stats.map((stat) => (
-            <View key={stat.label} style={styles.statItem}>
+            <View
+              key={stat.label}
+              style={[
+                styles.statItem,
+                allowWrappedStats ? styles.statItemWrapped : styles.statItemWide,
+              ]}
+            >
               <Text style={styles.statValue}>{stat.value ?? 0}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
@@ -93,6 +130,14 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+  },
+  cardCompact: {
+    padding: 12,
+    gap: 10,
+  },
+  cardSpacious: {
+    padding: 20,
+    gap: 16,
   },
   header: {
     flexDirection: 'row',
@@ -128,9 +173,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     gap: 12,
+    alignItems: 'center',
+  },
+  bodyCompact: {
+    padding: 12,
+  },
+  bodyHorizontal: {
+    flexDirection: 'row',
+  },
+  bodyStacked: {
+    flexDirection: 'column',
   },
   rateContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rateContainerHorizontal: {
+    paddingRight: 16,
+    minWidth: 140,
+  },
+  rateContainerStacked: {
+    width: '100%',
+    paddingBottom: 8,
   },
   rateValue: {
     fontSize: 28,
@@ -143,16 +207,43 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   divider: {
-    height: 1,
     backgroundColor: '#e2e8f0',
   },
+  dividerHorizontal: {
+    height: 1,
+    width: '100%',
+    marginVertical: 8,
+  },
+  dividerVertical: {
+    width: 1,
+    alignSelf: 'stretch',
+    marginHorizontal: 12,
+  },
   statsRow: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'stretch',
+  },
+  statsRowWrapped: {
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    paddingTop: 4,
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 6,
+  },
+  statItemWide: {
+    flex: 1,
+    minWidth: 120,
+  },
+  statItemWrapped: {
+    flexBasis: '48%',
+    maxWidth: '48%',
+    minWidth: '48%',
+    flexGrow: 1,
   },
   statValue: {
     fontSize: 16,
