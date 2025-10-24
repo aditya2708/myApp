@@ -11,10 +11,10 @@ import { useNavigation } from '@react-navigation/native';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
-import TutorAttendanceList from '../../../adminShelter/components/TutorAttendanceList';
-import TutorAttendanceFilters from '../../../adminShelter/components/TutorAttendanceFilters';
-import TutorAttendanceEmptyState from '../../../adminShelter/components/TutorAttendanceEmptyState';
-import TutorAttendanceSummary from '../../../adminShelter/components/TutorAttendanceSummary';
+import TutorAttendanceList from '../../components/reports/tutor/TutorAttendanceList';
+import TutorAttendanceFilters from '../../components/reports/tutor/TutorAttendanceFilters';
+import TutorAttendanceEmptyState from '../../components/reports/tutor/TutorAttendanceEmptyState';
+import TutorAttendanceSummary from '../../components/reports/tutor/TutorAttendanceSummary';
 import { useTutorAttendanceReport } from '../../hooks/reports/useTutorAttendanceReport';
 
 const DEFAULT_FILTERS = {
