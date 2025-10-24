@@ -308,49 +308,137 @@ const adaptChildAttendanceResponse = (response) => {
   return adaptedData;
 };
 
+let lastTutorReportFilterSignature = null;
+
 const normalizeTutorReportParams = (params = {}) => {
   const normalized = {};
 
-  const assignIfDefined = (key, ...candidates) => {
-    const value = firstDefined(...candidates);
-    if (value !== undefined && value !== null && value !== '') {
-      normalized[key] = value;
+  const toNullableValue = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed === '' ? null : trimmed;
     }
+    return value;
   };
 
-  assignIfDefined('page', params.page, params.current_page, params.currentPage);
-  assignIfDefined('per_page', params.per_page, params.perPage, params.pageSize, params.limit);
-  assignIfDefined(
-    'start_date',
-    params.start_date,
-    params.startDate,
-    params.dateRange?.start,
-    params.date_range?.start,
-    params.period?.start,
+  const pageCandidate = firstDefined(params.page, params.current_page, params.currentPage);
+  const normalizedPage = normalizeInteger(pageCandidate);
+  if (normalizedPage !== null) {
+    normalized.page = normalizedPage;
+  } else if (pageCandidate !== undefined && pageCandidate !== null && `${pageCandidate}`.trim() !== '') {
+    normalized.page = pageCandidate;
+  }
+
+  const perPageCandidate = firstDefined(
+    params.per_page,
+    params.perPage,
+    params.pageSize,
+    params.limit,
   );
-  assignIfDefined(
-    'end_date',
-    params.end_date,
-    params.endDate,
-    params.dateRange?.end,
-    params.date_range?.end,
-    params.period?.end,
+  const normalizedPerPage = normalizeInteger(perPageCandidate);
+  if (normalizedPerPage !== null) {
+    normalized.per_page = normalizedPerPage;
+  } else if (
+    perPageCandidate !== undefined &&
+    perPageCandidate !== null &&
+    `${perPageCandidate}`.trim() !== ''
+  ) {
+    normalized.per_page = perPageCandidate;
+  }
+
+  const startDate = toNullableValue(
+    firstDefined(
+      params.start_date,
+      params.startDate,
+      params.dateRange?.start,
+      params.date_range?.start,
+      params.period?.start,
+    ),
   );
-  assignIfDefined(
-    'jenis_kegiatan',
-    params.jenis_kegiatan,
-    params.jenisKegiatan,
-    params.activityType,
-    params.activity_type,
-    params.type,
+  if (startDate !== null) {
+    normalized.start_date = startDate;
+  }
+
+  const endDate = toNullableValue(
+    firstDefined(
+      params.end_date,
+      params.endDate,
+      params.dateRange?.end,
+      params.date_range?.end,
+      params.period?.end,
+    ),
   );
-  assignIfDefined(
-    'shelter_id',
-    params.shelter_id,
-    params.shelterId,
-    params.shelter?.id,
-    params.shelter,
+  if (endDate !== null) {
+    normalized.end_date = endDate;
+  }
+
+  const activityType = toNullableValue(
+    firstDefined(
+      params.jenis_kegiatan,
+      params.jenisKegiatan,
+      params.activityType,
+      params.activity_type,
+      params.type,
+    ),
   );
+  if (activityType !== null) {
+    normalized.jenis_kegiatan = activityType;
+  }
+
+  const shelterId = toNullableValue(
+    firstDefined(
+      params.shelter_id,
+      params.shelterId,
+      params.shelter?.id,
+      params.shelter,
+    ),
+  );
+  if (shelterId !== null) {
+    normalized.shelter_id = shelterId;
+  }
+
+  if (normalized.per_page === undefined) {
+    normalized.per_page = 20;
+  }
+
+  const resetIndicators = firstDefined(
+    params.filtersChanged,
+    params.filters_changed,
+    params.__filtersChanged,
+    params.__filters_changed,
+    params.shouldResetPage,
+    params.resetPage,
+    params.reset_page,
+    params.__resetPage,
+    params.__reset_page,
+    params.forceFirstPage,
+    params.force_first_page,
+  );
+
+  const filterSignature = JSON.stringify({
+    start_date: startDate,
+    end_date: endDate,
+    jenis_kegiatan: activityType,
+    shelter_id: shelterId,
+  });
+
+  let filtersChanged = Boolean(resetIndicators);
+  if (!filtersChanged) {
+    filtersChanged = filterSignature !== lastTutorReportFilterSignature;
+  }
+  lastTutorReportFilterSignature = filterSignature;
+
+  const pageExplicitlyProvided =
+    pageCandidate !== undefined && pageCandidate !== null && `${pageCandidate}`.trim() !== '';
+
+  if (!pageExplicitlyProvided && filtersChanged) {
+    normalized.page = 1;
+  }
+
+  if (normalized.page === undefined) {
+    normalized.page = 1;
+  }
 
   return normalized;
 };
@@ -547,10 +635,16 @@ const adaptTutorRecord = (record = {}, index = 0) => {
     record.name,
     record.full_name,
     record.fullName,
+    record.nama,
     record.tutor,
     record.tutorName,
     record.tutor_name,
+    record.tutor?.name,
+    record.tutor?.nama,
     record.user?.name,
+    record.user?.nama,
+    record.raw?.name,
+    record.raw?.nama,
     'Tutor',
   );
 
@@ -728,6 +822,32 @@ const adaptTutorReportResponse = (response) => {
   const pagination = extractPagination(paginationCandidate);
   if (pagination) {
     metadata.pagination = pagination;
+  } else if (
+    paginationCandidate &&
+    typeof paginationCandidate === 'object' &&
+    [
+      'page',
+      'current_page',
+      'currentPage',
+      'per_page',
+      'perPage',
+      'pageSize',
+      'limit',
+      'total',
+      'total_items',
+      'totalItems',
+      'total_pages',
+      'totalPages',
+      'last_page',
+      'pages',
+      'next_page',
+      'nextPage',
+      'prev_page',
+      'prevPage',
+      'previous_page',
+    ].some((key) => key in paginationCandidate)
+  ) {
+    metadata.pagination = { ...paginationCandidate };
   }
 
   const adapted = {
