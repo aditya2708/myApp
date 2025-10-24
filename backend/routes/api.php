@@ -194,6 +194,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::prefix('laporan')->group(function () {
             Route::get('/summary', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangReportSummaryController::class, 'getSummary']);
+            Route::get('/tutors', [App\Http\Controllers\API\AdminCabang\Reports\AdminCabangTutorReportController::class, 'index']);
             Route::prefix('attendance')->group(function () {
                 Route::get('/monthly-shelter', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyShelterController::class);
                 Route::get('/monthly-branch', App\Http\Controllers\API\AdminCabang\Reports\Attendance\AttendanceMonthlyBranchController::class);
