@@ -9,24 +9,30 @@ const createInitialState = () => ({
 });
 
 export const useTutorAttendanceReport = (initialParams = {}) => {
-  const initialParamsRef = useRef({ ...initialParams });
+  const initialParamsRef = useRef({ per_page: 20, page: 1, ...initialParams });
   const paramsRef = useRef({ ...initialParamsRef.current });
 
   const [state, setState] = useState(createInitialState);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchReport = useCallback(
     async (overrides = {}, { replace = false, isRefresh = false } = {}) => {
       const nextParams = replace
-        ? { ...overrides }
+        ? { ...initialParamsRef.current, ...overrides }
         : { ...paramsRef.current, ...overrides };
+
+      const requestedPage = nextParams.page ?? 1;
+      const isLoadMore = !replace && !isRefresh && requestedPage > 1;
 
       paramsRef.current = nextParams;
 
       if (isRefresh) {
         setRefreshing(true);
+      } else if (isLoadMore) {
+        setLoadingMore(true);
       } else {
         setLoading(true);
       }
@@ -34,18 +40,23 @@ export const useTutorAttendanceReport = (initialParams = {}) => {
       try {
         const response = await adminCabangReportApi.getTutorAttendanceReport(nextParams);
         const payload = response?.data ?? response ?? {};
+        const nextData = payload.data ?? [];
 
-        setState({
-          data: payload.data ?? [],
-          summary: payload.summary ?? null,
+        setState((prevState) => ({
+          data: isLoadMore ? [...prevState.data, ...nextData] : nextData,
+          summary: payload.summary ?? (isLoadMore ? prevState.summary : null),
           metadata: payload.metadata ?? {},
-        });
+        }));
+        
         setError(null);
       } catch (err) {
         setError(err);
       } finally {
         if (isRefresh) {
           setRefreshing(false);
+        }
+        if (isLoadMore) {
+          setLoadingMore(false);
         }
         setLoading(false);
       }
@@ -58,15 +69,18 @@ export const useTutorAttendanceReport = (initialParams = {}) => {
     fetchReport(paramsRef.current, { replace: true });
   }, [fetchReport]);
 
-  const refetch = useCallback(() => fetchReport({}, { replace: false }), [fetchReport]);
+  const refetch = useCallback(
+    () => fetchReport({ page: 1 }, { replace: false }),
+    [fetchReport],
+  );
 
   const refresh = useCallback(
-    () => fetchReport({}, { replace: false, isRefresh: true }),
+    () => fetchReport({ page: 1 }, { replace: false, isRefresh: true }),
     [fetchReport],
   );
 
   const updateFilters = useCallback(
-    (nextFilters = {}) => fetchReport(nextFilters, { replace: false }),
+    (nextFilters = {}) => fetchReport({ ...nextFilters, page: 1 }, { replace: false }),
     [fetchReport],
   );
 
@@ -75,25 +89,40 @@ export const useTutorAttendanceReport = (initialParams = {}) => {
     return fetchReport(paramsRef.current, { replace: true });
   }, [fetchReport]);
 
-  const memoizedState = useMemo(
-    () => ({
+  const memoizedState = useMemo(() => {
+    const pagination = state?.metadata?.pagination ?? {};
+
+    return {
       tutors: state.data,
       summary: state.summary,
       metadata: state.metadata,
+      pagination,
       params: paramsRef.current,
-    }),
-    [state],
-  );
+      hasNextPage: Boolean(pagination?.nextPage),
+    };
+  }, [state]);
+
+  const nextPage = state?.metadata?.pagination?.nextPage;
+
+  const loadMore = useCallback(() => {
+    if (!nextPage) {
+      return Promise.resolve();
+    }
+
+    return fetchReport({ page: nextPage }, { replace: false });
+  }, [fetchReport, nextPage]);
 
   return {
     ...memoizedState,
     loading,
     refreshing,
+    loadingMore,
     error,
     refetch,
     refresh,
     updateFilters,
     resetFilters,
+    loadMore,
   };
 };
 
