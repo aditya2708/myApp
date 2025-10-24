@@ -24,7 +24,7 @@ class AdminCabangTutorReportController extends Controller
 
         $pagination = [
             'page' => (int) ($validated['page'] ?? 1),
-            'per_page' => (int) ($validated['per_page'] ?? 20),
+            'per_page' => (int) ($validated['per_page'] ?? 15),
         ];
 
         $user = $request->user();
@@ -58,7 +58,12 @@ class AdminCabangTutorReportController extends Controller
             ->all();
 
         try {
-            $report = $reportService->build($adminCabang, array_merge($filters, $pagination));
+            $report = $reportService->build(
+                $adminCabang,
+                $filters,
+                $pagination['page'],
+                $pagination['per_page']
+            );
         } catch (RuntimeException $exception) {
             return response()->json([
                 'success' => false,
