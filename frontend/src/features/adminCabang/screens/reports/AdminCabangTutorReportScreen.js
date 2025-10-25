@@ -1,33 +1,18 @@
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useLayoutEffect, useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import TutorAttendanceList from '../../components/reports/tutor/TutorAttendanceList';
-import TutorAttendanceFilters from '../../components/reports/tutor/TutorAttendanceFilters';
 import TutorAttendanceEmptyState from '../../components/reports/tutor/TutorAttendanceEmptyState';
 import TutorAttendanceSummary from '../../components/reports/tutor/TutorAttendanceSummary';
 import { useTutorAttendanceReport } from '../../hooks/reports/useTutorAttendanceReport';
 import {
-  DEFAULT_FILTERS,
-  buildJenisOptions,
-  buildWilbinOptions,
-  buildShelterOptions,
   buildSummaryHighlights,
-  composeApiParamsFromFilters,
   formatInteger,
   highlightGridStyles,
-  mergeFilters,
   normalizeTutorRecord,
-  scopeShelterOptionsByWilbin,
   summarizeTutors,
 } from '../../utils/tutorReportHelpers';
 
@@ -40,67 +25,16 @@ const AdminCabangTutorReportScreen = () => {
     meta,
     loading,
     refreshing,
-    loadingMore,
     error,
     refresh,
     refetch,
-    updateFilters,
-    resetFilters,
-    params,
-    loadMore,
-    hasNextPage,
   } = useTutorAttendanceReport();
-
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [selectedWilbin, setSelectedWilbin] = useState(DEFAULT_FILTERS.wilbin_id);
-
-  const jenisOptions = useMemo(
-    () => buildJenisOptions(meta, rawTutors),
-    [meta, rawTutors],
-  );
-
-  const wilbinOptions = useMemo(
-    () => buildWilbinOptions(meta, rawTutors),
-    [meta, rawTutors],
-  );
-
-  const allShelterOptions = useMemo(
-    () => buildShelterOptions(meta, rawTutors),
-    [meta, rawTutors],
-  );
-
-  const shelterOptions = useMemo(
-    () => scopeShelterOptionsByWilbin(allShelterOptions, selectedWilbin, meta),
-    [allShelterOptions, selectedWilbin, meta],
-  );
-
-  const handleWilbinPreviewChange = useCallback((value) => {
-    setSelectedWilbin(value ?? DEFAULT_FILTERS.wilbin_id);
-  }, [setSelectedWilbin]);
-
-  const handleShelterPreviewChange = useCallback(() => {}, []);
-
-  const defaultFilters = useMemo(
-    () => mergeFilters(DEFAULT_FILTERS, meta?.filters),
-    [meta],
-  );
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity style={styles.headerActions} onPress={() => setShowFilters(true)}>
-          <Ionicons name="filter" size={22} color="#1f2933" />
-        </TouchableOpacity>
-      ),
+      headerRight: undefined,
     });
   }, [navigation]);
-
-  useEffect(() => {
-    const initialFilters = mergeFilters(defaultFilters, params);
-    setFilters(initialFilters);
-    setSelectedWilbin(initialFilters.wilbin_id ?? DEFAULT_FILTERS.wilbin_id);
-  }, [defaultFilters, params]);
 
   const normalizedTutors = useMemo(
     () => (Array.isArray(rawTutors) ? rawTutors.map(normalizeTutorRecord) : []),
@@ -120,37 +54,9 @@ const AdminCabangTutorReportScreen = () => {
     refresh();
   }, [refresh]);
 
-  const handleApplyFilters = useCallback((nextFilters) => {
-    const sanitized = mergeFilters(defaultFilters, nextFilters);
-    setFilters(sanitized);
-    setSelectedWilbin(sanitized.wilbin_id ?? DEFAULT_FILTERS.wilbin_id);
-    setShowFilters(false);
-    const paramsPayload = {
-      ...composeApiParamsFromFilters(sanitized),
-      page: 1,
-    };
-    updateFilters(paramsPayload);
-  }, [defaultFilters, setSelectedWilbin, updateFilters]);
-
-  const handleClearFilters = useCallback(() => {
-    const baseFilters = { ...defaultFilters };
-    setFilters(baseFilters);
-    setSelectedWilbin(baseFilters.wilbin_id ?? DEFAULT_FILTERS.wilbin_id);
-    setShowFilters(false);
-    resetFilters();
-  }, [defaultFilters, resetFilters, setSelectedWilbin]);
-
   const handleRetry = useCallback(() => {
     refetch();
   }, [refetch]);
-
-  const handleEndReached = useCallback(() => {
-    if (!hasNextPage || loadingMore) {
-      return;
-    }
-
-    loadMore();
-  }, [hasNextPage, loadMore, loadingMore]);
 
   const renderListHeader = useCallback(() => (
     <View style={styles.listHeader}>
@@ -171,25 +77,15 @@ const AdminCabangTutorReportScreen = () => {
         </View>
       ) : null}
 
+      <Text style={styles.filterStatusText}>
+        Menampilkan seluruh data kehadiran tutor cabang.
+      </Text>
+
       <View style={styles.summaryWrapper}>
         <TutorAttendanceSummary summary={attendanceSummary} />
       </View>
     </View>
   ), [attendanceSummary, meta?.last_refreshed_at, summaryHighlights]);
-
-  const renderListFooter = useCallback(() => {
-    if (!loadingMore) {
-      return null;
-    }
-
-    return (
-      <LoadingSpinner
-        size="small"
-        message={null}
-        style={styles.listFooter}
-      />
-    );
-  }, [loadingMore]);
 
   if (isInitialLoading) {
     return (
@@ -216,14 +112,10 @@ const AdminCabangTutorReportScreen = () => {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         renderHeader={renderListHeader}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.25}
-        loadingMore={loadingMore}
-        ListFooterComponent={renderListFooter}
         ListEmptyComponent={(
           <TutorAttendanceEmptyState
             title="Belum ada data tutor"
-            subtitle="Coba ubah rentang tanggal, jenis kegiatan, atau shelter untuk melihat laporan."
+            subtitle="Data kehadiran tutor belum tersedia untuk periode ini."
           />
         )}
       />
@@ -234,19 +126,6 @@ const AdminCabangTutorReportScreen = () => {
         </View>
       ) : null}
 
-      <TutorAttendanceFilters
-        visible={showFilters}
-        filters={filters}
-        defaultFilters={defaultFilters}
-        onClose={() => setShowFilters(false)}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-        jenisOptions={jenisOptions}
-        shelterOptions={shelterOptions}
-        wilbinOptions={wilbinOptions}
-        onWilbinChange={handleWilbinPreviewChange}
-        onShelterChange={handleShelterPreviewChange}
-      />
     </View>
   );
 };
@@ -262,12 +141,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f4f7fb',
     padding: 16,
-  },
-  headerActions: {
-    marginRight: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    padding: 8,
-    borderRadius: 20,
   },
   errorContainer: {
     paddingHorizontal: 16,
@@ -305,11 +178,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1f2937',
   },
+  filterStatusText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
   summaryWrapper: {
     marginTop: 4,
-  },
-  listFooter: {
-    paddingVertical: 16,
   },
 });
 
