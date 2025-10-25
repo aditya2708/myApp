@@ -320,7 +320,7 @@ const TutorAttendanceReportScreen = () => {
         onApply={handleApplyFilters}
         onClear={handleClearFilters}
         jenisOptions={jenisOptions}
-        {/* shelterOptions intentionally omitted - this screen operates without shelter context */}
+     
       />
     </View>
   );
