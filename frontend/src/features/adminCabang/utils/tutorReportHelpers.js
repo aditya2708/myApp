@@ -196,15 +196,15 @@ const ensureAllOption = (options = [], label = 'Semua') => {
   return [{ key: 'all', label }, ...normalized];
 };
 
-const extractOptionCandidates = (metadata, keys) => {
-  if (!metadata) {
+const extractOptionCandidates = (meta, keys) => {
+  if (!meta) {
     return [];
   }
 
-  const sources = ensureArray(metadata.available_filters)
-    .concat(ensureArray(metadata.availableFilters))
-    .concat(ensureArray(metadata.filters))
-    .concat(metadata);
+  const sources = ensureArray(meta.available_filters)
+    .concat(ensureArray(meta.availableFilters))
+    .concat(ensureArray(meta.filters))
+    .concat(meta);
 
   for (const source of sources) {
     if (!source || typeof source !== 'object') {
@@ -290,13 +290,13 @@ const normalizeActivityTypes = (value) => {
   return [];
 };
 
-export const buildJenisOptions = (metadata, tutors = []) => {
-  const metadataOptions = dedupeOptions(
-    extractOptionCandidates(metadata, ['jenis_kegiatan', 'jenisKegiatan', 'activity_types', 'activityTypes'])
+export const buildJenisOptions = (meta, tutors = []) => {
+  const metaOptions = dedupeOptions(
+    extractOptionCandidates(meta, ['jenis_kegiatan', 'jenisKegiatan', 'activity_types', 'activityTypes'])
   );
 
-  if (metadataOptions.length > 0) {
-    return ensureAllOption(metadataOptions, 'Semua Jenis');
+  if (metaOptions.length > 0) {
+    return ensureAllOption(metaOptions, 'Semua Jenis');
   }
 
   const types = new Set();
@@ -319,13 +319,13 @@ export const buildJenisOptions = (metadata, tutors = []) => {
   return ensureAllOption(derived, 'Semua Jenis');
 };
 
-export const buildShelterOptions = (metadata, tutors = []) => {
-  const metadataOptions = dedupeOptions(
-    extractOptionCandidates(metadata, ['shelter', 'shelters', 'shelter_id', 'shelterId', 'locations', 'location', 'branches'])
+export const buildShelterOptions = (meta, tutors = []) => {
+  const metaOptions = dedupeOptions(
+    extractOptionCandidates(meta, ['shelter', 'shelters', 'shelter_id', 'shelterId', 'locations', 'location', 'branches'])
   );
 
-  if (metadataOptions.length > 0) {
-    return ensureAllOption(metadataOptions, 'Semua Shelter');
+  if (metaOptions.length > 0) {
+    return ensureAllOption(metaOptions, 'Semua Shelter');
   }
 
   const shelterMap = new Map();
