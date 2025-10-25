@@ -385,4 +385,109 @@ class AdminCabangTutorReportControllerTest extends TestCase
         $this->assertSame(['jenis_kegiatan' => 'kelas'], $payload['meta']['filters']);
         $this->assertNull($payload['meta']['branch']);
     }
+
+    public function test_index_filters_tutors_by_shelter_id(): void
+    {
+        $user = $this->makeAuthenticatedAdminCabangUser();
+
+        $service = Mockery::mock(TutorAttendanceReportService::class);
+
+        $shelterId = 999;
+
+        $service->shouldReceive('build')
+            ->once()
+            ->with($user->adminCabang, ['shelter_id' => $shelterId], 1, 15)
+            ->andReturn([
+                'tutors' => [
+                    [
+                        'id' => 21,
+                        'nama' => 'Tutor Shelter 999-A',
+                        'attendance' => [
+                            'totals' => [
+                                'activities' => 2,
+                                'records' => 2,
+                                'attended' => 2,
+                            ],
+                            'breakdown' => [
+                                'present' => 2,
+                                'late' => 0,
+                                'absent' => 0,
+                            ],
+                            'verified' => [
+                                'total' => 2,
+                                'present' => 2,
+                                'late' => 0,
+                                'absent' => 0,
+                                'attended' => 2,
+                            ],
+                            'rate' => 100.0,
+                        ],
+                        'shelter' => [
+                            'id' => $shelterId,
+                            'name' => 'Shelter 999',
+                        ],
+                    ],
+                    [
+                        'id' => 22,
+                        'nama' => 'Tutor Shelter 999-B',
+                        'attendance' => [
+                            'totals' => [
+                                'activities' => 3,
+                                'records' => 3,
+                                'attended' => 3,
+                            ],
+                            'breakdown' => [
+                                'present' => 2,
+                                'late' => 1,
+                                'absent' => 0,
+                            ],
+                            'verified' => [
+                                'total' => 3,
+                                'present' => 2,
+                                'late' => 1,
+                                'absent' => 0,
+                                'attended' => 3,
+                            ],
+                            'rate' => 100.0,
+                        ],
+                        'shelter' => [
+                            'id' => $shelterId,
+                            'name' => 'Shelter 999',
+                        ],
+                    ],
+                ],
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 15,
+                    'total' => 2,
+                    'last_page' => 1,
+                    'next_page' => null,
+                    'prev_page' => null,
+                ],
+            ]);
+
+        $request = Request::create('/api/admin-cabang/laporan/tutors', 'GET', [
+            'shelter_id' => (string) $shelterId,
+        ]);
+        $request->setUserResolver(fn () => $user);
+
+        $controller = new AdminCabangTutorReportController();
+
+        $response = $controller->index($request, $service);
+
+        $this->assertSame(200, $response->status());
+
+        $payload = $response->getData(true);
+
+        $this->assertTrue($payload['success']);
+        $this->assertSame('Laporan tutor berhasil diambil.', $payload['message']);
+
+        $tutors = collect($payload['data']);
+
+        $this->assertSame(2, $tutors->count());
+        $this->assertTrue($tutors->every(fn ($tutor) => $tutor['shelter']['id'] === $shelterId));
+        $this->assertSame([$shelterId], $tutors->pluck('shelter.id')->unique()->values()->all());
+
+        $this->assertSame(['shelter_id' => $shelterId], $payload['meta']['filters']);
+    }
 }

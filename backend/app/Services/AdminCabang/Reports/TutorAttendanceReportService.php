@@ -87,7 +87,7 @@ class TutorAttendanceReportService
             ->where('absen.is_verified', true)
             ->groupBy('absen_user.id_tutor');
 
-        $tutorPaginator = Tutor::query()
+        $tutorQuery = Tutor::query()
             ->leftJoinSub($activityStatsQuery, 'activity_stats', function ($join) {
                 $join->on('activity_stats.id_tutor', '=', 'tutor.id_tutor');
             })
@@ -101,7 +101,13 @@ class TutorAttendanceReportService
                 if ($shelterIds->isNotEmpty()) {
                     $query->orWhereIn('tutor.id_shelter', $shelterIds);
                 }
-            })
+            });
+
+        if (!empty($filters['shelter_id'])) {
+            $tutorQuery->where('tutor.id_shelter', $filters['shelter_id']);
+        }
+
+        $tutorPaginator = $tutorQuery
             ->select([
                 'tutor.id_tutor',
                 'tutor.nama',
