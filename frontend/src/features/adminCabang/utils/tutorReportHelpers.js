@@ -88,6 +88,8 @@ const ensureArray = (value) => {
   return [value];
 };
 
+const firstDefined = (...values) => values.find((value) => value !== undefined && value !== null);
+
 const normalizeOptionCollection = (value) => {
   if (!value) {
     return [];
@@ -204,6 +206,9 @@ const extractOptionCandidates = (meta, keys) => {
   const sources = ensureArray(meta.available_filters)
     .concat(ensureArray(meta.availableFilters))
     .concat(ensureArray(meta.filters))
+    .concat(ensureArray(meta.collections))
+    .concat(ensureArray(meta.options))
+    .concat(ensureArray(meta.data))
     .concat(meta);
 
   for (const source of sources) {
@@ -321,7 +326,16 @@ export const buildJenisOptions = (meta, tutors = []) => {
 
 export const buildShelterOptions = (meta, tutors = []) => {
   const metaOptions = dedupeOptions(
-    extractOptionCandidates(meta, ['shelter', 'shelters', 'shelter_id', 'shelterId', 'locations', 'location', 'branches'])
+    extractOptionCandidates(meta, [
+      'shelter',
+      'shelters',
+      'shelter_id',
+      'shelterId',
+      'locations',
+      'location',
+      'branches',
+      'collections',
+    ])
   );
 
   if (metaOptions.length > 0) {
@@ -331,15 +345,20 @@ export const buildShelterOptions = (meta, tutors = []) => {
   const shelterMap = new Map();
   tutors.forEach((tutor) => {
     const raw = tutor.raw || {};
+    const shelter = tutor.shelter || raw.shelter || {};
     const possibleId = raw.shelter_id
       ?? raw.shelterId
       ?? raw.id_shelter
       ?? tutor.shelter_id
       ?? tutor.shelterId
+      ?? shelter.id
+      ?? shelter.id_shelter
       ?? raw.shelter?.id;
     const label = tutor.shelterName
       ?? raw.shelter_name
       ?? raw.shelterName
+      ?? shelter.name
+      ?? shelter.nama
       ?? raw.shelter?.name
       ?? raw.location
       ?? raw.branch
@@ -396,8 +415,17 @@ export const composeApiParamsFromFilters = (filters = {}) => ({
 });
 
 export const normalizeTutorRecord = (tutor = {}, index = 0) => {
+  const attendance = tutor.attendance
+    ?? tutor.raw?.attendance
+    ?? {};
+  const verifiedAttendance = attendance?.verified ?? {};
+  const attendanceBreakdown = attendance?.breakdown ?? {};
+  const attendanceTotals = attendance?.totals ?? {};
+
   const attendanceRate = toNumberOrNull(
-    tutor.attendanceRate
+    attendance?.rate
+      ?? verifiedAttendance?.rate
+      ?? tutor.attendanceRate
       ?? tutor.attendance_rate
       ?? tutor.attendanceRateValue
       ?? tutor.raw?.attendance_rate
@@ -405,28 +433,37 @@ export const normalizeTutorRecord = (tutor = {}, index = 0) => {
   );
 
   const present = toIntegerOrZero(
-    tutor.presentCount
+    verifiedAttendance.present
+      ?? attendanceBreakdown.present
+      ?? tutor.presentCount
       ?? tutor.present_count
       ?? tutor.raw?.present_count
       ?? tutor.raw?.present,
   );
 
   const late = toIntegerOrZero(
-    tutor.lateCount
+    verifiedAttendance.late
+      ?? attendanceBreakdown.late
+      ?? tutor.lateCount
       ?? tutor.late_count
       ?? tutor.raw?.late_count
       ?? tutor.raw?.late,
   );
 
   const absent = toIntegerOrZero(
-    tutor.absentCount
+    verifiedAttendance.absent
+      ?? attendanceBreakdown.absent
+      ?? tutor.absentCount
       ?? tutor.absent_count
       ?? tutor.raw?.absent_count
       ?? tutor.raw?.absent,
   );
 
   const totalActivities = toNumberOrNull(
-    tutor.totalActivities
+    attendanceTotals.activities
+      ?? attendanceTotals.total
+      ?? verifiedAttendance.total
+      ?? tutor.totalActivities
       ?? tutor.total_activities
       ?? tutor.raw?.total_activities
       ?? tutor.raw?.totalActivities,
@@ -450,9 +487,12 @@ export const normalizeTutorRecord = (tutor = {}, index = 0) => {
 
   const shelterName = tutor.shelterName
     ?? tutor.shelter_name
+    ?? tutor.shelter?.name
+    ?? tutor.shelter?.nama
     ?? tutor.raw?.shelter_name
     ?? tutor.raw?.shelterName
     ?? tutor.raw?.shelter?.name
+    ?? tutor.raw?.shelter?.nama
     ?? tutor.raw?.location
     ?? tutor.raw?.branch
     ?? null;
@@ -481,66 +521,159 @@ export const normalizeTutorRecord = (tutor = {}, index = 0) => {
   };
 };
 
-export const summarizeTutors = (tutors = []) => {
-  if (!Array.isArray(tutors) || tutors.length === 0) {
-    return {
-      total_tutors: 0,
-      average_attendance_rate: 0,
-      distribution: {
-        high: { count: 0, percentage: 0 },
-        medium: { count: 0, percentage: 0 },
-        low: { count: 0, percentage: 0 },
-        no_data: { count: 0, percentage: 0 },
-      },
-    };
+const DEFAULT_DISTRIBUTION = {
+  high: { count: 0, percentage: 0 },
+  medium: { count: 0, percentage: 0 },
+  low: { count: 0, percentage: 0 },
+  no_data: { count: 0, percentage: 0 },
+};
+
+const normalizeDistributionEntry = (entry) => {
+  if (!entry || typeof entry !== 'object') {
+    return { count: 0, percentage: 0 };
   }
 
-  const totalTutors = tutors.length;
-  const totalRate = tutors.reduce((acc, tutor) => (
-    typeof tutor.attendance_rate === 'number' ? acc + tutor.attendance_rate : acc
-  ), 0);
-
-  const averageRate = totalTutors > 0
-    ? Number((totalRate / totalTutors).toFixed(2))
-    : 0;
-
-  const distributionCounts = tutors.reduce((acc, tutor) => {
-    const category = tutor.category || deriveCategoryFromRate(tutor.attendance_rate);
-    if (!acc[category]) {
-      acc[category] = 0;
-    }
-    acc[category] += 1;
-    return acc;
-  }, { high: 0, medium: 0, low: 0, no_data: 0 });
-
-  const distribution = Object.entries(distributionCounts).reduce((acc, [key, count]) => {
-    const percentage = totalTutors > 0 ? Math.round((count / totalTutors) * 100) : 0;
-    acc[key] = { count, percentage };
-    return acc;
-  }, {});
+  const count = toIntegerOrZero(firstDefined(entry.count, entry.total, entry.value));
+  const percentageValue = toNumberOrNull(firstDefined(entry.percentage, entry.percent, entry.rate));
 
   return {
-    total_tutors: totalTutors,
-    average_attendance_rate: averageRate,
+    count,
+    percentage: percentageValue === null ? 0 : Number(percentageValue.toFixed(2)),
+  };
+};
+
+export const summarizeTutors = (tutors = [], summary = null) => {
+  const fallbackSummary = Array.isArray(tutors) && tutors.length > 0
+    ? (() => {
+      const totalTutors = tutors.length;
+      const totalRate = tutors.reduce((acc, tutor) => (
+        typeof tutor.attendance_rate === 'number' ? acc + tutor.attendance_rate : acc
+      ), 0);
+      const averageRate = totalTutors > 0
+        ? Number((totalRate / totalTutors).toFixed(2))
+        : 0;
+
+      const distributionCounts = tutors.reduce((acc, tutor) => {
+        const categoryKey = tutor.category?.key ?? tutor.category ?? deriveCategoryFromRate(tutor.attendance_rate);
+        const key = typeof categoryKey === 'string' ? categoryKey : 'no_data';
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      }, { high: 0, medium: 0, low: 0, no_data: 0 });
+
+      const distribution = Object.entries(distributionCounts).reduce((acc, [key, count]) => {
+        const percentage = totalTutors > 0 ? Number(((count / totalTutors) * 100).toFixed(2)) : 0;
+        acc[key] = { count, percentage };
+        return acc;
+      }, {});
+
+      return {
+        total_tutors: totalTutors,
+        average_attendance_rate: averageRate,
+        distribution: {
+          ...DEFAULT_DISTRIBUTION,
+          ...distribution,
+        },
+      };
+    })()
+    : {
+      total_tutors: 0,
+      average_attendance_rate: 0,
+      distribution: { ...DEFAULT_DISTRIBUTION },
+    };
+
+  if (!summary || typeof summary !== 'object') {
+    return fallbackSummary;
+  }
+
+  const totalTutors = toIntegerOrZero(firstDefined(
+    summary.total_tutors,
+    summary.totalTutors,
+    summary.total,
+    summary.count,
+  ));
+
+  const averageRate = toNumberOrNull(firstDefined(
+    summary.average_attendance_rate,
+    summary.averageAttendanceRate,
+    summary.attendanceRate,
+    summary.attendance_rate,
+    summary.rate,
+  ));
+
+  const distributionSource = summary.distribution
+    ?? summary.attendance?.distribution
+    ?? summary.category_distribution
+    ?? {};
+
+  const distribution = {
+    high: normalizeDistributionEntry(distributionSource.high),
+    medium: normalizeDistributionEntry(distributionSource.medium),
+    low: normalizeDistributionEntry(distributionSource.low),
+    no_data: normalizeDistributionEntry(distributionSource.no_data ?? distributionSource.noData),
+  };
+
+  const resolvedAverage = averageRate === null
+    ? fallbackSummary.average_attendance_rate
+    : Number(averageRate.toFixed(2));
+
+  return {
+    total_tutors: totalTutors || fallbackSummary.total_tutors,
+    average_attendance_rate: resolvedAverage,
     distribution: {
-      high: distribution.high || { count: 0, percentage: 0 },
-      medium: distribution.medium || { count: 0, percentage: 0 },
-      low: distribution.low || { count: 0, percentage: 0 },
-      no_data: distribution.no_data || { count: 0, percentage: 0 },
+      ...fallbackSummary.distribution,
+      ...distribution,
     },
   };
 };
 
 export const buildSummaryHighlights = (summary) => {
-  if (!summary) {
+  if (!summary || typeof summary !== 'object') {
     return [];
   }
 
+  const attendanceSummary = summary.attendance ?? summary.totals ?? {};
+  const totals = attendanceSummary.totals ?? attendanceSummary ?? {};
+  const verifiedTotals = attendanceSummary.verified ?? totals.verified ?? {};
+  const breakdown = attendanceSummary.breakdown ?? totals.breakdown ?? {};
+
+  const totalActivities = firstDefined(
+    totals.activities,
+    totals.total,
+    totals.activity,
+    summary.totalActivities,
+    summary.total_activities,
+    verifiedTotals.total,
+  );
+
+  const present = firstDefined(
+    verifiedTotals.present,
+    breakdown.present,
+    totals.present,
+    summary.presentCount,
+    summary.present_count,
+  );
+
+  const late = firstDefined(
+    verifiedTotals.late,
+    breakdown.late,
+    totals.late,
+    summary.lateCount,
+    summary.late_count,
+  );
+
+  const absent = firstDefined(
+    verifiedTotals.absent,
+    breakdown.absent,
+    totals.absent,
+    summary.absentCount,
+    summary.absent_count,
+  );
+
   return [
-    { key: 'activities', label: 'Total Aktivitas', value: summary.totalActivities ?? summary.total_activities },
-    { key: 'present', label: 'Hadir', value: summary.presentCount ?? summary.present_count },
-    { key: 'late', label: 'Terlambat', value: summary.lateCount ?? summary.late_count },
-    { key: 'absent', label: 'Tidak Hadir', value: summary.absentCount ?? summary.absent_count },
+    { key: 'activities', label: 'Total Aktivitas', value: totalActivities },
+    { key: 'present', label: 'Hadir', value: present },
+    { key: 'late', label: 'Terlambat', value: late },
+    { key: 'absent', label: 'Tidak Hadir', value: absent },
   ].filter((item) => item.value !== undefined && item.value !== null);
 };
 
