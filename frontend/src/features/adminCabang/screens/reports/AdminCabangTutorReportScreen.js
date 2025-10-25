@@ -35,7 +35,7 @@ const AdminCabangTutorReportScreen = () => {
   const {
     tutors: rawTutors,
     summary,
-    metadata,
+    meta,
     loading,
     refreshing,
     loadingMore,
@@ -53,13 +53,13 @@ const AdminCabangTutorReportScreen = () => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   const jenisOptions = useMemo(
-    () => buildJenisOptions(metadata, rawTutors),
-    [metadata, rawTutors],
+    () => buildJenisOptions(meta, rawTutors),
+    [meta, rawTutors],
   );
 
   const shelterOptions = useMemo(
-    () => buildShelterOptions(metadata, rawTutors),
-    [metadata, rawTutors],
+    () => buildShelterOptions(meta, rawTutors),
+    [meta, rawTutors],
   );
 
   useLayoutEffect(() => {
@@ -73,9 +73,9 @@ const AdminCabangTutorReportScreen = () => {
   }, [navigation]);
 
   useEffect(() => {
-    const initialFilters = mergeFilters(metadata?.filters, params);
+    const initialFilters = mergeFilters(meta?.filters, params);
     setFilters(initialFilters);
-  }, [metadata, params]);
+  }, [meta, params]);
 
   const normalizedTutors = useMemo(
     () => (Array.isArray(rawTutors) ? rawTutors.map(normalizeTutorRecord) : []),
@@ -112,11 +112,11 @@ const AdminCabangTutorReportScreen = () => {
   }, [updateFilters]);
 
   const handleClearFilters = useCallback(() => {
-    const baseFilters = mergeFilters(DEFAULT_FILTERS, metadata?.filters);
+    const baseFilters = mergeFilters(DEFAULT_FILTERS, meta?.filters);
     setFilters(baseFilters);
     setShowFilters(false);
     resetFilters();
-  }, [metadata?.filters, resetFilters]);
+  }, [meta?.filters, resetFilters]);
 
   const handleRetry = useCallback(() => {
     refetch();
@@ -132,9 +132,9 @@ const AdminCabangTutorReportScreen = () => {
 
   const renderListHeader = useCallback(() => (
     <View style={styles.listHeader}>
-      {metadata?.last_refreshed_at ? (
+      {meta?.last_refreshed_at ? (
         <Text style={styles.lastUpdatedText}>
-          Terakhir diperbarui: {metadata.last_refreshed_at}
+          Terakhir diperbarui: {meta.last_refreshed_at}
         </Text>
       ) : null}
 
@@ -153,7 +153,7 @@ const AdminCabangTutorReportScreen = () => {
         <TutorAttendanceSummary summary={attendanceSummary} />
       </View>
     </View>
-  ), [attendanceSummary, metadata?.last_refreshed_at, summaryHighlights]);
+  ), [attendanceSummary, meta?.last_refreshed_at, summaryHighlights]);
 
   const renderListFooter = useCallback(() => {
     if (!loadingMore) {
