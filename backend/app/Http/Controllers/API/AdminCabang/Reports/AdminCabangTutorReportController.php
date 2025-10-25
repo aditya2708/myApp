@@ -19,14 +19,7 @@ class AdminCabangTutorReportController extends Controller
             'jenis_kegiatan' => 'nullable|string',
             'shelter_id' => 'nullable|integer',
             'wilbin_id' => 'nullable|integer',
-            'page' => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:1',
         ]);
-
-        $pagination = [
-            'page' => (int) ($validated['page'] ?? 1),
-            'per_page' => (int) ($validated['per_page'] ?? 15),
-        ];
 
         $user = $request->user();
 
@@ -54,7 +47,6 @@ class AdminCabangTutorReportController extends Controller
         ] : null;
 
         $filters = collect($validated)
-            ->except(['page', 'per_page'])
             ->reject(fn($value) => $value === null || $value === '' || $value === 'all')
             ->map(function ($value, $key) {
                 if (in_array($key, ['shelter_id', 'wilbin_id'], true)) {
@@ -66,12 +58,7 @@ class AdminCabangTutorReportController extends Controller
             ->all();
 
         try {
-            $report = $reportService->build(
-                $adminCabang,
-                $filters,
-                $pagination['page'],
-                $pagination['per_page']
-            );
+            $report = $reportService->build($adminCabang, $filters);
         } catch (RuntimeException $exception) {
             return response()->json([
                 'success' => false,
@@ -84,61 +71,27 @@ class AdminCabangTutorReportController extends Controller
             ], 500);
         }
 
-        $tutorData = $report['tutors'] ?? collect();
-        $paginationSource = $report['pagination'] ?? null;
+        $serviceMetadata = [];
+        $tutorCollection = collect();
 
-        if ($tutorData instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
-            $paginationSource = $paginationSource ?? $tutorData;
-            $tutorCollection = collect($tutorData->items());
-        } elseif ($tutorData instanceof Collection) {
-            $tutorCollection = $tutorData;
-        } elseif (is_array($tutorData)) {
-            $tutorCollection = collect($tutorData['data'] ?? $tutorData);
+        if ($report instanceof Collection) {
+            $tutorCollection = $report;
+        } elseif (is_array($report)) {
+            $serviceMetadata = $report['metadata'] ?? [];
 
-            if (!$paginationSource && isset($tutorData['pagination'])) {
-                $paginationSource = $tutorData['pagination'];
+            $tutorData = $report['tutors'] ?? $report['data'] ?? null;
+
+            if ($tutorData === null && array_values($report) === $report) {
+                $tutorData = $report;
             }
-        } else {
-            $tutorCollection = collect($tutorData);
-        }
 
-        $paginationMetadata = [
-            'current_page' => null,
-            'per_page' => null,
-            'total' => null,
-            'last_page' => null,
-            'next_page' => null,
-            'prev_page' => null,
-        ];
-
-        if ($paginationSource instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
-            $paginationMetadata = [
-                'current_page' => $paginationSource->currentPage(),
-                'per_page' => $paginationSource->perPage(),
-                'total' => $paginationSource->total(),
-                'last_page' => $paginationSource->lastPage(),
-                'next_page' => $paginationSource->hasMorePages() ? $paginationSource->currentPage() + 1 : null,
-                'prev_page' => $paginationSource->currentPage() > 1 ? $paginationSource->currentPage() - 1 : null,
-            ];
-        } elseif (is_array($paginationSource)) {
-            $paginationMetadata = array_merge($paginationMetadata, [
-                'current_page' => $paginationSource['current_page']
-                    ?? $paginationSource['current']
-                    ?? $paginationMetadata['current_page'],
-                'per_page' => $paginationSource['per_page']
-                    ?? $paginationSource['perPage']
-                    ?? $paginationMetadata['per_page'],
-                'total' => $paginationSource['total'] ?? $paginationMetadata['total'],
-                'last_page' => $paginationSource['last_page']
-                    ?? $paginationSource['lastPage']
-                    ?? $paginationMetadata['last_page'],
-                'next_page' => $paginationSource['next_page']
-                    ?? $paginationSource['nextPage']
-                    ?? $paginationMetadata['next_page'],
-                'prev_page' => $paginationSource['prev_page']
-                    ?? $paginationSource['prevPage']
-                    ?? $paginationMetadata['prev_page'],
-            ]);
+            if ($tutorData instanceof Collection) {
+                $tutorCollection = $tutorData;
+            } elseif ($tutorData !== null) {
+                $tutorCollection = collect($tutorData);
+            }
+        } elseif (!empty($report)) {
+            $tutorCollection = collect($report);
         }
 
         $categoryLabels = [
@@ -222,14 +175,6 @@ class AdminCabangTutorReportController extends Controller
             ];
         })->all();
 
-        $metaPagination = [
-            'current_page' => $paginationMetadata['current_page'],
-            'total' => $paginationMetadata['total'],
-            'per_page' => $paginationMetadata['per_page'],
-        ];
-
-        $serviceMetadata = $report['metadata'] ?? [];
-
         $collections = [
             'wilbins' => $serviceMetadata['wilbins'] ?? [],
             'wilbin_shelters' => $serviceMetadata['wilbin_shelters'] ?? [],
@@ -248,7 +193,6 @@ class AdminCabangTutorReportController extends Controller
             ],
             'meta' => [
                 'branch' => $branchMetadata,
-                'pagination' => $metaPagination,
                 'filters' => $filters,
                 'collections' => $collections,
                 'metadata' => $serviceMetadata,
