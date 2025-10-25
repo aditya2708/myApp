@@ -18,6 +18,7 @@ class AdminCabangTutorReportController extends Controller
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'jenis_kegiatan' => 'nullable|string',
             'shelter_id' => 'nullable|integer',
+            'wilbin_id' => 'nullable|integer',
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1',
         ]);
@@ -56,7 +57,7 @@ class AdminCabangTutorReportController extends Controller
             ->except(['page', 'per_page'])
             ->reject(fn($value) => $value === null || $value === '' || $value === 'all')
             ->map(function ($value, $key) {
-                if ($key === 'shelter_id') {
+                if (in_array($key, ['shelter_id', 'wilbin_id'], true)) {
                     return (int) $value;
                 }
 
@@ -227,6 +228,15 @@ class AdminCabangTutorReportController extends Controller
             'per_page' => $paginationMetadata['per_page'],
         ];
 
+        $serviceMetadata = $report['metadata'] ?? [];
+
+        $collections = [
+            'wilbins' => $serviceMetadata['wilbins'] ?? [],
+            'wilbin_shelters' => $serviceMetadata['wilbin_shelters'] ?? [],
+            'wilbins_shelters' => $serviceMetadata['wilbin_shelters'] ?? [],
+            'shelters' => $serviceMetadata['shelters'] ?? [],
+        ];
+
         return response()->json([
             'success' => true,
             'message' => 'Laporan tutor berhasil diambil.',
@@ -240,6 +250,8 @@ class AdminCabangTutorReportController extends Controller
                 'branch' => $branchMetadata,
                 'pagination' => $metaPagination,
                 'filters' => $filters,
+                'collections' => $collections,
+                'metadata' => $serviceMetadata,
             ],
         ]);
     }
