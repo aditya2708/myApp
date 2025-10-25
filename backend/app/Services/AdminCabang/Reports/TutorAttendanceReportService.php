@@ -14,7 +14,7 @@ class TutorAttendanceReportService
     /**
      * Build tutor attendance summary for a branch administrator.
      */
-    public function build(AdminCabang $adminCabang, array $filters = [], int $page = 1, int $perPage = 15): array
+    public function build(AdminCabang $adminCabang, array $filters = []): array
     {
         $adminCabang->loadMissing('kacab');
         $kacab = $adminCabang->kacab;
@@ -183,7 +183,7 @@ class TutorAttendanceReportService
             $tutorQuery->where('tutor.id_shelter', $filters['shelter_id']);
         }
 
-        $tutorPaginator = $tutorQuery
+        $tutorCollection = $tutorQuery
             ->select([
                 'tutor.id_tutor',
                 'tutor.nama',
@@ -202,7 +202,7 @@ class TutorAttendanceReportService
                 'shelter.nama_shelter as shelter_name',
             ])
             ->orderBy('tutor.nama')
-            ->paginate($perPage, ['*'], 'page', $page);
+            ->get();
 
         $categoryLabels = [
             'high' => 'Baik',
@@ -211,7 +211,7 @@ class TutorAttendanceReportService
             'no_data' => 'Tidak Ada Data',
         ];
 
-        $tutorSummaries = $tutorPaginator->getCollection()->map(function (Tutor $tutor) use ($categoryLabels) {
+        $tutorSummaries = $tutorCollection->map(function (Tutor $tutor) use ($categoryLabels) {
             $totalActivities = (int) ($tutor->total_activities ?? 0);
             $presentCount = (int) ($tutor->present_count ?? 0);
             $lateCount = (int) ($tutor->late_count ?? 0);
@@ -284,18 +284,10 @@ class TutorAttendanceReportService
                     'label' => $categoryLabels[$categoryKey],
                 ],
             ];
-        });
+        })->values();
 
         return [
             'tutors' => $tutorSummaries,
-            'pagination' => [
-                'current' => $tutorPaginator->currentPage(),
-                'per_page' => $tutorPaginator->perPage(),
-                'total' => $tutorPaginator->total(),
-                'last_page' => $tutorPaginator->lastPage(),
-                'next_page' => $tutorPaginator->hasMorePages() ? $tutorPaginator->currentPage() + 1 : null,
-                'prev_page' => $tutorPaginator->currentPage() > 1 ? $tutorPaginator->currentPage() - 1 : null,
-            ],
             'metadata' => [
                 'kacab' => [
                     'id' => $kacab->id_kacab,
