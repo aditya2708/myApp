@@ -19,6 +19,7 @@ import { useTutorAttendanceReport } from '../../hooks/reports/useTutorAttendance
 import {
   DEFAULT_FILTERS,
   buildJenisOptions,
+  buildWilbinOptions,
   buildShelterOptions,
   buildSummaryHighlights,
   composeApiParamsFromFilters,
@@ -26,6 +27,7 @@ import {
   highlightGridStyles,
   mergeFilters,
   normalizeTutorRecord,
+  scopeShelterOptionsByWilbin,
   summarizeTutors,
 } from '../../utils/tutorReportHelpers';
 
@@ -51,16 +53,33 @@ const AdminCabangTutorReportScreen = () => {
 
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [selectedWilbin, setSelectedWilbin] = useState(DEFAULT_FILTERS.wilbin_id);
 
   const jenisOptions = useMemo(
     () => buildJenisOptions(meta, rawTutors),
     [meta, rawTutors],
   );
 
-  const shelterOptions = useMemo(
+  const wilbinOptions = useMemo(
+    () => buildWilbinOptions(meta, rawTutors),
+    [meta, rawTutors],
+  );
+
+  const allShelterOptions = useMemo(
     () => buildShelterOptions(meta, rawTutors),
     [meta, rawTutors],
   );
+
+  const shelterOptions = useMemo(
+    () => scopeShelterOptionsByWilbin(allShelterOptions, selectedWilbin, meta),
+    [allShelterOptions, selectedWilbin, meta],
+  );
+
+  const handleWilbinPreviewChange = useCallback((value) => {
+    setSelectedWilbin(value ?? DEFAULT_FILTERS.wilbin_id);
+  }, [setSelectedWilbin]);
+
+  const handleShelterPreviewChange = useCallback(() => {}, []);
 
   const defaultFilters = useMemo(
     () => mergeFilters(DEFAULT_FILTERS, meta?.filters),
@@ -80,6 +99,7 @@ const AdminCabangTutorReportScreen = () => {
   useEffect(() => {
     const initialFilters = mergeFilters(defaultFilters, params);
     setFilters(initialFilters);
+    setSelectedWilbin(initialFilters.wilbin_id ?? DEFAULT_FILTERS.wilbin_id);
   }, [defaultFilters, params]);
 
   const normalizedTutors = useMemo(
@@ -103,20 +123,22 @@ const AdminCabangTutorReportScreen = () => {
   const handleApplyFilters = useCallback((nextFilters) => {
     const sanitized = mergeFilters(defaultFilters, nextFilters);
     setFilters(sanitized);
+    setSelectedWilbin(sanitized.wilbin_id ?? DEFAULT_FILTERS.wilbin_id);
     setShowFilters(false);
     const paramsPayload = {
       ...composeApiParamsFromFilters(sanitized),
       page: 1,
     };
     updateFilters(paramsPayload);
-  }, [defaultFilters, updateFilters]);
+  }, [defaultFilters, setSelectedWilbin, updateFilters]);
 
   const handleClearFilters = useCallback(() => {
     const baseFilters = { ...defaultFilters };
     setFilters(baseFilters);
+    setSelectedWilbin(baseFilters.wilbin_id ?? DEFAULT_FILTERS.wilbin_id);
     setShowFilters(false);
     resetFilters();
-  }, [defaultFilters, resetFilters]);
+  }, [defaultFilters, resetFilters, setSelectedWilbin]);
 
   const handleRetry = useCallback(() => {
     refetch();
@@ -221,6 +243,9 @@ const AdminCabangTutorReportScreen = () => {
         onClear={handleClearFilters}
         jenisOptions={jenisOptions}
         shelterOptions={shelterOptions}
+        wilbinOptions={wilbinOptions}
+        onWilbinChange={handleWilbinPreviewChange}
+        onShelterChange={handleShelterPreviewChange}
       />
     </View>
   );

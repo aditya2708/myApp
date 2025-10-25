@@ -434,6 +434,20 @@ const normalizeTutorReportParams = (params = {}) => {
     normalized.shelter_id = shelterId;
   }
 
+  const wilbinId = toNullableValue(
+    firstDefined(
+      params.wilbin_id,
+      params.wilbinId,
+      params.wilbin?.id,
+      params.wilbin,
+      params.wilayah_binaan,
+      params.wilayahBinaan,
+    ),
+  );
+  if (wilbinId !== null) {
+    normalized.wilbin_id = wilbinId;
+  }
+
   if (normalized.per_page === undefined) {
     normalized.per_page = 20;
   }
@@ -456,6 +470,7 @@ const normalizeTutorReportParams = (params = {}) => {
     start_date: startDate,
     end_date: endDate,
     jenis_kegiatan: activityType,
+    wilbin_id: wilbinId,
     shelter_id: shelterId,
   });
 
