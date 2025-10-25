@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -18,10 +17,6 @@ const TutorAttendanceList = ({
   onTutorPress,
   ListEmptyComponent,
   renderHeader,
-  onEndReached,
-  onEndReachedThreshold,
-  loadingMore,
-  ListFooterComponent,
 }) => {
   const contentStyle = useMemo(() => {
     const base = [styles.content];
@@ -52,13 +47,6 @@ const TutorAttendanceList = ({
           </View>
         ) : null}
       ListEmptyComponent={ListEmptyComponent}
-      onEndReached={onEndReached}
-      onEndReachedThreshold={onEndReachedThreshold ?? 0.2}
-      ListFooterComponent={ListFooterComponent ?? (loadingMore ? (
-        <View style={styles.footerWrapper}>
-          <ActivityIndicator size="small" color="#2563eb" />
-        </View>
-      ) : null)}
       refreshControl={(
         <RefreshControl
           refreshing={Boolean(refreshing)}
@@ -83,10 +71,6 @@ const styles = StyleSheet.create({
   },
   headerWrapper: {
     marginBottom: 12,
-  },
-  footerWrapper: {
-    paddingVertical: 16,
-    alignItems: 'center',
   },
 });
 
