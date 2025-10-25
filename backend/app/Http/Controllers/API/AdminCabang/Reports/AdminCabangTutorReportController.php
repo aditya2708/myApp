@@ -45,6 +45,13 @@ class AdminCabangTutorReportController extends Controller
             ], 404);
         }
 
+        $adminCabang->loadMissing('kacab');
+        $branch = $adminCabang->kacab;
+        $branchMetadata = $branch ? [
+            'id' => $branch->id_kacab,
+            'name' => $branch->nama_kacab,
+        ] : null;
+
         $filters = collect($validated)
             ->except(['page', 'per_page'])
             ->reject(fn($value) => $value === null || $value === '' || $value === 'all')
@@ -176,26 +183,43 @@ class AdminCabangTutorReportController extends Controller
 
             $shelter = $record['shelter'] ?? null;
 
-            return array_merge($record, [
-                'present_count' => $presentCount,
-                'late_count' => $lateCount,
-                'absent_count' => $absentCount,
-                'verified_present_count' => $presentCount,
-                'verified_late_count' => $lateCount,
-                'verified_absent_count' => $absentCount,
-                'verified_attendance_count' => $verifiedAttendanceCount,
-                'attendance_total' => $attendanceTotal,
-                'attended_count' => $attendedCount,
-                'verified_attended_count' => $attendedCount,
-                'attendance_rate' => $attendanceRate,
-                'category' => $categoryKey,
-                'category_label' => $categoryLabels[$categoryKey],
+            return [
+                'id' => $record['id_tutor'] ?? null,
+                'name' => $record['nama'] ?? null,
+                'email' => $record['email'] ?? null,
+                'phone' => $record['no_hp'] ?? null,
+                'subject' => $record['maple'] ?? null,
+                'photo_url' => $record['foto_url'] ?? $record['foto'] ?? null,
                 'shelter' => $shelter,
-            ]);
+                'attendance' => [
+                    'totals' => [
+                        'activities' => $totalActivities,
+                        'records' => $attendanceTotal,
+                        'attended' => $attendedCount,
+                    ],
+                    'breakdown' => [
+                        'present' => $presentCount,
+                        'late' => $lateCount,
+                        'absent' => $absentCount,
+                    ],
+                    'verified' => [
+                        'total' => $verifiedAttendanceCount,
+                        'present' => $presentCount,
+                        'late' => $lateCount,
+                        'absent' => $absentCount,
+                        'attended' => $attendedCount,
+                    ],
+                    'rate' => $attendanceRate,
+                ],
+                'category' => [
+                    'key' => $categoryKey,
+                    'label' => $categoryLabels[$categoryKey],
+                ],
+            ];
         });
 
         $totalTutors = $tutors->count();
-        $rates = $tutors->pluck('attendance_rate')->filter(fn($rate) => $rate !== null);
+        $rates = $tutors->pluck('attendance.rate')->filter(fn($rate) => $rate !== null);
         $averageRate = $rates->isEmpty() ? null : round($rates->avg(), 2);
 
         $distributionSummary = $distribution->map(function ($count, $key) use ($totalTutors, $categoryLabels) {
@@ -204,24 +228,28 @@ class AdminCabangTutorReportController extends Controller
                 'percentage' => $totalTutors > 0 ? round(($count / $totalTutors) * 100, 2) : 0,
                 'label' => $categoryLabels[$key],
             ];
-        });
+        })->all();
+
+        $metaPagination = [
+            'current_page' => $paginationMetadata['current_page'],
+            'total' => $paginationMetadata['total'],
+            'per_page' => $paginationMetadata['per_page'],
+        ];
 
         return response()->json([
             'success' => true,
+            'message' => 'Laporan tutor berhasil diambil.',
             'data' => $tutors->values(),
             'summary' => [
                 'total_tutors' => $totalTutors,
                 'average_attendance_rate' => $averageRate,
                 'distribution' => $distributionSummary,
             ],
-            'metadata' => array_merge(
-                $report['metadata'] ?? [],
-                [
-                    'filters' => $filters,
-                    'pagination' => $paginationMetadata,
-                    'category_labels' => $categoryLabels,
-                ]
-            ),
+            'meta' => [
+                'branch' => $branchMetadata,
+                'pagination' => $metaPagination,
+                'filters' => $filters,
+            ],
         ]);
     }
 }
