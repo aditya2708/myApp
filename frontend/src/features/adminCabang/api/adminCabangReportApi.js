@@ -11,6 +11,42 @@ const ensureArray = (value) => {
   return [value];
 };
 
+const toPlainObject = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  return { ...value };
+};
+
+const normalizeNamedEntity = (value, fallbackName) => {
+  if (value === undefined || value === null) {
+    return fallbackName ? { name: fallbackName } : null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed && fallbackName) {
+      return { name: fallbackName };
+    }
+    if (!trimmed) {
+      return null;
+    }
+    return { name: trimmed };
+  }
+
+  const objectValue = toPlainObject(value);
+  if (objectValue) {
+    return objectValue;
+  }
+
+  if (fallbackName) {
+    return { name: fallbackName };
+  }
+
+  return null;
+};
+
 const normalizeNumber = (value) => {
   if (value === undefined || value === null || value === '') return null;
 
@@ -652,11 +688,99 @@ const adaptTutorRecord = (record = {}, index = 0) => {
     record.shelterName,
     record.shelter_name,
     record.shelter?.name,
-    record.shelter,
-    record.location,
+    record.shelter?.nama,
     record.location_name,
+    record.locationName,
+    record.branch_name,
+    record.branchName,
     record.branch,
+    record.location,
+    record.shelter,
     null,
+  );
+
+  const shelter = normalizeNamedEntity(
+    firstDefined(
+      record.shelter,
+      record.shelter_info,
+      record.shelterInfo,
+      record.shelter_data,
+      record.shelterData,
+      record.location,
+      record.location_data,
+      record.locationData,
+      record.branch,
+      record.branch_info,
+      record.branchInfo,
+    ),
+    shelterName,
+  );
+
+  const attendanceSource = toPlainObject(
+    firstDefined(
+      record.attendance,
+      record.attendance_stats,
+      record.attendanceStats,
+      record.attendance_summary,
+      record.attendanceSummary,
+      record.stats,
+      record.metrics,
+    ),
+  ) || {};
+
+  const attendance = { ...attendanceSource };
+
+  const assignAttendance = (key, ...candidates) => {
+    const value = firstDefined(...candidates);
+    if (value !== undefined && value !== null) {
+      attendance[key] = value;
+    }
+  };
+
+  assignAttendance('present', attendanceSource.present, attendanceSource.present_count, attendanceSource.presentCount, presentCount);
+  assignAttendance('present_count', attendanceSource.present_count, attendanceSource.presentCount, presentCount);
+  assignAttendance('presentCount', attendanceSource.presentCount, attendanceSource.present_count, presentCount);
+  assignAttendance('absent', attendanceSource.absent, attendanceSource.absent_count, attendanceSource.absentCount, absentCount);
+  assignAttendance('absent_count', attendanceSource.absent_count, attendanceSource.absentCount, absentCount);
+  assignAttendance('absentCount', attendanceSource.absentCount, attendanceSource.absent_count, absentCount);
+  assignAttendance('late', attendanceSource.late, attendanceSource.late_count, attendanceSource.lateCount, lateCount);
+  assignAttendance('late_count', attendanceSource.late_count, attendanceSource.lateCount, lateCount);
+  assignAttendance('lateCount', attendanceSource.lateCount, attendanceSource.late_count, lateCount);
+  assignAttendance('rate', attendanceSource.rate, attendanceSource.attendance_rate, attendanceSource.attendanceRate, attendanceRateValue);
+  assignAttendance('attendance_rate', attendanceSource.attendance_rate, attendanceSource.attendanceRate, attendanceRateValue);
+  assignAttendance('attendanceRate', attendanceSource.attendanceRate, attendanceSource.attendance_rate, attendanceRateValue);
+  assignAttendance('rate_label', attendanceSource.rate_label, attendanceSource.rateLabel, attendanceRateLabel);
+  assignAttendance('rateLabel', attendanceSource.rateLabel, attendanceSource.rate_label, attendanceRateLabel);
+  assignAttendance('rateValue', attendanceSource.rateValue, attendanceRateValue);
+
+  const hasAttendanceData = Object.keys(attendance).length > 0;
+
+  const category = firstDefined(
+    attendance.category,
+    attendance.status,
+    attendance.grade,
+    record.category,
+    record.attendance_category,
+    record.performance_category,
+    (() => {
+      if (attendanceRateValue === null || attendanceRateValue === undefined) {
+        return undefined;
+      }
+
+      if (attendanceRateValue >= 80) {
+        return 'high';
+      }
+
+      if (attendanceRateValue >= 60) {
+        return 'medium';
+      }
+
+      if (attendanceRateValue >= 0) {
+        return 'low';
+      }
+
+      return undefined;
+    })(),
   );
 
   const attendanceRateLabel = formatPercentageLabel(
@@ -686,6 +810,7 @@ const adaptTutorRecord = (record = {}, index = 0) => {
     code,
     name,
     shelterName,
+    shelter: shelter ?? (shelterName ? { name: shelterName } : null),
     totalActivities: totalActivities ?? (presentCount ?? 0) + (absentCount ?? 0),
     presentCount: presentCount ?? 0,
     absentCount: absentCount ?? 0,
@@ -693,6 +818,8 @@ const adaptTutorRecord = (record = {}, index = 0) => {
     attendanceRate: attendanceRateValue,
     attendanceRateLabel,
     attendanceRateValue,
+    attendance: hasAttendanceData ? attendance : undefined,
+    category: category ?? null,
     raw: record,
   };
 };
@@ -700,6 +827,125 @@ const adaptTutorRecord = (record = {}, index = 0) => {
 const adaptTutorReportResponse = (response) => {
   const rawPayload = response?.data ?? response ?? {};
   const payload = rawPayload?.data ?? rawPayload ?? {};
+
+  const adaptMeta = () => {
+    const metaPayload =
+      toPlainObject(payload.meta)
+      || toPlainObject(rawPayload.meta)
+      || {};
+
+    const metadata = {};
+
+    if (Object.keys(metaPayload).length > 0) {
+      metadata.raw = metaPayload;
+    }
+
+    const branch = normalizeNamedEntity(
+      firstDefined(
+        metaPayload.branch,
+        metaPayload.branch_info,
+        metaPayload.branchInfo,
+        metaPayload.cabang,
+        metaPayload.branch_data,
+        metaPayload.branchData,
+      ),
+    );
+    if (branch) {
+      metadata.branch = branch;
+    }
+
+    const filtersPayload = toPlainObject(metaPayload.filters) || {};
+
+    const appliedFilters = firstDefined(
+      filtersPayload.applied,
+      filtersPayload.active,
+      filtersPayload.current,
+      filtersPayload.selected,
+      filtersPayload.values,
+      metaPayload.applied_filters,
+      metaPayload.active_filters,
+      payload.filters,
+      rawPayload.filters,
+    );
+
+    if (appliedFilters !== undefined) {
+      metadata.filters = appliedFilters;
+    }
+
+    const availableFilters = firstDefined(
+      filtersPayload.available,
+      filtersPayload.options,
+      filtersPayload.available_filters,
+      filtersPayload.collections,
+      metaPayload.available_filters,
+      metaPayload.availableFilters,
+      payload.available_filters,
+      payload.availableFilters,
+      rawPayload.available_filters,
+      rawPayload.availableFilters,
+    );
+
+    if (availableFilters !== undefined) {
+      metadata.available_filters = availableFilters;
+      metadata.availableFilters = availableFilters;
+    }
+
+    const filterCollections = [
+      ...ensureArray(filtersPayload.collections),
+      ...ensureArray(filtersPayload.groups),
+      ...ensureArray(filtersPayload.sections),
+      ...ensureArray(filtersPayload.lists),
+      ...ensureArray(filtersPayload.records),
+      ...ensureArray(filtersPayload.available),
+    ].filter((item) => item !== undefined && item !== null);
+
+    if (filterCollections.length > 0) {
+      metadata.filter_collections = filterCollections;
+      metadata.filterCollections = filterCollections;
+    }
+
+    if (Object.keys(filtersPayload).length > 0) {
+      metadata.filters_meta = filtersPayload;
+      metadata.filtersMeta = filtersPayload;
+    }
+
+    const lastRefreshedAt = firstDefined(
+      metaPayload.last_refreshed_at,
+      metaPayload.lastRefreshedAt,
+      metaPayload.timestamps?.last_refreshed_at,
+      metaPayload.timestamps?.lastRefreshedAt,
+      payload.last_refreshed_at,
+      payload.lastRefreshedAt,
+      rawPayload.last_refreshed_at,
+      rawPayload.lastRefreshedAt,
+    );
+
+    if (lastRefreshedAt !== undefined) {
+      metadata.last_refreshed_at = lastRefreshedAt;
+      metadata.lastRefreshedAt = lastRefreshedAt;
+    }
+
+    const paginationCandidate = firstDefined(
+      metaPayload.pagination,
+      metaPayload.paging,
+      filtersPayload.pagination,
+      payload.pagination,
+      rawPayload.pagination,
+    );
+
+    const pagination = extractPagination(paginationCandidate);
+    if (pagination) {
+      metadata.pagination = pagination;
+    } else if (
+      paginationCandidate
+      && typeof paginationCandidate === 'object'
+      && !Array.isArray(paginationCandidate)
+    ) {
+      metadata.pagination = { ...paginationCandidate };
+    }
+
+    return metadata;
+  };
 
   const toArray = (value) => {
     if (!value) return [];
@@ -761,94 +1007,7 @@ const adaptTutorReportResponse = (response) => {
 
   const summary = adaptTutorSummary(summarySource, tutors);
 
-  const metadata = {};
-
-  const filters = firstDefined(
-    payload.filters,
-    rawPayload.filters,
-    payload.metadata?.filters,
-    rawPayload.metadata?.filters,
-    payload.meta?.filters,
-    rawPayload.meta?.filters,
-  );
-
-  if (filters !== undefined) {
-    metadata.filters = filters;
-  }
-
-  const availableFilters = firstDefined(
-    payload.available_filters,
-    payload.availableFilters,
-    rawPayload.available_filters,
-    rawPayload.availableFilters,
-    payload.metadata?.available_filters,
-    rawPayload.metadata?.available_filters,
-    payload.meta?.available_filters,
-    payload.meta?.availableFilters,
-    rawPayload.meta?.available_filters,
-    rawPayload.meta?.availableFilters,
-  );
-
-  if (availableFilters !== undefined) {
-    metadata.available_filters = availableFilters;
-  }
-
-  const lastRefreshedAt = firstDefined(
-    payload.last_refreshed_at,
-    payload.lastRefreshedAt,
-    rawPayload.last_refreshed_at,
-    rawPayload.lastRefreshedAt,
-    payload.meta?.last_refreshed_at,
-    payload.meta?.lastRefreshedAt,
-    rawPayload.meta?.last_refreshed_at,
-    rawPayload.meta?.lastRefreshedAt,
-  );
-
-  if (lastRefreshedAt !== undefined) {
-    metadata.last_refreshed_at = lastRefreshedAt;
-  }
-
-  const paginationCandidate = firstDefined(
-    payload.pagination,
-    rawPayload.pagination,
-    payload.metadata?.pagination,
-    rawPayload.metadata?.pagination,
-    payload.meta?.pagination,
-    rawPayload.meta?.pagination,
-    payload.meta,
-    rawPayload.meta,
-  );
-
-  const pagination = extractPagination(paginationCandidate);
-  if (pagination) {
-    metadata.pagination = pagination;
-  } else if (
-    paginationCandidate &&
-    typeof paginationCandidate === 'object' &&
-    [
-      'page',
-      'current_page',
-      'currentPage',
-      'per_page',
-      'perPage',
-      'pageSize',
-      'limit',
-      'total',
-      'total_items',
-      'totalItems',
-      'total_pages',
-      'totalPages',
-      'last_page',
-      'pages',
-      'next_page',
-      'nextPage',
-      'prev_page',
-      'prevPage',
-      'previous_page',
-    ].some((key) => key in paginationCandidate)
-  ) {
-    metadata.pagination = { ...paginationCandidate };
-  }
+  const metadata = adaptMeta();
 
   const adapted = {
     data: tutors,
@@ -905,3 +1064,5 @@ export const adminCabangReportApi = {
       .then(adaptTutorReportResponse);
   },
 };
+
+export { adaptTutorReportResponse };
