@@ -344,8 +344,6 @@ const adaptChildAttendanceResponse = (response) => {
   return adaptedData;
 };
 
-let lastTutorReportFilterSignature = null;
-
 const normalizeTutorReportParams = (params = {}) => {
   const normalized = {};
 
@@ -353,35 +351,12 @@ const normalizeTutorReportParams = (params = {}) => {
     if (value === undefined || value === null) return null;
     if (typeof value === 'string') {
       const trimmed = value.trim();
-      return trimmed === '' ? null : trimmed;
+      if (!trimmed) return null;
+      if (trimmed.toLowerCase() === 'all') return null;
+      return trimmed;
     }
     return value;
   };
-
-  const pageCandidate = firstDefined(params.page, params.current_page, params.currentPage);
-  const normalizedPage = normalizeInteger(pageCandidate);
-  if (normalizedPage !== null) {
-    normalized.page = normalizedPage;
-  } else if (pageCandidate !== undefined && pageCandidate !== null && `${pageCandidate}`.trim() !== '') {
-    normalized.page = pageCandidate;
-  }
-
-  const perPageCandidate = firstDefined(
-    params.per_page,
-    params.perPage,
-    params.pageSize,
-    params.limit,
-  );
-  const normalizedPerPage = normalizeInteger(perPageCandidate);
-  if (normalizedPerPage !== null) {
-    normalized.per_page = normalizedPerPage;
-  } else if (
-    perPageCandidate !== undefined &&
-    perPageCandidate !== null &&
-    `${perPageCandidate}`.trim() !== ''
-  ) {
-    normalized.per_page = perPageCandidate;
-  }
 
   const startDate = toNullableValue(
     firstDefined(
@@ -446,49 +421,6 @@ const normalizeTutorReportParams = (params = {}) => {
   );
   if (wilbinId !== null) {
     normalized.wilbin_id = wilbinId;
-  }
-
-  if (normalized.per_page === undefined) {
-    normalized.per_page = 20;
-  }
-
-  const resetIndicators = firstDefined(
-    params.filtersChanged,
-    params.filters_changed,
-    params.__filtersChanged,
-    params.__filters_changed,
-    params.shouldResetPage,
-    params.resetPage,
-    params.reset_page,
-    params.__resetPage,
-    params.__reset_page,
-    params.forceFirstPage,
-    params.force_first_page,
-  );
-
-  const filterSignature = JSON.stringify({
-    start_date: startDate,
-    end_date: endDate,
-    jenis_kegiatan: activityType,
-    wilbin_id: wilbinId,
-    shelter_id: shelterId,
-  });
-
-  let filtersChanged = Boolean(resetIndicators);
-  if (!filtersChanged) {
-    filtersChanged = filterSignature !== lastTutorReportFilterSignature;
-  }
-  lastTutorReportFilterSignature = filterSignature;
-
-  const pageExplicitlyProvided =
-    pageCandidate !== undefined && pageCandidate !== null && `${pageCandidate}`.trim() !== '';
-
-  if (!pageExplicitlyProvided && filtersChanged) {
-    normalized.page = 1;
-  }
-
-  if (normalized.page === undefined) {
-    normalized.page = 1;
   }
 
   return normalized;
