@@ -6,7 +6,6 @@ use App\Models\Absen;
 use App\Models\AdminCabang;
 use App\Models\Aktivitas;
 use App\Models\Tutor;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -24,16 +23,83 @@ class TutorAttendanceReportService
             throw new RuntimeException('Admin cabang tidak memiliki data cabang terkait.');
         }
 
-        $shelterIds = $kacab->shelters()->pluck('id_shelter');
+        $wilbins = $kacab->wilbins()
+            ->with(['shelters' => function ($query) {
+                $query->select('id_shelter', 'nama_shelter', 'id_wilbin');
+            }])
+            ->orderBy('nama_wilbin')
+            ->get(['id_wilbin', 'nama_wilbin', 'id_kacab']);
 
-        if (!empty($filters['shelter_id']) && !$shelterIds->contains($filters['shelter_id'])) {
-            throw new RuntimeException('Shelter tidak ditemukan pada cabang ini.');
+        $wilbinOptions = $wilbins->map(function ($wilbin) {
+            $wilbinId = (int) $wilbin->id_wilbin;
+            $wilbinName = $wilbin->nama_wilbin;
+
+            return [
+                'id' => $wilbinId,
+                'name' => $wilbinName,
+                'shelters' => $wilbin->shelters->map(function ($shelter) use ($wilbinId, $wilbinName) {
+                    return [
+                        'id' => (int) $shelter->id_shelter,
+                        'name' => $shelter->nama_shelter,
+                        'wilbin_id' => $wilbinId,
+                        'wilbin_name' => $wilbinName,
+                    ];
+                })->values()->all(),
+            ];
+        })->values();
+
+        $wilbinShelterMap = $wilbinOptions->mapWithKeys(function (array $option) {
+            return [
+                $option['id'] => collect($option['shelters'])->pluck('id')->map(fn($id) => (int) $id)->values(),
+            ];
+        });
+
+        $shelterCollection = $wilbinOptions
+            ->flatMap(fn(array $option) => $option['shelters'])
+            ->map(fn(array $shelter) => $shelter)
+            ->unique('id')
+            ->values();
+
+        $wilbinList = $wilbinOptions->map(fn(array $option) => [
+            'id' => $option['id'],
+            'name' => $option['name'],
+        ])->values();
+
+        $wilbinShelterEntries = $wilbinOptions->map(fn(array $option) => [
+            'wilbin_id' => $option['id'],
+            'wilbin_name' => $option['name'],
+            'shelters' => $option['shelters'],
+        ])->values();
+
+        $shelterIdList = $shelterCollection->pluck('id')->map(fn($id) => (int) $id)->values();
+        $wilbinIdList = $wilbinOptions->pluck('id')->map(fn($id) => (int) $id)->values();
+
+        $allowedShelterIds = $shelterIdList->values();
+
+        $wilbinIdFilter = isset($filters['wilbin_id']) ? (int) $filters['wilbin_id'] : null;
+
+        if ($wilbinIdFilter !== null) {
+            if (!$wilbinShelterMap->has($wilbinIdFilter)) {
+                throw new RuntimeException('Wilayah binaan tidak ditemukan pada cabang ini.');
+            }
+
+            $allowedShelterIds = $wilbinShelterMap->get($wilbinIdFilter, collect())->values();
+        }
+
+        if (!empty($filters['shelter_id'])) {
+            $shelterIdFilter = (int) $filters['shelter_id'];
+
+            if (!$allowedShelterIds->contains($shelterIdFilter)) {
+                throw new RuntimeException('Shelter tidak ditemukan pada cabang atau wilayah binaan ini.');
+            }
+
+            $allowedShelterIds = collect([$shelterIdFilter]);
         }
 
         $baseActivityQuery = Aktivitas::query();
 
-        if ($shelterIds->isNotEmpty()) {
-            $baseActivityQuery->whereIn('id_shelter', $shelterIds);
+        if ($allowedShelterIds->isNotEmpty()) {
+            $baseActivityQuery->whereIn('id_shelter', $allowedShelterIds->all());
         } else {
             $baseActivityQuery->whereRaw('1 = 0');
         }
@@ -95,13 +161,23 @@ class TutorAttendanceReportService
                 $join->on('attendance_stats.id_tutor', '=', 'tutor.id_tutor');
             })
             ->leftJoin('shelter', 'shelter.id_shelter', '=', 'tutor.id_shelter')
-            ->where(function ($query) use ($kacab, $shelterIds) {
+            ->where(function ($query) use ($kacab, $allowedShelterIds) {
                 $query->where('tutor.id_kacab', $kacab->id_kacab);
 
-                if ($shelterIds->isNotEmpty()) {
-                    $query->orWhereIn('tutor.id_shelter', $shelterIds);
+                if ($allowedShelterIds->isNotEmpty()) {
+                    $query->orWhereIn('tutor.id_shelter', $allowedShelterIds->all());
                 }
             });
+
+        if ($wilbinIdFilter !== null) {
+            $tutorQuery->where(function ($query) use ($wilbinIdFilter, $allowedShelterIds) {
+                $query->where('tutor.id_wilbin', $wilbinIdFilter);
+
+                if ($allowedShelterIds->isNotEmpty()) {
+                    $query->orWhereIn('tutor.id_shelter', $allowedShelterIds->all());
+                }
+            });
+        }
 
         if (!empty($filters['shelter_id'])) {
             $tutorQuery->where('tutor.id_shelter', $filters['shelter_id']);
@@ -226,7 +302,12 @@ class TutorAttendanceReportService
                     'nama' => $kacab->nama_kacab,
                     'email' => $kacab->email,
                 ],
-                'shelter_ids' => $shelterIds->values()->all(),
+                'wilbins' => $wilbinList->all(),
+                'wilbin_shelters' => $wilbinShelterEntries->all(),
+                'wilbins_shelters' => $wilbinShelterEntries->all(),
+                'shelters' => $shelterCollection->all(),
+                'shelter_ids' => $shelterIdList->all(),
+                'wilbin_ids' => $wilbinIdList->all(),
             ],
         ];
     }
