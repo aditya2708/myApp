@@ -51,7 +51,7 @@ class AdminCabangTutorReportControllerTest extends TestCase
 
         $service->shouldReceive('build')
             ->once()
-            ->with($user->adminCabang, [], 1, 15)
+            ->with($user->adminCabang, [])
             ->andReturn([
                 'tutors' => [
                     [
@@ -163,14 +163,6 @@ class AdminCabangTutorReportControllerTest extends TestCase
                         ],
                     ],
                 ],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => 15,
-                    'total' => 100,
-                    'last_page' => 7,
-                    'next_page' => 2,
-                    'prev_page' => null,
-                ],
                 'metadata' => [
                     'from_service' => true,
                 ],
@@ -254,13 +246,10 @@ class AdminCabangTutorReportControllerTest extends TestCase
 
         $this->assertSame($expectedDistribution, $summary['distribution']);
 
-        $this->assertSame([
-            'current_page' => 1,
-            'total' => 100,
-            'per_page' => 15,
-        ], $payload['meta']['pagination']);
         $this->assertSame([], $payload['meta']['filters']);
         $this->assertNull($payload['meta']['branch']);
+        $this->assertArrayHasKey('collections', $payload['meta']);
+        $this->assertSame(['from_service' => true], $payload['meta']['metadata']);
     }
 
     public function test_index_applies_custom_page_and_per_page_query_parameters(): void
@@ -271,11 +260,9 @@ class AdminCabangTutorReportControllerTest extends TestCase
 
         $service->shouldReceive('build')
             ->once()
-            ->withArgs(function ($adminCabang, $filters, $page, $perPage) use ($user) {
+            ->withArgs(function ($adminCabang, $filters) use ($user) {
                 $this->assertSame($user->adminCabang, $adminCabang);
                 $this->assertSame(['jenis_kegiatan' => 'kelas'], $filters);
-                $this->assertSame(2, $page);
-                $this->assertSame(50, $perPage);
 
                 return true;
             })
@@ -290,14 +277,6 @@ class AdminCabangTutorReportControllerTest extends TestCase
                         'total_activities' => 4,
                         'verified_attendance_count' => 4,
                     ],
-                ],
-                'pagination' => [
-                    'current_page' => 2,
-                    'per_page' => 50,
-                    'total' => 123,
-                    'last_page' => 5,
-                    'next_page' => 3,
-                    'prev_page' => 1,
                 ],
                 'metadata' => [
                     'from_service' => true,
@@ -377,13 +356,10 @@ class AdminCabangTutorReportControllerTest extends TestCase
             ],
         ], $summary['distribution']);
 
-        $this->assertSame([
-            'current_page' => 2,
-            'total' => 123,
-            'per_page' => 50,
-        ], $payload['meta']['pagination']);
         $this->assertSame(['jenis_kegiatan' => 'kelas'], $payload['meta']['filters']);
         $this->assertNull($payload['meta']['branch']);
+        $this->assertArrayHasKey('collections', $payload['meta']);
+        $this->assertSame(['from_service' => true], $payload['meta']['metadata']);
     }
 
     public function test_index_filters_tutors_by_shelter_id(): void
@@ -396,7 +372,7 @@ class AdminCabangTutorReportControllerTest extends TestCase
 
         $service->shouldReceive('build')
             ->once()
-            ->with($user->adminCabang, ['shelter_id' => $shelterId], 1, 15)
+            ->with($user->adminCabang, ['shelter_id' => $shelterId])
             ->andReturn([
                 'tutors' => [
                     [
@@ -456,14 +432,6 @@ class AdminCabangTutorReportControllerTest extends TestCase
                         ],
                     ],
                 ],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => 15,
-                    'total' => 2,
-                    'last_page' => 1,
-                    'next_page' => null,
-                    'prev_page' => null,
-                ],
             ]);
 
         $request = Request::create('/api/admin-cabang/laporan/tutors', 'GET', [
@@ -489,5 +457,8 @@ class AdminCabangTutorReportControllerTest extends TestCase
         $this->assertSame([$shelterId], $tutors->pluck('shelter.id')->unique()->values()->all());
 
         $this->assertSame(['shelter_id' => $shelterId], $payload['meta']['filters']);
+        $this->assertNull($payload['meta']['branch']);
+        $this->assertArrayHasKey('collections', $payload['meta']);
+        $this->assertSame([], $payload['meta']['metadata']);
     }
 }
