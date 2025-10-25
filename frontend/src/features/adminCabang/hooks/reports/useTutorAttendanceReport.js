@@ -5,7 +5,7 @@ import { adminCabangReportApi } from '../../api/adminCabangReportApi';
 const createInitialState = () => ({
   data: [],
   summary: null,
-  metadata: {},
+  meta: {},
 });
 
 export const useTutorAttendanceReport = (initialParams = {}) => {
@@ -41,11 +41,15 @@ export const useTutorAttendanceReport = (initialParams = {}) => {
         const response = await adminCabangReportApi.getTutorAttendanceReport(nextParams);
         const payload = response?.data ?? response ?? {};
         const nextData = payload.data ?? [];
+        const { meta: payloadMeta, metadata: legacyMetadata } = payload || {};
 
         setState((prevState) => ({
           data: isLoadMore ? [...prevState.data, ...nextData] : nextData,
           summary: payload.summary ?? (isLoadMore ? prevState.summary : null),
-          metadata: payload.metadata ?? {},
+          meta:
+            payloadMeta
+              ?? legacyMetadata
+              ?? (isLoadMore ? prevState.meta : {}),
         }));
         
         setError(null);
@@ -90,19 +94,101 @@ export const useTutorAttendanceReport = (initialParams = {}) => {
   }, [fetchReport]);
 
   const memoizedState = useMemo(() => {
-    const pagination = state?.metadata?.pagination ?? {};
+    const meta = state?.meta ?? {};
+    const rawPagination = meta?.pagination ?? {};
+
+    const page =
+      rawPagination.page ?? rawPagination.currentPage ?? rawPagination.current_page;
+    const perPage =
+      rawPagination.perPage
+      ?? rawPagination.per_page
+      ?? rawPagination.pageSize
+      ?? rawPagination.limit;
+    const total =
+      rawPagination.total
+      ?? rawPagination.total_items
+      ?? rawPagination.totalItems
+      ?? rawPagination.total_records
+      ?? rawPagination.totalRecords
+      ?? rawPagination.count;
+    const totalPagesCandidate =
+      rawPagination.totalPages
+      ?? rawPagination.total_pages
+      ?? rawPagination.last_page
+      ?? rawPagination.pages;
+
+    const computedTotalPages =
+      typeof totalPagesCandidate === 'number' && Number.isFinite(totalPagesCandidate)
+        ? totalPagesCandidate
+        : typeof total === 'number'
+            && typeof perPage === 'number'
+            && Number.isFinite(perPage)
+            && perPage > 0
+          ? Math.ceil(total / perPage)
+          : undefined;
+
+    const rawNextPage =
+      rawPagination.nextPage !== undefined
+        ? rawPagination.nextPage
+        : rawPagination.next_page;
+    const computedNextPage =
+      rawNextPage !== undefined
+        ? rawNextPage
+        : typeof page === 'number'
+            && typeof computedTotalPages === 'number'
+            && page < computedTotalPages
+          ? page + 1
+          : undefined;
+
+    const hasNextPage = (() => {
+      if (rawNextPage !== undefined) {
+        return Boolean(rawNextPage);
+      }
+
+      if (
+        typeof page === 'number'
+        && typeof computedTotalPages === 'number'
+      ) {
+        return page < computedTotalPages;
+      }
+
+      if (
+        typeof page === 'number'
+        && typeof perPage === 'number'
+        && typeof total === 'number'
+        && Number.isFinite(perPage)
+        && perPage > 0
+      ) {
+        return page * perPage < total;
+      }
+
+      return false;
+    })();
+
+    const pagination = {
+      ...rawPagination,
+      page: page ?? rawPagination.page,
+      perPage: perPage ?? rawPagination.perPage,
+      total: total ?? rawPagination.total,
+      totalPages: computedTotalPages ?? rawPagination.totalPages,
+      nextPage:
+        computedNextPage !== undefined
+          ? computedNextPage
+          : rawPagination.nextPage,
+    };
 
     return {
       tutors: state.data,
       summary: state.summary,
-      metadata: state.metadata,
+      meta,
       pagination,
       params: paramsRef.current,
-      hasNextPage: Boolean(pagination?.nextPage),
+      hasNextPage,
+      nextPage: computedNextPage,
     };
   }, [state]);
 
-  const nextPage = state?.metadata?.pagination?.nextPage;
+  const { nextPage } = memoizedState;
 
   const loadMore = useCallback(() => {
     if (!nextPage) {
