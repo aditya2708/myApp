@@ -62,6 +62,11 @@ const AdminCabangTutorReportScreen = () => {
     [meta, rawTutors],
   );
 
+  const defaultFilters = useMemo(
+    () => mergeFilters(DEFAULT_FILTERS, meta?.filters),
+    [meta],
+  );
+
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -73,9 +78,9 @@ const AdminCabangTutorReportScreen = () => {
   }, [navigation]);
 
   useEffect(() => {
-    const initialFilters = mergeFilters(meta?.filters, params);
+    const initialFilters = mergeFilters(defaultFilters, params);
     setFilters(initialFilters);
-  }, [meta, params]);
+  }, [defaultFilters, params]);
 
   const normalizedTutors = useMemo(
     () => (Array.isArray(rawTutors) ? rawTutors.map(normalizeTutorRecord) : []),
@@ -101,7 +106,7 @@ const AdminCabangTutorReportScreen = () => {
   }, [refresh]);
 
   const handleApplyFilters = useCallback((nextFilters) => {
-    const sanitized = mergeFilters(DEFAULT_FILTERS, nextFilters);
+    const sanitized = mergeFilters(defaultFilters, nextFilters);
     setFilters(sanitized);
     setShowFilters(false);
     const paramsPayload = {
@@ -109,14 +114,14 @@ const AdminCabangTutorReportScreen = () => {
       page: 1,
     };
     updateFilters(paramsPayload);
-  }, [updateFilters]);
+  }, [defaultFilters, updateFilters]);
 
   const handleClearFilters = useCallback(() => {
-    const baseFilters = mergeFilters(DEFAULT_FILTERS, meta?.filters);
+    const baseFilters = { ...defaultFilters };
     setFilters(baseFilters);
     setShowFilters(false);
     resetFilters();
-  }, [meta?.filters, resetFilters]);
+  }, [defaultFilters, resetFilters]);
 
   const handleRetry = useCallback(() => {
     refetch();
@@ -215,6 +220,7 @@ const AdminCabangTutorReportScreen = () => {
       <TutorAttendanceFilters
         visible={showFilters}
         filters={filters}
+        defaultFilters={defaultFilters}
         onClose={() => setShowFilters(false)}
         onApply={handleApplyFilters}
         onClear={handleClearFilters}
