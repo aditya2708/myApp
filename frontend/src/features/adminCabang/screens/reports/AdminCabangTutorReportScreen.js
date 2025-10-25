@@ -87,15 +87,10 @@ const AdminCabangTutorReportScreen = () => {
     [rawTutors],
   );
 
-  const attendanceSummary = useMemo(() => {
-    const summarized = summarizeTutors(normalizedTutors);
-    return {
-      ...summarized,
-      total_tutors: summary?.totalTutors ?? summary?.total_tutors ?? summarized.total_tutors,
-      average_attendance_rate: summary?.attendanceRate ?? summary?.attendance_rate ?? summarized.average_attendance_rate,
-      distribution: summarized.distribution,
-    };
-  }, [normalizedTutors, summary]);
+  const attendanceSummary = useMemo(
+    () => summarizeTutors(normalizedTutors, summary),
+    [normalizedTutors, summary],
+  );
 
   const summaryHighlights = useMemo(() => buildSummaryHighlights(summary), [summary]);
 
