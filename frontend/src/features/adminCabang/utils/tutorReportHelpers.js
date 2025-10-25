@@ -4,6 +4,7 @@ export const DEFAULT_FILTERS = {
   date_from: null,
   date_to: null,
   jenis_kegiatan: 'all',
+  wilbin_id: 'all',
   shelter_id: 'all',
 };
 
@@ -162,10 +163,29 @@ const toOption = (item) => {
       return null;
     }
 
-    return {
+    const option = {
       key,
       label: label ?? String(key),
     };
+
+    const wilbinIdCandidate = item.wilbin_id
+      ?? item.wilbinId
+      ?? item.id_wilbin
+      ?? item.idWilbin
+      ?? item.wilayah_binaan_id
+      ?? item.wilayahBinaanId
+      ?? item.wilayah_binaan
+      ?? item.wilayahBinaan;
+
+    if (wilbinIdCandidate !== undefined) {
+      option.wilbin_id = wilbinIdCandidate;
+    }
+
+    if (item.wilbin !== undefined) {
+      option.wilbin = item.wilbin;
+    }
+
+    return option;
   }
 
   return null;
@@ -324,6 +344,74 @@ export const buildJenisOptions = (meta, tutors = []) => {
   return ensureAllOption(derived, 'Semua Jenis');
 };
 
+export const buildWilbinOptions = (meta, tutors = []) => {
+  const metaOptions = dedupeOptions(
+    extractOptionCandidates(meta, [
+      'wilbin',
+      'wilbins',
+      'wilayah_binaan',
+      'wilayahBinaan',
+      'regions',
+      'region',
+      'wilayah',
+    ]),
+  );
+
+  if (metaOptions.length > 0) {
+    return ensureAllOption(metaOptions, 'Semua Wilbin');
+  }
+
+  const wilbinMap = new Map();
+
+  tutors.forEach((tutor) => {
+    const raw = tutor.raw || {};
+    const wilbinInfo = tutor.wilbin
+      ?? raw.wilbin
+      ?? raw.wilbin_info
+      ?? raw.wilbinInfo
+      ?? null;
+
+    const possibleId = raw.wilbin_id
+      ?? raw.wilbinId
+      ?? raw.id_wilbin
+      ?? tutor.wilbin_id
+      ?? tutor.wilbinId
+      ?? wilbinInfo?.id
+      ?? wilbinInfo?.id_wilbin
+      ?? wilbinInfo?.wilbin_id;
+
+    const label = tutor.wilbin_name
+      ?? tutor.wilbinName
+      ?? raw.wilbin_name
+      ?? raw.wilbinName
+      ?? wilbinInfo?.nama_wilbin
+      ?? wilbinInfo?.nama
+      ?? wilbinInfo?.name
+      ?? null;
+
+    if (possibleId !== undefined && possibleId !== null && possibleId !== '') {
+      const key = String(possibleId);
+      if (!wilbinMap.has(key)) {
+        wilbinMap.set(key, {
+          key: possibleId,
+          label: label ?? `Wilbin ${key}`,
+        });
+      }
+      return;
+    }
+
+    if (label) {
+      const key = String(label);
+      if (!wilbinMap.has(key)) {
+        wilbinMap.set(key, { key: label, label });
+      }
+    }
+  });
+
+  const derived = Array.from(wilbinMap.values());
+  return ensureAllOption(derived, 'Semua Wilbin');
+};
+
 export const buildShelterOptions = (meta, tutors = []) => {
   const metaOptions = dedupeOptions(
     extractOptionCandidates(meta, [
@@ -346,6 +434,22 @@ export const buildShelterOptions = (meta, tutors = []) => {
   tutors.forEach((tutor) => {
     const raw = tutor.raw || {};
     const shelter = tutor.shelter || raw.shelter || {};
+    const wilbinInfo = tutor.wilbin
+      ?? raw.wilbin
+      ?? shelter.wilbin
+      ?? raw.wilbin_info
+      ?? raw.wilbinInfo
+      ?? null;
+    const wilbinIdCandidate = raw.wilbin_id
+      ?? raw.wilbinId
+      ?? raw.id_wilbin
+      ?? shelter.id_wilbin
+      ?? shelter.wilbin_id
+      ?? tutor.wilbin_id
+      ?? tutor.wilbinId
+      ?? wilbinInfo?.id
+      ?? wilbinInfo?.id_wilbin
+      ?? wilbinInfo?.wilbin_id;
     const possibleId = raw.shelter_id
       ?? raw.shelterId
       ?? raw.id_shelter
@@ -367,7 +471,17 @@ export const buildShelterOptions = (meta, tutors = []) => {
     if (possibleId !== undefined && possibleId !== null && possibleId !== '') {
       const key = String(possibleId);
       if (!shelterMap.has(key)) {
-        shelterMap.set(key, { key: possibleId, label: label ?? `Shelter ${key}` });
+        const option = {
+          key: possibleId,
+          label: label ?? `Shelter ${key}`,
+        };
+        if (wilbinIdCandidate !== undefined) {
+          option.wilbin_id = wilbinIdCandidate;
+        }
+        if (wilbinInfo) {
+          option.wilbin = wilbinInfo;
+        }
+        shelterMap.set(key, option);
       }
       return;
     }
@@ -375,7 +489,14 @@ export const buildShelterOptions = (meta, tutors = []) => {
     if (label) {
       const key = String(label);
       if (!shelterMap.has(key)) {
-        shelterMap.set(key, { key: label, label });
+        const option = { key: label, label };
+        if (wilbinIdCandidate !== undefined) {
+          option.wilbin_id = wilbinIdCandidate;
+        }
+        if (wilbinInfo) {
+          option.wilbin = wilbinInfo;
+        }
+        shelterMap.set(key, option);
       }
     }
   });
@@ -384,10 +505,140 @@ export const buildShelterOptions = (meta, tutors = []) => {
   return ensureAllOption(derived, 'Semua Shelter');
 };
 
+export const scopeShelterOptionsByWilbin = (options = [], wilbinId, meta) => {
+  const normalizedWilbinId = wilbinId === undefined || wilbinId === null ? 'all' : wilbinId;
+  if (!normalizedWilbinId || normalizedWilbinId === 'all') {
+    return ensureAllOption(options, 'Semua Shelter');
+  }
+
+  const normalizedIdString = String(normalizedWilbinId);
+
+  const directMatches = options.filter((option) => {
+    if (!option) {
+      return false;
+    }
+
+    const candidateValues = [
+      option.wilbin_id,
+      option.wilbinId,
+      option.id_wilbin,
+      option.idWilbin,
+      option.wilayah_binaan_id,
+      option.wilayahBinaanId,
+      option.wilbin?.id,
+      option.wilbin?.id_wilbin,
+      option.wilbin?.wilbin_id,
+    ]
+      .filter((value) => value !== undefined && value !== null)
+      .map((value) => String(value));
+
+    return candidateValues.includes(normalizedIdString);
+  });
+
+  if (directMatches.length > 0) {
+    return ensureAllOption(directMatches, 'Semua Shelter');
+  }
+
+  const scopedFromMeta = (() => {
+    const sources = ensureArray(meta?.shelters_by_wilbin)
+      .concat(ensureArray(meta?.shelter_by_wilbin))
+      .concat(ensureArray(meta?.wilbin_shelters))
+      .concat(ensureArray(meta?.wilbins_shelters))
+      .concat(ensureArray(meta?.filters?.shelters_by_wilbin))
+      .concat(ensureArray(meta?.filters?.wilbin_shelters))
+      .concat(ensureArray(meta?.collections?.shelters_by_wilbin))
+      .concat(ensureArray(meta?.collections?.wilbin_shelters));
+
+    for (const source of sources) {
+      if (!source) {
+        continue;
+      }
+
+      if (Array.isArray(source)) {
+        const nested = source.flatMap((item) => {
+          if (!item || typeof item !== 'object') {
+            return [];
+          }
+
+          const matchesWilbin = [
+            item.wilbin_id,
+            item.wilbinId,
+            item.id_wilbin,
+            item.idWilbin,
+            item.wilayah_binaan_id,
+            item.wilayahBinaanId,
+            item.wilbin?.id,
+            item.wilbin?.id_wilbin,
+          ]
+            .filter((value) => value !== undefined && value !== null)
+            .map((value) => String(value))
+            .includes(normalizedIdString);
+
+          if (!matchesWilbin) {
+            return [];
+          }
+
+          const nestedOptions = item.options
+            ?? item.shelters
+            ?? item.items
+            ?? item.data
+            ?? item.list
+            ?? item.values
+            ?? item.records
+            ?? [];
+
+          const normalized = normalizeOptionCollection(nestedOptions);
+          if (normalized.length > 0) {
+            return normalized;
+          }
+
+          return [item];
+        });
+
+        if (nested.length > 0) {
+          return dedupeOptions(nested);
+        }
+
+        continue;
+      }
+
+      if (typeof source === 'object') {
+        const numericKey = Number(normalizedIdString);
+        const candidateKeys = [
+          normalizedIdString,
+          !Number.isNaN(numericKey) ? numericKey : undefined,
+          normalizedWilbinId,
+          normalizedWilbinId !== undefined && normalizedWilbinId !== null
+            ? String(normalizedWilbinId)
+            : undefined,
+        ].filter((key, index, arr) => key !== undefined && key !== null && arr.indexOf(key) === index);
+
+        for (const key of candidateKeys) {
+          if (key !== undefined && key !== null && source[key] !== undefined) {
+            const normalized = dedupeOptions(normalizeOptionCollection(source[key]));
+            if (normalized.length > 0) {
+              return normalized;
+            }
+          }
+        }
+      }
+    }
+
+    return [];
+  })();
+
+  if (scopedFromMeta.length > 0) {
+    return ensureAllOption(scopedFromMeta, 'Semua Shelter');
+  }
+
+  return ensureAllOption(options, 'Semua Shelter');
+};
+
 export const sanitizeFilters = (filters = {}) => ({
   date_from: filters.date_from ?? filters.start_date ?? filters.startDate ?? null,
   date_to: filters.date_to ?? filters.end_date ?? filters.endDate ?? null,
   jenis_kegiatan: filters.jenis_kegiatan ?? filters.jenisKegiatan ?? filters.activity_type ?? filters.activityType ?? 'all',
+  wilbin_id: filters.wilbin_id ?? filters.wilbinId ?? filters.wilbin ?? filters.wilayah_binaan ?? filters.wilayahBinaan ?? 'all',
   shelter_id: filters.shelter_id ?? filters.shelterId ?? filters.shelter ?? 'all',
 });
 
@@ -399,6 +650,7 @@ export const mergeFilters = (base, overrides) => {
     date_from: sanitizedOverrides.date_from ?? sanitizedBase.date_from ?? DEFAULT_FILTERS.date_from,
     date_to: sanitizedOverrides.date_to ?? sanitizedBase.date_to ?? DEFAULT_FILTERS.date_to,
     jenis_kegiatan: sanitizedOverrides.jenis_kegiatan ?? sanitizedBase.jenis_kegiatan ?? DEFAULT_FILTERS.jenis_kegiatan,
+    wilbin_id: sanitizedOverrides.wilbin_id ?? sanitizedBase.wilbin_id ?? DEFAULT_FILTERS.wilbin_id,
     shelter_id: sanitizedOverrides.shelter_id ?? sanitizedBase.shelter_id ?? DEFAULT_FILTERS.shelter_id,
   };
 };
@@ -408,6 +660,9 @@ export const composeApiParamsFromFilters = (filters = {}) => ({
   end_date: filters.date_to || null,
   jenis_kegiatan: filters.jenis_kegiatan && filters.jenis_kegiatan !== 'all'
     ? filters.jenis_kegiatan
+    : null,
+  wilbin_id: filters.wilbin_id && filters.wilbin_id !== 'all'
+    ? filters.wilbin_id
     : null,
   shelter_id: filters.shelter_id && filters.shelter_id !== 'all'
     ? filters.shelter_id
@@ -685,7 +940,9 @@ export default {
   toIntegerOrZero,
   formatInteger,
   buildJenisOptions,
+  buildWilbinOptions,
   buildShelterOptions,
+  scopeShelterOptionsByWilbin,
   sanitizeFilters,
   mergeFilters,
   composeApiParamsFromFilters,

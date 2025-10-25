@@ -10,6 +10,7 @@ const DEFAULT_FILTER_VALUES = {
   date_from: null,
   date_to: null,
   jenis_kegiatan: 'all',
+  wilbin_id: 'all',
   shelter_id: 'all',
 };
 
@@ -38,6 +39,7 @@ const mergeFilters = (filters = {}, defaults = DEFAULT_FILTER_VALUES) => ({
   date_from: filters?.date_from ?? defaults?.date_from ?? DEFAULT_FILTER_VALUES.date_from,
   date_to: filters?.date_to ?? defaults?.date_to ?? DEFAULT_FILTER_VALUES.date_to,
   jenis_kegiatan: filters?.jenis_kegiatan ?? defaults?.jenis_kegiatan ?? DEFAULT_FILTER_VALUES.jenis_kegiatan,
+  wilbin_id: filters?.wilbin_id ?? defaults?.wilbin_id ?? DEFAULT_FILTER_VALUES.wilbin_id,
   shelter_id: filters?.shelter_id ?? defaults?.shelter_id ?? DEFAULT_FILTER_VALUES.shelter_id,
 });
 
@@ -63,6 +65,9 @@ const TutorAttendanceFilters = ({
   onClear,
   jenisOptions,
   shelterOptions,
+  wilbinOptions,
+  onWilbinChange,
+  onShelterChange,
 }) => {
   const resolvedDefaultFilters = useMemo(
     () => mergeFilters(defaultFilters, DEFAULT_FILTER_VALUES),
@@ -80,6 +85,13 @@ const TutorAttendanceFilters = ({
   }, [visible, filters, resolvedDefaultFilters]);
 
   const activityOptions = useMemo(() => ensureAllOption(jenisOptions, 'Semua Jenis'), [jenisOptions]);
+  const wilbinDropdownItems = useMemo(
+    () => ensureAllOption(wilbinOptions, 'Semua Wilbin').map((option) => ({
+      label: option.label,
+      value: option.key,
+    })),
+    [wilbinOptions],
+  );
   const shelterDropdownItems = useMemo(
     () => ensureAllOption(shelterOptions, 'Semua Shelter').map((option) => ({
       label: option.label,
@@ -113,6 +125,8 @@ const TutorAttendanceFilters = ({
     const clearedFilters = mergeFilters(undefined, resolvedDefaultFilters);
     setLocalFilters(clearedFilters);
     setActiveDatePicker(null);
+    onWilbinChange?.(clearedFilters.wilbin_id);
+    onShelterChange?.(clearedFilters.shelter_id);
     onClear?.(clearedFilters);
   };
 
@@ -177,6 +191,31 @@ const TutorAttendanceFilters = ({
             </View>
           </View>
 
+          {wilbinDropdownItems.length > 0 ? (
+            <View style={styles.section}>
+              <PickerInput
+                label="Wilayah Binaan"
+                value={localFilters.wilbin_id}
+                onValueChange={(value) => {
+                  if (!value) {
+                    return;
+                  }
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    wilbin_id: value,
+                    shelter_id: 'all',
+                  }));
+                  onWilbinChange?.(value);
+                  onShelterChange?.('all');
+                }}
+                items={wilbinDropdownItems}
+                placeholder="Pilih Wilayah Binaan"
+                style={styles.pickerInput}
+                pickerProps={{ enabled: true }}
+              />
+            </View>
+          ) : null}
+
           {shelterDropdownItems.length > 0 ? (
             <View style={styles.section}>
               <PickerInput
@@ -190,6 +229,7 @@ const TutorAttendanceFilters = ({
                     ...prev,
                     shelter_id: value,
                   }));
+                  onShelterChange?.(value);
                 }}
                 items={shelterDropdownItems}
                 placeholder="Pilih Shelter"
