@@ -122,7 +122,14 @@ class TutorAttendanceReportService
             ->orderBy('tutor.nama')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        $tutorSummaries = $tutorPaginator->getCollection()->map(function (Tutor $tutor) {
+        $categoryLabels = [
+            'high' => 'Baik',
+            'medium' => 'Sedang',
+            'low' => 'Rendah',
+            'no_data' => 'Tidak Ada Data',
+        ];
+
+        $tutorSummaries = $tutorPaginator->getCollection()->map(function (Tutor $tutor) use ($categoryLabels) {
             $totalActivities = (int) ($tutor->total_activities ?? 0);
             $presentCount = (int) ($tutor->present_count ?? 0);
             $lateCount = (int) ($tutor->late_count ?? 0);
@@ -134,6 +141,8 @@ class TutorAttendanceReportService
                 $verifiedAttendanceCount = $attendanceTotal;
             }
 
+            $attendedCount = $presentCount + $lateCount;
+
             $activityTypes = collect(explode(',', (string) ($tutor->activity_types ?? '')))
                 ->map(fn($type) => trim($type))
                 ->filter()
@@ -141,24 +150,56 @@ class TutorAttendanceReportService
                 ->values()
                 ->all();
 
+            if ($totalActivities > 0) {
+                $attendanceRate = round(($attendedCount / $totalActivities) * 100, 2);
+
+                if ($attendanceRate >= 80) {
+                    $categoryKey = 'high';
+                } elseif ($attendanceRate >= 60) {
+                    $categoryKey = 'medium';
+                } else {
+                    $categoryKey = 'low';
+                }
+            } else {
+                $attendanceRate = 0;
+                $categoryKey = 'no_data';
+            }
+
             return [
-                'id_tutor' => $tutor->id_tutor,
-                'nama' => $tutor->nama,
+                'id' => $tutor->id_tutor ? (int) $tutor->id_tutor : null,
+                'name' => $tutor->nama,
                 'email' => $tutor->email,
-                'no_hp' => $tutor->no_hp,
-                'foto' => $tutor->foto,
-                'foto_url' => method_exists($tutor, 'getFotoUrlAttribute') ? $tutor->foto_url : null,
-                'maple' => $tutor->maple,
-                'total_activities' => $totalActivities,
-                'present_count' => $presentCount,
-                'late_count' => $lateCount,
-                'absent_count' => $absentCount,
-                'verified_attendance_count' => $verifiedAttendanceCount,
-                'attendance_total' => $attendanceTotal,
+                'phone' => $tutor->no_hp,
+                'subject' => $tutor->maple,
+                'photo_url' => method_exists($tutor, 'getFotoUrlAttribute') ? $tutor->foto_url : $tutor->foto,
                 'activity_types' => $activityTypes,
+                'attendance' => [
+                    'totals' => [
+                        'activities' => $totalActivities,
+                        'records' => $attendanceTotal,
+                        'attended' => $attendedCount,
+                    ],
+                    'breakdown' => [
+                        'present' => $presentCount,
+                        'late' => $lateCount,
+                        'absent' => $absentCount,
+                    ],
+                    'verified' => [
+                        'total' => $verifiedAttendanceCount,
+                        'present' => $presentCount,
+                        'late' => $lateCount,
+                        'absent' => $absentCount,
+                        'attended' => $attendedCount,
+                    ],
+                    'rate' => $attendanceRate,
+                ],
                 'shelter' => [
                     'id' => $tutor->shelter_id ? (int) $tutor->shelter_id : null,
                     'name' => $tutor->shelter_name,
+                ],
+                'category' => [
+                    'key' => $categoryKey,
+                    'label' => $categoryLabels[$categoryKey],
                 ],
             ];
         });

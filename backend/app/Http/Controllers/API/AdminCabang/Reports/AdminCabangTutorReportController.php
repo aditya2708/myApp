@@ -150,48 +150,21 @@ class AdminCabangTutorReportController extends Controller
         $distribution = collect(array_fill_keys(array_keys($categoryLabels), 0));
 
         $tutors = $tutorCollection->map(function (array $record) use (&$distribution, $categoryLabels) {
-            $totalActivities = (int) ($record['total_activities'] ?? 0);
-            $presentCount = (int) ($record['present_count'] ?? 0);
-            $lateCount = (int) ($record['late_count'] ?? 0);
-            $absentCount = (int) ($record['absent_count'] ?? 0);
-            $verifiedAttendanceCount = (int) ($record['verified_attendance_count'] ?? 0);
-            $attendanceTotal = (int) ($record['attendance_total'] ?? ($presentCount + $lateCount + $absentCount));
-            $attendedCount = $presentCount + $lateCount;
+            $attendance = $record['attendance'] ?? null;
 
-            if ($verifiedAttendanceCount === 0) {
-                $verifiedAttendanceCount = $attendanceTotal;
-            }
+            if (!is_array($attendance)) {
+                $presentCount = (int) ($record['present_count'] ?? 0);
+                $lateCount = (int) ($record['late_count'] ?? 0);
+                $absentCount = (int) ($record['absent_count'] ?? 0);
+                $totalActivities = (int) ($record['total_activities'] ?? 0);
+                $attendanceTotal = (int) ($record['attendance_total'] ?? ($presentCount + $lateCount + $absentCount));
+                $attendedCount = $presentCount + $lateCount;
 
-            if ($totalActivities > 0) {
                 $attendanceRate = $totalActivities > 0
                     ? round(($attendedCount / $totalActivities) * 100, 2)
                     : 0;
 
-                if ($attendanceRate >= 80) {
-                    $categoryKey = 'high';
-                } elseif ($attendanceRate >= 60) {
-                    $categoryKey = 'medium';
-                } else {
-                    $categoryKey = 'low';
-                }
-            } else {
-                $attendanceRate = null;
-                $categoryKey = 'no_data';
-            }
-
-            $distribution[$categoryKey] = $distribution[$categoryKey] + 1;
-
-            $shelter = $record['shelter'] ?? null;
-
-            return [
-                'id' => $record['id_tutor'] ?? null,
-                'name' => $record['nama'] ?? null,
-                'email' => $record['email'] ?? null,
-                'phone' => $record['no_hp'] ?? null,
-                'subject' => $record['maple'] ?? null,
-                'photo_url' => $record['foto_url'] ?? $record['foto'] ?? null,
-                'shelter' => $shelter,
-                'attendance' => [
+                $attendance = [
                     'totals' => [
                         'activities' => $totalActivities,
                         'records' => $attendanceTotal,
@@ -203,19 +176,37 @@ class AdminCabangTutorReportController extends Controller
                         'absent' => $absentCount,
                     ],
                     'verified' => [
-                        'total' => $verifiedAttendanceCount,
+                        'total' => (int) ($record['verified_attendance_count'] ?? $attendanceTotal),
                         'present' => $presentCount,
                         'late' => $lateCount,
                         'absent' => $absentCount,
                         'attended' => $attendedCount,
                     ],
-                    'rate' => $attendanceRate,
-                ],
-                'category' => [
-                    'key' => $categoryKey,
-                    'label' => $categoryLabels[$categoryKey],
-                ],
+                    'rate' => $totalActivities > 0 ? $attendanceRate : 0,
+                ];
+            }
+
+            $category = $record['category'] ?? [];
+            $categoryKey = is_array($category) ? ($category['key'] ?? null) : null;
+
+            if (!$categoryKey || !array_key_exists($categoryKey, $categoryLabels)) {
+                $hasActivities = (int) ($attendance['totals']['activities'] ?? 0) > 0;
+                $categoryKey = $hasActivities
+                    ? (($attendance['rate'] ?? 0) >= 80
+                        ? 'high'
+                        : (($attendance['rate'] ?? 0) >= 60 ? 'medium' : 'low'))
+                    : 'no_data';
+            }
+
+            $distribution[$categoryKey] = ($distribution[$categoryKey] ?? 0) + 1;
+
+            $record['attendance'] = $attendance;
+            $record['category'] = [
+                'key' => $categoryKey,
+                'label' => $categoryLabels[$categoryKey],
             ];
+
+            return $record;
         });
 
         $totalTutors = $tutors->count();
