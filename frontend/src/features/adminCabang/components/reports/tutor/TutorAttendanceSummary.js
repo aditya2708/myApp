@@ -18,8 +18,9 @@ const formatRate = (rate) => {
 
   const isFraction = numericRate !== 0 && Math.abs(numericRate) <= 1;
   const normalized = isFraction ? numericRate * 100 : numericRate;
+  const rounded = Number(normalized.toFixed(2));
 
-  return `${normalized.toFixed(2)}%`;
+  return `${rounded}%`;
 };
 
 const TutorAttendanceSummary = ({ summary, style }) => {

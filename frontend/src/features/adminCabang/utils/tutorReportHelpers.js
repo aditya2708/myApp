@@ -879,152 +879,6 @@ export const summarizeTutors = (tutors = [], summary = null) => {
   };
 };
 
-const resolveTutorDistribution = (summary) => {
-  const distributionSource = summary?.distribution
-    ?? summary?.attendance?.distribution
-    ?? summary?.category_distribution
-    ?? summary?.categories
-    ?? {};
-
-  return {
-    high: normalizeDistributionEntry(distributionSource.high),
-    medium: normalizeDistributionEntry(distributionSource.medium),
-    low: normalizeDistributionEntry(distributionSource.low),
-    no_data: normalizeDistributionEntry(
-      distributionSource.no_data
-        ?? distributionSource.noData
-        ?? distributionSource.none
-        ?? distributionSource.undefined
-        ?? distributionSource.unknown,
-    ),
-  };
-};
-
-const resolveAttendanceBreakdown = (summary = {}) => {
-  if (!summary || typeof summary !== 'object') {
-    return {
-      present: 0,
-      late: 0,
-      excused: 0,
-      absent: 0,
-      totalActivities: 0,
-    };
-  }
-
-  const attendance = typeof summary.attendance === 'object' && summary.attendance !== null
-    ? summary.attendance
-    : null;
-
-  const attendanceTotals = attendance?.totals ?? attendance ?? {};
-  const attendanceVerified = attendance?.verified ?? attendanceTotals.verified ?? {};
-  const attendanceBreakdown = attendance?.breakdown ?? attendanceTotals.breakdown ?? {};
-
-  const legacyTotals = summary.totals ?? {};
-  const legacyVerified = summary.verified ?? legacyTotals.verified ?? {};
-  const legacyBreakdown = summary.breakdown ?? legacyTotals.breakdown ?? {};
-
-  const present = toIntegerOrZero(firstDefined(
-    attendanceVerified.present,
-    attendanceBreakdown.present,
-    attendanceTotals.present,
-    legacyVerified.present,
-    legacyBreakdown.present,
-    legacyTotals.present,
-    summary.present,
-    summary.presentCount,
-    summary.present_count,
-  ));
-
-  const late = toIntegerOrZero(firstDefined(
-    attendanceVerified.late,
-    attendanceBreakdown.late,
-    attendanceTotals.late,
-    legacyVerified.late,
-    legacyBreakdown.late,
-    legacyTotals.late,
-    summary.late,
-    summary.lateCount,
-    summary.late_count,
-  ));
-
-  const excused = toIntegerOrZero(firstDefined(
-    attendanceVerified.excused,
-    attendanceVerified.excuse,
-    attendanceVerified.permit,
-    attendanceVerified.permission,
-    attendanceVerified.sick,
-    attendanceBreakdown.excused,
-    attendanceBreakdown.excuse,
-    attendanceBreakdown.permit,
-    attendanceBreakdown.permission,
-    attendanceBreakdown.sick,
-    attendanceTotals.excused,
-    attendanceTotals.excuse,
-    attendanceTotals.permit,
-    attendanceTotals.permission,
-    attendanceTotals.sick,
-    legacyVerified.excused,
-    legacyVerified.excuse,
-    legacyVerified.permit,
-    legacyVerified.permission,
-    legacyVerified.sick,
-    legacyBreakdown.excused,
-    legacyBreakdown.excuse,
-    legacyBreakdown.permit,
-    legacyBreakdown.permission,
-    legacyBreakdown.sick,
-    legacyTotals.excused,
-    legacyTotals.excuse,
-    legacyTotals.permit,
-    legacyTotals.permission,
-    legacyTotals.sick,
-    summary.excused,
-    summary.excused_count,
-    summary.excuse,
-    summary.permit,
-    summary.permission,
-    summary.izin,
-    summary.sick,
-  ));
-
-  const absent = toIntegerOrZero(firstDefined(
-    attendanceVerified.absent,
-    attendanceBreakdown.absent,
-    attendanceTotals.absent,
-    legacyVerified.absent,
-    legacyBreakdown.absent,
-    legacyTotals.absent,
-    summary.absent,
-    summary.absentCount,
-    summary.absent_count,
-  ));
-
-  const totalActivities = toIntegerOrZero(firstDefined(
-    attendanceTotals.activities,
-    attendanceTotals.total,
-    attendanceTotals.activity,
-    attendanceVerified.total,
-    attendanceBreakdown.total,
-    legacyTotals.activities,
-    legacyTotals.total,
-    legacyTotals.activity,
-    legacyVerified.total,
-    legacyBreakdown.total,
-    summary.totalActivities,
-    summary.total_activities,
-    summary.totalSessions,
-    summary.total_sessions,
-  ));
-
-  return {
-    present,
-    late,
-    excused,
-    absent,
-    totalActivities,
-  };
-};
-
 export const buildTutorSummaryCards = (summary) => {
   if (!summary || typeof summary !== 'object') {
     return [];
@@ -1045,44 +899,13 @@ export const buildTutorSummaryCards = (summary) => {
     summary.rate,
   ));
 
-  const distribution = resolveTutorDistribution(summary);
-  const primaryDistributionKeys = ['high', 'medium', 'low'];
-
-  let primaryCategoryKey = 'high';
-  let highestCount = -1;
-  primaryDistributionKeys.forEach((key) => {
-    const candidateCount = distribution[key]?.count ?? 0;
-    if (candidateCount > highestCount) {
-      highestCount = candidateCount;
-      primaryCategoryKey = key;
-    }
-  });
-
-  const primaryCategoryLabel = deriveCategoryLabel(primaryCategoryKey);
-  const primaryCategoryCount = formatInteger(distribution[primaryCategoryKey]?.count ?? 0);
-
-  const noDataLabel = deriveCategoryLabel('no_data');
-  const noDataCount = formatInteger(distribution.no_data?.count ?? 0);
-
-  const attendanceBreakdown = resolveAttendanceBreakdown(summary);
-  const breakdownValue = [
-    attendanceBreakdown.present,
-    attendanceBreakdown.late,
-    attendanceBreakdown.excused,
-    attendanceBreakdown.absent,
-  ]
-    .map((value) => formatInteger(value))
-    .join('/');
-
-  const totalActivitiesLabel = formatInteger(attendanceBreakdown.totalActivities);
-
   return [
     {
       id: 'average-attendance-rate',
       icon: 'stats-chart',
       label: 'Rata-rata Kehadiran',
       value: averageRateValue,
-      description: `Berdasarkan ${totalActivitiesLabel} aktivitas diverifikasi`,
+      description: 'Persentase rata-rata kehadiran tutor yang tercatat.',
       color: '#0284c7',
     },
     {
@@ -1090,24 +913,8 @@ export const buildTutorSummaryCards = (summary) => {
       icon: 'people-circle',
       label: 'Total Tutor',
       value: formatInteger(totalTutors),
-      description: 'Tutor terpantau dalam laporan ini',
+      description: 'Jumlah tutor yang terpantau dalam laporan ini.',
       color: '#6366f1',
-    },
-    {
-      id: 'category-distribution',
-      icon: 'pie-chart',
-      label: `Distribusi Kategori Utama (${primaryCategoryLabel})`,
-      value: primaryCategoryCount,
-      description: `${noDataLabel}: ${noDataCount}`,
-      color: '#f97316',
-    },
-    {
-      id: 'verified-activities',
-      icon: 'checkmark-done-circle',
-      label: 'Aktivitas Diverifikasi',
-      value: breakdownValue,
-      description: `Hadir/Terlambat/Izin/Tidak Hadir · ${totalActivitiesLabel} aktivitas`,
-      color: '#10b981',
     },
   ];
 };
