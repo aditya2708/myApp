@@ -34,7 +34,15 @@ const AdminCabangTutorReportScreen = () => {
   }, [navigation]);
 
   const normalizedTutors = useMemo(
-    () => (Array.isArray(rawTutors) ? rawTutors.map(normalizeTutorRecord) : []),
+    () => (
+      Array.isArray(rawTutors)
+        ? rawTutors
+            .map(normalizeTutorRecord)
+            .sort(
+              (a, b) => (b?.present_count ?? 0) - (a?.present_count ?? 0),
+            )
+        : []
+    ),
     [rawTutors],
   );
 
