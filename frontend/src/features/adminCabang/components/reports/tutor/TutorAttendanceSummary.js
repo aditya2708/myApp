@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View, Text, useWindowDimensions } from 'react-native';
 
-import ReportSummaryCard from '../../ReportSummaryCard';
+import ReportSummaryCard from '../ReportSummaryCard';
 import { buildTutorSummaryCards, formatInteger } from '../../../utils/tutorReportHelpers';
 
 const formatRate = (rate) => {
