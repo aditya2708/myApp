@@ -220,6 +220,26 @@ class AdminCabangTutorReportControllerTest extends TestCase
         $summary = $payload['summary'];
         $this->assertSame(4, $summary['total_tutors']);
         $this->assertSame(61.67, $summary['average_attendance_rate']);
+        $this->assertSame([
+            'totals' => [
+                'activities' => 14,
+                'records' => 14,
+                'attended' => 9,
+            ],
+            'breakdown' => [
+                'present' => 7,
+                'late' => 2,
+                'absent' => 5,
+            ],
+            'verified' => [
+                'total' => 14,
+                'present' => 7,
+                'late' => 2,
+                'absent' => 5,
+                'attended' => 9,
+            ],
+            'rate' => 64.29,
+        ], $summary['attendance']);
 
         $expectedDistribution = [
             'high' => [
@@ -332,6 +352,26 @@ class AdminCabangTutorReportControllerTest extends TestCase
         $summary = $payload['summary'];
         $this->assertSame(1, $summary['total_tutors']);
         $this->assertSame(100.0, $summary['average_attendance_rate']);
+        $this->assertSame([
+            'totals' => [
+                'activities' => 4,
+                'records' => 4,
+                'attended' => 4,
+            ],
+            'breakdown' => [
+                'present' => 3,
+                'late' => 1,
+                'absent' => 0,
+            ],
+            'verified' => [
+                'total' => 4,
+                'present' => 3,
+                'late' => 1,
+                'absent' => 0,
+                'attended' => 4,
+            ],
+            'rate' => 100.0,
+        ], $summary['attendance']);
 
         $this->assertSame([
             'high' => [

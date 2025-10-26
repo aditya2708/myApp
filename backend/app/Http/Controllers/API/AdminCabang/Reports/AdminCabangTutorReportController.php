@@ -167,6 +167,41 @@ class AdminCabangTutorReportController extends Controller
         $rates = $tutors->pluck('attendance.rate')->filter(fn($rate) => $rate !== null);
         $averageRate = $rates->isEmpty() ? null : round($rates->avg(), 2);
 
+        $sumActivities = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.totals.activities', 0));
+        $sumRecords = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.totals.records', 0));
+        $sumAttended = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.totals.attended', 0));
+
+        $sumPresent = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.breakdown.present', 0));
+        $sumLate = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.breakdown.late', 0));
+        $sumAbsent = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.breakdown.absent', 0));
+
+        $sumVerifiedTotal = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.verified.total', 0));
+        $sumVerifiedPresent = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.verified.present', 0));
+        $sumVerifiedLate = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.verified.late', 0));
+        $sumVerifiedAbsent = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.verified.absent', 0));
+        $sumVerifiedAttended = $tutors->sum(fn ($tutor) => (int) data_get($tutor, 'attendance.verified.attended', 0));
+
+        $attendanceSummary = [
+            'totals' => [
+                'activities' => $sumActivities,
+                'records' => $sumRecords,
+                'attended' => $sumAttended,
+            ],
+            'breakdown' => [
+                'present' => $sumPresent,
+                'late' => $sumLate,
+                'absent' => $sumAbsent,
+            ],
+            'verified' => [
+                'total' => $sumVerifiedTotal,
+                'present' => $sumVerifiedPresent,
+                'late' => $sumVerifiedLate,
+                'absent' => $sumVerifiedAbsent,
+                'attended' => $sumVerifiedAttended,
+            ],
+            'rate' => $sumActivities > 0 ? round(($sumAttended / $sumActivities) * 100, 2) : null,
+        ];
+
         $distributionSummary = $distribution->map(function ($count, $key) use ($totalTutors, $categoryLabels) {
             return [
                 'count' => $count,
@@ -190,6 +225,7 @@ class AdminCabangTutorReportController extends Controller
                 'total_tutors' => $totalTutors,
                 'average_attendance_rate' => $averageRate,
                 'distribution' => $distributionSummary,
+                'attendance' => $attendanceSummary,
             ],
             'meta' => [
                 'branch' => $branchMetadata,
