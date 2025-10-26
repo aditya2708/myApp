@@ -177,11 +177,31 @@ const formatDateLabel = (value) => {
   try {
     return new Intl.DateTimeFormat('id-ID', {
       day: 'numeric',
-      month: 'short',
+      month: 'long',
       year: 'numeric',
     }).format(date);
   } catch (err) {
-    return sanitized;
+    const monthNames = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+
+    const monthName = monthNames[date.getMonth()];
+    if (monthName) {
+      return `${date.getDate()} ${monthName} ${date.getFullYear()}`;
+    }
+
+    return formatDateToLocalISO(date) ?? sanitized;
   }
 };
 
