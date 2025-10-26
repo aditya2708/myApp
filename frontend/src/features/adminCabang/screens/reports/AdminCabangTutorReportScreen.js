@@ -9,9 +9,6 @@ import TutorAttendanceEmptyState from '../../components/reports/tutor/TutorAtten
 import TutorAttendanceSummary from '../../components/reports/tutor/TutorAttendanceSummary';
 import { useTutorAttendanceReport } from '../../hooks/reports/useTutorAttendanceReport';
 import {
-  buildSummaryHighlights,
-  formatInteger,
-  highlightGridStyles,
   normalizeTutorRecord,
   summarizeTutors,
 } from '../../utils/tutorReportHelpers';
@@ -46,8 +43,6 @@ const AdminCabangTutorReportScreen = () => {
     [normalizedTutors, summary],
   );
 
-  const summaryHighlights = useMemo(() => buildSummaryHighlights(summary), [summary]);
-
   const isInitialLoading = loading && !refreshing && normalizedTutors.length === 0 && !error;
 
   const handleRefresh = useCallback(() => {
@@ -58,34 +53,50 @@ const AdminCabangTutorReportScreen = () => {
     refetch();
   }, [refetch]);
 
-  const renderListHeader = useCallback(() => (
-    <View style={styles.listHeader}>
-      {meta?.last_refreshed_at ? (
-        <Text style={styles.lastUpdatedText}>
-          Terakhir diperbarui: {meta.last_refreshed_at}
-        </Text>
-      ) : null}
+  const renderListHeader = useCallback(() => {
+    const lastRefreshedAt = meta?.last_refreshed_at
+      ?? meta?.timestamps?.last_refreshed_at
+      ?? meta?.lastUpdatedAt
+      ?? meta?.updated_at
+      ?? meta?.updatedAt
+      ?? null;
 
-      {summaryHighlights.length > 0 ? (
-        <View style={highlightGridStyles.container}>
-          {summaryHighlights.map((item) => (
-            <View key={item.key} style={highlightGridStyles.card}>
-              <Text style={styles.highlightLabel}>{item.label}</Text>
-              <Text style={styles.highlightValue}>{formatInteger(item.value)}</Text>
-            </View>
-          ))}
+    const periodLabel = meta?.period?.label
+      ?? meta?.period_label
+      ?? meta?.filters?.period_label
+      ?? meta?.filters?.periodLabel
+      ?? meta?.filters?.periode_label
+      ?? meta?.filters?.periodeLabel
+      ?? meta?.filters?.periode
+      ?? meta?.filters?.date_range?.label
+      ?? meta?.filters?.dateRange?.label
+      ?? meta?.date_range?.label
+      ?? meta?.range_label
+      ?? null;
+
+    return (
+      <View style={styles.listHeader}>
+        <View style={styles.pageHeader}>
+          <Text style={styles.pageTitle}>Laporan Kehadiran Tutor</Text>
+          <Text style={styles.pageSubtitle}>
+            Pantau performa kehadiran tutor cabang Anda.
+          </Text>
+          {lastRefreshedAt ? (
+            <Text style={styles.pageMetaText}>Terakhir diperbarui: {lastRefreshedAt}</Text>
+          ) : null}
+          {periodLabel ? (
+            <Text style={styles.pageMetaText}>Periode: {periodLabel}</Text>
+          ) : null}
         </View>
-      ) : null}
 
-      <Text style={styles.filterStatusText}>
-        Menampilkan seluruh data kehadiran tutor cabang.
-      </Text>
-
-      <View style={styles.summaryWrapper}>
         <TutorAttendanceSummary summary={attendanceSummary} />
+
+        <Text style={styles.filterStatusText}>
+          Menampilkan seluruh data kehadiran tutor cabang.
+        </Text>
       </View>
-    </View>
-  ), [attendanceSummary, meta?.last_refreshed_at, summaryHighlights]);
+    );
+  }, [attendanceSummary, meta]);
 
   if (isInitialLoading) {
     return (
@@ -162,27 +173,29 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   listHeader: {
-    gap: 12,
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  lastUpdatedText: {
-    fontSize: 12,
-    color: '#64748b',
+  pageHeader: {
+    gap: 6,
   },
-  highlightLabel: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginBottom: 4,
-  },
-  highlightValue: {
-    fontSize: 18,
+  pageTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#1f2937',
+  },
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  pageMetaText: {
+    fontSize: 12,
+    color: '#94a3b8',
   },
   filterStatusText: {
     fontSize: 12,
     color: '#64748b',
-  },
-  summaryWrapper: {
     marginTop: 4,
   },
 });
