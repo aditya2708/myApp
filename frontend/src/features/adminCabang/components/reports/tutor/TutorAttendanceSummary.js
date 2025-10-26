@@ -4,8 +4,33 @@ import { StyleSheet, View, Text, useWindowDimensions } from 'react-native';
 import ReportSummaryCard from '../../ReportSummaryCard';
 import { buildTutorSummaryCards } from '../../../utils/tutorReportHelpers';
 
+const formatRate = (rate) => {
+  if (rate === null || rate === undefined || rate === '') {
+    return '-';
+  }
+
+  const sanitized = typeof rate === 'string' ? rate.replace(/%/g, '').trim() : rate;
+  const numericRate = Number(sanitized);
+
+  if (!Number.isFinite(numericRate)) {
+    return '-';
+  }
+
+  const isFraction = numericRate !== 0 && Math.abs(numericRate) <= 1;
+  const normalized = isFraction ? numericRate * 100 : numericRate;
+
+  return `${normalized.toFixed(2)}%`;
+};
+
 const TutorAttendanceSummary = ({ summary, style }) => {
-  const cards = useMemo(() => buildTutorSummaryCards(summary), [summary]);
+  const cards = useMemo(() => {
+    const baseCards = buildTutorSummaryCards(summary);
+    return baseCards.map((card) => (
+      card.id === 'average-attendance-rate'
+        ? { ...card, value: formatRate(card.value) }
+        : card
+    ));
+  }, [summary]);
   const { width } = useWindowDimensions();
   const isCompact = width < 720;
 
