@@ -37,9 +37,13 @@ export const useTutorAttendanceReport = (initialParams = {}) => {
         const nextData = payload.data ?? [];
         const { meta: payloadMeta, metadata: legacyMetadata } = payload || {};
 
+        const summaryPayload = typeof payload.summary === 'object' || payload.summary === null
+          ? payload.summary
+          : null;
+
         setState({
           data: nextData,
-          summary: payload.summary ?? null,
+          summary: summaryPayload,
           meta: payloadMeta ?? legacyMetadata ?? {},
         });
 
