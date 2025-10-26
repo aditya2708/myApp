@@ -1,4 +1,4 @@
-import { buildTutorSummaryCards } from '../tutorReportHelpers';
+import { buildTutorSummaryCards, summarizeTutors } from '../tutorReportHelpers';
 
 describe('buildTutorSummaryCards', () => {
   const baseSummary = {
@@ -31,7 +31,7 @@ describe('buildTutorSummaryCards', () => {
 
     const averageCard = cards.find((card) => card.id === 'average-attendance-rate');
     expect(averageCard).toBeDefined();
-    expect(averageCard.value).toBe('24%');
+    expect(averageCard.value).toBe(24);
     expect(averageCard.description).toContain('19');
 
     const totalTutorsCard = cards.find((card) => card.id === 'total-tutors');
@@ -61,10 +61,51 @@ describe('buildTutorSummaryCards', () => {
     });
 
     expect(cards).toHaveLength(4);
-    expect(cards[0].value).toBe('0%');
+    expect(cards[0].value).toBeNull();
     expect(cards[1].value).toBe('0');
     expect(cards[2].value).toBe('0');
     expect(cards[2].description).toContain('0');
     expect(cards[3].value).toBe('0/0/0/0');
+  });
+});
+
+describe('summarizeTutors', () => {
+  it('normalizes fractional averages to percentage scale', () => {
+    const result = summarizeTutors([], {
+      total_tutors: 12,
+      average_attendance_rate: 0.24,
+      distribution: {},
+    });
+
+    expect(result.average_attendance_rate).toBe(24);
+  });
+
+  it('converts tutor records with fractional rates to percentages', () => {
+    const result = summarizeTutors([
+      { attendance_rate: 0.245, category: 'low' },
+      { attendance_rate: 0.5, category: 'medium' },
+    ]);
+
+    expect(result.average_attendance_rate).toBe(37.25);
+  });
+
+  it('retains percent-based averages without additional scaling', () => {
+    const result = summarizeTutors([], {
+      total_tutors: 8,
+      average_attendance_rate: 11.76,
+      distribution: {},
+    });
+
+    expect(result.average_attendance_rate).toBe(11.76);
+  });
+
+  it('parses percentage strings from the API', () => {
+    const result = summarizeTutors([], {
+      total_tutors: 5,
+      average_attendance_rate: '24%',
+      distribution: {},
+    });
+
+    expect(result.average_attendance_rate).toBe(24);
   });
 });

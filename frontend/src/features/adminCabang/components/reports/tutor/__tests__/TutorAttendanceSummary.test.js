@@ -3,7 +3,7 @@ import { render } from '@testing-library/react-native';
 
 import TutorAttendanceSummary from '../TutorAttendanceSummary';
 
-const mockSummary = {
+const baseSummary = {
   total_tutors: 55,
   average_attendance_rate: 0.24,
   distribution: {
@@ -28,15 +28,37 @@ const mockSummary = {
 
 describe('TutorAttendanceSummary', () => {
   it('renders summary cards with expected values', () => {
-    const { getByText } = render(<TutorAttendanceSummary summary={mockSummary} />);
+    const { getByText } = render(<TutorAttendanceSummary summary={baseSummary} />);
 
     expect(getByText('Ringkasan Kehadiran Tutor')).toBeTruthy();
-    expect(getByText('24%')).toBeTruthy();
+    expect(getByText('24.00%')).toBeTruthy();
     expect(getByText('55')).toBeTruthy();
     expect(getByText('Distribusi Kategori Utama (Rendah)')).toBeTruthy();
     expect(getByText('3')).toBeTruthy();
     expect(getByText(/Tidak Ada Data: 52/)).toBeTruthy();
     expect(getByText('17/2/0/0')).toBeTruthy();
+  });
+
+  it('keeps percent-scale averages untouched', () => {
+    const summary = {
+      ...baseSummary,
+      average_attendance_rate: 11.76,
+    };
+
+    const { getByText } = render(<TutorAttendanceSummary summary={summary} />);
+
+    expect(getByText('11.76%')).toBeTruthy();
+  });
+
+  it('shows fallback dash when the rate is unavailable', () => {
+    const summary = {
+      ...baseSummary,
+      average_attendance_rate: null,
+    };
+
+    const { getByText } = render(<TutorAttendanceSummary summary={summary} />);
+
+    expect(getByText('-')).toBeTruthy();
   });
 
   it('does not render when summary produces no cards', () => {

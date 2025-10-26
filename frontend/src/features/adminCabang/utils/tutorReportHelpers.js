@@ -772,19 +772,42 @@ const normalizeDistributionEntry = (entry) => {
   };
 };
 
+const toPercentageScale = (value) => {
+  const rawValue = typeof value === 'string' ? value.replace(/%/g, '').trim() : value;
+  const numeric = toNumberOrNull(rawValue);
+  if (numeric === null) {
+    return null;
+  }
+
+  const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  return Number.isFinite(normalized) ? normalized : null;
+};
+
+const normalizeTutorPercentageValue = (value) => {
+  const scaled = toPercentageScale(value);
+  if (scaled === null) {
+    return null;
+  }
+
+  return Number(scaled.toFixed(2));
+};
+
 export const summarizeTutors = (tutors = [], summary = null) => {
   const fallbackSummary = Array.isArray(tutors) && tutors.length > 0
     ? (() => {
       const totalTutors = tutors.length;
-      const totalRate = tutors.reduce((acc, tutor) => (
-        typeof tutor.attendance_rate === 'number' ? acc + tutor.attendance_rate : acc
-      ), 0);
+      const totalRate = tutors.reduce((acc, tutor) => {
+        const normalizedRate = toPercentageScale(tutor.attendance_rate);
+        return normalizedRate === null ? acc : acc + normalizedRate;
+      }, 0);
       const averageRate = totalTutors > 0
         ? Number((totalRate / totalTutors).toFixed(2))
         : 0;
 
       const distributionCounts = tutors.reduce((acc, tutor) => {
-        const categoryKey = tutor.category?.key ?? tutor.category ?? deriveCategoryFromRate(tutor.attendance_rate);
+        const normalizedRate = toPercentageScale(tutor.attendance_rate);
+        const rateForCategory = normalizedRate ?? toNumberOrNull(tutor.attendance_rate) ?? 0;
+        const categoryKey = tutor.category?.key ?? tutor.category ?? deriveCategoryFromRate(rateForCategory);
         const key = typeof categoryKey === 'string' ? categoryKey : 'no_data';
         acc[key] = (acc[key] ?? 0) + 1;
         return acc;
@@ -822,7 +845,7 @@ export const summarizeTutors = (tutors = [], summary = null) => {
     summary.count,
   ));
 
-  const averageRate = toNumberOrNull(firstDefined(
+  const averageRate = normalizeTutorPercentageValue(firstDefined(
     summary.average_attendance_rate,
     summary.averageAttendanceRate,
     summary.attendanceRate,
@@ -844,7 +867,7 @@ export const summarizeTutors = (tutors = [], summary = null) => {
 
   const resolvedAverage = averageRate === null
     ? fallbackSummary.average_attendance_rate
-    : Number(averageRate.toFixed(2));
+    : averageRate;
 
   return {
     total_tutors: totalTutors || fallbackSummary.total_tutors,
@@ -875,18 +898,6 @@ const resolveTutorDistribution = (summary) => {
         ?? distributionSource.unknown,
     ),
   };
-};
-
-const formatTutorPercentage = (value) => {
-  const numeric = toNumberOrNull(value);
-  if (numeric === null) {
-    return '0%';
-  }
-
-  const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
-  const rounded = Number.isFinite(normalized) ? Math.round(normalized) : 0;
-
-  return `${rounded.toLocaleString('id-ID')}%`;
 };
 
 const resolveAttendanceBreakdown = (summary = {}) => {
@@ -1026,7 +1037,7 @@ export const buildTutorSummaryCards = (summary) => {
     summary.count,
   ));
 
-  const averageRateLabel = formatTutorPercentage(firstDefined(
+  const averageRateValue = normalizeTutorPercentageValue(firstDefined(
     summary.average_attendance_rate,
     summary.averageAttendanceRate,
     summary.attendanceRate,
@@ -1070,7 +1081,7 @@ export const buildTutorSummaryCards = (summary) => {
       id: 'average-attendance-rate',
       icon: 'stats-chart',
       label: 'Rata-rata Kehadiran',
-      value: averageRateLabel,
+      value: averageRateValue,
       description: `Berdasarkan ${totalActivitiesLabel} aktivitas diverifikasi`,
       color: '#0284c7',
     },
