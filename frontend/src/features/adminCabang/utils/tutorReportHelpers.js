@@ -886,40 +886,64 @@ export const buildSummaryHighlights = (summary) => {
     return [];
   }
 
-  const attendanceSummary = summary.attendance ?? summary.totals ?? {};
-  const totals = attendanceSummary.totals ?? attendanceSummary ?? {};
-  const verifiedTotals = attendanceSummary.verified ?? totals.verified ?? {};
-  const breakdown = attendanceSummary.breakdown ?? totals.breakdown ?? {};
+  const attendance = typeof summary.attendance === 'object' && summary.attendance !== null
+    ? summary.attendance
+    : null;
+
+  const attendanceTotals = attendance?.totals ?? attendance ?? {};
+  const attendanceVerified = attendance?.verified ?? attendanceTotals.verified ?? {};
+  const attendanceBreakdown = attendance?.breakdown ?? attendanceTotals.breakdown ?? {};
+
+  const legacyTotals = summary.totals ?? {};
+  const legacyVerified = summary.verified ?? legacyTotals.verified ?? {};
+  const legacyBreakdown = summary.breakdown ?? legacyTotals.breakdown ?? {};
 
   const totalActivities = firstDefined(
-    totals.activities,
-    totals.total,
-    totals.activity,
+    attendanceTotals.activities,
+    attendanceTotals.total,
+    attendanceTotals.activity,
+    attendanceVerified.total,
+    attendanceBreakdown.total,
+    legacyTotals.activities,
+    legacyTotals.total,
+    legacyTotals.activity,
+    legacyVerified.total,
+    legacyBreakdown.total,
     summary.totalActivities,
     summary.total_activities,
-    verifiedTotals.total,
+    summary.totalSessions,
+    summary.total_sessions,
   );
 
   const present = firstDefined(
-    verifiedTotals.present,
-    breakdown.present,
-    totals.present,
+    attendanceVerified.present,
+    attendanceBreakdown.present,
+    attendanceTotals.present,
+    legacyVerified.present,
+    legacyBreakdown.present,
+    legacyTotals.present,
     summary.presentCount,
     summary.present_count,
   );
 
   const late = firstDefined(
-    verifiedTotals.late,
-    breakdown.late,
-    totals.late,
+    attendanceVerified.late,
+    attendanceBreakdown.late,
+    attendanceTotals.late,
+    legacyVerified.late,
+    legacyBreakdown.late,
+    legacyTotals.late,
     summary.lateCount,
     summary.late_count,
   );
 
   const absent = firstDefined(
-    verifiedTotals.absent,
-    breakdown.absent,
-    totals.absent,
+    attendanceVerified.absent,
+    attendanceBreakdown.absent,
+    attendanceTotals.absent,
+    legacyVerified.absent,
+    legacyBreakdown.absent,
+    legacyTotals.absent,
     summary.absentCount,
     summary.absent_count,
   );
