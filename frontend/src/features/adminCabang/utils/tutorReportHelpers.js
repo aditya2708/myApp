@@ -1,5 +1,3 @@
-import { StyleSheet } from 'react-native';
-
 export const DEFAULT_FILTERS = {
   date_from: null,
   date_to: null,
@@ -14,29 +12,6 @@ const CATEGORY_LABELS = {
   low: 'Rendah',
   no_data: 'Tidak Ada Data',
 };
-
-export const highlightGridStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    minWidth: 120,
-    flexGrow: 1,
-    flexBasis: '48%',
-    maxWidth: '48%',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-});
 
 export const deriveCategoryFromRate = (rate) => {
   if (typeof rate !== 'number' || Number.isNaN(rate)) {
@@ -881,9 +856,48 @@ export const summarizeTutors = (tutors = [], summary = null) => {
   };
 };
 
-export const buildSummaryHighlights = (summary) => {
+const resolveTutorDistribution = (summary) => {
+  const distributionSource = summary?.distribution
+    ?? summary?.attendance?.distribution
+    ?? summary?.category_distribution
+    ?? summary?.categories
+    ?? {};
+
+  return {
+    high: normalizeDistributionEntry(distributionSource.high),
+    medium: normalizeDistributionEntry(distributionSource.medium),
+    low: normalizeDistributionEntry(distributionSource.low),
+    no_data: normalizeDistributionEntry(
+      distributionSource.no_data
+        ?? distributionSource.noData
+        ?? distributionSource.none
+        ?? distributionSource.undefined
+        ?? distributionSource.unknown,
+    ),
+  };
+};
+
+const formatTutorPercentage = (value) => {
+  const numeric = toNumberOrNull(value);
+  if (numeric === null) {
+    return '0%';
+  }
+
+  const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  const rounded = Number.isFinite(normalized) ? Math.round(normalized) : 0;
+
+  return `${rounded.toLocaleString('id-ID')}%`;
+};
+
+const resolveAttendanceBreakdown = (summary = {}) => {
   if (!summary || typeof summary !== 'object') {
-    return [];
+    return {
+      present: 0,
+      late: 0,
+      excused: 0,
+      absent: 0,
+      totalActivities: 0,
+    };
   }
 
   const attendance = typeof summary.attendance === 'object' && summary.attendance !== null
@@ -898,7 +912,83 @@ export const buildSummaryHighlights = (summary) => {
   const legacyVerified = summary.verified ?? legacyTotals.verified ?? {};
   const legacyBreakdown = summary.breakdown ?? legacyTotals.breakdown ?? {};
 
-  const totalActivities = firstDefined(
+  const present = toIntegerOrZero(firstDefined(
+    attendanceVerified.present,
+    attendanceBreakdown.present,
+    attendanceTotals.present,
+    legacyVerified.present,
+    legacyBreakdown.present,
+    legacyTotals.present,
+    summary.present,
+    summary.presentCount,
+    summary.present_count,
+  ));
+
+  const late = toIntegerOrZero(firstDefined(
+    attendanceVerified.late,
+    attendanceBreakdown.late,
+    attendanceTotals.late,
+    legacyVerified.late,
+    legacyBreakdown.late,
+    legacyTotals.late,
+    summary.late,
+    summary.lateCount,
+    summary.late_count,
+  ));
+
+  const excused = toIntegerOrZero(firstDefined(
+    attendanceVerified.excused,
+    attendanceVerified.excuse,
+    attendanceVerified.permit,
+    attendanceVerified.permission,
+    attendanceVerified.sick,
+    attendanceBreakdown.excused,
+    attendanceBreakdown.excuse,
+    attendanceBreakdown.permit,
+    attendanceBreakdown.permission,
+    attendanceBreakdown.sick,
+    attendanceTotals.excused,
+    attendanceTotals.excuse,
+    attendanceTotals.permit,
+    attendanceTotals.permission,
+    attendanceTotals.sick,
+    legacyVerified.excused,
+    legacyVerified.excuse,
+    legacyVerified.permit,
+    legacyVerified.permission,
+    legacyVerified.sick,
+    legacyBreakdown.excused,
+    legacyBreakdown.excuse,
+    legacyBreakdown.permit,
+    legacyBreakdown.permission,
+    legacyBreakdown.sick,
+    legacyTotals.excused,
+    legacyTotals.excuse,
+    legacyTotals.permit,
+    legacyTotals.permission,
+    legacyTotals.sick,
+    summary.excused,
+    summary.excused_count,
+    summary.excuse,
+    summary.permit,
+    summary.permission,
+    summary.izin,
+    summary.sick,
+  ));
+
+  const absent = toIntegerOrZero(firstDefined(
+    attendanceVerified.absent,
+    attendanceBreakdown.absent,
+    attendanceTotals.absent,
+    legacyVerified.absent,
+    legacyBreakdown.absent,
+    legacyTotals.absent,
+    summary.absent,
+    summary.absentCount,
+    summary.absent_count,
+  ));
+
+  const totalActivities = toIntegerOrZero(firstDefined(
     attendanceTotals.activities,
     attendanceTotals.total,
     attendanceTotals.activity,
@@ -913,47 +1003,102 @@ export const buildSummaryHighlights = (summary) => {
     summary.total_activities,
     summary.totalSessions,
     summary.total_sessions,
-  );
+  ));
 
-  const present = firstDefined(
-    attendanceVerified.present,
+  return {
+    present,
+    late,
+    excused,
+    absent,
+    totalActivities,
+  };
+};
+
+export const buildTutorSummaryCards = (summary) => {
+  if (!summary || typeof summary !== 'object') {
+    return [];
+  }
+
+  const totalTutors = toIntegerOrZero(firstDefined(
+    summary.total_tutors,
+    summary.totalTutors,
+    summary.total,
+    summary.count,
+  ));
+
+  const averageRateLabel = formatTutorPercentage(firstDefined(
+    summary.average_attendance_rate,
+    summary.averageAttendanceRate,
+    summary.attendanceRate,
+    summary.attendance_rate,
+    summary.rate,
+  ));
+
+  const distribution = resolveTutorDistribution(summary);
+  const primaryDistributionKeys = ['high', 'medium', 'low'];
+
+  let primaryCategoryKey = 'high';
+  let highestCount = -1;
+  primaryDistributionKeys.forEach((key) => {
+    const candidateCount = distribution[key]?.count ?? 0;
+    if (candidateCount > highestCount) {
+      highestCount = candidateCount;
+      primaryCategoryKey = key;
+    }
+  });
+
+  const primaryCategoryLabel = deriveCategoryLabel(primaryCategoryKey);
+  const primaryCategoryCount = formatInteger(distribution[primaryCategoryKey]?.count ?? 0);
+
+  const noDataLabel = deriveCategoryLabel('no_data');
+  const noDataCount = formatInteger(distribution.no_data?.count ?? 0);
+
+  const attendanceBreakdown = resolveAttendanceBreakdown(summary);
+  const breakdownValue = [
     attendanceBreakdown.present,
-    attendanceTotals.present,
-    legacyVerified.present,
-    legacyBreakdown.present,
-    legacyTotals.present,
-    summary.presentCount,
-    summary.present_count,
-  );
-
-  const late = firstDefined(
-    attendanceVerified.late,
     attendanceBreakdown.late,
-    attendanceTotals.late,
-    legacyVerified.late,
-    legacyBreakdown.late,
-    legacyTotals.late,
-    summary.lateCount,
-    summary.late_count,
-  );
-
-  const absent = firstDefined(
-    attendanceVerified.absent,
+    attendanceBreakdown.excused,
     attendanceBreakdown.absent,
-    attendanceTotals.absent,
-    legacyVerified.absent,
-    legacyBreakdown.absent,
-    legacyTotals.absent,
-    summary.absentCount,
-    summary.absent_count,
-  );
+  ]
+    .map((value) => formatInteger(value))
+    .join('/');
+
+  const totalActivitiesLabel = formatInteger(attendanceBreakdown.totalActivities);
 
   return [
-    { key: 'activities', label: 'Total Aktivitas', value: totalActivities },
-    { key: 'present', label: 'Hadir', value: present },
-    { key: 'late', label: 'Terlambat', value: late },
-    { key: 'absent', label: 'Tidak Hadir', value: absent },
-  ].filter((item) => item.value !== undefined && item.value !== null);
+    {
+      id: 'average-attendance-rate',
+      icon: 'stats-chart',
+      label: 'Rata-rata Kehadiran',
+      value: averageRateLabel,
+      description: `Berdasarkan ${totalActivitiesLabel} aktivitas diverifikasi`,
+      color: '#0284c7',
+    },
+    {
+      id: 'total-tutors',
+      icon: 'people-circle',
+      label: 'Total Tutor',
+      value: formatInteger(totalTutors),
+      description: 'Tutor terpantau dalam laporan ini',
+      color: '#6366f1',
+    },
+    {
+      id: 'category-distribution',
+      icon: 'pie-chart',
+      label: `Distribusi Kategori Utama (${primaryCategoryLabel})`,
+      value: primaryCategoryCount,
+      description: `${noDataLabel}: ${noDataCount}`,
+      color: '#f97316',
+    },
+    {
+      id: 'verified-activities',
+      icon: 'checkmark-done-circle',
+      label: 'Aktivitas Diverifikasi',
+      value: breakdownValue,
+      description: `Hadir/Terlambat/Izin/Tidak Hadir · ${totalActivitiesLabel} aktivitas`,
+      color: '#10b981',
+    },
+  ];
 };
 
 export default {
@@ -972,6 +1117,5 @@ export default {
   composeApiParamsFromFilters,
   normalizeTutorRecord,
   summarizeTutors,
-  buildSummaryHighlights,
-  highlightGridStyles,
+  buildTutorSummaryCards,
 };
