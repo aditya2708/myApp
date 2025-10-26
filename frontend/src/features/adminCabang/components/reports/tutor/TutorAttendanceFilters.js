@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import DatePicker from '../../../../../common/components/DatePicker';
 import PickerInput from '../../../../../common/components/PickerInput';
+import { formatDateToLocalISO } from '../../../../../common/utils/dateUtils';
 
 const toOptionArray = (value) => {
   if (!value) return [];
@@ -154,12 +155,25 @@ const parseDate = (value) => {
     return Number.isNaN(value.getTime()) ? null : value;
   }
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const isoDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const matches = trimmed.match(isoDatePattern);
+
+    if (matches) {
+      const [, year, month, day] = matches;
+      const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  return parsed;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 const formatDateLabel = (value) => {
@@ -173,7 +187,7 @@ const formatDateLabel = (value) => {
       year: 'numeric',
     }).format(parsed);
   } catch (err) {
-    return parsed.toISOString().split('T')[0];
+    return formatDateToLocalISO(parsed);
   }
 };
 
@@ -202,8 +216,8 @@ const initializeFilters = (filters = {}, defaults = {}) => {
   };
 
   const getDate = (value, fallback) => {
-    const parsed = parseDate(value);
-    if (parsed) return parsed.toISOString().split('T')[0];
+    const formatted = formatDateToLocalISO(value);
+    if (formatted) return formatted;
     return fallback ?? '';
   };
 
@@ -278,7 +292,11 @@ const TutorAttendanceFilters = ({
       return;
     }
 
-    const iso = nextDate.toISOString().split('T')[0];
+    const iso = formatDateToLocalISO(nextDate);
+    if (!iso) {
+      setActiveDatePicker(null);
+      return;
+    }
     setLocalFilters((prev) => ({
       ...prev,
       start_date: activeDatePicker === 'start' ? iso : prev.start_date,

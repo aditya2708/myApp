@@ -8,6 +8,7 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
 import TutorAttendanceList from '../../components/reports/tutor/TutorAttendanceList';
 import TutorAttendanceEmptyState from '../../components/reports/tutor/TutorAttendanceEmptyState';
 import TutorAttendanceSummary from '../../components/reports/tutor/TutorAttendanceSummary';
+import { formatDateToLocalISO } from '../../../../common/utils/dateUtils';
 import TutorAttendanceFilters, {
   mapTutorFilterOptions,
 } from '../../components/reports/tutor/TutorAttendanceFilters';
@@ -19,10 +20,10 @@ import {
 
 const createLastSevenDaysRange = () => {
   const today = new Date();
-  const end = today.toISOString().split('T')[0];
+  const end = formatDateToLocalISO(today);
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - 6);
-  const start = startDate.toISOString().split('T')[0];
+  const start = formatDateToLocalISO(startDate);
 
   return {
     start_date: start,
@@ -33,23 +34,23 @@ const createLastSevenDaysRange = () => {
 const sanitizeDateValue = (value) => {
   if (!value) return null;
   if (value instanceof Date) {
-    return value.toISOString().split('T')[0];
+    return formatDateToLocalISO(value);
   }
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (!trimmed) return null;
-    const parsed = new Date(trimmed);
-    if (Number.isNaN(parsed.getTime())) {
-      return trimmed;
+    const formatted = formatDateToLocalISO(trimmed);
+    if (formatted) {
+      return formatted;
     }
-    return parsed.toISOString().split('T')[0];
+    return trimmed;
   }
 
   if (typeof value === 'number') {
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().split('T')[0];
+      return formatDateToLocalISO(parsed);
     }
   }
 
