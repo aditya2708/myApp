@@ -772,6 +772,245 @@ const normalizeDistributionEntry = (entry) => {
   };
 };
 
+const toOptionalInteger = (value) => {
+  const numeric = toNumberOrNull(value);
+  return numeric === null ? null : Math.round(numeric);
+};
+
+const hasValue = (value) => {
+  if (value === undefined || value === null) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() !== '';
+  }
+
+  return true;
+};
+
+const assignIntegerField = (target, key, candidate, fallbackValue) => {
+  if (hasValue(target[key])) {
+    return;
+  }
+
+  if (candidate !== null) {
+    target[key] = candidate;
+    return;
+  }
+
+  if (fallbackValue !== undefined) {
+    target[key] = fallbackValue;
+  }
+};
+
+const assignRateField = (target, candidate, fallbackValue) => {
+  if (hasValue(target.rate)) {
+    return;
+  }
+
+  if (candidate !== null) {
+    target.rate = candidate;
+    return;
+  }
+
+  if (fallbackValue !== undefined) {
+    target.rate = fallbackValue;
+  }
+};
+
+const buildAttendanceDetailFromTutors = (tutors = []) => {
+  if (!Array.isArray(tutors) || tutors.length === 0) {
+    return {
+      activities: 0,
+      records: 0,
+      attended: 0,
+      rate: 0,
+    };
+  }
+
+  const totals = tutors.reduce((acc, tutor, index) => {
+    if (!tutor || typeof tutor !== 'object') {
+      return acc;
+    }
+
+    const normalized = normalizeTutorRecord(tutor, index);
+    const present = toIntegerOrZero(normalized.present_count);
+    const late = toIntegerOrZero(normalized.late_count);
+    const absent = toIntegerOrZero(normalized.absent_count);
+    const totalActivities = toOptionalInteger(normalized.total_activities);
+
+    const records = present + late + absent;
+
+    acc.records += records;
+    acc.attended += present + late;
+    acc.activities += totalActivities === null ? records : totalActivities;
+
+    return acc;
+  }, {
+    activities: 0,
+    records: 0,
+    attended: 0,
+  });
+
+  const rate = totals.records > 0
+    ? Number(((totals.attended / totals.records) * 100).toFixed(2))
+    : 0;
+
+  return {
+    activities: totals.activities,
+    records: totals.records,
+    attended: totals.attended,
+    rate,
+  };
+};
+
+const normalizeAttendanceDetail = (
+  attendanceSource,
+  fallback = { activities: 0, records: 0, attended: 0, rate: 0 },
+) => {
+  const base = {
+    activities: fallback?.activities ?? 0,
+    records: fallback?.records ?? 0,
+    attended: fallback?.attended ?? 0,
+    rate: fallback?.rate ?? 0,
+  };
+
+  if (!attendanceSource || typeof attendanceSource !== 'object') {
+    return { ...base };
+  }
+
+  const normalizedDetail = { ...attendanceSource };
+
+  const directAttended = toOptionalInteger(firstDefined(
+    attendanceSource.attended,
+    attendanceSource.total_attended,
+    attendanceSource.totalAttended,
+  ));
+
+  const presentValue = toOptionalInteger(firstDefined(
+    attendanceSource.present,
+    attendanceSource.present_count,
+    attendanceSource.presentCount,
+    attendanceSource.hadir,
+    attendanceSource.hadir_count,
+    attendanceSource.total_hadir,
+    attendanceSource.totalHadir,
+    attendanceSource?.verified?.present,
+    attendanceSource?.verified?.present_count,
+    attendanceSource?.verified?.presentCount,
+    attendanceSource?.breakdown?.present,
+    attendanceSource?.breakdown?.present_count,
+    attendanceSource?.breakdown?.presentCount,
+    attendanceSource?.totals?.present,
+    attendanceSource?.totals?.present_count,
+    attendanceSource?.totals?.presentCount,
+  ));
+
+  const lateValue = toOptionalInteger(firstDefined(
+    attendanceSource.late,
+    attendanceSource.late_count,
+    attendanceSource.lateCount,
+    attendanceSource.terlambat,
+    attendanceSource.terlambat_count,
+    attendanceSource.total_terlambat,
+    attendanceSource.totalTerlambat,
+    attendanceSource?.verified?.late,
+    attendanceSource?.verified?.late_count,
+    attendanceSource?.verified?.lateCount,
+    attendanceSource?.breakdown?.late,
+    attendanceSource?.breakdown?.late_count,
+    attendanceSource?.breakdown?.lateCount,
+    attendanceSource?.totals?.late,
+    attendanceSource?.totals?.late_count,
+    attendanceSource?.totals?.lateCount,
+  ));
+
+  const absentValue = toOptionalInteger(firstDefined(
+    attendanceSource.absent,
+    attendanceSource.absent_count,
+    attendanceSource.absentCount,
+    attendanceSource.tidakHadir,
+    attendanceSource.tidak_hadir,
+    attendanceSource.total_tidak_hadir,
+    attendanceSource.totalTidakHadir,
+    attendanceSource?.verified?.absent,
+    attendanceSource?.verified?.absent_count,
+    attendanceSource?.verified?.absentCount,
+    attendanceSource?.breakdown?.absent,
+    attendanceSource?.breakdown?.absent_count,
+    attendanceSource?.breakdown?.absentCount,
+    attendanceSource?.totals?.absent,
+    attendanceSource?.totals?.absent_count,
+    attendanceSource?.totals?.absentCount,
+  ));
+
+  const derivedAttended = directAttended !== null
+    ? directAttended
+    : (presentValue ?? 0) + (lateValue ?? 0);
+
+  const recordsCandidate = toOptionalInteger(firstDefined(
+    attendanceSource.records,
+    attendanceSource.total_records,
+    attendanceSource.totalRecords,
+    attendanceSource.records_count,
+    attendanceSource.recordsCount,
+    attendanceSource.total,
+    attendanceSource.count,
+    attendanceSource?.verified?.total,
+    attendanceSource?.totals?.total,
+    attendanceSource?.totals?.records,
+    attendanceSource?.totals?.activities,
+    attendanceSource?.breakdown?.total,
+  ));
+
+  const derivedRecords = recordsCandidate !== null
+    ? recordsCandidate
+    : (presentValue ?? 0) + (lateValue ?? 0) + (absentValue ?? 0);
+
+  const activitiesCandidate = toOptionalInteger(firstDefined(
+    attendanceSource.activities,
+    attendanceSource.total_activities,
+    attendanceSource.totalActivities,
+    attendanceSource.activity_count,
+    attendanceSource.activities_count,
+    attendanceSource.activityCount,
+    attendanceSource.activitiesCount,
+    attendanceSource.total,
+    attendanceSource.count,
+    attendanceSource?.totals?.activities,
+    attendanceSource?.totals?.total,
+  ));
+
+  const derivedActivities = activitiesCandidate !== null
+    ? activitiesCandidate
+    : derivedRecords;
+
+  const rateCandidate = normalizeTutorPercentageValue(firstDefined(
+    attendanceSource.rate,
+    attendanceSource.percentage,
+    attendanceSource.attendance_rate,
+    attendanceSource.attendanceRate,
+    attendanceSource.average,
+    attendanceSource.average_rate,
+    attendanceSource.averageRate,
+    attendanceSource?.verified?.rate,
+    attendanceSource?.verified?.percentage,
+    attendanceSource?.verified?.attendance_rate,
+  ));
+
+  const derivedRate = rateCandidate !== null
+    ? rateCandidate
+    : (derivedRecords > 0 ? Number(((derivedAttended / derivedRecords) * 100).toFixed(2)) : base.rate);
+
+  assignIntegerField(normalizedDetail, 'activities', derivedActivities, base.activities);
+  assignIntegerField(normalizedDetail, 'records', derivedRecords, base.records);
+  assignIntegerField(normalizedDetail, 'attended', derivedAttended, base.attended);
+  assignRateField(normalizedDetail, derivedRate, base.rate);
+
+  return normalizedDetail;
+};
+
 const toPercentageScale = (value) => {
   const rawValue = typeof value === 'string' ? value.replace(/%/g, '').trim() : value;
   const numeric = toNumberOrNull(rawValue);
@@ -793,6 +1032,8 @@ const normalizeTutorPercentageValue = (value) => {
 };
 
 export const summarizeTutors = (tutors = [], summary = null) => {
+  const fallbackAttendanceDetail = buildAttendanceDetailFromTutors(tutors);
+
   const fallbackSummary = Array.isArray(tutors) && tutors.length > 0
     ? (() => {
       const totalTutors = tutors.length;
@@ -819,6 +1060,8 @@ export const summarizeTutors = (tutors = [], summary = null) => {
         return acc;
       }, {});
 
+      const attendanceDetail = { ...fallbackAttendanceDetail };
+
       return {
         total_tutors: totalTutors,
         average_attendance_rate: averageRate,
@@ -826,12 +1069,16 @@ export const summarizeTutors = (tutors = [], summary = null) => {
           ...DEFAULT_DISTRIBUTION,
           ...distribution,
         },
+        attendance: attendanceDetail,
+        attendance_detail: attendanceDetail,
       };
     })()
     : {
       total_tutors: 0,
       average_attendance_rate: 0,
       distribution: { ...DEFAULT_DISTRIBUTION },
+      attendance: { ...fallbackAttendanceDetail },
+      attendance_detail: { ...fallbackAttendanceDetail },
     };
 
   if (!summary || typeof summary !== 'object') {
@@ -869,6 +1116,16 @@ export const summarizeTutors = (tutors = [], summary = null) => {
     ? fallbackSummary.average_attendance_rate
     : averageRate;
 
+  const attendanceSource = firstDefined(
+    summary.attendance,
+    summary.attendance_detail,
+    summary.attendanceDetail,
+    summary.attendance_stats,
+    summary.attendanceStats,
+    summary.attendanceSummary,
+  );
+  const attendanceDetail = normalizeAttendanceDetail(attendanceSource, fallbackAttendanceDetail);
+
   return {
     total_tutors: totalTutors || fallbackSummary.total_tutors,
     average_attendance_rate: resolvedAverage,
@@ -876,6 +1133,8 @@ export const summarizeTutors = (tutors = [], summary = null) => {
       ...fallbackSummary.distribution,
       ...distribution,
     },
+    attendance: attendanceDetail,
+    attendance_detail: attendanceDetail,
   };
 };
 
