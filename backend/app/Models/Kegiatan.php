@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Kegiatan extends Model
 {
@@ -16,4 +17,9 @@ class Kegiatan extends Model
     protected $fillable = [
         'nama_kegiatan'
     ];
+
+    public function aktivitas(): HasMany
+    {
+        return $this->hasMany(Aktivitas::class, 'id_kegiatan', 'id_kegiatan');
+    }
 }

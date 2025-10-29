@@ -126,7 +126,7 @@ const AnakManagementScreen = () => {
   };
 
   const handleAddAnak = () => {
-    navigation.navigate('AnakDetail', { isNew: true });
+    navigation.navigate('PengajuanAnakSearch');
   };
 
 
@@ -290,7 +290,7 @@ const AnakManagementScreen = () => {
       <View style={styles.fabContainer}>
         <TouchableOpacity 
           style={styles.fab}
-          onPress={() => navigation.navigate('PengajuanAnakSearch')}
+          onPress={handleAddAnak}
         >
           <Ionicons name="add" size={28} color="#FFFFFF" />
         </TouchableOpacity>

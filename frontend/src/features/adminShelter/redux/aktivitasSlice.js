@@ -3,6 +3,7 @@ import { aktivitasApi } from '../api/aktivitasApi';
 import { adminShelterKelompokApi } from '../api/adminShelterKelompokApi';
 import { kurikulumShelterApi } from '../api/kurikulumShelterApi';
 import { activityReportApi } from '../api/activityReportApi';
+import { kegiatanApi } from '../api/kegiatanApi';
 
 // Initial state
 const initialState = {
@@ -48,7 +49,12 @@ const initialState = {
   calendarActivitiesError: null,
   selectedDateActivities: [],
   selectedDateActivitiesLoading: false,
-  selectedDate: null
+  selectedDate: null,
+
+  // Kegiatan master data
+  kegiatanOptions: [],
+  kegiatanOptionsLoading: false,
+  kegiatanOptionsError: null
 };
 
 // Async thunks
@@ -301,6 +307,18 @@ export const fetchActivitiesForCalendar = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Gagal mengambil aktivitas untuk kalender');
+    }
+  }
+);
+
+export const fetchKegiatanOptions = createAsyncThunk(
+  'aktivitas/fetchKegiatanOptions',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await kegiatanApi.getAllKegiatan();
+      return response.data?.data || response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Gagal mengambil daftar kegiatan');
     }
   }
 );
@@ -737,6 +755,19 @@ const aktivitasSlice = createSlice({
       .addCase(fetchActivitiesForCalendar.rejected, (state, action) => {
         state.calendarActivitiesLoading = false;
         state.calendarActivitiesError = action.payload;
+      })
+
+      .addCase(fetchKegiatanOptions.pending, (state) => {
+        state.kegiatanOptionsLoading = true;
+        state.kegiatanOptionsError = null;
+      })
+      .addCase(fetchKegiatanOptions.fulfilled, (state, action) => {
+        state.kegiatanOptionsLoading = false;
+        state.kegiatanOptions = action.payload || [];
+      })
+      .addCase(fetchKegiatanOptions.rejected, (state, action) => {
+        state.kegiatanOptionsLoading = false;
+        state.kegiatanOptionsError = action.payload;
       });
   }
 });
@@ -794,5 +825,8 @@ export const selectCalendarActivitiesError = (state) => state.aktivitas.calendar
 export const selectSelectedDateActivities = (state) => state.aktivitas.selectedDateActivities;
 export const selectSelectedDateActivitiesLoading = (state) => state.aktivitas.selectedDateActivitiesLoading;
 export const selectSelectedDate = (state) => state.aktivitas.selectedDate;
+export const selectKegiatanOptions = (state) => state.aktivitas.kegiatanOptions;
+export const selectKegiatanOptionsLoading = (state) => state.aktivitas.kegiatanOptionsLoading;
+export const selectKegiatanOptionsError = (state) => state.aktivitas.kegiatanOptionsError;
 
 export default aktivitasSlice.reducer;

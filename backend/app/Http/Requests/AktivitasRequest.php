@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Kegiatan;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -25,7 +26,8 @@ class AktivitasRequest extends FormRequest
     public function rules()
     {
         $rules = [
-            'jenis_kegiatan' => 'required|string|max:255',
+            'jenis_kegiatan' => 'nullable|string|max:255',
+            'id_kegiatan' => 'required|exists:kegiatan,id_kegiatan',
             'level' => 'nullable|string|max:255',
             'nama_kelompok' => 'nullable|string|max:255',
             'materi' => 'nullable|string',
@@ -53,15 +55,24 @@ class AktivitasRequest extends FormRequest
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
+            $jenisKegiatan = $this->jenis_kegiatan;
+
+            if (!$jenisKegiatan && $this->id_kegiatan) {
+                $jenisKegiatan = Kegiatan::where('id_kegiatan', $this->id_kegiatan)->value('nama_kegiatan');
+                if ($jenisKegiatan) {
+                    $this->merge(['jenis_kegiatan' => $jenisKegiatan]);
+                }
+            }
+
             // For Bimbel activities, ensure either id_materi or materi is provided
-            if ($this->jenis_kegiatan === 'Bimbel') {
+            if ($jenisKegiatan === 'Bimbel') {
                 if (empty($this->id_materi) && empty($this->materi)) {
                     $validator->errors()->add('materi', 'Either select materi from dropdown or provide custom materi text for Bimbel activities.');
                 }
             }
 
             // For Kegiatan activities, ensure materi is provided
-            if ($this->jenis_kegiatan === 'Kegiatan') {
+            if ($jenisKegiatan === 'Kegiatan') {
                 if (empty($this->materi)) {
                     $validator->errors()->add('materi', 'Materi is required for Kegiatan activities.');
                 }
@@ -86,7 +97,8 @@ class AktivitasRequest extends FormRequest
     public function messages()
     {
         return [
-            'jenis_kegiatan.required' => 'The activity type is required.',
+            'id_kegiatan.required' => 'Kegiatan wajib dipilih.',
+            'id_kegiatan.exists' => 'Kegiatan yang dipilih tidak valid.',
             'tanggal.required' => 'The date is required.',
             'tanggal.date' => 'The date must be a valid date format.',
             'start_time.date_format' => 'The start time must be in HH:MM:SS format.',

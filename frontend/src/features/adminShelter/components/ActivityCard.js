@@ -65,7 +65,7 @@ const ActivityCard = ({ activity, onPress, onEdit, onDelete }) => {
           
           {/* Materi - Main Title */}
           <Text style={styles.materi} numberOfLines={2}>
-            {activity.materi || 'No materials specified'}
+            {activity.materi || 'Materi belum dipilih'}
           </Text>
           
           <Text style={styles.date}>

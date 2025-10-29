@@ -82,6 +82,7 @@ import NilaiSikapFormScreen from '../features/adminShelter/screens/NilaiSikapFor
 
 // Management & Utility screens
 import PengajuanAnakSearchScreen from '../features/adminShelter/screens/PengajuanAnakSearchScreen';
+import PengajuanAnakFormScreen from '../features/adminShelter/screens/PengajuanAnakFormScreen';
 import KeuanganDetailScreen from '../features/adminShelter/screens/KeuanganDetailScreen';
 import KeuanganListScreen from '../features/adminShelter/screens/KeuanganListScreen';
 import KeuanganFormScreen from '../features/adminShelter/screens/KeuanganFormScreen';
@@ -202,6 +203,7 @@ const HomeStackNavigator = () => {
     
     {/* Management & Utility screens */}
     <HomeStack.Screen name="PengajuanAnakSearch" component={PengajuanAnakSearchScreen} options={{ headerTitle: 'Cari Pengajuan Anak' }} />
+    <HomeStack.Screen name="PengajuanAnakForm" component={PengajuanAnakFormScreen} options={{ headerTitle: 'Form Pengajuan Anak' }} />
     <HomeStack.Screen name="KurikulumAssignment" component={KurikulumAssignmentScreen} options={{ headerTitle: 'Assignment Kurikulum' }} />
     <HomeStack.Screen name="KurikulumSelection" component={KurikulumSelectionScreen} options={{ headerTitle: 'Pilih Kurikulum' }} />
     <HomeStack.Screen name="HonorCalculation" component={HonorCalculationScreen} options={{ headerTitle: 'Kalkulasi Honor' }} />
@@ -253,6 +255,16 @@ const ManagementStackNavigator = () => (
   {/* Anak Management related screens */}
   <ManagementStack.Screen name="AnakDetail" component={AnakDetailScreen} options={{ headerTitle: 'Detail Anak' }} />
   <ManagementStack.Screen name="AnakForm" component={AnakFormScreen} options={{ headerTitle: 'Form Anak' }} />
+  <ManagementStack.Screen
+    name="PengajuanAnakSearch"
+    component={PengajuanAnakSearchScreen}
+    options={{ headerTitle: 'Cari Pengajuan Anak' }}
+  />
+  <ManagementStack.Screen
+    name="PengajuanAnakForm"
+    component={PengajuanAnakFormScreen}
+    options={{ headerTitle: 'Form Pengajuan Anak' }}
+  />
 
   {/* AnakDetail module */}
   <ManagementStack.Screen name="InformasiAnak" component={InformasiAnakScreen} options={{ headerTitle: 'Informasi Anak' }} />

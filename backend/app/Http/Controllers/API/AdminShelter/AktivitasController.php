@@ -11,6 +11,7 @@ use App\Models\Semester;
 use App\Models\Kelompok;
 use App\Models\MataPelajaran;
 use App\Models\TutorKelompok;
+use App\Models\Kegiatan;
 use App\Http\Resources\AktivitasResource;
 use App\Http\Requests\AktivitasRequest;
 use App\Http\Requests\AdminShelter\UpdateAktivitasStatusRequest;
@@ -55,9 +56,9 @@ class AktivitasController extends Controller
             // Get shelter_id from the admin_shelter relationship
             $shelterId = $user->adminShelter->shelter->id_shelter;
             
-            // Base query with tutor relation only (materi is string field)
+            // Base query with related tutor & kegiatan (materi stored as string)
             $query = Aktivitas::where('id_shelter', $shelterId)
-                ->with(['tutor']);
+                ->with(['tutor', 'kegiatan']);
             
             // Auto-update status for activities that might be completed
             $this->updateActivitiesStatus($shelterId);
@@ -73,6 +74,7 @@ class AktivitasController extends Controller
             $mataPelajaranId = $request->input('mata_pelajaran_id');
             $kelasId = $request->input('kelas_id');
             $semesterId = $request->input('semester_id');
+            $kegiatanId = $request->input('id_kegiatan');
             
             // Apply filters
             if ($search) {
@@ -100,6 +102,10 @@ class AktivitasController extends Controller
             
             if ($typeNot) {
                 $query->where('jenis_kegiatan', '!=', $typeNot);
+            }
+
+            if ($kegiatanId) {
+                $query->where('id_kegiatan', $kegiatanId);
             }
             
             if ($namaKelompok) {
@@ -220,6 +226,16 @@ class AktivitasController extends Controller
                 }
             }
             
+            $kegiatan = Kegiatan::find($request->id_kegiatan);
+            if (!$kegiatan) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kegiatan tidak ditemukan'
+                ], 404);
+            }
+
+            $request->merge(['jenis_kegiatan' => $kegiatan->nama_kegiatan]);
+
             // Check for activity conflicts (tutor and kelompok overlap)
             $conflictValidation = $this->validateActivityConflicts($request, $shelterId);
             if (!$conflictValidation['success']) {
@@ -230,10 +246,12 @@ class AktivitasController extends Controller
             $aktivitas = new Aktivitas();
             $aktivitas->id_shelter = $shelterId;
             $aktivitas->id_tutor = $request->id_tutor;
-            $aktivitas->jenis_kegiatan = $request->jenis_kegiatan;
+            $aktivitas->id_kegiatan = $kegiatan->id_kegiatan;
+            $aktivitas->jenis_kegiatan = $kegiatan->nama_kegiatan;
+            $jenisKegiatan = $kegiatan->nama_kegiatan;
             
             // Handle nama_kelompok and level based on activity type
-            if ($request->jenis_kegiatan === 'Bimbel') {
+            if ($jenisKegiatan === 'Bimbel') {
                 // Validate kelompok exists and belongs to shelter
                 if (!$request->nama_kelompok) {
                     return response()->json([
@@ -311,7 +329,7 @@ class AktivitasController extends Controller
             $aktivitas->save();
             
             // Load relationships for response (NOT materi relation)
-            $aktivitas->load(['tutor']);
+            $aktivitas->load(['tutor', 'kegiatan']);
             
             // Add kurikulum info if materi exists (consistent with index method)
             if ($aktivitas->id_materi) {
@@ -373,7 +391,7 @@ class AktivitasController extends Controller
             $shelterId = $user->adminShelter->shelter->id_shelter;
             
             // Load relations BUT NOT 'materi' to avoid overriding string field
-            $aktivitas = Aktivitas::with(['absen.absenUser.anak', 'absen.absenUser.tutor', 'tutor'])
+            $aktivitas = Aktivitas::with(['absen.absenUser.anak', 'absen.absenUser.tutor', 'tutor', 'kegiatan'])
                 ->findOrFail($id);
             
             // Auto-update status for this specific activity
@@ -467,6 +485,16 @@ class AktivitasController extends Controller
                 }
             }
             
+            $kegiatan = Kegiatan::find($request->id_kegiatan);
+            if (!$kegiatan) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kegiatan tidak ditemukan'
+                ], 404);
+            }
+
+            $request->merge(['jenis_kegiatan' => $kegiatan->nama_kegiatan]);
+
             // Check for activity conflicts (tutor and kelompok overlap) - exclude current activity
             $conflictValidation = $this->validateActivityConflicts($request, $shelterId, $id);
             if (!$conflictValidation['success']) {
@@ -475,10 +503,12 @@ class AktivitasController extends Controller
             
             // Update activity data
             $aktivitas->id_tutor = $request->id_tutor;
-            $aktivitas->jenis_kegiatan = $request->jenis_kegiatan;
+            $aktivitas->id_kegiatan = $kegiatan->id_kegiatan;
+            $aktivitas->jenis_kegiatan = $kegiatan->nama_kegiatan;
+            $jenisKegiatan = $kegiatan->nama_kegiatan;
             
             // Handle nama_kelompok and level based on activity type
-            if ($request->jenis_kegiatan === 'Bimbel') {
+            if ($jenisKegiatan === 'Bimbel') {
                 // Validate kelompok exists and belongs to shelter
                 if (!$request->nama_kelompok) {
                     return response()->json([
@@ -553,7 +583,7 @@ class AktivitasController extends Controller
             $aktivitas->save();
             
             // Load relationships for response (NOT materi relation)
-            $aktivitas->load(['tutor']);
+            $aktivitas->load(['tutor', 'kegiatan']);
             
             // Add kurikulum info if materi exists
             if ($aktivitas->id_materi) {
@@ -1264,6 +1294,11 @@ class AktivitasController extends Controller
 
             $existingActivities = $existingQuery->get();
 
+            $requestedJenis = $request->jenis_kegiatan;
+            if (!$requestedJenis && $request->id_kegiatan) {
+                $requestedJenis = Kegiatan::where('id_kegiatan', $request->id_kegiatan)->value('nama_kegiatan');
+            }
+
             foreach ($existingActivities as $existing) {
                 $existingStart = $existing->start_time;
                 $existingEnd = $existing->end_time;
@@ -1284,7 +1319,7 @@ class AktivitasController extends Controller
                 }
 
                 // Check kelompok conflict (only for Bimbel activities)
-                if ($request->jenis_kegiatan === 'Bimbel' && 
+                if ($requestedJenis === 'Bimbel' && 
                     $existing->jenis_kegiatan === 'Bimbel' &&
                     $request->nama_kelompok && 
                     $existing->nama_kelompok == $request->nama_kelompok) {

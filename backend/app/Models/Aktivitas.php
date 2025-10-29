@@ -18,6 +18,7 @@ class Aktivitas extends Model
         'id_shelter',
         'id_tutor',
         'jenis_kegiatan',
+        'id_kegiatan',
         'nama_kelompok',
         'materi',
         'id_materi',
@@ -44,6 +45,7 @@ class Aktivitas extends Model
     protected $casts = [
         'tanggal' => 'date',
         'late_minutes_threshold' => 'integer',
+        'id_kegiatan' => 'integer',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
         'require_gps' => 'boolean',
@@ -65,6 +67,11 @@ class Aktivitas extends Model
     public function materi(): BelongsTo
     {
         return $this->belongsTo(Materi::class, 'id_materi', 'id_materi');
+    }
+
+    public function kegiatan(): BelongsTo
+    {
+        return $this->belongsTo(Kegiatan::class, 'id_kegiatan', 'id_kegiatan');
     }
 
     public function absen()

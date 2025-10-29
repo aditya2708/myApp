@@ -12,6 +12,7 @@ class AktivitasResource extends JsonResource
             'id_aktivitas' => $this->id_aktivitas,
             'id_shelter' => $this->id_shelter,
             'jenis_kegiatan' => $this->jenis_kegiatan,
+            'id_kegiatan' => $this->id_kegiatan,
             'level' => $this->level,
             'nama_kelompok' => $this->nama_kelompok,
             'materi' => $this->materi,
@@ -39,6 +40,12 @@ class AktivitasResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'shelter' => $this->whenLoaded('shelter'),
+            'kegiatan' => $this->whenLoaded('kegiatan', function () {
+                return [
+                    'id_kegiatan' => $this->kegiatan->id_kegiatan,
+                    'nama_kegiatan' => $this->kegiatan->nama_kegiatan,
+                ];
+            }),
             'absen' => $this->whenLoaded('absen')
         ];
     }

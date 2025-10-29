@@ -139,11 +139,27 @@ const normalizeTutorFilters = (sources = [], defaults = {}) => {
 
   return {
     start_date: resolveDate(
-      ['start_date', 'startDate', 'date_range.start', 'dateRange.start', 'period.start'],
+      [
+        'start_date',
+        'startDate',
+        'date_from',
+        'dateFrom',
+        'date_range.start',
+        'dateRange.start',
+        'period.start',
+      ],
       defaultStart,
     ),
     end_date: resolveDate(
-      ['end_date', 'endDate', 'date_range.end', 'dateRange.end', 'period.end'],
+      [
+        'end_date',
+        'endDate',
+        'date_to',
+        'dateTo',
+        'date_range.end',
+        'dateRange.end',
+        'period.end',
+      ],
       defaultEnd,
     ),
     jenis_kegiatan: resolveOption([

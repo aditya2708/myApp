@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { adminCabangReportApi } from '../../../api/adminCabangReportApi';
 import DatePicker from '../../../../../common/components/DatePicker';
 import PickerInput from '../../../../../common/components/PickerInput';
 import { formatDateToLocalISO } from '../../../../../common/utils/dateUtils';
@@ -116,6 +118,8 @@ const normalizeOptionList = (list) => {
     .filter(Boolean);
 };
 
+const SELECT_ALL_VALUE = '__ALL__';
+
 export const mapTutorFilterOptions = (available = {}) => {
   const source = available && Object.keys(available || {}).length ? available : {};
 
@@ -215,6 +219,7 @@ const initializeFilters = (filters = {}, defaults = {}) => {
   const sanitize = (value) => {
     if (value === undefined || value === null) return '';
     if (typeof value === 'string') {
+      if (value === SELECT_ALL_VALUE) return SELECT_ALL_VALUE;
       const trimmed = value.trim();
       if (!trimmed || trimmed.toLowerCase() === 'all') return '';
       return trimmed;
@@ -257,6 +262,7 @@ const prepareFiltersForSubmit = (filters = {}, defaults = {}) => {
   const toNullable = (value, fallback = null) => {
     if (value === undefined || value === null) return fallback;
     if (typeof value === 'string') {
+      if (value === SELECT_ALL_VALUE) return fallback;
       const trimmed = value.trim();
       if (!trimmed || trimmed.toLowerCase() === 'all') return fallback;
       return trimmed;
@@ -290,10 +296,104 @@ const TutorAttendanceFilters = ({
   const [datePickerValue, setDatePickerValue] = useState(new Date());
 
   const options = useMemo(() => mapTutorFilterOptions(availableFilters), [availableFilters]);
+  const [wilayahOptions, setWilayahOptions] = useState(() => options.wilbins ?? []);
+  const [wilayahLoading, setWilayahLoading] = useState(false);
+  const [wilayahError, setWilayahError] = useState(null);
+  const [wilayahLoadedFromApi, setWilayahLoadedFromApi] = useState(false);
+
+  const [shelterOptions, setShelterOptions] = useState([]);
+  const [shelterLoading, setShelterLoading] = useState(false);
+  const [shelterError, setShelterError] = useState(null);
+  const [shelterSourceWilayah, setShelterSourceWilayah] = useState(null);
+
+  const selectedWilayah = localFilters.wilbin_id;
+  const isWilayahSelectAll = selectedWilayah === SELECT_ALL_VALUE;
+  const selectedWilayahId = !isWilayahSelectAll && selectedWilayah
+    ? Number(selectedWilayah)
+    : null;
+  const isShelterEnabled = Number.isInteger(selectedWilayahId);
+  const wilayahPickerValue = isWilayahSelectAll ? '' : (selectedWilayah || '');
+  const selectAllShelterActive = localFilters.shelter_id === SELECT_ALL_VALUE;
+  const shelterPickerValue = selectAllShelterActive ? '' : (localFilters.shelter_id || '');
+  const hasWilayahOptions = wilayahOptions.length > 0;
+  const hasShelterOptions = shelterOptions.length > 0;
+
+  const fetchWilayahOptions = useCallback(async () => {
+    setWilayahLoading(true);
+    try {
+      const response = await adminCabangReportApi.getTutorWilayahFilters();
+      const payload = response?.data?.data ?? response?.data ?? [];
+      const normalized = normalizeOptionList(payload);
+      setWilayahOptions(normalized);
+      setWilayahError(null);
+      setWilayahLoadedFromApi(true);
+    } catch (err) {
+      setWilayahError(err);
+    } finally {
+      setWilayahLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (wilayahLoading || wilayahLoadedFromApi) return;
+    fetchWilayahOptions();
+  }, [visible, wilayahLoading, wilayahLoadedFromApi, fetchWilayahOptions]);
+
+  useEffect(() => {
+    if (options.wilbins?.length && !wilayahOptions.length && !wilayahLoading) {
+      setWilayahOptions(options.wilbins);
+    }
+  }, [options.wilbins, wilayahOptions.length, wilayahLoading]);
+
+  const fetchSheltersByWilayah = useCallback(async (wilbinId) => {
+    setShelterLoading(true);
+    setShelterError(null);
+    try {
+      const response = await adminCabangReportApi.getTutorShelterFilters(wilbinId);
+      const payload = response?.data?.data ?? response?.data ?? [];
+      const normalized = normalizeOptionList(payload);
+      setShelterOptions(normalized);
+      setShelterSourceWilayah(wilbinId);
+    } catch (err) {
+      setShelterError(err);
+      setShelterOptions([]);
+      setShelterSourceWilayah(null);
+    } finally {
+      setShelterLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    if (!isShelterEnabled) {
+      setShelterOptions([]);
+      setShelterSourceWilayah(null);
+      setShelterError(null);
+      return;
+    }
+
+    if (shelterSourceWilayah === selectedWilayahId && shelterOptions.length) {
+      return;
+    }
+
+    fetchSheltersByWilayah(selectedWilayahId);
+  }, [
+    visible,
+    isShelterEnabled,
+    selectedWilayahId,
+    shelterOptions.length,
+    shelterSourceWilayah,
+    fetchSheltersByWilayah,
+  ]);
 
   useEffect(() => {
     if (visible) {
       setLocalFilters(initializeFilters(filters, defaultFilters));
+      setShelterOptions([]);
+      setShelterSourceWilayah(null);
+      setShelterError(null);
     }
   }, [visible, filters, defaultFilters]);
 
@@ -331,11 +431,41 @@ const TutorAttendanceFilters = ({
   };
 
   const handleWilbinChange = (value) => {
-    const nextValue = value ?? '';
+    const nextValue =
+      value === undefined || value === null ? '' : String(value);
+
     setLocalFilters((prev) => ({
       ...prev,
       wilbin_id: nextValue,
-      shelter_id: nextValue ? '' : prev.shelter_id,
+      shelter_id: '',
+    }));
+    setShelterOptions([]);
+    setShelterSourceWilayah(null);
+    setShelterError(null);
+  };
+
+  const handleSelectAllWilayah = () => {
+    setLocalFilters((prev) => {
+      const nextValue = prev.wilbin_id === SELECT_ALL_VALUE ? '' : SELECT_ALL_VALUE;
+      return {
+        ...prev,
+        wilbin_id: nextValue,
+        shelter_id: '',
+      };
+    });
+    setShelterOptions([]);
+    setShelterSourceWilayah(null);
+    setShelterError(null);
+  };
+
+  const handleSelectAllShelter = () => {
+    if (!isShelterEnabled) {
+      return;
+    }
+
+    setLocalFilters((prev) => ({
+      ...prev,
+      shelter_id: prev.shelter_id === SELECT_ALL_VALUE ? '' : SELECT_ALL_VALUE,
     }));
   };
 
@@ -346,6 +476,9 @@ const TutorAttendanceFilters = ({
 
   const handleClear = () => {
     setLocalFilters(initializeFilters(defaultFilters, defaultFilters));
+    setShelterOptions([]);
+    setShelterSourceWilayah(null);
+    setShelterError(null);
     onClear?.();
   };
 
@@ -429,14 +562,40 @@ const TutorAttendanceFilters = ({
             </View>
 
             <View style={styles.fieldGroup}>
+              <View style={styles.fieldHeaderRow}>
+                <Text style={styles.sectionLabel}>Wilayah Binaan</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.selectAllButton,
+                    isWilayahSelectAll && styles.selectAllButtonActive,
+                    (!hasWilayahOptions || wilayahLoading) && styles.selectAllButtonDisabled,
+                  ]}
+                  onPress={handleSelectAllWilayah}
+                  disabled={!hasWilayahOptions || wilayahLoading}
+                >
+                  <Text
+                    style={[
+                      styles.selectAllButtonText,
+                      isWilayahSelectAll && styles.selectAllButtonTextActive,
+                      (!hasWilayahOptions || wilayahLoading) && styles.selectAllButtonTextDisabled,
+                    ]}
+                  >
+                    {isWilayahSelectAll ? 'Batalkan Pilih Semua' : 'Pilih Semua'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
               <PickerInput
-                label="Wilayah Binaan"
-                value={localFilters.wilbin_id || ''}
-                onValueChange={(value) => handleWilbinChange(value)}
-                items={options.wilbins}
-                placeholder="Pilih wilayah binaan"
+                value={wilayahPickerValue}
+                onValueChange={handleWilbinChange}
+                items={wilayahOptions}
+                placeholder={hasWilayahOptions ? 'Pilih wilayah binaan' : 'Wilayah belum tersedia'}
+                pickerProps={{ enabled: hasWilayahOptions && !wilayahLoading }}
+                style={!hasWilayahOptions || wilayahLoading ? styles.disabledField : undefined}
               />
-              {localFilters.wilbin_id ? (
+              {isWilayahSelectAll ? (
+                <Text style={styles.helperText}>Menggunakan semua wilayah binaan.</Text>
+              ) : null}
+              {localFilters.wilbin_id && !isWilayahSelectAll ? (
                 <TouchableOpacity
                   onPress={() => handleWilbinChange('')}
                   style={styles.clearSelectionButton}
@@ -444,22 +603,99 @@ const TutorAttendanceFilters = ({
                   <Text style={styles.clearSelectionText}>Hapus pilihan</Text>
                 </TouchableOpacity>
               ) : null}
+              {wilayahLoading ? (
+                <View style={styles.inlineStatusRow}>
+                  <ActivityIndicator size="small" color="#2563eb" />
+                  <Text style={[styles.inlineStatusText, styles.inlineStatusTextSpacing]}>
+                    Memuat wilayah binaan...
+                  </Text>
+                </View>
+              ) : null}
+              {wilayahError ? (
+                <TouchableOpacity
+                  style={styles.inlineStatusRow}
+                  onPress={fetchWilayahOptions}
+                >
+                  <Ionicons
+                    name="refresh"
+                    size={16}
+                    color="#ef4444"
+                    style={styles.inlineStatusIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.inlineStatusText,
+                      styles.inlineStatusTextError,
+                    ]}
+                  >
+                    Gagal memuat wilayah. Ketuk untuk mencoba lagi.
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {!wilayahLoading && !wilayahError && !hasWilayahOptions ? (
+                <Text style={styles.helperText}>Belum ada wilayah binaan terdaftar.</Text>
+              ) : null}
             </View>
 
             <View style={styles.fieldGroup}>
+              <View style={styles.fieldHeaderRow}>
+                <Text style={styles.sectionLabel}>Shelter</Text>
+                {isShelterEnabled ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.selectAllButton,
+                      selectAllShelterActive && styles.selectAllButtonActive,
+                      (!hasShelterOptions || shelterLoading) && styles.selectAllButtonDisabled,
+                    ]}
+                    onPress={handleSelectAllShelter}
+                    disabled={!hasShelterOptions || shelterLoading}
+                  >
+                    <Text
+                      style={[
+                        styles.selectAllButtonText,
+                        selectAllShelterActive && styles.selectAllButtonTextActive,
+                        (!hasShelterOptions || shelterLoading) && styles.selectAllButtonTextDisabled,
+                      ]}
+                    >
+                      {selectAllShelterActive ? 'Batalkan Pilih Semua' : 'Pilih Semua'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
               <PickerInput
-                label="Shelter"
-                value={localFilters.shelter_id || ''}
+                value={shelterPickerValue}
                 onValueChange={(value) =>
                   setLocalFilters((prev) => ({
                     ...prev,
                     shelter_id: value ?? '',
                   }))
                 }
-                items={options.shelters}
-                placeholder="Pilih shelter"
+                items={shelterOptions}
+                placeholder={
+                  isShelterEnabled
+                    ? hasShelterOptions
+                      ? 'Pilih shelter'
+                      : 'Shelter belum tersedia'
+                    : 'Pilih wilayah binaan terlebih dahulu'
+                }
+                pickerProps={{
+                  enabled: isShelterEnabled && hasShelterOptions && !shelterLoading,
+                }}
+                style={!isShelterEnabled ? styles.disabledField : undefined}
               />
-              {localFilters.shelter_id ? (
+              {!isShelterEnabled ? (
+                <Text style={styles.helperText}>
+                  {isWilayahSelectAll
+                    ? 'Filter shelter tidak tersedia ketika memilih semua wilayah.'
+                    : 'Pilih wilayah binaan terlebih dahulu untuk memuat shelter.'}
+                </Text>
+              ) : null}
+              {selectAllShelterActive ? (
+                <Text style={styles.helperText}>
+                  Menggunakan semua shelter pada wilayah yang dipilih.
+                </Text>
+              ) : null}
+              {localFilters.shelter_id && !selectAllShelterActive ? (
                 <TouchableOpacity
                   onPress={() =>
                     setLocalFilters((prev) => ({
@@ -471,6 +707,38 @@ const TutorAttendanceFilters = ({
                 >
                   <Text style={styles.clearSelectionText}>Hapus pilihan</Text>
                 </TouchableOpacity>
+              ) : null}
+              {shelterLoading ? (
+                <View style={styles.inlineStatusRow}>
+                  <ActivityIndicator size="small" color="#2563eb" />
+                  <Text style={[styles.inlineStatusText, styles.inlineStatusTextSpacing]}>
+                    Memuat shelter...
+                  </Text>
+                </View>
+              ) : null}
+              {shelterError && isShelterEnabled ? (
+                <TouchableOpacity
+                  style={styles.inlineStatusRow}
+                  onPress={() => selectedWilayahId && fetchSheltersByWilayah(selectedWilayahId)}
+                >
+                  <Ionicons
+                    name="refresh"
+                    size={16}
+                    color="#ef4444"
+                    style={styles.inlineStatusIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.inlineStatusText,
+                      styles.inlineStatusTextError,
+                    ]}
+                  >
+                    Gagal memuat shelter. Ketuk untuk mencoba lagi.
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {isShelterEnabled && !shelterLoading && !shelterError && !hasShelterOptions ? (
+                <Text style={styles.helperText}>Belum ada shelter untuk wilayah ini.</Text>
               ) : null}
             </View>
           </ScrollView>
@@ -583,6 +851,64 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#ef4444',
     fontWeight: '500',
+  },
+  fieldHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  selectAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#cbd5f5',
+    backgroundColor: '#f8fbff',
+  },
+  selectAllButtonActive: {
+    backgroundColor: '#dbeafe',
+    borderColor: '#2563eb',
+  },
+  selectAllButtonDisabled: {
+    opacity: 0.4,
+  },
+  selectAllButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+  selectAllButtonTextActive: {
+    color: '#1d4ed8',
+  },
+  selectAllButtonTextDisabled: {
+    color: '#94a3b8',
+  },
+  inlineStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  inlineStatusText: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  inlineStatusTextError: {
+    color: '#ef4444',
+  },
+  inlineStatusTextSpacing: {
+    marginLeft: 8,
+  },
+  inlineStatusIcon: {
+    marginRight: 8,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 6,
+  },
+  disabledField: {
+    opacity: 0.7,
   },
   footer: {
     flexDirection: 'row',

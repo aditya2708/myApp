@@ -52,7 +52,10 @@ const PengajuanAnakFormScreen = () => {
     ],
     livingWith: [
       { label: '-- Pilih Tinggal Bersama --', value: '' },
-      { label: 'Ayah', value: 'Ayah' }, { label: 'Ibu', value: 'Ibu' }, { label: 'Wali', value: 'Wali' },
+      { label: 'Ayah', value: 'Ayah' },
+      { label: 'Ibu', value: 'Ibu' },
+      { label: 'Ayah dan Ibu', value: 'Ayah dan Ibu' },
+      { label: 'Wali', value: 'Wali' },
     ],
     hafalan: [
       { label: '-- Pilih Jenis Hafalan --', value: '' },

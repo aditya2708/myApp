@@ -1,5 +1,5 @@
 // API base URLs
-export const API_BASE_URL = 'http://10.132.12.166:8000/api';
+export const API_BASE_URL = 'http://192.168.1.25:8000/api';
 //export const API_BASE_URL = 'http://192.168.8.105:8000/api';
 //export const API_BASE_URL = 'https://bp.berbagipendidikan.org/api';
 

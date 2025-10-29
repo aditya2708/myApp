@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image,
   Alert, Platform, ActivityIndicator, Switch
@@ -18,7 +18,8 @@ import ErrorMessage from '../../../../common/components/ErrorMessage';
 import {
   createAktivitas, updateAktivitas, selectAktivitasLoading, selectAktivitasError, selectAktivitasConflicts,
   fetchAllMateri, setSelectedMateri, selectMateriCache, selectMateriCacheLoading,
-  selectSelectedMateri, clearSelectedMateri
+  selectSelectedMateri, clearSelectedMateri, fetchKegiatanOptions,
+  selectKegiatanOptions, selectKegiatanOptionsLoading, selectKegiatanOptionsError
 } from '../../redux/aktivitasSlice';
 
 import { adminShelterKelompokApi } from '../../api/adminShelterKelompokApi';
@@ -38,11 +39,15 @@ const ActivityFormScreen = ({ navigation, route }) => {
   const materiCache = useSelector(selectMateriCache);
   const materiCacheLoading = useSelector(selectMateriCacheLoading);
   const selectedMateriFromStore = useSelector(selectSelectedMateri);
+  const kegiatanOptions = useSelector(selectKegiatanOptions);
+  const kegiatanOptionsLoading = useSelector(selectKegiatanOptionsLoading);
+  const kegiatanOptionsError = useSelector(selectKegiatanOptionsError);
   
   const [formData, setFormData] = useState({
-    jenis_kegiatan: '', level: '', nama_kelompok: '', materi: '', id_materi: null,
+    jenis_kegiatan: '', id_kegiatan: null, level: '', nama_kelompok: '', materi: '', id_materi: null,
     tanggal: new Date(), selectedKelompokId: null, selectedKelompokObject: null, start_time: null,
-    end_time: null, late_threshold: null, late_minutes_threshold: 15, id_tutor: null
+    end_time: null, late_threshold: null, late_minutes_threshold: 15, id_tutor: null,
+    pakai_materi_manual: false, mata_pelajaran_manual: '', materi_manual: ''
   });
   
   const [uiState, setUIState] = useState({
@@ -59,6 +64,14 @@ const ActivityFormScreen = ({ navigation, route }) => {
   });
   const [errors, setErrors] = useState({ kelompok: null, tutor: null });
   const [conflictWarning, setConflictWarning] = useState(null);
+
+  const selectedKegiatan = useMemo(
+    () => kegiatanOptions.find(option => option.id_kegiatan === formData.id_kegiatan),
+    [kegiatanOptions, formData.id_kegiatan]
+  );
+
+  const jenisKegiatan = selectedKegiatan?.nama_kegiatan || formData.jenis_kegiatan || '';
+  const hasSelectedKegiatan = !!formData.id_kegiatan;
   
   useEffect(() => {
     if (isEditing && activity) initializeEditForm();
@@ -66,10 +79,55 @@ const ActivityFormScreen = ({ navigation, route }) => {
     // Fetch materi cache on component mount
     dispatch(fetchAllMateri());
   }, [isEditing, activity, dispatch]);
+
+  useEffect(() => {
+    if (!kegiatanOptions.length && !kegiatanOptionsLoading) {
+      dispatch(fetchKegiatanOptions());
+    }
+  }, [dispatch, kegiatanOptions.length, kegiatanOptionsLoading]);
   
   useEffect(() => {
-    if (formData.jenis_kegiatan === 'Bimbel') fetchKelompokData();
-  }, [formData.jenis_kegiatan]);
+    if (isEditing && activity && !formData.id_kegiatan && kegiatanOptions.length > 0) {
+      const matched = kegiatanOptions.find(
+        option => option.id_kegiatan === activity.id_kegiatan ||
+          option.nama_kegiatan === activity.jenis_kegiatan
+      );
+      if (matched) {
+        setFormData(prev => ({
+          ...prev,
+          id_kegiatan: matched.id_kegiatan,
+          jenis_kegiatan: matched.nama_kegiatan
+        }));
+      }
+    }
+  }, [isEditing, activity, formData.id_kegiatan, kegiatanOptions]);
+  
+  useEffect(() => {
+    if (hasSelectedKegiatan && !kelompokList.length && !loadingStates.kelompok) {
+      fetchKelompokData();
+    }
+  }, [hasSelectedKegiatan, kelompokList.length, loadingStates.kelompok]);
+
+  useEffect(() => {
+    if (
+      !isEditing ||
+      !formData.nama_kelompok ||
+      formData.selectedKelompokId ||
+      !kelompokList.length
+    ) {
+      return;
+    }
+
+    const match = kelompokList.find(k => k.nama_kelompok === formData.nama_kelompok);
+    if (match) {
+      setFormData(prev => ({
+        ...prev,
+        selectedKelompokId: match.id_kelompok,
+        selectedKelompokObject: match,
+        level: getKelompokDisplayLevel(match)
+      }));
+    }
+  }, [isEditing, formData.nama_kelompok, formData.selectedKelompokId, kelompokList, getKelompokDisplayLevel]);
   
   // NEW: Update selected materi in store when form data changes
   useEffect(() => {
@@ -122,28 +180,39 @@ const ActivityFormScreen = ({ navigation, route }) => {
       }
     };
     
-    setFormData({
-      ...formData,
+    const isManualMaterial = Boolean(activity.pakai_materi_manual) ||
+      (!activity.id_materi && (!!activity.mata_pelajaran_manual || !!activity.materi_manual));
+
+    setFormData(prev => ({
+      ...prev,
       jenis_kegiatan: activity.jenis_kegiatan || '',
+      id_kegiatan: activity.id_kegiatan || activity.kegiatan?.id_kegiatan || null,
       level: activity.level || '',
       nama_kelompok: activity.nama_kelompok || '',
-      materi: activity.materi || '',
-      id_materi: activity.id_materi || null,
+      materi: isManualMaterial
+        ? (activity.materi_manual || activity.materi || '')
+        : (activity.materi || ''),
+      id_materi: isManualMaterial ? null : (activity.id_materi || null),
       tanggal: activity.tanggal ? new Date(activity.tanggal) : new Date(),
       start_time: parseTime(activity.start_time),
       end_time: parseTime(activity.end_time),
       late_threshold: parseTime(activity.late_threshold),
       late_minutes_threshold: activity.late_minutes_threshold || 15,
-      id_tutor: activity.tutor?.id_tutor || null
-    });
+      id_tutor: activity.tutor?.id_tutor || null,
+      pakai_materi_manual: isManualMaterial,
+      mata_pelajaran_manual: activity.mata_pelajaran_manual || '',
+      materi_manual: activity.materi_manual || ''
+    }));
+
+    if (isManualMaterial) {
+      dispatch(clearSelectedMateri());
+    }
     
     
     setUIState(prev => ({
       ...prev,
       useCustomLateThreshold: activity.late_threshold !== null
     }));
-    
-    if (activity.jenis_kegiatan === 'Bimbel') fetchKelompokData();
   };
   
   const fetchData = async (apiCall, setData, setLoading, setError, key) => {
@@ -183,14 +252,14 @@ const ActivityFormScreen = ({ navigation, route }) => {
   );
   
   // NEW: Helper function to get display level from kelas_gabungan
-  const getKelompokDisplayLevel = (kelompok) => {
+  const getKelompokDisplayLevel = useCallback((kelompok) => {
     if (!kelompok.kelas_gabungan || kelompok.kelas_gabungan.length === 0) {
       return kelompok.level_anak_binaan?.nama_level_binaan || '';
     }
     
     // For kelas_gabungan, show combined class names
     return `Gabungan ${kelompok.kelas_gabungan.length} kelas`;
-  };
+  }, []);
   
   // REMOVED: fetchMateriData - replaced with SmartMateriSelector
   
@@ -203,26 +272,42 @@ const ActivityFormScreen = ({ navigation, route }) => {
   );
   
   const handleChange = (name, value) => {
-    if (name === 'jenis_kegiatan') {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value,
-        level: value === 'Bimbel' ? prev.level : '',
-        nama_kelompok: value === 'Bimbel' ? prev.nama_kelompok : '',
-        selectedKelompokId: value === 'Bimbel' ? prev.selectedKelompokId : null,
-        selectedLevelId: value === 'Bimbel' ? prev.selectedLevelId : null,
-        id_materi: value === 'Bimbel' ? prev.id_materi : null
-      }));
-      
-      // Clear conflict warning when activity type changes
-      setConflictWarning(null);
-    } else if (name === 'id_tutor' || name === 'tanggal') {
+    if (name === 'id_tutor' || name === 'tanggal') {
       setFormData(prev => ({ ...prev, [name]: value }));
       // Clear conflict warning when tutor or date changes
       setConflictWarning(null);
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleKegiatanChange = (kegiatanId) => {
+    const normalizedId = kegiatanId || null;
+    const selected = kegiatanOptions.find(option => option.id_kegiatan === normalizedId) || null;
+    const nextJenis = selected?.nama_kegiatan || '';
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        id_kegiatan: normalizedId,
+        jenis_kegiatan: nextJenis,
+        level: '',
+        nama_kelompok: '',
+        selectedKelompokId: null,
+        selectedKelompokObject: null,
+        id_materi: null,
+        materi: '',
+        pakai_materi_manual: false,
+        mata_pelajaran_manual: '',
+        materi_manual: ''
+      };
+
+      return updated;
+    });
+
+    dispatch(clearSelectedMateri());
+
+    setConflictWarning(null);
   };
   
   const handleKelompokChange = (kelompokId) => {
@@ -242,6 +327,19 @@ const ActivityFormScreen = ({ navigation, route }) => {
     dispatch(clearSelectedMateri());
     // Clear conflict warning when kelompok changes
     setConflictWarning(null);
+  };
+  
+  const toggleManualMateri = (value) => {
+    setFormData(prev => ({
+      ...prev,
+      pakai_materi_manual: value,
+      id_materi: value ? null : prev.id_materi,
+      materi: value ? '' : prev.materi
+    }));
+
+    if (value) {
+      dispatch(clearSelectedMateri());
+    }
   };
   
   // NEW: Handle materi selection from SmartMateriSelector
@@ -340,9 +438,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
       
       setConflictWarning(
         `Pastikan tidak ada konflik: ${tutorName} pada ${dateStr} jam ${timeRange}${
-          formData.jenis_kegiatan === 'Bimbel' && formData.nama_kelompok 
-            ? ` untuk kelompok ${formData.nama_kelompok}` 
-            : ''
+          formData.nama_kelompok ? ` untuk kelompok ${formData.nama_kelompok}` : ''
         }`
       );
     };
@@ -352,7 +448,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
     }, 1000); // Debounce to avoid too many checks
     
     return () => clearTimeout(timeoutId);
-  }, [formData.tanggal, formData.start_time, formData.end_time, formData.id_tutor, formData.nama_kelompok, formData.jenis_kegiatan, tutorList]);
+  }, [formData.tanggal, formData.start_time, formData.end_time, formData.id_tutor, formData.nama_kelompok, tutorList]);
   
   const durationMinutes = useMemo(
     () => calculateDurationMinutes(formData.start_time, formData.end_time),
@@ -360,8 +456,8 @@ const ActivityFormScreen = ({ navigation, route }) => {
   );
 
   const validateForm = () => {
-    if (!formData.jenis_kegiatan || !formData.tanggal) {
-      Alert.alert('Error Validasi', 'Jenis aktivitas dan tanggal wajib diisi');
+    if (!formData.id_kegiatan || !jenisKegiatan || !formData.tanggal) {
+      Alert.alert('Error Validasi', 'Jenis kegiatan dan tanggal wajib diisi');
       return false;
     }
     
@@ -370,17 +466,17 @@ const ActivityFormScreen = ({ navigation, route }) => {
       return false;
     }
     
-    if (formData.jenis_kegiatan === 'Bimbel' && !formData.selectedKelompokId) {
-      Alert.alert('Error Validasi', 'Silakan pilih kelompok untuk aktivitas Bimbel');
+    if (!formData.selectedKelompokId) {
+      Alert.alert('Error Validasi', 'Silakan pilih kelompok untuk aktivitas ini');
       return false;
     }
-    
-    if (formData.jenis_kegiatan === 'Bimbel' && !formData.id_materi) {
+    if (formData.pakai_materi_manual) {
+      if (!formData.mata_pelajaran_manual?.trim() || !formData.materi_manual?.trim()) {
+        Alert.alert('Error Validasi', 'Silakan isi mata pelajaran dan materi manual');
+        return false;
+      }
+    } else if (!formData.id_materi) {
       Alert.alert('Error Validasi', 'Silakan pilih materi dari daftar');
-      return false;
-    }
-    if (formData.jenis_kegiatan === 'Kegiatan' && !formData.materi) {
-      Alert.alert('Error Validasi', 'Materi tidak boleh kosong');
       return false;
     }
     
@@ -409,21 +505,30 @@ const ActivityFormScreen = ({ navigation, route }) => {
     if (isEditing) {
       // For updates, use JSON object (photos will be handled separately if needed)
       const data = {
-        jenis_kegiatan: formData.jenis_kegiatan,
+        jenis_kegiatan: jenisKegiatan,
+        id_kegiatan: formData.id_kegiatan,
         tanggal: format(formData.tanggal, 'yyyy-MM-dd')
       };
       
       if (formData.id_tutor) data.id_tutor = formData.id_tutor;
       
-      if (formData.jenis_kegiatan === 'Bimbel') {
-        data.level = formData.level || '';
-        data.nama_kelompok = formData.nama_kelompok || '';
-        if (formData.id_materi) data.id_materi = formData.id_materi;
-      } else {
-        data.level = '';
-        data.nama_kelompok = '';
-        data.materi = formData.materi || '';
+      data.level = formData.level || '';
+      data.nama_kelompok = formData.nama_kelompok || '';
+
+      const materiPayload = formData.pakai_materi_manual
+        ? formData.materi_manual || ''
+        : formData.materi || '';
+      
+      if (formData.pakai_materi_manual) {
+        data.id_materi = null;
+      } else if (formData.id_materi) {
+        data.id_materi = formData.id_materi;
       }
+
+      data.materi = materiPayload;
+      data.pakai_materi_manual = formData.pakai_materi_manual;
+      data.mata_pelajaran_manual = formData.pakai_materi_manual ? formData.mata_pelajaran_manual : '';
+      data.materi_manual = formData.pakai_materi_manual ? formData.materi_manual : '';
       
       if (formData.start_time) data.start_time = format(formData.start_time, 'HH:mm:ss');
       if (formData.end_time) data.end_time = format(formData.end_time, 'HH:mm:ss');
@@ -439,19 +544,24 @@ const ActivityFormScreen = ({ navigation, route }) => {
       // For creating, use FormData (for file uploads)
       const data = new FormData();
       
-      data.append('jenis_kegiatan', formData.jenis_kegiatan);
+      data.append('jenis_kegiatan', jenisKegiatan);
+      data.append('id_kegiatan', String(formData.id_kegiatan));
       
       if (formData.id_tutor) data.append('id_tutor', formData.id_tutor);
       
-      if (formData.jenis_kegiatan === 'Bimbel') {
-        data.append('level', formData.level || '');
-        data.append('nama_kelompok', formData.nama_kelompok || '');
-        if (formData.id_materi) data.append('id_materi', formData.id_materi);
-      } else {
-        data.append('level', '');
-        data.append('nama_kelompok', '');
-        data.append('materi', formData.materi || '');
+      data.append('level', formData.level || '');
+      data.append('nama_kelompok', formData.nama_kelompok || '');
+      const materiPayload = formData.pakai_materi_manual
+        ? formData.materi_manual || ''
+        : formData.materi || '';
+
+      data.append('pakai_materi_manual', formData.pakai_materi_manual ? 'true' : 'false');
+      if (!formData.pakai_materi_manual && formData.id_materi) {
+        data.append('id_materi', formData.id_materi);
       }
+      data.append('materi', materiPayload);
+      data.append('mata_pelajaran_manual', formData.pakai_materi_manual ? formData.mata_pelajaran_manual : '');
+      data.append('materi_manual', formData.pakai_materi_manual ? formData.materi_manual : '');
       
       data.append('tanggal', format(formData.tanggal, 'yyyy-MM-dd'));
       
@@ -521,17 +631,6 @@ const ActivityFormScreen = ({ navigation, route }) => {
     }
   };
 
-  const TypeButton = ({ type, label, active, onPress }) => (
-    <TouchableOpacity
-      style={[styles.typeButton, active && styles.typeButtonActive]}
-      onPress={() => onPress(type)}
-    >
-      <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-
   const TimePickerButton = ({ time, placeholder, onPress, icon = "time" }) => (
     <TouchableOpacity style={styles.timeButton} onPress={onPress}>
       <Text style={styles.timeText}>{formatTime(time) === 'Belum diatur' ? placeholder : formatTime(time)}</Text>
@@ -568,21 +667,18 @@ const ActivityFormScreen = ({ navigation, route }) => {
       {error && <ErrorMessage message={error} />}
       
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Jenis Aktivitas<Text style={styles.required}>*</Text></Text>
-        <View style={styles.typeButtons}>
-          <TypeButton 
-            type="Bimbel" 
-            label="Bimbel" 
-            active={formData.jenis_kegiatan === 'Bimbel'}
-            onPress={(type) => handleChange('jenis_kegiatan', type)}
-          />
-          <TypeButton 
-            type="Kegiatan" 
-            label="Kegiatan" 
-            active={formData.jenis_kegiatan === 'Kegiatan'}
-            onPress={(type) => handleChange('jenis_kegiatan', type)}
-          />
-        </View>
+        <Text style={styles.label}>Jenis Kegiatan<Text style={styles.required}>*</Text></Text>
+        <PickerSection
+          data={kegiatanOptions}
+          loading={kegiatanOptionsLoading}
+          error={kegiatanOptionsError}
+          onRetry={() => dispatch(fetchKegiatanOptions())}
+          placeholder="Pilih jenis kegiatan"
+          selectedValue={formData.id_kegiatan}
+          onValueChange={(value) => handleKegiatanChange(value || null)}
+          labelKey="nama_kegiatan"
+          valueKey="id_kegiatan"
+        />
       </View>
       
       <View style={styles.inputGroup}>
@@ -600,7 +696,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
         />
       </View>
       
-      {formData.jenis_kegiatan === 'Bimbel' && (
+      {hasSelectedKegiatan && (
         <>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Kelompok<Text style={styles.required}>*</Text></Text>
@@ -629,32 +725,55 @@ const ActivityFormScreen = ({ navigation, route }) => {
           
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Materi<Text style={styles.required}>*</Text></Text>
-            <SmartMateriSelector
-              allMateri={materiCache}
-              selectedKelompok={formData.selectedKelompokObject}
-              selectedMateri={selectedMateriFromStore}
-              onMateriSelect={handleMateriSelect}
-              loading={materiCacheLoading}
-              placeholder="Pilih materi dari daftar"
-              showPreview={true}
-            />
+            <View style={styles.switchContainer}>
+              <Text style={styles.switchLabel}>Input materi secara manual</Text>
+              <Switch
+                value={formData.pakai_materi_manual}
+                onValueChange={toggleManualMateri}
+                trackColor={{ false: '#bdc3c7', true: '#2ecc71' }}
+                thumbColor={formData.pakai_materi_manual ? '#27ae60' : '#ecf0f1'}
+              />
+            </View>
+            
+            {formData.pakai_materi_manual ? (
+              <View style={styles.nestedInput}>
+                <Text style={styles.nestedLabel}>
+                  Mata Pelajaran Manual<Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.mata_pelajaran_manual}
+                  onChangeText={(value) => handleChange('mata_pelajaran_manual', value)}
+                  placeholder="Contoh: Matematika"
+                />
+                <Text style={[styles.helperText, { marginTop: 6 }]}>
+                  Gunakan nama mata pelajaran sesuai kebutuhan cabang.
+                </Text>
+
+                <Text style={[styles.nestedLabel, { marginTop: 12 }]}>
+                  Materi Manual<Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.materi_manual}
+                  onChangeText={(value) => handleChange('materi_manual', value)}
+                  placeholder="Contoh: Pecahan campuran"
+                  multiline
+                />
+              </View>
+            ) : (
+              <SmartMateriSelector
+                allMateri={materiCache}
+                selectedKelompok={formData.selectedKelompokObject}
+                selectedMateri={selectedMateriFromStore}
+                onMateriSelect={handleMateriSelect}
+                loading={materiCacheLoading}
+                placeholder="Pilih materi dari daftar"
+                showPreview={true}
+              />
+            )}
           </View>
         </>
-      )}
-      
-      {formData.jenis_kegiatan === 'Kegiatan' && (
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Materi<Text style={styles.required}>*</Text></Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={formData.materi}
-            onChangeText={(value) => handleChange('materi', value)}
-            placeholder="Deskripsi Materi"
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
       )}
       
       <View style={styles.inputGroup}>
@@ -840,15 +959,6 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 20 },
   label: { fontSize: 16, color: '#34495e', marginBottom: 8, fontWeight: '500' },
   required: { color: '#e74c3c' },
-  typeButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  typeButton: {
-    flex: 1, backgroundColor: '#f5f5f5', paddingVertical: 12, paddingHorizontal: 16,
-    borderRadius: 8, alignItems: 'center', marginHorizontal: 4,
-    borderWidth: 1, borderColor: '#ddd'
-  },
-  typeButtonActive: { backgroundColor: '#3498db', borderColor: '#3498db' },
-  typeButtonText: { fontSize: 16, color: '#34495e', fontWeight: '500' },
-  typeButtonTextActive: { color: '#fff' },
   input: {
     backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#ddd',
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16
