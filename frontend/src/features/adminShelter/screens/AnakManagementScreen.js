@@ -201,12 +201,7 @@ const AnakManagementScreen = () => {
           )}
         </View>
         
-        <Button
-          leftIcon={<Ionicons name="add" size={20} color="#FFFFFF" />}
-          type="primary"
-          onPress={handleAddAnak}
-          style={styles.addButton}
-        />
+      
       </View>
       
       {/* Filter Buttons */}

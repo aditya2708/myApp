@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class Survey extends Model
 {
@@ -54,12 +55,15 @@ class Survey extends Model
         'approved_by',
         'approved_at',
         'rejection_reason',
-        'approval_notes'
+        'approval_notes',
+        'submitted_by',
+        'submitted_at',
     ];
 
     protected $casts = [
         'approved_at' => 'datetime',
-        'tanggal_survey' => 'date'
+        'tanggal_survey' => 'date',
+        'submitted_at' => 'datetime',
     ];
 
     public function keluarga()
@@ -70,6 +74,11 @@ class Survey extends Model
     public function approvedBy()
     {
         return $this->belongsTo(AdminCabang::class, 'approved_by', 'id_admin_cabang');
+    }
+
+    public function submittedBy()
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
     }
 
     public function scopePending($query)

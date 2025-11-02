@@ -150,6 +150,9 @@ class KeluargaResource extends JsonResource
                         'petugas_survey' => $survey->petugas_survey,
                         'hasil_survey' => $survey->hasil_survey,
                         'keterangan_hasil' => $survey->keterangan_hasil,
+                        'submitted_at' => $survey->submitted_at?->format('Y-m-d H:i:s'),
+                        'submitted_by' => $survey->submitted_by,
+                        'submitted_by_name' => $survey->submittedBy?->name,
                     ];
                 });
             }),

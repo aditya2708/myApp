@@ -302,7 +302,6 @@ const KelompokDetailScreen = () => {
         <Text style={styles.childDetails}>
           {child.jenis_kelamin === 'Laki-laki' ? 'Laki-laki' : 'Perempuan'} 
           {child.tanggal_lahir ? ` • ${calculateAge(child.tanggal_lahir)}` : ''}
-          {child.nik_anak ? ` • ${child.nik_anak}` : ''}
         </Text>
         
         <View style={styles.childBadgeContainer}>
@@ -409,58 +408,6 @@ const KelompokDetailScreen = () => {
               </Text>
               <Text style={styles.statLabel}>Jenjang</Text>
             </View>
-          </View>
-
-          {/* Simplified Kurikulum Info */}
-          {kelompok.kelas_gabungan && kelompok.kelas_gabungan.length > 0 && (
-            <View style={styles.kurikulumInfoSection}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="library" size={20} color="#e67e22" />
-                <Text style={styles.sectionTitle}>Informasi Kurikulum</Text>
-              </View>
-              <Text style={styles.kurikulumInfoText}>
-                Kelompok ini dapat mengakses materi untuk {kelompok.kelas_gabungan.length} kelas yang dipilih.
-                Aktivitas dapat dibuat berdasarkan materi yang tersedia untuk kombinasi kelas ini.
-              </Text>
-              <Button
-                title="Lihat Materi Tersedia"
-                onPress={() => navigation.navigate('KurikulumBrowser')}
-                type="outline"
-                size="small"
-                style={styles.viewMateriButton}
-                leftIcon={<Ionicons name="book-outline" size={16} color="#e67e22" />}
-              />
-            </View>
-          )}
-
-          {/* Kurikulum Management Section */}
-          {/* Simplified Aktivitas Management */}
-          <View style={styles.aktivitasManagementSection}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="calendar" size={20} color="#3498db" />
-              <Text style={styles.sectionTitle}>Kelola Aktivitas</Text>
-            </View>
-            <View style={styles.aktivitasActions}>
-              <Button
-                title="Buat Aktivitas"
-                onPress={() => navigation.navigate('ActivityForm', { kelompok })}
-                type="primary"
-                style={styles.createAktivitasButton}
-                leftIcon={<Ionicons name="add-circle" size={16} color="#ffffff" />}
-              />
-              
-              <Button
-                title="Lihat Aktivitas"
-                onPress={() => navigation.navigate('ActivitiesList', { kelompokId: kelompok.id_kelompok })}
-                type="outline"
-                style={styles.viewAktivitasButton}
-                leftIcon={<Ionicons name="list-outline" size={16} color="#3498db" />}
-              />
-            </View>
-            
-            <Text style={styles.aktivitasNote}>
-              Buat aktivitas pembelajaran berdasarkan materi yang sesuai dengan kelas gabungan kelompok ini.
-            </Text>
           </View>
 
           
@@ -647,63 +594,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-
-  // Kurikulum Info Section
-  kurikulumInfoSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  kurikulumInfoText: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  viewMateriButton: {
-    borderColor: '#e67e22',
-  },
-
-  // Aktivitas Management Section
-  aktivitasManagementSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  aktivitasActions: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    gap: 12,
-  },
-  createAktivitasButton: {
-    flex: 1,
-    backgroundColor: '#3498db',
-  },
-  viewAktivitasButton: {
-    flex: 1,
-    borderColor: '#3498db',
-  },
-  aktivitasNote: {
-    fontSize: 13,
-    color: '#7f8c8d',
-    lineHeight: 18,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-
-
   // Children Section
   childrenContainer: {
     backgroundColor: '#ffffff',

@@ -13,7 +13,7 @@ import { useQrTokenGeneration } from '../../../hooks/useQrTokenGeneration';
 
 const QrTokenGenerationTab = ({ 
   id_aktivitas, activityName, activityDate, activityType, 
-  kelompokId, kelompokName, level, completeActivity 
+  kelompokId, kelompokIds = [], kelompokName, level, completeActivity 
 }) => {
   const {
     targets, selectedTargets, searchQuery, setSearchQuery, loading, error,
@@ -24,7 +24,7 @@ const QrTokenGenerationTab = ({
     validDays, setValidDays, expiryStrategy, setExpiryStrategy
   } = useQrTokenGeneration({
     id_aktivitas, activityName, activityDate, activityType,
-    kelompokId, kelompokName, level, completeActivity
+    kelompokId, kelompokIds, kelompokName, level, completeActivity
   });
 
 

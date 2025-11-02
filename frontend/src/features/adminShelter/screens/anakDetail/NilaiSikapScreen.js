@@ -9,12 +9,12 @@ import {
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-import Button from '../../../common/components/Button';
-import LoadingSpinner from '../../../common/components/LoadingSpinner';
-import ErrorMessage from '../../../common/components/ErrorMessage';
+import Button from '../../../../common/components/Button';
+import LoadingSpinner from '../../../../common/components/LoadingSpinner';
+import ErrorMessage from '../../../../common/components/ErrorMessage';
 
-import { raportApi } from '../api/raportApi';
-import { semesterApi } from '../api/semesterApi';
+import { raportApi } from '../../api/raportApi';
+import { semesterApi } from '../../api/semesterApi';
 
 const NilaiSikapScreen = () => {
   const navigation = useNavigation();

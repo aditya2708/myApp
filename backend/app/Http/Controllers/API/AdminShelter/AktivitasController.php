@@ -276,35 +276,49 @@ class AktivitasController extends Controller
                 // Auto-populate level from kelompok's kelas (array of IDs)
                 $aktivitas->level = $kelompok->kelas ? implode(', ', $kelompok->kelas) : '';
                 
-                // Validate and set materi
-                $aktivitas->id_materi = $request->id_materi;
+                $pakaiManual = filter_var($request->pakai_materi_manual, FILTER_VALIDATE_BOOLEAN);
+                $aktivitas->pakai_materi_manual = $pakaiManual;
 
-                if ($request->id_materi) {
-                    $materi = Materi::with(['mataPelajaran', 'kelas'])->find($request->id_materi);
-                    if (!$materi) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Invalid materi selected'
-                        ], 400);
-                    }
+                if ($pakaiManual) {
+                    $aktivitas->id_materi = null;
+                    $aktivitas->mata_pelajaran_manual = $request->mata_pelajaran_manual;
+                    $aktivitas->materi_manual = $request->materi_manual;
+                    $aktivitas->materi = $this->formatMateriLabel(
+                        $request->mata_pelajaran_manual,
+                        $request->materi_manual
+                    );
+                } else {
+                    $aktivitas->id_materi = $request->id_materi;
+                    $aktivitas->mata_pelajaran_manual = null;
+                    $aktivitas->materi_manual = null;
 
-                    // Validate materi compatibility with kelompok's kelas
-                    if ($kelompok->kelas && !empty($kelompok->kelas)) {
-                        $materiKelasId = $materi->id_kelas;
-                        $kelompokKelasIds = $kelompok->kelas;
-                        
-                        if (!in_array($materiKelasId, $kelompokKelasIds)) {
+                    if ($request->id_materi) {
+                        $materi = Materi::with(['mataPelajaran', 'kelas'])->find($request->id_materi);
+                        if (!$materi) {
                             return response()->json([
                                 'success' => false,
-                                'message' => 'Selected materi is not compatible with kelompok\'s kelas. Please select appropriate materi.'
+                                'message' => 'Invalid materi selected'
                             ], 400);
                         }
-                    }
 
-                    // Store materi as STRING (not object)
-                    $aktivitas->materi = ($materi->mataPelajaran->nama_mata_pelajaran ?? '') . ' - ' . $materi->nama_materi;
-                } else {
-                    $aktivitas->materi = $request->materi ?? '';
+                        // Validate materi compatibility with kelompok's kelas
+                        if ($kelompok->kelas && !empty($kelompok->kelas)) {
+                            $materiKelasId = $materi->id_kelas;
+                            $kelompokKelasIds = $kelompok->kelas;
+                            
+                            if (!in_array($materiKelasId, $kelompokKelasIds)) {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'Selected materi is not compatible with kelompok\'s kelas. Please select appropriate materi.'
+                                ], 400);
+                            }
+                        }
+
+                        // Store materi as STRING (not object)
+                        $aktivitas->materi = ($materi->mataPelajaran->nama_mata_pelajaran ?? '') . ' - ' . $materi->nama_materi;
+                    } else {
+                        $aktivitas->materi = $request->materi ?? '';
+                    }
                 }
             } else {
                 // For "Kegiatan" type, set empty values
@@ -312,6 +326,9 @@ class AktivitasController extends Controller
                 $aktivitas->level = '';
                 $aktivitas->id_materi = null;
                 $aktivitas->materi = $request->materi ?? '';
+                $aktivitas->pakai_materi_manual = false;
+                $aktivitas->mata_pelajaran_manual = null;
+                $aktivitas->materi_manual = null;
             }
             
             $aktivitas->tanggal = $request->tanggal;
@@ -533,41 +550,58 @@ class AktivitasController extends Controller
                 // Auto-populate level from kelompok's kelas (array of IDs)
                 $aktivitas->level = $kelompok->kelas ? implode(', ', $kelompok->kelas) : '';
                 
-                // Validate and set materi
-                $aktivitas->id_materi = $request->id_materi;
+                $pakaiManual = filter_var($request->pakai_materi_manual, FILTER_VALIDATE_BOOLEAN);
+                $aktivitas->pakai_materi_manual = $pakaiManual;
 
-                if ($request->id_materi) {
-                    $materi = Materi::with(['mataPelajaran', 'kelas'])->find($request->id_materi);
-                    if (!$materi) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Invalid materi selected'
-                        ], 400);
-                    }
+                if ($pakaiManual) {
+                    $aktivitas->id_materi = null;
+                    $aktivitas->mata_pelajaran_manual = $request->mata_pelajaran_manual;
+                    $aktivitas->materi_manual = $request->materi_manual;
+                    $aktivitas->materi = $this->formatMateriLabel(
+                        $request->mata_pelajaran_manual,
+                        $request->materi_manual
+                    );
+                } else {
+                    $aktivitas->id_materi = $request->id_materi;
+                    $aktivitas->mata_pelajaran_manual = null;
+                    $aktivitas->materi_manual = null;
 
-                    // Validate materi compatibility with kelompok's kelas
-                    if ($kelompok->kelas && !empty($kelompok->kelas)) {
-                        $materiKelasId = $materi->id_kelas;
-                        $kelompokKelasIds = $kelompok->kelas;
-                        
-                        if (!in_array($materiKelasId, $kelompokKelasIds)) {
+                    if ($request->id_materi) {
+                        $materi = Materi::with(['mataPelajaran', 'kelas'])->find($request->id_materi);
+                        if (!$materi) {
                             return response()->json([
                                 'success' => false,
-                                'message' => 'Selected materi is not compatible with kelompok\'s kelas. Please select appropriate materi.'
+                                'message' => 'Invalid materi selected'
                             ], 400);
                         }
-                    }
 
-                    // Store materi as STRING (not object)
-                    $aktivitas->materi = ($materi->mataPelajaran->nama_mata_pelajaran ?? '') . ' - ' . $materi->nama_materi;
-                } else {
-                    $aktivitas->materi = $request->materi ?? '';
+                        // Validate materi compatibility with kelompok's kelas
+                        if ($kelompok->kelas && !empty($kelompok->kelas)) {
+                            $materiKelasId = $materi->id_kelas;
+                            $kelompokKelasIds = $kelompok->kelas;
+                            
+                            if (!in_array($materiKelasId, $kelompokKelasIds)) {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'Selected materi is not compatible with kelompok\'s kelas. Please select appropriate materi.'
+                                ], 400);
+                            }
+                        }
+
+                        // Store materi as STRING (not object)
+                        $aktivitas->materi = ($materi->mataPelajaran->nama_mata_pelajaran ?? '') . ' - ' . $materi->nama_materi;
+                    } else {
+                        $aktivitas->materi = $request->materi ?? '';
+                    }
                 }
             } else {
                 $aktivitas->nama_kelompok = '';
                 $aktivitas->level = '';
                 $aktivitas->id_materi = null;
                 $aktivitas->materi = $request->materi ?? '';
+                $aktivitas->pakai_materi_manual = false;
+                $aktivitas->mata_pelajaran_manual = null;
+                $aktivitas->materi_manual = null;
             }
             
             $aktivitas->tanggal = $request->tanggal;
@@ -1243,7 +1277,20 @@ class AktivitasController extends Controller
             ], 500);
         }
     }
-    
+
+    /**
+     * Build a consistent materi label from mata pelajaran + materi values.
+     */
+    private function formatMateriLabel(?string $mataPelajaran, ?string $materi): string
+    {
+        $parts = array_filter([
+            $mataPelajaran ? trim($mataPelajaran) : null,
+            $materi ? trim($materi) : null,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        return implode(' - ', $parts);
+    }
+
     /**
      * Auto-update activities status based on current time
      */

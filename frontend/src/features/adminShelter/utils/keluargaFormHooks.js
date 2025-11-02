@@ -243,7 +243,7 @@ export const useFormSubmission = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  const prepareFormData = useCallback((data) => {
+  const prepareFormData = useCallback((data, extraFields = {}) => {
     const formDataObj = new FormData();
     
     // Add default regional values
@@ -283,16 +283,25 @@ export const useFormSubmission = () => {
         }
       }
     });
+
+    Object.entries(extraFields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formDataObj.append(key, value);
+      }
+    });
     
     return formDataObj;
   }, []);
 
-  const submitForm = useCallback(async (formData, isEditMode, existingKeluargaId) => {
+  const submitForm = useCallback(async (formData, isEditMode, existingKeluargaId, options = {}) => {
     try {
       setSubmitting(true);
       setSubmitError(null);
       
-      const formDataObj = prepareFormData(formData);
+      const { submitSurvey = false } = options;
+      const formDataObj = prepareFormData(formData, {
+        submit_survey: submitSurvey ? '1' : '0',
+      });
       let response;
       
       if (isEditMode) {
@@ -305,12 +314,20 @@ export const useFormSubmission = () => {
       }
       
       if (response.data.success) {
+        const successMessage = (() => {
+          if (submitSurvey) {
+            return 'Survei berhasil dikirim ke cabang untuk validasi';
+          }
+          return isEditMode
+            ? 'Perubahan data keluarga berhasil disimpan'
+            : 'Data keluarga berhasil disimpan';
+        })();
+
         return {
           success: true,
-          message: isEditMode
-            ? 'Informasi Keluarga Berhasil Diupdate'
-            : 'Keluarga Berhasil Ditambahkan',
+          message: successMessage,
           data: response.data.data,
+          submitSurvey,
         };
       } else {
         throw new Error(response.data.message || 'Gagal Menyimpan Informasi Keluarga');
@@ -369,11 +386,12 @@ export const useEnhancedKeluargaForm = (existingKeluarga = null, isEditMode = fa
   }, [formHook.setField, fieldValidationHook.clearFieldError]);
 
   // Enhanced form submission
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (options = {}) => {
     const result = await submissionHook.submitForm(
       formHook.formData,
       isEditMode,
-      existingKeluarga?.id_keluarga
+      existingKeluarga?.id_keluarga,
+      options
     );
     
     if (result.success) {

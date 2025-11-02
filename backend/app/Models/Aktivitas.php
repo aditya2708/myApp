@@ -22,6 +22,9 @@ class Aktivitas extends Model
         'nama_kelompok',
         'materi',
         'id_materi',
+        'pakai_materi_manual',
+        'mata_pelajaran_manual',
+        'materi_manual',
         'tanggal',
         'start_time',
         'end_time',
@@ -40,12 +43,16 @@ class Aktivitas extends Model
     protected $attributes = [
         'nama_kelompok' => '',
         'late_minutes_threshold' => 15,
+        'pakai_materi_manual' => false,
+        'mata_pelajaran_manual' => null,
+        'materi_manual' => null,
     ];
 
     protected $casts = [
         'tanggal' => 'date',
         'late_minutes_threshold' => 'integer',
         'id_kegiatan' => 'integer',
+        'pakai_materi_manual' => 'boolean',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
         'require_gps' => 'boolean',

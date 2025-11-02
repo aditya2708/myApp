@@ -12,14 +12,22 @@ import Button from '../../../../common/components/Button';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 
-import { createActivityReport, fetchActivityReport } from '../../redux/aktivitasSlice';
+import {
+  createActivityReport,
+  fetchActivityReport,
+  selectActivityReportCache,
+  ACTIVITY_REPORT_CACHE_TTL,
+  ACTIVITY_REPORT_ERROR_RETRY_DELAY
+} from '../../redux/aktivitasSlice';
 import CampaignShareModal from '../../components/CampaignShareModal';
 
 const ActivityReportScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const { id_aktivitas, activityName, activityDate } = route.params || {};
   
-  const { activityReport, reportLoading, reportError } = useSelector(state => state.aktivitas);
+  const { reportLoading, reportError } = useSelector(state => state.aktivitas);
+  const reportCache = useSelector(selectActivityReportCache);
+  const cachedReportEntry = id_aktivitas ? reportCache?.[id_aktivitas] : null;
   
   const [photos, setPhotos] = useState({ foto_1: null, foto_2: null, foto_3: null });
   const [loading, setLoading] = useState(false);
@@ -40,28 +48,71 @@ const ActivityReportScreen = ({ navigation, route }) => {
   
   // Check if report already exists when component mounts
   useEffect(() => {
-    const checkExistingReport = async () => {
-      if (!id_aktivitas) {
+    if (!id_aktivitas) {
+      setCheckingExisting(false);
+      return;
+    }
+
+    const now = Date.now();
+    const cacheEntry = cachedReportEntry;
+
+    if (cacheEntry) {
+      const cacheAge = cacheEntry.fetchedAt ? now - cacheEntry.fetchedAt : Number.POSITIVE_INFINITY;
+      const cacheTtl = cacheEntry.status === 'error'
+        ? ACTIVITY_REPORT_ERROR_RETRY_DELAY
+        : ACTIVITY_REPORT_CACHE_TTL;
+
+      if (cacheEntry.status === 'exists' && cacheEntry.data && cacheAge < cacheTtl) {
+        navigation.replace('ViewReportScreen', {
+          report: cacheEntry.data,
+          activityName,
+          activityDate
+        });
+        return;
+      }
+
+      if ((cacheEntry.status === 'missing' || cacheEntry.status === 'error') && cacheAge < cacheTtl) {
         setCheckingExisting(false);
         return;
       }
-      
+    }
+
+    let isActive = true;
+
+    const resolveReportPayload = (payload) => (
+      payload?.data && typeof payload.data === 'object' ? payload.data : payload
+    );
+
+    const checkExistingReport = async () => {
       try {
-        const reportData = await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
-        // If successful, report exists - navigate to view screen
+        const reportPayload = await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
+        if (!isActive) return;
+
+        const reportData = resolveReportPayload(reportPayload);
         navigation.replace('ViewReportScreen', {
           report: reportData,
           activityName,
           activityDate
         });
       } catch (err) {
-        // Report doesn't exist, user can create new one
+        if (!isActive) return;
         setCheckingExisting(false);
       }
     };
     
     checkExistingReport();
-  }, [id_aktivitas, dispatch, navigation, activityName, activityDate]);
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    id_aktivitas,
+    cachedReportEntry,
+    dispatch,
+    navigation,
+    activityName,
+    activityDate
+  ]);
   
   // Show loading while checking existing report
   if (checkingExisting) {

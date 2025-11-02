@@ -69,32 +69,42 @@ const ActivitiesListScreen = ({ navigation, route }) => {
   }, [dispatch]);
   
   // Fetch activities data with pagination
-  const fetchActivities = async (page = 1) => {
+  const fetchActivities = async (page = 1, overrides = {}) => {
     const params = {
       page,
       per_page: 20
     };
-    
-    if (searchQuery) {
-      params.search = searchQuery;
+
+    const effectiveSearch = overrides.searchQuery ?? searchQuery;
+    if (effectiveSearch) {
+      params.search = effectiveSearch;
     }
-    
-    if (filterType !== 'all') {
-      params.jenis_kegiatan = filterType;
+
+    const effectiveFilterType = overrides.filterType ?? filterType;
+    if (effectiveFilterType !== 'all') {
+      params.jenis_kegiatan = effectiveFilterType;
     }
-    
-    if (isDateFilterActive) {
-      if (filterDate) {
+
+    const effectiveDateFilterActive =
+      overrides.isDateFilterActive !== undefined ? overrides.isDateFilterActive : isDateFilterActive;
+
+    const effectiveFilterDate =
+      overrides.filterDate !== undefined ? overrides.filterDate : filterDate;
+
+    const effectiveSelectedMonth = overrides.selectedMonth ?? selectedMonth;
+
+    if (effectiveDateFilterActive) {
+      if (effectiveFilterDate) {
         // If filtering by specific date, use exact date
-        params.date_from = filterDate;
-        params.date_to = filterDate;
+        params.date_from = effectiveFilterDate;
+        params.date_to = effectiveFilterDate;
       } else {
         // If filtering by month, use month range
-        params.date_from = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-        params.date_to = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+        params.date_from = format(startOfMonth(effectiveSelectedMonth), 'yyyy-MM-dd');
+        params.date_to = format(endOfMonth(effectiveSelectedMonth), 'yyyy-MM-dd');
       }
     }
-    
+
     try {
       await dispatch(fetchAllAktivitas(params)).unwrap();
     } catch (err) {
@@ -118,50 +128,29 @@ const ActivitiesListScreen = ({ navigation, route }) => {
   // Handle type filter
   const handleFilterChange = (type) => {
     setFilterType(type);
-    
-    const params = {
-      page: 1,
-      per_page: 20
-    };
-    
-    if (searchQuery) {
-      params.search = searchQuery;
-    }
-    
-    if (type !== 'all') {
-      params.jenis_kegiatan = type;
-    }
-    
-    if (isDateFilterActive) {
-      if (filterDate) {
-        // If filtering by specific date, use exact date
-        params.date_from = filterDate;
-        params.date_to = filterDate;
-      } else {
-        // If filtering by month, use month range
-        params.date_from = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-        params.date_to = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
-      }
-    }
-    
-    dispatch(fetchAllAktivitas(params))
-      .unwrap()
-      .catch(err => console.error('Failed to fetch activities:', err));
+    fetchActivities(1, { filterType: type });
   };
   
   // Handle date filter
   const applyDateFilter = () => {
     setShowDateFilter(false);
     setIsDateFilterActive(true);
-    fetchActivities(1);
+    if (navigation?.setParams) {
+      navigation.setParams({ filterDate: null });
+    }
+    fetchActivities(1, { isDateFilterActive: true, filterDate: null });
   };
   
   // Clear date filter
   const clearDateFilter = () => {
+    const resetMonth = new Date();
     setIsDateFilterActive(false);
-    setSelectedMonth(new Date());
+    setSelectedMonth(resetMonth);
     setShowDateFilter(false);
-    fetchActivities(1);
+    if (navigation?.setParams) {
+      navigation.setParams({ filterDate: null });
+    }
+    fetchActivities(1, { isDateFilterActive: false, filterDate: null, selectedMonth: resetMonth });
   };
   
   // Handle load more

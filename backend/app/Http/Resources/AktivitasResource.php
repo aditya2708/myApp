@@ -18,6 +18,9 @@ class AktivitasResource extends JsonResource
             'materi' => $this->materi,
             'status' => $this->status,
             'id_materi' => $this->id_materi,
+            'pakai_materi_manual' => $this->pakai_materi_manual,
+            'mata_pelajaran_manual' => $this->mata_pelajaran_manual,
+            'materi_manual' => $this->materi_manual,
             'materi_data' => $this->whenLoaded('materiData', function() {
                 return [
                     'id_materi' => $this->materiData->id_materi,

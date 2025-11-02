@@ -49,6 +49,8 @@ class StoreKeluargaRequest extends FormRequest
             'an_rek' => $bankSelected ? 'required_with:id_bank|string|max:255' : 'nullable|string|max:255',
         ]);
 
+        $rules['submit_survey'] = 'nullable|boolean';
+
         return $rules;
     }
 

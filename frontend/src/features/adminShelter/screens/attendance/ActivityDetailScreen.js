@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert
 } from 'react-native';
@@ -22,7 +22,10 @@ import {
   selectAktivitasError,
   selectKelompokDetail,
   fetchActivityReport,
-  selectAktivitasAttendanceSummary
+  selectAktivitasAttendanceSummary,
+  selectActivityReportCache,
+  ACTIVITY_REPORT_CACHE_TTL,
+  ACTIVITY_REPORT_ERROR_RETRY_DELAY
 } from '../../redux/aktivitasSlice';
 
 const ActivityDetailScreen = ({ navigation, route }) => {
@@ -33,11 +36,43 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   const loading = useSelector(selectAktivitasLoading);
   const error = useSelector(selectAktivitasError);
   const kelompokDetail = useSelector(selectKelompokDetail);
-  const { activityReport } = useSelector(state => state.aktivitas);
   const { profile } = useSelector(state => state.auth);
   const cachedAttendanceSummary = useSelector(selectAktivitasAttendanceSummary);
+  const reportCache = useSelector(selectActivityReportCache);
+  const reportCacheEntry = id_aktivitas ? reportCache?.[id_aktivitas] : null;
   
   const [activePhoto, setActivePhoto] = useState(0);
+
+  const kelompokIds = useMemo(() => {
+    if (!activity) return [];
+
+    if (Array.isArray(activity.kelompok_ids) && activity.kelompok_ids.length > 0) {
+      return activity.kelompok_ids.filter(Boolean);
+    }
+
+    if (Array.isArray(activity.selectedKelompokIds) && activity.selectedKelompokIds.length > 0) {
+      return activity.selectedKelompokIds.filter(Boolean);
+    }
+
+    const fallbackId =
+      activity.selectedKelompokId ||
+      activity.kelompok_id ||
+      activity.kelompokId ||
+      kelompokDetail?.id_kelompok ||
+      null;
+    return fallbackId ? [fallbackId] : [];
+  }, [activity, kelompokDetail]);
+
+  const primaryKelompokId = useMemo(
+    () => (kelompokIds.length === 1 ? kelompokIds[0] : null),
+    [kelompokIds],
+  );
+
+  const hasKelompokContext = kelompokIds.length > 0;
+  const studentsHeaderNote = useMemo(
+    () => (kelompokIds.length > 1 ? 'Menampilkan gabungan semua kelompok' : null),
+    [kelompokIds],
+  );
   
   // GPS Navigation hook
   const { checkGpsAndNavigate, isCheckingGps, gpsError } = useGpsNavigation();
@@ -207,13 +242,39 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   
   // Check if activity report exists once the activity detail is loaded
   useEffect(() => {
-    const checkActivityReport = async () => {
-      if (!activity || !id_aktivitas) return;
+    if (!activity || !id_aktivitas) return;
 
+    const cacheEntry = reportCacheEntry;
+    const now = Date.now();
+
+    if (cacheEntry) {
+      if (cacheEntry.status === 'exists') {
+        setReportExists(true);
+      } else if (cacheEntry.status === 'missing') {
+        setReportExists(false);
+      }
+
+      const cacheAge = cacheEntry.fetchedAt ? now - cacheEntry.fetchedAt : Number.POSITIVE_INFINITY;
+      const cacheTtl = cacheEntry.status === 'error'
+        ? ACTIVITY_REPORT_ERROR_RETRY_DELAY
+        : ACTIVITY_REPORT_CACHE_TTL;
+
+      if (cacheAge < cacheTtl) {
+        return;
+      }
+    }
+
+    let isActive = true;
+
+    const checkActivityReport = async () => {
       try {
         await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
-        setReportExists(true);
+        if (isActive) {
+          setReportExists(true);
+        }
       } catch (err) {
+        if (!isActive) return;
+
         const statusCode = err?.status || err?.response?.status || err?.originalStatus;
         const rawMessage = typeof err === 'string' ? err : err?.message;
         const normalizedMessage = typeof rawMessage === 'string' ? rawMessage.toLowerCase() : '';
@@ -222,15 +283,21 @@ const ActivityDetailScreen = ({ navigation, route }) => {
           normalizedMessage.includes('tidak ditemukan') ||
           normalizedMessage.includes('not found');
 
-        if (!isNotFound) {
+        if (!isNotFound && statusCode !== 429) {
           console.error('Error checking activity report:', err);
         }
-        setReportExists(false);
+
+        const hadExistingReport = cacheEntry?.status === 'exists';
+        setReportExists(hadExistingReport && !isNotFound);
       }
     };
 
-    if (activity) checkActivityReport();
-  }, [dispatch, id_aktivitas, activity]);
+    checkActivityReport();
+
+    return () => {
+      isActive = false;
+    };
+  }, [dispatch, id_aktivitas, activity, reportCacheEntry]);
   
   const handleEditActivity = () => navigation.navigate('ActivityForm', { activity });
   
@@ -266,7 +333,8 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         activityName: activity.jenis_kegiatan,
         activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
         activityType: activity.jenis_kegiatan,
-        kelompokId: activity.selectedKelompokId || kelompokDetail?.id_kelompok || null,
+        kelompokId: primaryKelompokId,
+        kelompokIds,
         kelompokName: activity.nama_kelompok || null,
         activityStatus: activity.status,
         attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
@@ -285,7 +353,8 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         activityName: activity.jenis_kegiatan,
         activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
         activityType: activity.jenis_kegiatan,
-        kelompokId: activity.selectedKelompokId || kelompokDetail?.id_kelompok || null,
+        kelompokId: primaryKelompokId,
+        kelompokIds,
         kelompokName: activity.nama_kelompok || null,
         activityStatus: activity.status
       });
@@ -303,7 +372,8 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         activityName: activity.jenis_kegiatan,
         activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
         activityType: activity.jenis_kegiatan,
-        kelompokId: activity.selectedKelompokId || kelompokDetail?.id_kelompok || null,
+        kelompokId: primaryKelompokId,
+        kelompokIds,
         kelompokName: activity.nama_kelompok || null,
         initialTab: 'AttendanceList',
         activityStatus: activity.status,
@@ -323,7 +393,8 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         activityName: activity.jenis_kegiatan,
         activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
         activityType: activity.jenis_kegiatan,
-        kelompokId: activity.selectedKelompokId || kelompokDetail?.id_kelompok || null,
+        kelompokId: primaryKelompokId,
+        kelompokIds,
         kelompokName: activity.nama_kelompok || null,
         level: activity.level || null,
         completeActivity: activity,
@@ -364,7 +435,7 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   
   if (!activity) return null;
   
-  const kelompokId = activity.selectedKelompokId || kelompokDetail?.id_kelompok || null;
+  const kelompokId = primaryKelompokId;
   
   const DetailItem = ({ label, value, color }) => (
     <View style={styles.detail}>
@@ -448,25 +519,22 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   const StudentsSection = () => (
     <View style={styles.studentsSection}>
       <Text style={styles.sectionTitle}>Siswa dalam Kelompok</Text>
-      
-      {activity.jenis_kegiatan === 'Bimbel' ? (
-        kelompokId ? (
-          <GroupStudentsList
-            kelompokId={kelompokId}
-            showTitle={false}
-            onRefresh={() => dispatch(fetchAktivitasDetail(id_aktivitas))}
-          />
-        ) : (
-          <View style={styles.noGroupContainer}>
-            <Ionicons name="people-outline" size={48} color="#bdc3c7" />
-            <Text style={styles.noGroupText}>Tidak ada kelompok terkait dengan aktivitas ini</Text>
-            <Text style={styles.noGroupSubtext}>Edit aktivitas untuk menentukan kelompok</Text>
-          </View>
-        )
+
+      {hasKelompokContext ? (
+        <GroupStudentsList
+          kelompokId={kelompokId}
+          kelompokIds={kelompokIds}
+          showTitle={false}
+          headerNote={studentsHeaderNote}
+          onRefresh={() => dispatch(fetchAktivitasDetail(id_aktivitas))}
+        />
       ) : (
         <View style={styles.noGroupContainer}>
-          <Ionicons name="information-circle-outline" size={48} color="#bdc3c7" />
-          <Text style={styles.noGroupText}>Daftar siswa hanya tersedia untuk aktivitas Bimbel</Text>
+          <Ionicons name="people-outline" size={48} color="#bdc3c7" />
+          <Text style={styles.noGroupText}>Tidak ada kelompok terkait dengan aktivitas ini</Text>
+          <Text style={styles.noGroupSubtext}>
+            Edit aktivitas untuk menentukan kelompok yang akan mengikuti aktivitas ini.
+          </Text>
         </View>
       )}
     </View>
@@ -535,17 +603,14 @@ const ActivityDetailScreen = ({ navigation, route }) => {
               icon="calendar"
               text="Absen QR"
               style={styles.fullWidthButton}
+              disabled={!hasKelompokContext}
             />
             <ActionButton
               onPress={handleManualAttendance}
               icon="create"
               text="Absen Manual"
               style={styles.manualButton}
-              disabled={
-                activity.jenis_kegiatan === 'Bimbel' &&
-                !kelompokId &&
-                !activity.nama_kelompok
-              }
+              disabled={!hasKelompokContext}
             />
           </View>
           <ActionButton
@@ -563,6 +628,7 @@ const ActivityDetailScreen = ({ navigation, route }) => {
             icon="list"
             text="Daftar Kehadiran"
             style={[styles.reportButtonFullWidth, styles.recordsButton]}
+            disabled={!hasKelompokContext}
           />
         </View>
       )

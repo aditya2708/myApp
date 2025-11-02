@@ -2,6 +2,7 @@
 
 namespace App\Services\AdminShelter;
 
+use App\Constants\AdminShelter\KeluargaConstants;
 use App\Models\Keluarga;
 use App\Models\Anak;
 use App\Models\AnakPendidikan;
@@ -47,7 +48,14 @@ class KeluargaService
     public function getKeluargaDetail($id)
     {
         $keluarga = Keluarga::with([
-            'ayah', 'ibu', 'wali', 'shelter', 'wilbin', 'kacab', 'bank', 'surveys'
+            'ayah',
+            'ibu',
+            'wali',
+            'shelter',
+            'wilbin',
+            'kacab',
+            'bank',
+            'surveys.submittedBy'
         ])->findOrFail($id);
         
         $anak = Anak::with(['anakPendidikan'])->where('id_keluarga', $id)->get();
@@ -61,6 +69,8 @@ class KeluargaService
     public function createKeluarga(array $data)
     {
         return DB::transaction(function () use ($data) {
+            $submitSurvey = $this->resolveSubmitSurveyFlag($data);
+
             // Create family
             $keluargaData = $this->extractKeluargaData($data);
             $keluarga = Keluarga::create($keluargaData);
@@ -77,12 +87,12 @@ class KeluargaService
             $anakPendidikan = $this->createEducationData($keluarga->id_keluarga, $data);
             
             // Create child with id_anak_pend
-            $anak = $this->createChildData($keluarga->id_keluarga, $data, $anakPendidikan->id_anak_pend);
+            $this->createChildData($keluarga->id_keluarga, $data, $anakPendidikan->id_anak_pend);
             
             // Create survey data
-            $this->createSurveyData($keluarga->id_keluarga, $data);
+            $this->createSurveyData($keluarga->id_keluarga, $data, $submitSurvey);
             
-            return $keluarga->load(['ayah', 'ibu', 'wali', 'anak']);
+            return $keluarga->load(['ayah', 'ibu', 'wali', 'anak', 'surveys.submittedBy']);
         });
     }
 
@@ -90,6 +100,7 @@ class KeluargaService
     {
         return DB::transaction(function () use ($id, $data) {
             $keluarga = Keluarga::findOrFail($id);
+            $submitSurvey = $this->resolveSubmitSurveyFlag($data);
             
             // Update family data
             $keluargaData = $this->extractKeluargaData($data);
@@ -110,9 +121,9 @@ class KeluargaService
             $this->updateChildData($id, $data);
             
             // Update survey data
-            $this->updateSurveyData($id, $data);
+            $this->updateSurveyData($id, $data, $submitSurvey);
             
-            return $keluarga->fresh();
+            return $keluarga->fresh(['ayah', 'ibu', 'wali', 'anak', 'surveys.submittedBy']);
         });
     }
 
@@ -408,24 +419,51 @@ class KeluargaService
         }));
     }
 
-    private function createSurveyData($keluargaId, array $data): void
+    private function createSurveyData($keluargaId, array $data, ?bool $submitSurvey): void
     {
         $surveyData = array_merge(
             ['id_keluarga' => $keluargaId],
             $this->buildSurveyDataPayload($data)
         );
 
+        if ($submitSurvey === true) {
+            $surveyData['hasil_survey'] = KeluargaConstants::HASIL_SURVEY_PENDING;
+            $surveyData['submitted_at'] = now();
+            $surveyData['submitted_by'] = Auth::id();
+        } else {
+            $surveyData['hasil_survey'] = KeluargaConstants::HASIL_SURVEY_DRAFT;
+            $surveyData['submitted_at'] = null;
+            $surveyData['submitted_by'] = null;
+        }
+
         Survey::create($surveyData);
     }
 
-    private function updateSurveyData($keluargaId, array $data): void
+    private function updateSurveyData($keluargaId, array $data, ?bool $submitSurvey): void
     {
         $surveyData = $this->buildSurveyDataPayload($data);
 
-        Survey::updateOrCreate(
-            ['id_keluarga' => $keluargaId],
-            $surveyData
-        );
+        $survey = Survey::firstOrNew(['id_keluarga' => $keluargaId]);
+        $survey->fill($surveyData);
+
+        if ($submitSurvey === true) {
+            $survey->hasil_survey = KeluargaConstants::HASIL_SURVEY_PENDING;
+            $survey->submitted_at = now();
+            $survey->submitted_by = Auth::id();
+        } elseif ($submitSurvey === false) {
+            // Only revert to draft for new survey or when it is still a draft
+            if (!$survey->exists || $survey->hasil_survey === null || $survey->hasil_survey === KeluargaConstants::HASIL_SURVEY_DRAFT) {
+                $survey->hasil_survey = KeluargaConstants::HASIL_SURVEY_DRAFT;
+                $survey->submitted_at = null;
+                $survey->submitted_by = null;
+            }
+        }
+
+        if (!$survey->hasil_survey) {
+            $survey->hasil_survey = KeluargaConstants::HASIL_SURVEY_DRAFT;
+        }
+
+        $survey->save();
     }
 
     private function buildSurveyDataPayload(array $data): array
@@ -492,6 +530,37 @@ class KeluargaService
     private function getSurveyInput(array $data, string $key, $default = null)
     {
         return array_key_exists($key, $data) ? $data[$key] : $default;
+    }
+
+    private function resolveSubmitSurveyFlag(array &$data): ?bool
+    {
+        if (!array_key_exists('submit_survey', $data)) {
+            return null;
+        }
+
+        $value = $data['submit_survey'];
+        unset($data['submit_survey']);
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (bool) ((int) $value);
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower($value);
+            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
+                return false;
+            }
+        }
+
+        return null;
     }
 
     private function deleteRelatedData($keluargaId): void

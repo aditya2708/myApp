@@ -237,50 +237,6 @@ const KurikulumHomeScreen = () => {
     </View>
   );
 
-  const TodayScheduleCard = ({ activities }) => (
-    <View style={styles.scheduleCard}>
-      <View style={styles.cardHeader}>
-        <Ionicons name="today" size={20} color="#3498db" />
-        <Text style={styles.cardTitle}>Jadwal Hari Ini</Text>
-      </View>
-      {activities?.length ? (
-        activities.map((item, index) => {
-          // Create "Mata Pelajaran - Nama Materi" format
-          let displayTitle = '';
-          if (item.mata_pelajaran && item.nama_materi) {
-            displayTitle = `${item.mata_pelajaran} - ${item.nama_materi}`;
-          } else if (item.mata_pelajaran) {
-            displayTitle = item.mata_pelajaran;
-          } else if (item.nama_materi) {
-            displayTitle = item.nama_materi;
-          } else {
-            // Fallback to cleaned activity name
-            let cleanActivity = item.activity || 'Aktivitas tidak diketahui';
-            displayTitle = cleanActivity.replace(/\s*\([0-9]{1,2}\/[0-9]{1,2}\)\s*$/, '');
-          }
-          
-          return (
-            <View key={index} style={styles.scheduleItem}>
-              <View style={styles.scheduleTime}>
-                <Text style={styles.timeText}>{item.time}</Text>
-              </View>
-              <View style={styles.scheduleContent}>
-                <Text style={styles.activityText}>{displayTitle}</Text>
-                <Text style={styles.tutorText}>Tutor: {item.tutor}</Text>
-                <Text style={styles.groupText}>Kelompok: {item.kelompok}</Text>
-              </View>
-            </View>
-          );
-        })
-      ) : (
-        <View style={styles.emptySchedule}>
-          <Ionicons name="calendar-outline" size={48} color="#bdc3c7" />
-          <Text style={styles.emptyText}>Tidak ada jadwal hari ini</Text>
-        </View>
-      )}
-    </View>
-  );
-
   const OperationalMenuGrid = ({ menuItems }) => (
     <View style={styles.menuContainer}>
       <Text style={styles.sectionTitle}>Operasional Harian</Text>
@@ -321,9 +277,6 @@ const KurikulumHomeScreen = () => {
       
       {/* Quick Stats */}
       <QuickStatsCard stats={dashboardData?.todayStats} />
-      
-      {/* Today Schedule */}
-      <TodayScheduleCard activities={dashboardData?.recentActivity} />
       
       {/* Operational Menu Grid */}
       <OperationalMenuGrid menuItems={operationalMenuItems} />
@@ -509,88 +462,6 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textAlign: 'center',
     marginTop: 2
-  },
-  
-  // Schedule Card
-  scheduleCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginLeft: 8
-  },
-  scheduleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa'
-  },
-  scheduleTime: {
-    width: 60,
-    alignItems: 'center'
-  },
-  timeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#3498db'
-  },
-  scheduleContent: {
-    flex: 1,
-    marginLeft: 12
-  },
-  activityText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2c3e50'
-  },
-  subjectText: {
-    fontSize: 12,
-    color: '#3498db',
-    marginTop: 2
-  },
-  tutorText: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginTop: 2
-  },
-  groupText: {
-    fontSize: 11,
-    color: '#8e44ad',
-    marginTop: 2
-  },
-  categoryText: {
-    fontSize: 11,
-    color: '#e67e22',
-    marginTop: 2,
-    fontStyle: 'italic'
-  },
-  emptySchedule: {
-    alignItems: 'center',
-    paddingVertical: 24
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginTop: 8
   },
   
   // Menu Section

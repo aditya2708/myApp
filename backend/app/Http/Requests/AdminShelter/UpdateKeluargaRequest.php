@@ -27,6 +27,7 @@ class UpdateKeluargaRequest extends FormRequest
             'an_rek' => 'nullable|string|max:255',
             'no_tlp' => 'nullable|string|max:255',
             'an_tlp' => 'nullable|string|max:255',
+            'submit_survey' => 'nullable|boolean',
 
             // Child data
             'nik_anak' => 'sometimes|required|regex:/^[0-9]{16}$/',

@@ -12,13 +12,13 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import components
-import Button from '../../../common/components/Button';
-import LoadingSpinner from '../../../common/components/LoadingSpinner';
-import ErrorMessage from '../../../common/components/ErrorMessage';
+import Button from '../../../../common/components/Button';
+import LoadingSpinner from '../../../../common/components/LoadingSpinner';
+import ErrorMessage from '../../../../common/components/ErrorMessage';
 
 // Import API
-import { raportApi } from '../api/raportApi';
-import { semesterApi } from '../api/semesterApi';
+import { raportApi } from '../../api/raportApi';
+import { semesterApi } from '../../api/semesterApi';
 
 const NilaiSikapFormScreen = () => {
   const navigation = useNavigation();

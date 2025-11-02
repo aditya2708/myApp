@@ -15,14 +15,26 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 
 // Import components
-import Button from '../../../common/components/Button';
-import LoadingSpinner from '../../../common/components/LoadingSpinner';
-import ErrorMessage from '../../../common/components/ErrorMessage';
+import Button from '../../../../common/components/Button';
+import LoadingSpinner from '../../../../common/components/LoadingSpinner';
+import ErrorMessage from '../../../../common/components/ErrorMessage';
 
 // Import API
-import { penilaianApi } from '../api/penilaianApi';
-import { aktivitasApi } from '../api/aktivitasApi';
-import { kurikulumShelterApi } from '../api/kurikulumShelterApi';
+import { penilaianApi } from '../../api/penilaianApi';
+import { aktivitasApi } from '../../api/aktivitasApi';
+import { kurikulumShelterApi } from '../../api/kurikulumShelterApi';
+import { attendanceApi } from '../../api/attendanceApi';
+
+const formatMateriLabel = (subject, materi) => {
+  const parts = [];
+  if (subject && subject.toString().trim()) {
+    parts.push(subject.toString().trim());
+  }
+  if (materi && materi.toString().trim()) {
+    parts.push(materi.toString().trim());
+  }
+  return parts.join(' - ');
+};
 
 const PenilaianFormScreen = () => {
   const navigation = useNavigation();
@@ -51,6 +63,9 @@ const PenilaianFormScreen = () => {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState(null);
+  const [materiText, setMateriText] = useState('');
+  const [manualSubject, setManualSubject] = useState('');
+  const [manualMateri, setManualMateri] = useState('');
 
   useEffect(() => {
     navigation.setOptions({
@@ -70,13 +85,23 @@ const PenilaianFormScreen = () => {
   useEffect(() => {
     if (formData.id_aktivitas && aktivitasList.length > 0) {
       const selectedAktivitas = aktivitasList.find(
-        aktivitas => aktivitas.id_aktivitas.toString() === formData.id_aktivitas.toString()
+        a => a.id_aktivitas.toString() === formData.id_aktivitas.toString()
       );
-      if (selectedAktivitas && selectedAktivitas.id_materi) {
+
+      if (!selectedAktivitas) return;
+
+      const useManual = Boolean(selectedAktivitas.pakai_materi_manual) ||
+        (!selectedAktivitas.id_materi &&
+          (!!selectedAktivitas.mata_pelajaran_manual || !!selectedAktivitas.materi_manual));
+
+      if (!useManual && selectedAktivitas.id_materi) {
         const filtered = allMateriList.filter(
           m => m.id_materi === selectedAktivitas.id_materi
         );
         setMateriList(filtered);
+        setManualSubject('');
+        setManualMateri('');
+        setMateriText('');
         if (filtered.length === 1) {
           updateFormData('id_materi', filtered[0].id_materi);
         } else {
@@ -85,12 +110,197 @@ const PenilaianFormScreen = () => {
       } else {
         setMateriList([]);
         updateFormData('id_materi', '');
+        const subject = selectedAktivitas.mata_pelajaran_manual || '';
+        const materiManualValue = selectedAktivitas.materi_manual || '';
+        setManualSubject(subject);
+        setManualMateri(materiManualValue);
+        setMateriText(formatMateriLabel(subject, materiManualValue || selectedAktivitas.materi));
       }
     } else {
       setMateriList([]);
       updateFormData('id_materi', '');
+      setMateriText('');
+      setManualSubject('');
+      setManualMateri('');
     }
   }, [formData.id_aktivitas, aktivitasList, allMateriList]);
+  
+
+  const toIdString = (value) => (value !== undefined && value !== null ? value.toString() : '');
+  const targetAnakId = toIdString(anakId);
+
+  const collectionHasTargetChild = (collection) => {
+    if (!Array.isArray(collection) || !targetAnakId) {
+      return false;
+    }
+    return collection.some(item => {
+      if (!item) return false;
+      const possibleIds = [
+        item.id_anak,
+        item.anak_id,
+        item.child_id,
+        item?.anak?.id_anak,
+        item?.pivot?.id_anak,
+        item?.target_id
+      ];
+      return possibleIds.some(id => toIdString(id) === targetAnakId);
+    });
+  };
+
+  const unwrapCollection = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.records)) return data.records;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
+  };
+
+  const inferMembershipFromActivity = (activity) => {
+    if (!activity) return null;
+
+    if (
+      anakData?.kelompok?.nama_kelompok &&
+      activity?.nama_kelompok &&
+      activity.nama_kelompok === anakData.kelompok.nama_kelompok
+    ) {
+      return true;
+    }
+
+    const candidateCollections = [
+      activity.members,
+      activity.participants,
+      activity.peserta,
+      activity.anak,
+      activity.anak_binaan,
+      activity.students,
+      activity.child_list,
+      activity.attendance_members,
+      activity?.attendance_summary?.members,
+      activity?.kelompok?.anggota,
+      activity?.kelompok?.members
+    ];
+
+    for (const raw of candidateCollections) {
+      const collection = unwrapCollection(raw);
+      if (collection.length === 0) continue;
+      if (collectionHasTargetChild(collection)) {
+        return true;
+      }
+    }
+
+    return null;
+  };
+
+  const extractMembersFromPayload = (payload) => {
+    if (!payload) return [];
+
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (Array.isArray(payload.members)) {
+      return payload.members;
+    }
+
+    if (Array.isArray(payload.data?.members)) {
+      return payload.data.members;
+    }
+
+    if (Array.isArray(payload.data)) {
+      return payload.data;
+    }
+
+    if (Array.isArray(payload.data?.data?.members)) {
+      return payload.data.data.members;
+    }
+
+    return [];
+  };
+
+  const parseDateSafe = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const sortActivitiesByLatest = (activities) => {
+    return activities.slice().sort((a, b) => {
+      const dateA = parseDateSafe(a?.tanggal);
+      const dateB = parseDateSafe(b?.tanggal);
+
+      if (dateA && dateB) {
+        return dateB.getTime() - dateA.getTime();
+      }
+
+      if (dateB) return 1;
+      if (dateA) return -1;
+      return 0;
+    });
+  };
+
+  const filterActivitiesForChild = async (activities, usedActivityIds, allowedActivityId) => {
+    if (!Array.isArray(activities)) return { list: [], unresolved: 0 };
+
+    const allowedIdString = toIdString(allowedActivityId);
+    const result = [];
+    const pendingVerification = [];
+
+    activities.forEach(activity => {
+      if (!activity?.id_aktivitas) return;
+
+      const aktivitasIdString = toIdString(activity.id_aktivitas);
+      if (!aktivitasIdString) return;
+
+      if (usedActivityIds.has(aktivitasIdString) && aktivitasIdString !== allowedIdString) {
+        return;
+      }
+
+      const inferred = inferMembershipFromActivity(activity);
+      if (inferred === true) {
+        result.push(activity);
+        return;
+      }
+
+      if (inferred === false) {
+        return;
+      }
+
+      pendingVerification.push(activity);
+    });
+
+    let unresolvedCount = 0;
+
+    if (pendingVerification.length > 0 && targetAnakId) {
+      const verificationResults = await Promise.allSettled(
+        pendingVerification.map(activity =>
+          attendanceApi.getActivityMembers(activity.id_aktivitas, { include_summary: true })
+        )
+      );
+
+      verificationResults.forEach((verification, index) => {
+        const activity = pendingVerification[index];
+
+        if (verification.status !== 'fulfilled') {
+          unresolvedCount += 1;
+          result.push(activity);
+          return;
+        }
+
+        const payload = verification.value?.data;
+        const members = extractMembersFromPayload(payload?.data ?? payload);
+
+        if (collectionHasTargetChild(members)) {
+          result.push(activity);
+        }
+      });
+    }
+
+    return {
+      list: sortActivitiesByLatest(result),
+      unresolved: unresolvedCount
+    };
+  };
 
   const fetchInitialData = async () => {
     try {
@@ -111,22 +321,76 @@ const PenilaianFormScreen = () => {
       if (anakData?.kelompok?.nama_kelompok) {
         aktivitasParams.nama_kelompok = anakData.kelompok.nama_kelompok;
       }
+
+      const aktivitasPromise = aktivitasApi.getAllAktivitas(aktivitasParams);
+      const jenisPenilaianPromise = penilaianApi.getJenisPenilaian();
+      const materiPromise = kurikulumShelterApi.getAllMateri();
+      const existingPenilaianPromise = anakId && formData.id_semester
+        ? penilaianApi
+            .getByAnakSemester(anakId, formData.id_semester)
+            .catch(err => {
+              console.warn('Failed to fetch existing penilaian:', err?.response?.data || err);
+              return null;
+            })
+        : Promise.resolve(null);
       
-      promises.push(aktivitasApi.getAllAktivitas(aktivitasParams));
+      promises.push(aktivitasPromise);
 
       // Fetch jenis penilaian
-      promises.push(penilaianApi.getJenisPenilaian());
+      promises.push(jenisPenilaianPromise);
 
       // Fetch materi from kurikulum
-      promises.push(kurikulumShelterApi.getAllMateri());
+      promises.push(materiPromise);
 
-      const [aktivitasResponse, jenisPenilaianResponse, materiResponse] = await Promise.all(promises);
-      
+      // Fetch existing penilaian so we can hide used activities when creating new records
+      promises.push(existingPenilaianPromise);
+
+      const [
+        aktivitasResponse,
+        jenisPenilaianResponse,
+        materiResponse,
+        existingPenilaianResponse
+      ] = await Promise.all(promises);
+
+      const aktivitasData = aktivitasResponse?.data?.data || [];
+
+      const existingPenilaian = Array.isArray(existingPenilaianResponse?.data?.data)
+        ? existingPenilaianResponse.data.data
+        : [];
+
+      const usedAktivitasIds = new Set(
+        existingPenilaian
+          .map(item => toIdString(item?.id_aktivitas))
+          .filter(Boolean)
+      );
+
+      const { list: filteredActivities, unresolved } = await filterActivitiesForChild(
+        aktivitasData,
+        usedAktivitasIds,
+        penilaian?.id_aktivitas
+      );
+
       // Handle aktivitas response
       if (aktivitasResponse?.data?.success) {
-        setAktivitasList(aktivitasResponse.data.data || []);
+        setAktivitasList(filteredActivities);
+
+        if (
+          formData.id_aktivitas &&
+          !filteredActivities.some(
+            aktivitas => toIdString(aktivitas.id_aktivitas) === toIdString(formData.id_aktivitas)
+          )
+        ) {
+          updateFormData('id_aktivitas', isEdit ? penilaian?.id_aktivitas || '' : '');
+        }
+
+        if (unresolved > 0) {
+          console.warn(
+            `Unable to verify membership for ${unresolved} aktivitas. These were excluded from the picker.`
+          );
+        }
       } else {
         console.warn('Failed to fetch aktivitas:', aktivitasResponse?.data?.message);
+        setAktivitasList([]);
       }
 
       // Handle jenis penilaian response
@@ -164,11 +428,18 @@ const PenilaianFormScreen = () => {
       
       const submitData = {
         ...formData,
-        id_materi: formData.id_materi,
+        // Pastikan id_materi dikirim null bila kosong agar backend tahu ini bukan pilihan kurikulum
+        id_materi: formData.id_materi && formData.id_materi.toString().trim() !== '' ? formData.id_materi : null,
+        // Kirim materi_text ketika tidak ada id_materi (atau tetap kirim null)
+        materi_text: (!formData.id_materi || formData.id_materi === '') ? (materiText || null) : null,
+        mata_pelajaran_manual: manualSubject?.toString().trim() ? manualSubject : null,
+        materi_manual: manualMateri?.toString().trim() ? manualMateri : null,
         id_semester: formData.id_semester,
         nilai: parseFloat(formData.nilai),
         tanggal_penilaian: formData.tanggal_penilaian.toISOString().split('T')[0]
       };
+      
+      
 
       let response;
       if (isEdit) {
@@ -211,14 +482,27 @@ const PenilaianFormScreen = () => {
   };
 
   const validateForm = () => {
+    // Jika tidak ada id_aktivitas
     if (!formData.id_aktivitas) {
       Alert.alert('Error', 'Silakan pilih aktivitas');
       return false;
     }
-    if (!formData.id_materi) {
+  
+    const isManualAktivitas = Boolean(manualSubject || manualMateri);
+    const hasIdMateri = formData.id_materi && formData.id_materi.toString().trim() !== '';
+    const hasMateriText = materiText && materiText.toString().trim() !== '';
+    const hasManualValues = manualSubject?.toString().trim() && manualMateri?.toString().trim();
+
+    if (isManualAktivitas) {
+      if (!hasManualValues) {
+        Alert.alert('Error', 'Aktivitas ini menggunakan materi manual. Pastikan mata pelajaran dan materi terisi.');
+        return false;
+      }
+    } else if (!hasIdMateri && !hasMateriText) {
       Alert.alert('Error', 'Silakan pilih materi');
       return false;
     }
+  
     if (!formData.id_jenis_penilaian) {
       Alert.alert('Error', 'Silakan pilih jenis penilaian');
       return false;
@@ -234,6 +518,7 @@ const PenilaianFormScreen = () => {
     }
     return true;
   };
+  
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({
@@ -286,29 +571,50 @@ const PenilaianFormScreen = () => {
         </View>
 
         {/* Materi Picker */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Materi *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={formData.id_materi}
-              onValueChange={(value) => updateFormData('id_materi', value)}
-              style={styles.picker}
-              enabled={materiList.length > 0}
-            >
-              <Picker.Item
-                label={materiList.length > 0 ? 'Pilih Materi' : 'Pilih Aktivitas terlebih dahulu'}
-                value=""
-              />
-              {materiList.map(materi => (
-                <Picker.Item
-                  key={materi.id_materi}
-                  label={`${materi.mata_pelajaran?.nama_mata_pelajaran || 'Mata Pelajaran'} - ${materi.nama_materi} (${materi.kelas?.nama_kelas || 'Kelas'})`}
-                  value={materi.id_materi}
-                />
-              ))}
-            </Picker>
-          </View>
-        </View>
+     {/* Materi Picker / Text */}
+<View style={styles.inputGroup}>
+  <Text style={styles.label}>Materi *</Text>
+
+  {/* Jika materiList ada (dari kurikulum) → tampilkan Picker */}
+  {materiList.length > 0 ? (
+    <View style={styles.pickerContainer}>
+      <Picker
+        selectedValue={formData.id_materi}
+        onValueChange={(value) => updateFormData('id_materi', value)}
+        style={styles.picker}
+      >
+        <Picker.Item label="Pilih Materi" value="" />
+        {materiList.map(materi => (
+          <Picker.Item
+            key={materi.id_materi}
+            label={`${materi.mata_pelajaran?.nama_mata_pelajaran || 'Mata Pelajaran'} - ${materi.nama_materi}`}
+            value={materi.id_materi}
+          />
+        ))}
+      </Picker>
+    </View>
+  ) : (manualSubject || manualMateri) ? (
+    <View>
+      <View style={styles.materiPreviewBox}>
+        <Text style={styles.materiPreviewLabel}>Mata Pelajaran</Text>
+        <Text style={styles.materiPreviewValue}>{manualSubject || '-'}</Text>
+      </View>
+      <View style={[styles.materiPreviewBox, { marginTop: 8 }]}>
+        <Text style={styles.materiPreviewLabel}>Materi</Text>
+        <Text style={styles.materiPreviewValue}>{manualMateri || '-'}</Text>
+      </View>
+    </View>
+  ) : (
+    // Jika tidak ada list dan tidak manual, tampilkan input teks dari aktivitas
+    <TextInput
+      style={styles.input}
+      value={materiText}
+      editable={false}
+      placeholder="Materi dari aktivitas"
+    />
+  )}
+</View>
+
 
         {/* Jenis Penilaian Picker */}
         <View style={styles.inputGroup}>
@@ -464,6 +770,23 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  materiPreviewBox: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+  },
+  materiPreviewLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#34495e',
+    marginBottom: 4,
+  },
+  materiPreviewValue: {
+    fontSize: 15,
+    color: '#2c3e50',
   },
   pickerContainer: {
     backgroundColor: '#ffffff',

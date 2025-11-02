@@ -5,6 +5,17 @@ import { kurikulumShelterApi } from '../api/kurikulumShelterApi';
 import { activityReportApi } from '../api/activityReportApi';
 import { kegiatanApi } from '../api/kegiatanApi';
 
+export const ACTIVITY_REPORT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+export const ACTIVITY_REPORT_ERROR_RETRY_DELAY = 30 * 1000; // 30 seconds
+
+const extractReportData = (payload) => {
+  if (!payload) return null;
+  if (payload.data && typeof payload.data === 'object') {
+    return payload.data;
+  }
+  return payload;
+};
+
 // Initial state
 const initialState = {
   aktivitasList: [],
@@ -39,6 +50,7 @@ const initialState = {
   activityReport: null,
   reportLoading: false,
   reportError: null,
+  reportCache: {},
   
   // Dashboard data
   todayActivities: [],
@@ -257,7 +269,9 @@ export const fetchActivityReport = createAsyncThunk(
       const response = await activityReportApi.getByActivity(id_aktivitas);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Gagal mengambil laporan');
+      const status = error.response?.status ?? error.status ?? error.code;
+      const message = error.response?.data?.message || error.message || 'Gagal mengambil laporan';
+      return rejectWithValue({ message, status });
     }
   }
 );
@@ -676,15 +690,24 @@ const aktivitasSlice = createSlice({
       })
       .addCase(createActivityReport.fulfilled, (state, action) => {
         state.reportLoading = false;
-        state.activityReport = action.payload;
+        const reportData = extractReportData(action.payload);
+        state.activityReport = reportData;
+        if (reportData?.id_aktivitas) {
+          state.reportCache[reportData.id_aktivitas] = {
+            status: 'exists',
+            data: reportData,
+            fetchedAt: Date.now(),
+            error: null
+          };
+        }
         // Update activity status to reported
-        if (state.aktivitasDetail && state.aktivitasDetail.id_aktivitas === action.payload.id_aktivitas) {
+        if (state.aktivitasDetail && state.aktivitasDetail.id_aktivitas === reportData?.id_aktivitas) {
           state.aktivitasDetail.status = 'reported';
         }
       })
       .addCase(createActivityReport.rejected, (state, action) => {
         state.reportLoading = false;
-        state.reportError = action.payload;
+        state.reportError = action.payload?.message || action.payload || 'Gagal membuat laporan';
       })
       
       .addCase(fetchActivityReport.pending, (state) => {
@@ -693,11 +716,33 @@ const aktivitasSlice = createSlice({
       })
       .addCase(fetchActivityReport.fulfilled, (state, action) => {
         state.reportLoading = false;
-        state.activityReport = action.payload;
+        const reportData = extractReportData(action.payload);
+        state.activityReport = reportData;
+        const activityId = action.meta.arg;
+        if (activityId) {
+          state.reportCache[activityId] = {
+            status: reportData ? 'exists' : 'missing',
+            data: reportData || null,
+            fetchedAt: Date.now(),
+            error: null
+          };
+        }
       })
       .addCase(fetchActivityReport.rejected, (state, action) => {
         state.reportLoading = false;
-        state.reportError = action.payload;
+        const activityId = action.meta.arg;
+        const status = action.payload?.status;
+        const normalizedStatus = typeof status === 'number' ? status : undefined;
+        const message = action.payload?.message || action.payload || 'Gagal mengambil laporan';
+        state.reportError = message;
+        if (activityId) {
+          state.reportCache[activityId] = {
+            status: normalizedStatus === 404 ? 'missing' : 'error',
+            data: null,
+            fetchedAt: Date.now(),
+            error: { message, status: normalizedStatus }
+          };
+        }
       })
       
       .addCase(deleteActivityReport.pending, (state) => {
@@ -814,6 +859,7 @@ export const selectIsCacheValid = (state) => {
 export const selectActivityReport = (state) => state.aktivitas.activityReport;
 export const selectReportLoading = (state) => state.aktivitas.reportLoading;
 export const selectReportError = (state) => state.aktivitas.reportError;
+export const selectActivityReportCache = (state) => state.aktivitas.reportCache;
 
 // Dashboard selectors
 export const selectTodayActivities = (state) => state.aktivitas.todayActivities;

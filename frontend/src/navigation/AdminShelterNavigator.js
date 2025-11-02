@@ -74,11 +74,11 @@ import KelompokDetailScreen from '../features/adminShelter/screens/KelompokDetai
 import KelompokFormScreen from '../features/adminShelter/screens/KelompokFormScreen';
 import AddChildrenToKelompokScreen from '../features/adminShelter/screens/AddChildrenToKelompokScreen';
 import KelompokReportingScreen from '../features/adminShelter/screens/kelola/KelompokReportingScreen';
-import PenilaianListScreen from '../features/adminShelter/screens/PenilaianListScreen';
-import PenilaianFormScreen from '../features/adminShelter/screens/PenilaianFormScreen';
+import PenilaianListScreen from '../features/adminShelter/screens/anakDetail/PenilaianListScreen';
+import PenilaianFormScreen from '../features/adminShelter/screens/anakDetail/PenilaianFormScreen';
 import SemesterManagementScreen from '../features/adminShelter/screens/SemesterManagementScreen';
-import NilaiSikapScreen from '../features/adminShelter/screens/NilaiSikapScreen';
-import NilaiSikapFormScreen from '../features/adminShelter/screens/NilaiSikapFormScreen';
+import NilaiSikapScreen from '../features/adminShelter/screens/anakDetail/NilaiSikapScreen';
+import NilaiSikapFormScreen from '../features/adminShelter/screens/anakDetail/NilaiSikapFormScreen';
 
 // Management & Utility screens
 import PengajuanAnakSearchScreen from '../features/adminShelter/screens/PengajuanAnakSearchScreen';

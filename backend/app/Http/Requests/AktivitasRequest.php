@@ -32,6 +32,9 @@ class AktivitasRequest extends FormRequest
             'nama_kelompok' => 'nullable|string|max:255',
             'materi' => 'nullable|string',
             'id_materi' => 'nullable|exists:materi,id_materi',
+            'pakai_materi_manual' => 'sometimes|boolean',
+            'mata_pelajaran_manual' => 'nullable|string|max:255',
+            'materi_manual' => 'nullable|string',
             'id_tutor' => 'required|exists:tutor,id_tutor',
             'tanggal' => 'required|date',
             'start_time' => 'nullable|date_format:H:i:s',
@@ -56,6 +59,7 @@ class AktivitasRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             $jenisKegiatan = $this->jenis_kegiatan;
+            $pakaiManual = filter_var($this->pakai_materi_manual, FILTER_VALIDATE_BOOLEAN);
 
             if (!$jenisKegiatan && $this->id_kegiatan) {
                 $jenisKegiatan = Kegiatan::where('id_kegiatan', $this->id_kegiatan)->value('nama_kegiatan');
@@ -66,8 +70,18 @@ class AktivitasRequest extends FormRequest
 
             // For Bimbel activities, ensure either id_materi or materi is provided
             if ($jenisKegiatan === 'Bimbel') {
-                if (empty($this->id_materi) && empty($this->materi)) {
-                    $validator->errors()->add('materi', 'Either select materi from dropdown or provide custom materi text for Bimbel activities.');
+                if ($pakaiManual) {
+                    if (!$this->mata_pelajaran_manual) {
+                        $validator->errors()->add('mata_pelajaran_manual', 'Mata pelajaran manual wajib diisi ketika menggunakan input manual.');
+                    }
+
+                    if (!$this->materi_manual) {
+                        $validator->errors()->add('materi_manual', 'Materi manual wajib diisi ketika menggunakan input manual.');
+                    }
+                } else {
+                    if (empty($this->id_materi) && empty($this->materi)) {
+                        $validator->errors()->add('materi', 'Either select materi from dropdown or provide custom materi text for Bimbel activities.');
+                    }
                 }
             }
 

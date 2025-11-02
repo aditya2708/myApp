@@ -13,15 +13,19 @@ class Penilaian extends Model
     
     protected $fillable = [
         'id_anak',
-        'id_aktivitas',
+        'id_aktivitas',  // ✅ tambahkan ini
         'id_materi',
+        'materi_text',
+        'mata_pelajaran_manual',
+        'materi_manual',
         'id_jenis_penilaian',
         'id_semester',
         'nilai',
         'deskripsi_tugas',
         'tanggal_penilaian',
-        'catatan'
+        'catatan',
     ];
+    
 
     protected $casts = [
         'nilai' => 'decimal:2',

@@ -30,6 +30,21 @@ const ActivityCard = ({ activity, onPress, onEdit, onDelete }) => {
     return '#9b59b6';
   };
 
+  const materiString = activity.materi || '';
+  const [parsedSubject, ...parsedMateriParts] = materiString.split(' - ').map(part => part?.trim());
+  const parsedMateri = parsedMateriParts.filter(Boolean).join(' - ');
+
+  const subjectLabel = activity.pakai_materi_manual
+    ? activity.mata_pelajaran_manual
+    : activity.materi_data?.mata_pelajaran?.nama_mata_pelajaran
+      || activity.materi_data?.mata_pelajaran
+      || parsedSubject;
+
+  const materiLabel = activity.pakai_materi_manual
+    ? activity.materi_manual
+    : activity.materi_data?.nama_materi
+      || (parsedMateri || materiString || 'Materi belum dipilih');
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -64,8 +79,13 @@ const ActivityCard = ({ activity, onPress, onEdit, onDelete }) => {
           </View>
           
           {/* Materi - Main Title */}
+          {subjectLabel ? (
+            <Text style={styles.subject} numberOfLines={1}>
+              {subjectLabel}
+            </Text>
+          ) : null}
           <Text style={styles.materi} numberOfLines={2}>
-            {activity.materi || 'Materi belum dipilih'}
+            {materiLabel || 'Materi belum dipilih'}
           </Text>
           
           <Text style={styles.date}>
@@ -178,6 +198,12 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     marginBottom: 4,
     lineHeight: 20,
+  },
+  subject: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#34495e',
+    marginBottom: 2,
   },
   date: {
     fontSize: 13,

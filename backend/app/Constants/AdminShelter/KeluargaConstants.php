@@ -163,11 +163,13 @@ class KeluargaConstants
     ];
 
     // Survey result options
+    const HASIL_SURVEY_DRAFT = 'draft';
     const HASIL_SURVEY_PENDING = 'pending';
-    const HASIL_SURVEY_APPROVED = 'approved';
-    const HASIL_SURVEY_REJECTED = 'rejected';
+    const HASIL_SURVEY_APPROVED = 'layak';
+    const HASIL_SURVEY_REJECTED = 'tidak layak';
 
     const HASIL_SURVEY_OPTIONS = [
+        self::HASIL_SURVEY_DRAFT,
         self::HASIL_SURVEY_PENDING,
         self::HASIL_SURVEY_APPROVED,
         self::HASIL_SURVEY_REJECTED,

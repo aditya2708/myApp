@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import components
@@ -39,7 +39,10 @@ const KelompokManagementScreen = () => {
   const [viewMode, setViewMode] = useState('grid'); // grid or list
 
   // Fetch kelompok data with new kelas gabungan support
-  const fetchKelompokData = async (page = 1, refresh = false) => {
+  const fetchKelompokData = useCallback(async (page = 1, refresh = false) => {
+    if (!refresh && page === 1) {
+      setLoading(true);
+    }
     try {
       if (refresh) {
         setCurrentPage(1);
@@ -104,10 +107,10 @@ const KelompokManagementScreen = () => {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  };
+  }, [searchQuery, selectedJenjang]);
 
   // Fetch available kelas for filtering
-  const fetchAvailableKelas = async () => {
+  const fetchAvailableKelas = useCallback(async () => {
     try {
       const response = await adminShelterKelompokApi.getAvailableKelas();
       if (response.data.success) {
@@ -128,15 +131,29 @@ const KelompokManagementScreen = () => {
     } catch (err) {
       console.error('Error fetching available kelas:', err);
     }
-  };
-
-  // Initial data fetch
-  useEffect(() => {
-    Promise.all([
-      fetchKelompokData(),
-      fetchAvailableKelas()
-    ]);
   }, []);
+
+  const fetchKelompokDataRef = useRef(fetchKelompokData);
+  const fetchAvailableKelasRef = useRef(fetchAvailableKelas);
+
+  useEffect(() => {
+    fetchKelompokDataRef.current = fetchKelompokData;
+  }, [fetchKelompokData]);
+
+  useEffect(() => {
+    fetchAvailableKelasRef.current = fetchAvailableKelas;
+  }, [fetchAvailableKelas]);
+
+  // Reload data whenever the screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      Promise.all([
+        fetchKelompokDataRef.current(1, true),
+        fetchAvailableKelasRef.current()
+      ]);
+    }, [])
+  );
 
   // Handle refresh
   const handleRefresh = () => {
@@ -157,12 +174,14 @@ const KelompokManagementScreen = () => {
 
   // Handle search
   const handleSearch = () => {
+    setLoading(true);
     setCurrentPage(1);
     fetchKelompokData(1, true);
   };
 
   // Clear search
   const clearSearch = () => {
+    setLoading(true);
     setSearchQuery('');
     setCurrentPage(1);
     fetchKelompokData(1, true);
@@ -170,6 +189,7 @@ const KelompokManagementScreen = () => {
 
   // Handle jenjang filter
   const handleJenjangFilter = (jenjangName) => {
+    setLoading(true);
     setSelectedJenjang(jenjangName === selectedJenjang ? '' : jenjangName);
     setCurrentPage(1);
     fetchKelompokData(1, true);

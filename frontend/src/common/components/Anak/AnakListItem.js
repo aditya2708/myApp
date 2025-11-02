@@ -8,8 +8,67 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { calculateAge, getStatusLabel } from '../../../common/utils/ageCalculator';
+import { getStatusLabel } from '../../../common/utils/ageCalculator';
 import { formatEducationDisplay } from '../../../common/utils/educationFormatter';
+
+const pickFirstNonEmptyString = (...values) => {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+  return null;
+};
+
+const resolveKelompokName = (item) => {
+  const fallback = 'Belum memiliki kelompok';
+  if (!item) return fallback;
+
+  const extractFromGroup = (group) => {
+    if (Array.isArray(group)) {
+      for (const entry of group) {
+        const nameFromEntry = extractFromGroup(entry);
+        if (nameFromEntry) {
+          return nameFromEntry;
+        }
+      }
+      return null;
+    }
+
+    if (typeof group === 'string') {
+      return pickFirstNonEmptyString(group);
+    }
+
+    if (group && typeof group === 'object') {
+      return pickFirstNonEmptyString(
+        group.nama_kelompok,
+        group.namaKelompok,
+        group.nama,
+        group.name,
+        group.title,
+        group.label
+      );
+    }
+
+    return null;
+  };
+
+  const primaryName = extractFromGroup(item.kelompok);
+  if (primaryName) {
+    return primaryName;
+  }
+
+  const fallbackName = pickFirstNonEmptyString(
+    item.nama_kelompok,
+    item.namaKelompok,
+    item.kelompok_name
+  );
+
+  return fallbackName || fallback;
+};
 
 const AnakListItem = ({ item, onPress, onToggleStatus, onDelete, showDeleteAction = true }) => {
   if (!item) return null;
@@ -24,8 +83,8 @@ const AnakListItem = ({ item, onPress, onToggleStatus, onDelete, showDeleteActio
   };
 
   const statusColor = item.status_validasi === 'aktif' ? '#10B981' : '#EF4444';
-  const statusBg = item.status_validasi === 'aktif' ? '#DCFCE7' : '#FEE2E2';
   const statusText = item.status_validasi === 'aktif' ? 'Aktif' : 'Non aktif';
+  const kelompokLabel = resolveKelompokName(item);
 
   return (
     <TouchableOpacity 
@@ -54,9 +113,9 @@ const AnakListItem = ({ item, onPress, onToggleStatus, onDelete, showDeleteActio
           <View style={styles.detailsContainer}>
             <View style={styles.detailRow}>
               <View style={styles.detailItem}>
-                <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-                <Text style={styles.detailText}>
-                  {calculateAge(item.tanggal_lahir)}
+                <Ionicons name="people-circle-outline" size={14} color="#6B7280" />
+                <Text style={styles.detailText} numberOfLines={1}>
+                  {kelompokLabel}
                 </Text>
               </View>
               

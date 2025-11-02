@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Alert, Animated, SafeAreaView, Vibration
 } from 'react-native';
@@ -31,7 +31,7 @@ const QrScannerScreen = ({ navigation, route }) => {
   const sound = useRef(null);
   
   const { 
-    id_aktivitas, activityName, activityDate, activityType, kelompokId, kelompokName
+    id_aktivitas, activityName, activityDate, activityType, kelompokId, kelompokIds, kelompokName
   } = route.params || {};
   
   const tokenLoading = useSelector(selectQrTokenLoading);
@@ -52,7 +52,18 @@ const QrScannerScreen = ({ navigation, route }) => {
   const [loadingKelompokData, setLoadingKelompokData] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activityDateStatus, setActivityDateStatus] = useState('valid');
-  
+
+  const resolvedKelompokIds = useMemo(() => {
+    const ids = [];
+    if (Array.isArray(kelompokIds)) {
+      ids.push(...kelompokIds.filter(Boolean));
+    }
+    if (kelompokId) {
+      ids.push(kelompokId);
+    }
+    return Array.from(new Set(ids));
+  }, [kelompokId, kelompokIds]);
+
   useEffect(() => {
     const loadSound = async () => {
       try {
@@ -86,11 +97,19 @@ const QrScannerScreen = ({ navigation, route }) => {
   
   useEffect(() => {
     setIsBimbelActivity(activityType === 'Bimbel');
-    if (activityType === 'Bimbel' && kelompokId) {
-      fetchKelompokStudents(kelompokId);
+
+    if (activityType === 'Bimbel') {
+      if (resolvedKelompokIds.length > 0) {
+        fetchKelompokStudents(resolvedKelompokIds);
+      } else {
+        setKelompokStudentIds([]);
+      }
+    } else {
+      setKelompokStudentIds([]);
     }
+
     validateActivityDate();
-  }, [activityType, kelompokId, activityDate, id_aktivitas]);
+  }, [activityType, resolvedKelompokIds, activityDate, id_aktivitas, fetchKelompokStudents]);
   
   useEffect(() => {
     if (duplicateError || tutorDuplicateError) {
@@ -133,25 +152,41 @@ const QrScannerScreen = ({ navigation, route }) => {
     }
   };
   
-  const fetchKelompokStudents = async (kelompokId) => {
-    if (!kelompokId) return;
-    
+  const fetchKelompokStudents = useCallback(async (idsParam) => {
+    const uniqueIds = Array.from(
+      new Set((Array.isArray(idsParam) ? idsParam : [idsParam]).filter(Boolean)),
+    );
+
+    if (uniqueIds.length === 0) {
+      setKelompokStudentIds([]);
+      return;
+    }
+
     setLoadingKelompokData(true);
     try {
-      const response = await adminShelterKelompokApi.getGroupChildren(kelompokId);
-      if (response.data?.data) {
-        const studentIds = response.data.data
-          .filter(student => student.status_validasi === 'aktif')
-          .map(student => student.id_anak);
-        setKelompokStudentIds(studentIds);
-      }
+      const responses = await Promise.all(
+        uniqueIds.map(id => adminShelterKelompokApi.getGroupChildren(id)),
+      );
+
+      const studentSet = new Set();
+      responses.forEach(response => {
+        if (response?.data?.data && Array.isArray(response.data.data)) {
+          response.data.data.forEach(student => {
+            if (!student?.id_anak) return;
+            if (student.status_validasi && student.status_validasi !== 'aktif') return;
+            studentSet.add(student.id_anak);
+          });
+        }
+      });
+
+      setKelompokStudentIds(Array.from(studentSet));
     } catch (error) {
       console.error('Error mengambil siswa kelompok:', error);
       setKelompokStudentIds([]);
     } finally {
       setLoadingKelompokData(false);
     }
-  };
+  }, []);
   
   const playSound = useCallback(async () => {
     try {

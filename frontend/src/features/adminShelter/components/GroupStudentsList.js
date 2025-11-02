@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,63 +6,85 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
-  RefreshControl
+  RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Components
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
-
-// API Service
 import { adminShelterKelompokApi } from '../api/adminShelterKelompokApi';
 
 /**
- * Display a list of students in a kelompok/group
- * 
+ * Display a list of students for one or many kelompok.
+ *
  * @param {Object} props
- * @param {string|number} props.kelompokId - ID of the kelompok to display students for
- * @param {boolean} props.showTitle - Whether to show the section title
- * @param {Function} props.onRefresh - Callback for refresh action
+ * @param {string|number} props.kelompokId - Primary kelompok ID (backward compatibility).
+ * @param {Array<number>} props.kelompokIds - Optional list of kelompok IDs to aggregate.
+ * @param {boolean} props.showTitle - Whether to show the section title.
+ * @param {Function} props.onRefresh - Callback for refresh action.
+ * @param {string} props.headerNote - Optional helper text displayed under the title.
  */
-const GroupStudentsList = ({ kelompokId, showTitle = true, onRefresh }) => {
+const GroupStudentsList = ({
+  kelompokId,
+  kelompokIds = [],
+  showTitle = true,
+  onRefresh,
+  headerNote = null,
+}) => {
   const navigation = useNavigation();
-  
-  // State
+
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Load students on mount and when kelompokId changes
-  useEffect(() => {
-    if (kelompokId) {
-      fetchStudents();
-    } else {
-      setStudents([]);
-      setLoading(false);
+  const [activeGroupCount, setActiveGroupCount] = useState(0);
+
+  const resolvedKelompokIds = useMemo(() => {
+    const ids = [];
+
+    if (Array.isArray(kelompokIds)) {
+      ids.push(...kelompokIds.filter(Boolean));
     }
-  }, [kelompokId]);
-  
-  // Fetch students for the kelompok
-  const fetchStudents = async () => {
-    if (!kelompokId) return;
-    
+
+    if (kelompokId) {
+      ids.push(kelompokId);
+    }
+
+    return Array.from(new Set(ids));
+  }, [kelompokId, kelompokIds]);
+
+  const fetchStudents = useCallback(async (ids = resolvedKelompokIds) => {
+    if (!ids || ids.length === 0) {
+      setStudents([]);
+      setActiveGroupCount(0);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       setError(null);
-      const response = await adminShelterKelompokApi.getGroupChildren(kelompokId);
-      
-      if (response.data && response.data.data) {
-        // Filter only active students
-        const activeStudents = response.data.data.filter(
-          student => student.status_validasi === 'aktif'
-        );
-        setStudents(activeStudents);
-      } else {
-        setStudents([]);
-      }
+      const responses = await Promise.all(
+        ids.map(id => adminShelterKelompokApi.getGroupChildren(id)),
+      );
+
+      const aggregated = responses.flatMap(response => {
+        if (response?.data?.data && Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+        return [];
+      });
+
+      const uniqueStudentsMap = new Map();
+      aggregated.forEach(student => {
+        if (!student?.id_anak) return;
+        if (student.status_validasi && student.status_validasi !== 'aktif') return;
+        uniqueStudentsMap.set(student.id_anak, { ...student });
+      });
+
+      setStudents(Array.from(uniqueStudentsMap.values()));
+      setActiveGroupCount(ids.length);
     } catch (err) {
       console.error('Error fetching kelompok students:', err);
       setError('Failed to load students in this group');
@@ -70,33 +92,41 @@ const GroupStudentsList = ({ kelompokId, showTitle = true, onRefresh }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-  
-  // Handle refresh
+  }, [resolvedKelompokIds]);
+
+  useEffect(() => {
+    if (!resolvedKelompokIds.length) {
+      setStudents([]);
+      setLoading(false);
+      setActiveGroupCount(0);
+      return;
+    }
+
+    setLoading(true);
+    fetchStudents(resolvedKelompokIds);
+  }, [resolvedKelompokIds, fetchStudents]);
+
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchStudents();
+    fetchStudents(resolvedKelompokIds);
     if (onRefresh) {
       onRefresh();
     }
   };
-  
-  // Navigate to student details
+
   const handleViewStudent = (student) => {
     navigation.navigate('AnakDetail', {
       id: student.id_anak,
-      title: student.full_name || student.nick_name
+      title: student.full_name || student.nick_name,
     });
   };
-  
-  // Render student item
+
   const renderStudentItem = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.studentCard}
       onPress={() => handleViewStudent(item)}
       activeOpacity={0.7}
     >
-      {/* Student Image */}
       <View style={styles.avatarContainer}>
         {item.foto_url ? (
           <Image source={{ uri: item.foto_url }} style={styles.avatar} />
@@ -106,82 +136,83 @@ const GroupStudentsList = ({ kelompokId, showTitle = true, onRefresh }) => {
           </View>
         )}
       </View>
-      
-      {/* Student Details */}
+
       <View style={styles.studentDetails}>
         <Text style={styles.studentName} numberOfLines={1}>
           {item.full_name || item.nick_name || 'Unknown Student'}
         </Text>
-        
+
         <View style={styles.studentInfo}>
           <Text style={styles.studentIdText}>ID: {item.id_anak}</Text>
-          
+
           {item.agama && (
             <Text style={styles.infoText}>Agama: {item.agama}</Text>
           )}
-          
+
           {item.jenis_kelamin && (
             <Text style={styles.infoText}>
-              Jenis kelamin: {item.jenis_kelamin === 'Laki-laki' ? 'Laki-Laki' : item.jenis_kelamin === 'Perempuan' ? 'Perempuan' : item.jenis_kelamin}
+              Jenis kelamin: {item.jenis_kelamin === 'Laki-laki'
+                ? 'Laki-Laki'
+                : item.jenis_kelamin === 'Perempuan'
+                  ? 'Perempuan'
+                  : item.jenis_kelamin}
             </Text>
           )}
         </View>
       </View>
-      
-      {/* Action Icon */}
-      <Ionicons name="chevron-forward" size={20} color="#bdc3c7" />
     </TouchableOpacity>
   );
-  
-  // Render empty list
+
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="people-outline" size={48} color="#bdc3c7" />
-      <Text style={styles.emptyText}>No students in this group</Text>
-      {kelompokId ? (
+      <Ionicons name="school-outline" size={48} color="#bdc3c7" />
+      <Text style={styles.emptyText}>No students found</Text>
+      {resolvedKelompokIds.length > 0 ? (
         <Text style={styles.emptySubText}>Try selecting a different group</Text>
       ) : (
         <Text style={styles.emptySubText}>This activity is not associated with any group</Text>
       )}
     </View>
   );
-  
-  // Show loading spinner
+
   if (loading && !refreshing && !students.length) {
     return <LoadingSpinner message="Loading students..." />;
   }
-  
+
   return (
     <View style={styles.container}>
-      {/* Section Title */}
       {showTitle && (
         <Text style={styles.sectionTitle}>
           Students in Group {students.length > 0 ? `(${students.length})` : ''}
         </Text>
       )}
-      
-      {/* Error Message */}
+
+      {(headerNote || activeGroupCount > 1) && (
+        <Text style={styles.headerNote}>
+          {headerNote || `Menampilkan gabungan ${activeGroupCount} kelompok`}
+        </Text>
+      )}
+
       {error && (
         <ErrorMessage
           message={error}
-          onRetry={fetchStudents}
+          onRetry={() => fetchStudents(resolvedKelompokIds)}
         />
       )}
-      
-      {/* Students List */}
+
       <FlatList
         data={students}
         renderItem={renderStudentItem}
         keyExtractor={(item) => item.id_anak.toString()}
         ListEmptyComponent={renderEmptyList}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
+        refreshControl={(
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
             colors={['#3498db']}
           />
-        }
+        )}
       />
     </View>
   );
@@ -195,6 +226,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2c3e50',
+    marginBottom: 12,
+  },
+  headerNote: {
+    fontSize: 12,
+    color: '#7f8c8d',
     marginBottom: 12,
   },
   listContainer: {

@@ -316,8 +316,8 @@ const KeluargaFormScreen = () => {
   }, [navigation, isEditMode]);
 
   // Enhanced submit handler
-  const onSubmit = async () => {
-    const result = await handleSubmit();
+  const submitAndExit = async (options) => {
+    const result = await handleSubmit(options);
     if (result.success) {
       skipConfirmationRef.current = true;
       navigation.goBack();
@@ -471,14 +471,24 @@ const KeluargaFormScreen = () => {
               disabled={submitting}
             />
           ) : (
-            <Button
-              title={isEditMode ? "Edit" : "Simpan"}
-              onPress={onSubmit}
-              type="primary"
-              style={styles.navigationButton}
-              loading={submitting}
-              disabled={submitting}
-            />
+            <>
+              <Button
+                title="Simpan Data Keluarga"
+                onPress={() => submitAndExit({ submitSurvey: false })}
+                type="outline"
+                style={styles.navigationButton}
+                loading={submitting}
+                disabled={submitting}
+              />
+              <Button
+                title="Kirim Survei ke Cabang"
+                onPress={() => submitAndExit({ submitSurvey: true })}
+                type="primary"
+                style={styles.navigationButton}
+                loading={submitting}
+                disabled={submitting}
+              />
+            </>
           )}
         </View>
       </ScrollView>

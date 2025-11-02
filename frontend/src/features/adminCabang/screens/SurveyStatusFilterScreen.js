@@ -27,7 +27,8 @@ const SurveyStatusFilterScreen = () => {
   const statusConfig = {
     pending: { label: 'MENUNGGU', color: '#f39c12', bgColor: '#fef5e7' },
     layak: { label: 'DISETUJUI', color: '#27ae60', bgColor: '#d5f4e6', icon: 'checkmark-circle' },
-    'tidak layak': { label: 'DITOLAK', color: '#e74c3c', bgColor: '#fdeaea', icon: 'close-circle' }
+    'tidak layak': { label: 'DITOLAK', color: '#e74c3c', bgColor: '#fdeaea', icon: 'close-circle' },
+    draft: { label: 'DRAFT', color: '#7f8c8d', bgColor: '#ecf0f1', icon: 'create-outline' }
   };
 
   const fetchSurveys = useCallback(async (params = {}) => {

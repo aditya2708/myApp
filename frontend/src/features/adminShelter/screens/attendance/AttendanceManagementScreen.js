@@ -17,7 +17,7 @@ const Tab = createMaterialTopTabNavigator();
 const AttendanceManagementScreen = ({ navigation, route }) => {
   const {
     id_aktivitas, activityName, activityDate, activityType,
-    kelompokId, kelompokName, level, completeActivity, initialTab,
+    kelompokId, kelompokIds, kelompokName, level, completeActivity, initialTab,
     activityStatus: routeActivityStatus,
     attendanceSummary: routeAttendanceSummary
   } = route.params || {};
@@ -71,10 +71,11 @@ const AttendanceManagementScreen = ({ navigation, route }) => {
     activityDate,
     activityType,
     kelompokId,
+    kelompokIds,
     kelompokName,
     level,
     completeActivity,
-  }), [id_aktivitas, activityName, activityDate, activityType, kelompokId, kelompokName, level, completeActivity]);
+  }), [id_aktivitas, activityName, activityDate, activityType, kelompokId, kelompokIds, kelompokName, level, completeActivity]);
 
   const qrScannerProps = useMemo(() => ({
     navigation,
@@ -83,10 +84,11 @@ const AttendanceManagementScreen = ({ navigation, route }) => {
     activityDate,
     activityType,
     kelompokId,
+    kelompokIds,
     kelompokName,
     startTime,
     endTime,
-  }), [navigation, id_aktivitas, activityName, activityDate, activityType, kelompokId, kelompokName, startTime, endTime]);
+  }), [navigation, id_aktivitas, activityName, activityDate, activityType, kelompokId, kelompokIds, kelompokName, startTime, endTime]);
 
   const attendanceListProps = useMemo(() => ({
     navigation,
@@ -95,6 +97,7 @@ const AttendanceManagementScreen = ({ navigation, route }) => {
     activityDate,
     activityType,
     kelompokId,
+    kelompokIds,
     kelompokName,
     activityStatus: effectiveActivityStatus,
     attendanceSummary: effectiveAttendanceSummary,
@@ -105,6 +108,7 @@ const AttendanceManagementScreen = ({ navigation, route }) => {
     activityDate,
     activityType,
     kelompokId,
+    kelompokIds,
     kelompokName,
     effectiveActivityStatus,
     effectiveAttendanceSummary,

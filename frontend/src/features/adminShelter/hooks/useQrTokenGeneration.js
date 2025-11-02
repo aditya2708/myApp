@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Alert } from 'react-native';
 import { adminShelterAnakApi } from '../api/adminShelterAnakApi';
@@ -28,6 +28,7 @@ export const useQrTokenGeneration = (routeParams = {}) => {
     activityDate,
     activityType,
     kelompokId,
+    kelompokIds = [],
     kelompokName,
     level,
     completeActivity
@@ -55,6 +56,17 @@ export const useQrTokenGeneration = (routeParams = {}) => {
   const [kelompokError, setKelompokError] = useState(null);
   const [isContextualMode, setIsContextualMode] = useState(!!id_aktivitas);
   const [targets, setTargets] = useState([]);
+
+  const resolvedKelompokIds = useMemo(() => {
+    const ids = [];
+    if (Array.isArray(kelompokIds)) {
+      ids.push(...kelompokIds.filter(Boolean));
+    }
+    if (kelompokId) {
+      ids.push(kelompokId);
+    }
+    return Array.from(new Set(ids));
+  }, [kelompokId, kelompokIds]);
   
   const qrRefs = useRef({}); // Unified QR refs for all targets
 
@@ -88,19 +100,37 @@ export const useQrTokenGeneration = (routeParams = {}) => {
   }, [isContextualMode, activityType, completeActivity]);
   
   useEffect(() => {
-    if (isContextualMode && activityType === 'Bimbel' && kelompokId) {
-      fetchStudentsByKelompok(kelompokId);
-    } 
-    else if (isContextualMode && activityType === 'Kegiatan') {
-      fetchAllStudents();
+    if (isContextualMode) {
+      if (activityType === 'Bimbel') {
+        if (resolvedKelompokIds.length > 0) {
+          fetchStudentsByKelompokIds(resolvedKelompokIds);
+        } else {
+          setStudents([]);
+          setSelectedStudents([]);
+        }
+        return;
+      }
+
+      if (activityType === 'Kegiatan') {
+        fetchAllStudents();
+        return;
+      }
     }
-    else if (selectedKelompokId) {
+
+    if (selectedKelompokId) {
       fetchStudentsByKelompok(selectedKelompokId);
-    } 
-    else {
+    } else {
       fetchAllStudents();
     }
-  }, [isContextualMode, activityType, kelompokId, selectedKelompokId]);
+  }, [
+    isContextualMode,
+    activityType,
+    resolvedKelompokIds,
+    selectedKelompokId,
+    fetchStudentsByKelompokIds,
+    fetchStudentsByKelompok,
+    fetchAllStudents,
+  ]);
 
   const fetchKelompokList = async () => {
     try {
@@ -119,6 +149,18 @@ export const useQrTokenGeneration = (routeParams = {}) => {
       setKelompokLoading(false);
     }
   };
+  
+  const queueTokenFetch = useCallback((activeStudentsList) => {
+    const tokenFetchDelay = 300;
+
+    activeStudentsList.forEach((student, index) => {
+      if (!studentTokens[student.id_anak]) {
+        setTimeout(() => {
+          dispatch(getActiveToken(student.id_anak));
+        }, tokenFetchDelay * index);
+      }
+    });
+  }, [dispatch, studentTokens]);
   
   const fetchAllStudents = async () => {
     try {
@@ -151,15 +193,7 @@ export const useQrTokenGeneration = (routeParams = {}) => {
         setStudents(activeStudents);
         setSelectedStudents([]);
         
-        // Debounced token fetching to prevent rate limiting
-        const tokenFetchDelay = 300;
-        activeStudents.forEach((student, index) => {
-          if (!studentTokens[student.id_anak]) {
-            setTimeout(() => {
-              dispatch(getActiveToken(student.id_anak));
-            }, tokenFetchDelay * index);
-          }
-        });
+        queueTokenFetch(activeStudents);
       }
     } catch (error) {
       console.error('Error mengambil semua siswa:', error);
@@ -168,46 +202,57 @@ export const useQrTokenGeneration = (routeParams = {}) => {
       setLoading(false);
     }
   };
-  
-  const fetchStudentsByKelompok = async (kelompokId) => {
+
+  const fetchStudentsByKelompokIds = useCallback(async (idsParam) => {
+    const uniqueIds = Array.from(
+      new Set((Array.isArray(idsParam) ? idsParam : [idsParam]).filter(Boolean)),
+    );
+
+    if (uniqueIds.length === 0) {
+      setStudents([]);
+      setSelectedStudents([]);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await adminShelterKelompokApi.getGroupChildren(kelompokId);
-      
-      if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        const kelompokStudents = response.data.data;
-        
-        const activeStudents = kelompokStudents.filter(
-          student => student.status_validasi === 'aktif'
-        );
-        
-        setStudents(activeStudents);
-        setSelectedStudents([]);
-        
-        // Debounced token fetching to prevent rate limiting
-        const tokenFetchDelay = 300;
-        activeStudents.forEach((student, index) => {
-          if (!studentTokens[student.id_anak]) {
-            setTimeout(() => {
-              dispatch(getActiveToken(student.id_anak));
-            }, tokenFetchDelay * index);
-          }
-        });
-      } else {
-        setError('Struktur data siswa tidak valid. Silakan coba kelompok yang berbeda.');
-      }
+
+      const responses = await Promise.all(
+        uniqueIds.map(id => adminShelterKelompokApi.getGroupChildren(id)),
+      );
+
+      const combinedStudents = responses.flatMap(response => {
+        if (response?.data?.data && Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+        return [];
+      });
+
+      const activeStudents = combinedStudents.filter(
+        student => student.status_validasi === 'aktif',
+      );
+
+      setStudents(activeStudents);
+      setSelectedStudents([]);
+      queueTokenFetch(activeStudents);
     } catch (error) {
       console.error('Error mengambil siswa berdasarkan kelompok:', error);
-      setError(`Gagal memuat siswa: ${error.message}`);
-      
-      if (isContextualMode) {
-        fetchAllStudents();
-      }
+      setError(`Gagal memuat siswa: ${error.message || 'Tidak diketahui'}`);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
+  }, [queueTokenFetch]);
+  
+  const fetchStudentsByKelompok = async (kelompokIdParam) => {
+    if (!kelompokIdParam) {
+      setStudents([]);
+      setSelectedStudents([]);
+      return;
+    }
+
+    await fetchStudentsByKelompokIds([kelompokIdParam]);
   };
 
   const handleKelompokChange = (kelompokId) => {

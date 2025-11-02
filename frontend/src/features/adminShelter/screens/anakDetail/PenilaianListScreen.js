@@ -13,13 +13,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 
 // Import components
-import LoadingSpinner from '../../../common/components/LoadingSpinner';
-import ErrorMessage from '../../../common/components/ErrorMessage';
-import Button from '../../../common/components/Button';
+import LoadingSpinner from '../../../../common/components/LoadingSpinner';
+import ErrorMessage from '../../../../common/components/ErrorMessage';
+import Button from '../../../../common/components/Button';
 
 // Import API
-import { penilaianApi } from '../api/penilaianApi';
-import { semesterApi } from '../api/semesterApi';
+import { penilaianApi } from '../../api/penilaianApi';
+import { semesterApi } from '../../api/semesterApi';
 
 const PenilaianListScreen = () => {
   const navigation = useNavigation();
@@ -160,65 +160,79 @@ const PenilaianListScreen = () => {
     );
   };
 
-  const renderPenilaianCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigateToForm(item)}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>
-          {item.materi?.nama_materi || 'Tanpa Materi'}
-        </Text>
-        <Text style={[styles.nilaiHuruf, { color: getNilaiColor(item.nilai) }]}>
-          {item.nilai_huruf || 'N/A'}
-        </Text>
-      </View>
-      
-      {/* Show mata pelajaran and kelas info if available */}
-      {item.materi && (
-        <View style={styles.materiInfo}>
-          <Text style={styles.materiText}>
-            {item.materi.mataPelajaran?.nama_mata_pelajaran || 'Mata Pelajaran'} • {item.materi.kelas?.nama_kelas || 'Kelas'}
+  const renderPenilaianCard = ({ item }) => {
+    const subjectLabel = item.mata_pelajaran_manual
+      || item.materi?.mataPelajaran?.nama_mata_pelajaran
+      || item.materi?.mata_pelajaran
+      || '';
+
+    const materiLabel = item.materi_manual
+      || item.materi?.nama_materi
+      || item.materi_text
+      || 'Tanpa Materi';
+
+    const kelasLabel = item.materi?.kelas?.nama_kelas;
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigateToForm(item)}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>
+            {materiLabel || 'Tanpa Materi'}
           </Text>
-        </View>
-      )}
-      
-      <View style={styles.cardBody}>
-        <View style={styles.infoRow}>
-          <Ionicons name="document-text-outline" size={16} color="#7f8c8d" />
-          <Text style={styles.infoText}>
-            {item.jenisPenilaian?.nama_jenis || 'Jenis tidak diketahui'}
+          <Text style={[styles.nilaiHuruf, { color: getNilaiColor(item.nilai) }]}>
+            {item.nilai_huruf || 'N/A'}
           </Text>
         </View>
         
-        <View style={styles.infoRow}>
-          <Ionicons name="calendar-outline" size={16} color="#7f8c8d" />
-          <Text style={styles.infoText}>{formatDate(item.tanggal_penilaian)}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="star-outline" size={16} color="#7f8c8d" />
-          <Text style={styles.infoText}>Nilai: {item.nilai || '0'}</Text>
-        </View>
-      </View>
-
-      <View style={styles.cardActions}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => navigateToForm(item)}
-        >
-          <Ionicons name="pencil" size={20} color="#3498db" />
-        </TouchableOpacity>
+        {(subjectLabel || kelasLabel) && (
+          <View style={styles.materiInfo}>
+            <Text style={styles.materiText}>
+              {subjectLabel || 'Tanpa Mata Pelajaran'}
+              {kelasLabel ? ` • ${kelasLabel}` : ''}
+            </Text>
+          </View>
+        )}
         
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => handleDelete(item.id_penilaian)}
-        >
-          <Ionicons name="trash" size={20} color="#e74c3c" />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.cardBody}>
+          <View style={styles.infoRow}>
+            <Ionicons name="document-text-outline" size={16} color="#7f8c8d" />
+            <Text style={styles.infoText}>
+              {item.jenisPenilaian?.nama_jenis || 'Jenis tidak diketahui'}
+            </Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Ionicons name="calendar-outline" size={16} color="#7f8c8d" />
+            <Text style={styles.infoText}>{formatDate(item.tanggal_penilaian)}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Ionicons name="star-outline" size={16} color="#7f8c8d" />
+            <Text style={styles.infoText}>Nilai: {item.nilai || '0'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.cardActions}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigateToForm(item)}
+          >
+            <Ionicons name="pencil" size={20} color="#3498db" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleDelete(item.id_penilaian)}
+          >
+            <Ionicons name="trash" size={20} color="#e74c3c" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const getNilaiColor = (nilai) => {
     if (nilai >= 90) return '#2ecc71';

@@ -79,9 +79,12 @@ class PenilaianController extends Controller
                 'nilai' => 'required|numeric|min:0|max:100',
                 'deskripsi_tugas' => 'nullable|string',
                 'tanggal_penilaian' => 'required|date',
-                'catatan' => 'nullable|string'
+                'catatan' => 'nullable|string',
+                'materi_text' => 'nullable|string',
+                'mata_pelajaran_manual' => 'nullable|string|max:255',
+                'materi_manual' => 'nullable|string',
             ]);
-
+    
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
@@ -89,18 +92,69 @@ class PenilaianController extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
-
+    
             $aktivitas = Aktivitas::find($request->id_aktivitas);
-            if (!$aktivitas || !$aktivitas->id_materi) {
+
+            if (!$aktivitas) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Aktivitas tidak memiliki materi kurikulum'
+                    'message' => 'Aktivitas tidak ditemukan'
                 ], 422);
             }
 
             $data = $request->all();
-            $data['id_materi'] = $aktivitas->id_materi;
 
+            if ($aktivitas->id_materi) {
+                // Activity uses kurikulum materi
+                $data['id_materi'] = $aktivitas->id_materi;
+                $data['mata_pelajaran_manual'] = null;
+                $data['materi_manual'] = null;
+
+                if (!$request->filled('materi_text')) {
+                    $data['materi_text'] = $aktivitas->materi;
+                }
+            } else {
+                $data['id_materi'] = null;
+                $pakaiManualAktivitas = (bool) $aktivitas->pakai_materi_manual;
+
+                if ($pakaiManualAktivitas) {
+                    $mataPelajaranManual = $request->mata_pelajaran_manual ?? $aktivitas->mata_pelajaran_manual;
+                    $materiManual = $request->materi_manual ?? $aktivitas->materi_manual;
+
+                    if (!$mataPelajaranManual || !$materiManual) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Aktivitas menggunakan materi manual, namun mata pelajaran atau materi manual tidak tersedia.'
+                        ], 422);
+                    }
+
+                    $data['mata_pelajaran_manual'] = $mataPelajaranManual;
+                    $data['materi_manual'] = $materiManual;
+                    $data['materi_text'] = $request->materi_text ?? $this->formatMateriLabel($mataPelajaranManual, $materiManual);
+                } else {
+                    $data['mata_pelajaran_manual'] = $request->mata_pelajaran_manual;
+                    $data['materi_manual'] = $request->materi_manual;
+
+                    if (
+                        !$request->filled('materi_text')
+                        && (!$data['materi_manual'] || trim($data['materi_manual']) === '')
+                    ) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Aktivitas tidak memiliki materi kurikulum dan materi_text tidak disediakan'
+                        ], 422);
+                    }
+
+                    if (!$request->filled('materi_text')) {
+                        $data['materi_text'] = $this->formatMateriLabel(
+                            $data['mata_pelajaran_manual'],
+                            $data['materi_manual']
+                        );
+                    }
+                }
+            }
+    
+            // ✅ Pastikan ada semester aktif jika id_semester tidak dikirim
             if (!$request->filled('id_semester')) {
                 $kacabId = auth()->user()->adminShelter->id_kacab ?? null;
                 $query = Semester::query();
@@ -121,23 +175,31 @@ class PenilaianController extends Controller
                 }
                 $data['id_semester'] = $activeSemester->id_semester;
             }
-
+    
             $penilaian = Penilaian::create($data);
-            
+    
             return response()->json([
                 'success' => true,
                 'message' => 'Penilaian berhasil ditambahkan',
                 'data' => $penilaian->load(['anak', 'aktivitas', 'materi', 'jenisPenilaian', 'semester'])
             ], 201);
-            
+
         } catch (\Exception $e) {
+            logger()->error('Error menambahkan penilaian: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menambahkan penilaian',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString() // <-- tambahkan untuk debug sementara
             ], 500);
         }
+        
     }
+    
 
     /**
      * Display the specified penilaian
@@ -179,7 +241,10 @@ class PenilaianController extends Controller
                 'nilai' => 'sometimes|required|numeric|min:0|max:100',
                 'deskripsi_tugas' => 'nullable|string',
                 'tanggal_penilaian' => 'sometimes|required|date',
-                'catatan' => 'nullable|string'
+                'catatan' => 'nullable|string',
+                'materi_text' => 'nullable|string',
+                'mata_pelajaran_manual' => 'nullable|string|max:255',
+                'materi_manual' => 'nullable|string',
             ]);
 
             if ($validator->fails()) {
@@ -192,16 +257,66 @@ class PenilaianController extends Controller
 
             $aktivitasId = $request->id_aktivitas ?? $penilaian->id_aktivitas;
             $aktivitas = Aktivitas::find($aktivitasId);
-            if (!$aktivitas || !$aktivitas->id_materi) {
+            if (!$aktivitas) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Aktivitas tidak memiliki materi kurikulum'
+                    'message' => 'Aktivitas tidak ditemukan'
                 ], 422);
             }
 
             $data = $request->all();
             $data['id_aktivitas'] = $aktivitasId;
-            $data['id_materi'] = $aktivitas->id_materi;
+            $pakaiManualAktivitas = (bool) $aktivitas->pakai_materi_manual;
+
+            if ($aktivitas->id_materi) {
+                $data['id_materi'] = $aktivitas->id_materi;
+                $data['mata_pelajaran_manual'] = null;
+                $data['materi_manual'] = null;
+
+                if (!$request->filled('materi_text')) {
+                    $data['materi_text'] = $aktivitas->materi;
+                }
+            } else {
+                $data['id_materi'] = null;
+
+                if ($pakaiManualAktivitas) {
+                    $mataPelajaranManual = $request->mata_pelajaran_manual ?? $aktivitas->mata_pelajaran_manual;
+                    $materiManual = $request->materi_manual ?? $aktivitas->materi_manual;
+
+                    if (!$mataPelajaranManual || !$materiManual) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Aktivitas menggunakan materi manual, namun mata pelajaran atau materi manual tidak tersedia.'
+                        ], 422);
+                    }
+
+                    $data['mata_pelajaran_manual'] = $mataPelajaranManual;
+                    $data['materi_manual'] = $materiManual;
+                    if (!$request->filled('materi_text')) {
+                        $data['materi_text'] = $this->formatMateriLabel($mataPelajaranManual, $materiManual);
+                    }
+                } else {
+                    $data['mata_pelajaran_manual'] = $request->mata_pelajaran_manual;
+                    $data['materi_manual'] = $request->materi_manual;
+
+                    if (
+                        !$request->filled('materi_text')
+                        && (!$data['materi_manual'] || trim($data['materi_manual']) === '')
+                    ) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Aktivitas tidak memiliki materi kurikulum dan materi_text tidak disediakan'
+                        ], 422);
+                    }
+
+                    if (!$request->filled('materi_text')) {
+                        $data['materi_text'] = $this->formatMateriLabel(
+                            $data['mata_pelajaran_manual'],
+                            $data['materi_manual']
+                        );
+                    }
+                }
+            }
 
             if (!$request->has('id_semester')) {
                 $kacabId = auth()->user()->adminShelter->id_kacab ?? null;
@@ -278,9 +393,14 @@ class PenilaianController extends Controller
             
             // Group by mata pelajaran with null handling
             $grouped = $penilaianCollection->groupBy(function ($item) {
+                if ($item->mata_pelajaran_manual) {
+                    return $item->mata_pelajaran_manual;
+                }
+
                 if ($item->materi && $item->materi->mataPelajaran) {
                     return $item->materi->mataPelajaran->nama_mata_pelajaran;
                 }
+
                 return 'Tanpa Mata Pelajaran';
             });
             
@@ -454,25 +574,35 @@ class PenilaianController extends Controller
         return 'E';
     }
 
-    public function getJenisPenilaian()
-{
-    try {
-        $jenisPenilaian = JenisPenilaian::select('id_jenis_penilaian', 'nama_jenis', 'bobot_persen', 'kategori')
-            ->orderBy('kategori')
-            ->orderBy('nama_jenis')
-            ->get();
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Data jenis penilaian berhasil diambil',
-            'data' => $jenisPenilaian
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal mengambil data jenis penilaian',
-            'error' => $e->getMessage()
-        ], 500);
+    private function formatMateriLabel(?string $mataPelajaran, ?string $materi): string
+    {
+        $parts = array_filter([
+            $mataPelajaran ? trim($mataPelajaran) : null,
+            $materi ? trim($materi) : null,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        return implode(' - ', $parts);
     }
-}
+
+    public function getJenisPenilaian()
+    {
+        try {
+            $jenisPenilaian = JenisPenilaian::select('id_jenis_penilaian', 'nama_jenis', 'bobot_persen', 'kategori')
+                ->orderBy('kategori')
+                ->orderBy('nama_jenis')
+                ->get();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Data jenis penilaian berhasil diambil',
+                'data' => $jenisPenilaian
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data jenis penilaian',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
