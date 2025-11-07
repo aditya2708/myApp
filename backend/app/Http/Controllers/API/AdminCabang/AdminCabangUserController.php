@@ -25,7 +25,23 @@ class AdminCabangUserController extends Controller
             'search' => 'sometimes|string|max:255',
             'page' => 'sometimes|integer|min:1',
             'per_page' => 'sometimes|integer|min:1|max:100',
+            'wilbin_id' => 'sometimes|integer|min:1',
+            'shelter_id' => 'sometimes|integer|min:1',
         ]);
+
+        $authUser = $request->user();
+        $authAdminCabang = $authUser?->adminCabang;
+
+        if (!$authAdminCabang || !$authAdminCabang->id_kacab) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Data cabang untuk akun ini tidak ditemukan.',
+            ], 403);
+        }
+
+        $idKacab = $authAdminCabang->id_kacab;
+        $wilbinFilter = $validated['wilbin_id'] ?? null;
+        $shelterFilter = $validated['shelter_id'] ?? null;
 
         $search = $validated['search'] ?? null;
         $perPage = (int) ($validated['per_page'] ?? 10);
@@ -33,6 +49,24 @@ class AdminCabangUserController extends Controller
 
         $users = User::with(['adminCabang', 'adminShelter'])
             ->where('level', $validated['level'])
+            ->when($validated['level'] === 'admin_cabang', function ($query) use ($idKacab) {
+                $query->whereHas('adminCabang', function ($cabQuery) use ($idKacab) {
+                    $cabQuery->where('id_kacab', $idKacab);
+                });
+            })
+            ->when($validated['level'] === 'admin_shelter', function ($query) use ($idKacab, $wilbinFilter, $shelterFilter) {
+                $query->whereHas('adminShelter', function ($shelterQuery) use ($idKacab, $wilbinFilter, $shelterFilter) {
+                    $shelterQuery->where('id_kacab', $idKacab);
+
+                    if ($wilbinFilter) {
+                        $shelterQuery->where('id_wilbin', $wilbinFilter);
+                    }
+
+                    if ($shelterFilter) {
+                        $shelterQuery->where('id_shelter', $shelterFilter);
+                    }
+                });
+            })
             ->when($search, function ($query, $searchKeyword) {
                 $query->where(function ($innerQuery) use ($searchKeyword) {
                     $innerQuery

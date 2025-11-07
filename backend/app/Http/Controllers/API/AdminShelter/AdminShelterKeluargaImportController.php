@@ -20,133 +20,29 @@ class AdminShelterKeluargaImportController extends Controller
     public function template(): StreamedResponse
     {
         $headers = [
-            'no_kk',
-            'kepala_keluarga',
-            'status_ortu',
-            'nik_ayah',
-            'nama_ayah',
-            'agama_ayah',
-            'tempat_lahir_ayah',
-            'tanggal_lahir_ayah',
-            'alamat_ayah',
-            'penghasilan_ayah',
-            'tanggal_kematian_ayah',
-            'penyebab_kematian_ayah',
-            'nik_ibu',
-            'nama_ibu',
-            'agama_ibu',
-            'tempat_lahir_ibu',
-            'tanggal_lahir_ibu',
-            'alamat_ibu',
-            'penghasilan_ibu',
-            'tanggal_kematian_ibu',
-            'penyebab_kematian_ibu',
-            'nik_wali',
-            'nama_wali',
-            'agama_wali',
-            'tempat_lahir_wali',
-            'tanggal_lahir_wali',
-            'alamat_wali',
-            'penghasilan_wali',
-            'hub_kerabat_wali',
-            'nik_anak',
-            'full_name',
-            'nick_name',
-            'agama',
-            'tempat_lahir',
-            'tanggal_lahir',
-            'jenis_kelamin',
-            'tinggal_bersama',
-            'anak_ke',
-            'dari_bersaudara',
-            'hafalan',
-            'jarak_rumah',
-            'transportasi',
-            'pelajaran_favorit',
-            'hobi',
-            'prestasi',
-            'alamat',
-            'jenjang',
-            'kelas',
-            'nama_sekolah',
-            'alamat_sekolah',
-            'jurusan',
-            'semester',
-            'nama_pt',
-            'alamat_pt',
-            'status_validasi',
-            'status_cpb',
-            'status_keluarga',
-            'id_bank',
-            'no_rek',
-            'an_rek',
-            'no_tlp',
-            'an_tlp',
+            'NAMA ANAK',
+            'NIK',
+            'TTL',
+            'ALAMAT',
+            'JENJANG SEKOLAH',
+            'KELAS',
+            'ALAMAT SEKOLAH',
+            'NAMA IBU',
+            'NAMA AYAH',
+            'DHUAFA/NON DHUAFA',
         ];
 
         $sampleRow = [
-            '3201122012345678',
-            'Budi Santoso',
-            'yatim',
-            '3175091501800001',
-            'Sutrisno',
-            'Islam',
-            'Jakarta',
-            '1970-05-14',
-            'Jl. Melati No. 5',
-            '2500000',
-            null,
-            null,
-            '3175096403810002',
-            'Siti Aminah',
-            'Islam',
-            'Jakarta',
-            '1975-03-22',
-            'Jl. Melati No. 5',
-            '1500000',
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            '3175091507150003',
-            'Andi Santoso',
-            'Andi',
-            'Islam',
-            'Jakarta',
-            '2010-07-15',
-            'Laki-laki',
-            'Ibu',
-            1,
-            3,
-            'Tahfidz',
-            '2',
-            'Sepeda',
-            'Matematika',
-            'Sepak Bola',
-            'Juara 1 Lomba Tahfidz',
-            'Jl. Melati No. 5',
-            'smp',
-            '8',
-            'SMPN 12 Jakarta',
-            'Jl. Pendidikan No. 3',
-            null,
-            2,
-            null,
-            null,
-            'aktif',
-            'BCPB',
-            'dengan_keluarga',
-            null,
-            null,
-            null,
-            '081211223344',
-            'Siti Aminah',
+            'Aufar Taufik Haidar',
+            '321181402140001',
+            'Sumedang, 14 - 02 - 2014',
+            'Dusun Pangjeleran RT. 03 RW. 01',
+            'SD',
+            'V',
+            'Dusun Cibitung Desa Padasuka',
+            'Elly Anggawati',
+            'Wawan Taufik',
+            'DHUAFA',
         ];
 
         return response()->streamDownload(
@@ -213,7 +109,15 @@ class AdminShelterKeluargaImportController extends Controller
 
         $context = array_merge($context, $defaults);
 
-        $analysis = $this->importService->validateFile($request->file('file'), $context);
+        try {
+            $analysis = $this->importService->validateFile($request->file('file'), $context);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'dry_run' => $dryRun,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
         if (($analysis['summary']['total_rows'] ?? 0) === 0) {
             return response()->json([
@@ -232,22 +136,27 @@ class AdminShelterKeluargaImportController extends Controller
             ]);
         }
 
-        if ($analysis['summary']['invalid_rows'] > 0) {
-            return response()->json([
-                'success' => false,
-                'dry_run' => false,
-                'message' => 'Masih ada baris yang tidak valid. Perbaiki terlebih dahulu sebelum import final.',
-                'summary' => $analysis['summary'],
-                'errors' => $analysis['errors'],
-            ], 422);
-        }
-
         $commitResult = $this->importService->commit($analysis['rows']);
+        $hasInvalidRows = ($analysis['summary']['invalid_rows'] ?? 0) > 0;
+        $hasCommitFailures = !empty($commitResult['failed_rows']);
+        $statusCode = ($hasInvalidRows || $hasCommitFailures) ? 207 : 200;
 
-        return response()->json([
+        $response = [
             'success' => empty($commitResult['failed_rows']),
             'dry_run' => false,
+            'summary' => $analysis['summary'],
             'result' => $commitResult,
-        ], empty($commitResult['failed_rows']) ? 200 : 207);
+            'errors' => $analysis['errors'],
+        ];
+
+        if ($hasInvalidRows && $hasCommitFailures) {
+            $response['message'] = 'Sebagian baris tidak valid dan beberapa baris gagal diproses.';
+        } elseif ($hasInvalidRows) {
+            $response['message'] = 'Sebagian baris tidak valid dan dilewati saat import.';
+        } elseif ($hasCommitFailures) {
+            $response['message'] = 'Sebagian baris gagal diproses saat commit.';
+        }
+
+        return response()->json($response, $statusCode);
     }
 }

@@ -27,10 +27,26 @@ use Carbon\Carbon;
 class AktivitasController extends Controller
 {
     protected AttendanceService $attendanceService;
+    protected array $kelompokRequiredActivities = ['Bimbel', 'Tahfidz'];
 
     public function __construct(AttendanceService $attendanceService)
     {
         $this->attendanceService = $attendanceService;
+    }
+
+    protected function requiresKelompok(?string $jenisKegiatan): bool
+    {
+        if (!$jenisKegiatan) {
+            return false;
+        }
+
+        foreach ($this->kelompokRequiredActivities as $requiredType) {
+            if (strcasecmp($requiredType, $jenisKegiatan) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -251,12 +267,12 @@ class AktivitasController extends Controller
             $jenisKegiatan = $kegiatan->nama_kegiatan;
             
             // Handle nama_kelompok and level based on activity type
-            if ($jenisKegiatan === 'Bimbel') {
+            if ($this->requiresKelompok($jenisKegiatan)) {
                 // Validate kelompok exists and belongs to shelter
                 if (!$request->nama_kelompok) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Kelompok is required for Bimbel activities'
+                        'message' => 'Kelompok wajib dipilih untuk kegiatan Bimbel dan Tahfidz'
                     ], 400);
                 }
 
@@ -525,12 +541,12 @@ class AktivitasController extends Controller
             $jenisKegiatan = $kegiatan->nama_kegiatan;
             
             // Handle nama_kelompok and level based on activity type
-            if ($jenisKegiatan === 'Bimbel') {
+            if ($this->requiresKelompok($jenisKegiatan)) {
                 // Validate kelompok exists and belongs to shelter
                 if (!$request->nama_kelompok) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Kelompok is required for Bimbel activities'
+                        'message' => 'Kelompok wajib dipilih untuk kegiatan Bimbel dan Tahfidz'
                     ], 400);
                 }
 
@@ -1365,10 +1381,10 @@ class AktivitasController extends Controller
                     $conflicts[] = "Tutor {$tutorName} sudah dijadwalkan pada {$existingStart}-{$existingEnd} untuk {$existing->jenis_kegiatan}";
                 }
 
-                // Check kelompok conflict (only for Bimbel activities)
-                if ($requestedJenis === 'Bimbel' && 
-                    $existing->jenis_kegiatan === 'Bimbel' &&
-                    $request->nama_kelompok && 
+                // Check kelompok conflict (only for activities that require kelompok context)
+                if ($this->requiresKelompok($requestedJenis) &&
+                    $this->requiresKelompok($existing->jenis_kegiatan) &&
+                    $request->nama_kelompok &&
                     $existing->nama_kelompok == $request->nama_kelompok) {
                     $conflicts[] = "Kelompok {$existing->nama_kelompok} sudah dijadwalkan pada {$existingStart}-{$existingEnd}";
                 }

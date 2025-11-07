@@ -7,15 +7,11 @@ const LaporanKegiatanMainScreen = () => {
   const navigation = useNavigation();
 
   const handleActivityReportPress = () => {
-    const parentNavigator = navigation.getParent();
-    if (parentNavigator) {
-      parentNavigator.navigate('Home', {
-        screen: 'ActivitiesList',
-        params: { mode: 'activity-report' }
-      });
-    } else {
-      navigation.navigate('ActivitiesList', { mode: 'activity-report' });
-    }
+    navigation.navigate('ActivityReportList');
+  };
+
+  const handleAchievementReportPress = () => {
+    navigation.navigate('ChildAchievementReport');
   };
 
   const handleTutorAttendancePress = () => {
@@ -38,6 +34,19 @@ const LaporanKegiatanMainScreen = () => {
             <Text style={styles.cardTitle}>Laporan Kegiatan</Text>
             <Text style={styles.cardDescription}>
               Buka daftar aktivitas shelter dan pilih kegiatan yang ingin dilaporkan.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#9aa5b1" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.card} onPress={handleAchievementReportPress} activeOpacity={0.85}>
+          <View style={styles.iconWrapperAchievement}>
+            <Ionicons name="school-outline" size={28} color="#27ae60" />
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardTitle}>Laporan Pencapaian Anak</Text>
+            <Text style={styles.cardDescription}>
+              Tinjau nilai anak berdasarkan aktivitas shelter lengkap dengan catatan tutor.
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9aa5b1" />
@@ -103,6 +112,15 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 14,
     backgroundColor: 'rgba(231, 76, 60, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16
+  },
+  iconWrapperAchievement: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: 'rgba(39, 174, 96, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16

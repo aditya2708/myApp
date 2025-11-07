@@ -4,6 +4,10 @@ import { adminShelterKelompokApi } from '../api/adminShelterKelompokApi';
 import { kurikulumShelterApi } from '../api/kurikulumShelterApi';
 import { activityReportApi } from '../api/activityReportApi';
 import { kegiatanApi } from '../api/kegiatanApi';
+import {
+  MANUAL_ATTENDANCE_ACTIVITY_SET,
+  MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET,
+} from '../constants/activityTypes';
 
 export const ACTIVITY_REPORT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 export const ACTIVITY_REPORT_ERROR_RETRY_DELAY = 30 * 1000; // 30 seconds
@@ -92,9 +96,17 @@ export const fetchAktivitasDetail = createAsyncThunk(
     try {
       const response = await aktivitasApi.getAktivitasDetail(id);
       
-      // If this is a Bimbel activity and has a nama_kelompok, fetch the kelompok details
       const aktivitasData = response.data.data;
-      if (aktivitasData.jenis_kegiatan === 'Bimbel' && aktivitasData.nama_kelompok) {
+      const jenisKegiatan = aktivitasData?.jenis_kegiatan;
+      const needsKelompokDetail =
+        aktivitasData?.nama_kelompok &&
+        jenisKegiatan &&
+        (
+          MANUAL_ATTENDANCE_ACTIVITY_SET.has(jenisKegiatan) ||
+          MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET.has(jenisKegiatan.toLowerCase())
+        );
+
+      if (needsKelompokDetail) {
         dispatch(fetchKelompokByName(aktivitasData.nama_kelompok));
       }
       
@@ -431,10 +443,16 @@ const aktivitasSlice = createSlice({
         
         // Keep time fields as strings to avoid timezone issues
         
-        // Ensure we have a selectedKelompokId field if this is a Bimbel activity
+        const resolvedJenis = state.aktivitasDetail?.jenis_kegiatan;
+        const manualEligible =
+          resolvedJenis &&
+          (
+            MANUAL_ATTENDANCE_ACTIVITY_SET.has(resolvedJenis) ||
+            MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET.has(resolvedJenis.toLowerCase())
+          );
+
         if (
-          state.aktivitasDetail && 
-          state.aktivitasDetail.jenis_kegiatan === 'Bimbel' && 
+          manualEligible &&
           state.kelompokDetail &&
           state.kelompokDetail.data
         ) {

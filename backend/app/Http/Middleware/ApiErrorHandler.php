@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Exceptions\ApiExceptionHandler;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class ApiErrorHandler
@@ -24,7 +26,7 @@ class ApiErrorHandler
             $response = $next($request);
             
             // Handle successful responses but ensure JSON format for API routes
-            if ($this->isApiRoute($request) && !$response instanceof JsonResponse) {
+            if ($this->isApiRoute($request) && !$response instanceof JsonResponse && !$this->isDownloadResponse($response)) {
                 return $this->formatSuccessResponse($response);
             }
             
@@ -50,6 +52,20 @@ class ApiErrorHandler
                $request->expectsJson() || 
                $request->header('Accept') === 'application/json' ||
                $request->header('Content-Type') === 'application/json';
+    }
+
+    /**
+     * Determine whether the response is meant to trigger a download/stream.
+     */
+    private function isDownloadResponse(Response $response): bool
+    {
+        if ($response instanceof BinaryFileResponse || $response instanceof StreamedResponse) {
+            return true;
+        }
+
+        $disposition = $response->headers->get('Content-Disposition');
+
+        return is_string($disposition) && str_contains($disposition, 'attachment');
     }
 
     /**

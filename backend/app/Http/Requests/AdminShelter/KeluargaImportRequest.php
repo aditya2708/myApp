@@ -17,7 +17,7 @@ class KeluargaImportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
+            'file' => 'required|file|mimetypes:text/csv,text/plain,application/vnd.ms-excel|max:10240',
             'dry_run' => 'sometimes|boolean',
             'id_kacab' => 'sometimes|nullable|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'sometimes|nullable|integer|exists:wilbin,id_wilbin',
@@ -48,7 +48,7 @@ class KeluargaImportRequest extends FormRequest
     {
         return [
             'file.required' => 'File import wajib diunggah.',
-            'file.mimes' => 'Format file harus CSV atau Excel (.xlsx/.xls).',
+            'file.mimetypes' => 'Format file harus CSV (mime type text/csv, text/plain, atau application/vnd.ms-excel).',
             'file.max' => 'Ukuran file maksimal 10MB.',
         ];
     }

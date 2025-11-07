@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 // Import components
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
@@ -22,215 +23,174 @@ import Button from '../../../common/components/Button';
 // Import API
 import { adminShelterKelompokApi } from '../api/adminShelterKelompokApi';
 
+const ITEMS_PER_PAGE = 10;
+
 const KelompokManagementScreen = () => {
   const navigation = useNavigation();
-  const [kelompokList, setKelompokList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  
-  // Multi-kelas filtering state & available kelas data
-  const [availableKelas, setAvailableKelas] = useState([]);
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [selectedJenjang, setSelectedJenjang] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // grid or list
 
-  // Fetch kelompok data with new kelas gabungan support
-  const fetchKelompokData = useCallback(async (page = 1, refresh = false) => {
-    if (!refresh && page === 1) {
-      setLoading(true);
-    }
-    try {
-      if (refresh) {
-        setCurrentPage(1);
-        page = 1;
-      }
-      
-      setError(null);
-      
-      // Prepare params with new filtering
+  const {
+    data,
+    error,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isRefetching,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: ['adminShelterKelompokList', { search: appliedSearch, jenjang: selectedJenjang }],
+    queryFn: async ({ pageParam = 1 }) => {
       const params = {
-        page,
-        per_page: 10
+        page: pageParam,
+        per_page: ITEMS_PER_PAGE,
+        ...(appliedSearch ? { search: appliedSearch } : {}),
+        ...(selectedJenjang ? { jenjang: selectedJenjang } : {}),
       };
-      
-      // Add search query if provided
-      if (searchQuery.trim()) {
-        params.search = searchQuery.trim();
-      }
-      
-      // Add jenjang filtering for kelas_gabungan
-      if (selectedJenjang) {
-        params.jenjang = selectedJenjang;
-      }
-      
+
       const response = await adminShelterKelompokApi.getAllKelompok(params);
-      
-      if (response.data.success) {
-        const newData = response.data.data || [];
-        
-        // DEBUG: Log response dari API
-        console.log('DEBUG API Response:', {
-          total_data: newData.length,
-          sample_kelompok: newData.slice(0, 1).map(k => ({
-            id: k.id_kelompok,
-            nama: k.nama_kelompok,
-            kelas_gabungan: k.kelas_gabungan,
-            kelas_gabungan_type: typeof k.kelas_gabungan
-          }))
-        });
-        
-        // If refreshing or first page, replace data
-        // Otherwise, append data
-        if (refresh || page === 1) {
-          setKelompokList(newData);
-        } else {
-          setKelompokList(prev => [...prev, ...newData]);
-        }
-        
-        // Set pagination info
-        if (response.data.pagination) {
-          setCurrentPage(response.data.pagination.current_page);
-          setTotalPages(response.data.pagination.last_page);
-        }
-      } else {
-        setError(response.data.message || 'Gagal memuat data');
-      }
-    } catch (err) {
-      console.error('Error mengambil kelompok:', err);
-      setError('Gagal memuat kelompok. Silakan coba lagi.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  }, [searchQuery, selectedJenjang]);
+      const payload = response?.data || {};
 
-  // Fetch available kelas for filtering
-  const fetchAvailableKelas = useCallback(async () => {
-    try {
+      if (!payload.success) {
+        throw new Error(payload.message || 'Gagal memuat data kelompok');
+      }
+
+      return {
+        data: payload.data || [],
+        pagination: payload.pagination || {},
+      };
+    },
+    getNextPageParam: (lastPage) => {
+      const current =
+        lastPage?.pagination?.current_page ??
+        lastPage?.pagination?.currentPage ??
+        1;
+      const last =
+        lastPage?.pagination?.last_page ??
+        lastPage?.pagination?.lastPage ??
+        1;
+
+      return current < last ? current + 1 : undefined;
+    },
+    initialPageParam: 1,
+  });
+
+  const {
+    data: availableKelasData,
+    isFetching: isFetchingAvailableKelas,
+    refetch: refetchAvailableKelas,
+  } = useQuery({
+    queryKey: ['adminShelterAvailableKelas'],
+    queryFn: async () => {
       const response = await adminShelterKelompokApi.getAvailableKelas();
-      if (response.data.success) {
-        const kelasList = response.data.data.kelas_list || [];
-        setAvailableKelas(kelasList);
-        
-        // DEBUG: Log available kelas
-        console.log('DEBUG Available Kelas:', {
-          total_kelas: kelasList.length,
-          sample_kelas: kelasList.slice(0, 3).map(k => ({
-            id: k.id_kelas,
-            id_type: typeof k.id_kelas,
-            nama: k.nama_kelas,
-            jenjang: k.jenjang?.nama_jenjang
-          }))
-        });
+      const payload = response?.data || {};
+
+      if (!payload.success) {
+        throw new Error(payload.message || 'Gagal memuat daftar kelas');
       }
-    } catch (err) {
-      console.error('Error fetching available kelas:', err);
-    }
-  }, []);
 
-  const fetchKelompokDataRef = useRef(fetchKelompokData);
-  const fetchAvailableKelasRef = useRef(fetchAvailableKelas);
+      return payload.data?.kelas_list || [];
+    },
+  });
 
-  useEffect(() => {
-    fetchKelompokDataRef.current = fetchKelompokData;
-  }, [fetchKelompokData]);
-
-  useEffect(() => {
-    fetchAvailableKelasRef.current = fetchAvailableKelas;
-  }, [fetchAvailableKelas]);
-
-  // Reload data whenever the screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      setLoading(true);
-      Promise.all([
-        fetchKelompokDataRef.current(1, true),
-        fetchAvailableKelasRef.current()
-      ]);
-    }, [])
+  const availableKelas = React.useMemo(
+    () => availableKelasData || [],
+    [availableKelasData]
   );
 
-  // Handle refresh
+  const kelompokList = React.useMemo(
+    () => (data?.pages || []).flatMap((page) => page?.data || []),
+    [data]
+  );
+
+  const errorMessage = React.useMemo(() => {
+    if (!error) {
+      return null;
+    }
+
+    const apiMessage = error.response?.data?.message;
+    return apiMessage || error.message || 'Gagal memuat kelompok. Silakan coba lagi.';
+  }, [error]);
+
+  const loading = isLoading && !data;
+  const refreshing = (isRefetching || isFetchingAvailableKelas) && !!data;
+  const loadingMore = isFetchingNextPage;
+
+  const hasFocusedOnceRef = React.useRef(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (hasFocusedOnceRef.current) {
+        refetch();
+        refetchAvailableKelas();
+      } else {
+        hasFocusedOnceRef.current = true;
+      }
+    }, [refetch, refetchAvailableKelas])
+  );
+
   const handleRefresh = () => {
-    setRefreshing(true);
-    Promise.all([
-      fetchKelompokData(1, true),
-      fetchAvailableKelas()
-    ]);
+    refetch();
+    refetchAvailableKelas();
   };
 
-  // Handle load more
   const handleLoadMore = () => {
-    if (loadingMore || currentPage >= totalPages) return;
-    
-    setLoadingMore(true);
-    fetchKelompokData(currentPage + 1);
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    fetchNextPage();
   };
 
-  // Handle search
   const handleSearch = () => {
-    setLoading(true);
-    setCurrentPage(1);
-    fetchKelompokData(1, true);
+    setAppliedSearch(searchQuery.trim());
   };
 
-  // Clear search
   const clearSearch = () => {
-    setLoading(true);
     setSearchQuery('');
-    setCurrentPage(1);
-    fetchKelompokData(1, true);
+    setAppliedSearch('');
   };
 
-  // Handle jenjang filter
   const handleJenjangFilter = (jenjangName) => {
-    setLoading(true);
-    setSelectedJenjang(jenjangName === selectedJenjang ? '' : jenjangName);
-    setCurrentPage(1);
-    fetchKelompokData(1, true);
+    if (!jenjangName) {
+      setSelectedJenjang('');
+      return;
+    }
+    setSelectedJenjang((prev) => (prev === jenjangName ? '' : jenjangName));
   };
 
-  // Navigate to kelompok detail screen
   const handleViewKelompok = (kelompokId) => {
     navigation.navigate('KelompokDetail', { id: kelompokId });
   };
 
-  // Navigate to add new kelompok screen
   const handleAddKelompok = () => {
     navigation.navigate('KelompokForm');
   };
 
-  // Handle delete kelompok
   const handleDeleteKelompok = (kelompok) => {
     Alert.alert(
       'Hapus Kelompok',
       `Apakah Anda yakin ingin menghapus ${kelompok.nama_kelompok}?`,
       [
         { text: 'Batal', style: 'cancel' },
-        { 
-          text: 'Hapus', 
+        {
+          text: 'Hapus',
           style: 'destructive',
           onPress: async () => {
             try {
-              setLoading(true);
               await adminShelterKelompokApi.deleteKelompok(kelompok.id_kelompok);
-              
-              // Refresh data after deleting
-              handleRefresh();
-              
+              await Promise.all([
+                refetch(),
+                refetchAvailableKelas(),
+              ]);
               Alert.alert('Berhasil', 'Kelompok berhasil dihapus');
             } catch (err) {
               console.error('Error deleting kelompok:', err);
               Alert.alert('Error', 'Gagal menghapus kelompok');
-            } finally {
-              setLoading(false);
             }
-          }
+          },
         },
       ]
     );
@@ -494,16 +454,16 @@ const KelompokManagementScreen = () => {
   );
 
   // Loading state
-  if (loading && !refreshing && !loadingMore) {
+  if (loading) {
     return <LoadingSpinner fullScreen message="Memuat kelompok..." />;
   }
 
   return (
     <View style={styles.container}>
       {/* Error Message */}
-      {error && (
+      {errorMessage && (
         <ErrorMessage
-          message={error}
+          message={errorMessage}
           onRetry={handleRefresh}
           retryText="Coba Lagi"
         />
@@ -569,8 +529,8 @@ const KelompokManagementScreen = () => {
                 title="Bersihkan Filter" 
                 onPress={() => {
                   setSearchQuery('');
+                  setAppliedSearch('');
                   setSelectedJenjang('');
-                  fetchKelompokData(1, true);
                 }} 
                 type="outline"
                 style={styles.emptyButton}

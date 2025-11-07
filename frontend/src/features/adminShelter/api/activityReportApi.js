@@ -17,6 +17,12 @@ export const activityReportApi = {
     return response.data;
   },
 
+  // List activity reports with optional filters
+  listReports: async (params = {}) => {
+    const response = await api.get('/admin-shelter/activity-reports', { params });
+    return response.data;
+  },
+
   // Delete activity report
   deleteReport: async (id) => {
     const response = await api.delete(`/admin-shelter/activity-reports/${id}`);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,12 @@ import { penilaianApi } from '../../api/penilaianApi';
 import { aktivitasApi } from '../../api/aktivitasApi';
 import { kurikulumShelterApi } from '../../api/kurikulumShelterApi';
 import { attendanceApi } from '../../api/attendanceApi';
+import {
+  filterActivitiesForChild,
+  formatDateForQuery,
+  parseDateSafe,
+  toIdString
+} from './utils/penilaianAktivitasUtils';
 
 const formatMateriLabel = (subject, materi) => {
   const parts = [];
@@ -39,9 +45,18 @@ const formatMateriLabel = (subject, materi) => {
 const PenilaianFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { anakId, anakData, penilaian, semesterId } = route.params || {};
+  const { anakId, anakData, penilaian, semesterId, initialActivityDate } = route.params || {};
   
   const isEdit = !!penilaian;
+
+  const resolvedPenilaianDate = penilaian && penilaian.tanggal_penilaian
+    ? new Date(penilaian.tanggal_penilaian)
+    : new Date();
+  const resolvedAktivitasDate = parseDateSafe(
+    initialActivityDate ||
+    penilaian?.aktivitas?.tanggal ||
+    penilaian?.tanggal_penilaian
+  ) || new Date();
 
   const [formData, setFormData] = useState({
     id_anak: anakId,
@@ -51,7 +66,7 @@ const PenilaianFormScreen = () => {
     id_semester: semesterId || penilaian?.id_semester || '',
     nilai: penilaian?.nilai?.toString() || '',
     deskripsi_tugas: penilaian?.deskripsi_tugas || '',
-    tanggal_penilaian: penilaian && penilaian.tanggal_penilaian ? new Date(penilaian.tanggal_penilaian) : new Date(),
+    tanggal_penilaian: resolvedPenilaianDate,
     catatan: penilaian?.catatan || ''
   });
 
@@ -66,6 +81,8 @@ const PenilaianFormScreen = () => {
   const [materiText, setMateriText] = useState('');
   const [manualSubject, setManualSubject] = useState('');
   const [manualMateri, setManualMateri] = useState('');
+  const [selectedAktivitasDate, setSelectedAktivitasDate] = useState(resolvedAktivitasDate);
+  const [showAktivitasDatePicker, setShowAktivitasDatePicker] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
@@ -77,9 +94,7 @@ const PenilaianFormScreen = () => {
       setLoadingData(false);
       return;
     }
-    
-    fetchInitialData();
-  }, [anakId]);
+  }, [anakId, isEdit, navigation]);
 
   // Filter materi based on selected aktivitas
   useEffect(() => {
@@ -126,183 +141,17 @@ const PenilaianFormScreen = () => {
   }, [formData.id_aktivitas, aktivitasList, allMateriList]);
   
 
-  const toIdString = (value) => (value !== undefined && value !== null ? value.toString() : '');
   const targetAnakId = toIdString(anakId);
+  const currentSemesterId = formData.id_semester;
 
-  const collectionHasTargetChild = (collection) => {
-    if (!Array.isArray(collection) || !targetAnakId) {
-      return false;
-    }
-    return collection.some(item => {
-      if (!item) return false;
-      const possibleIds = [
-        item.id_anak,
-        item.anak_id,
-        item.child_id,
-        item?.anak?.id_anak,
-        item?.pivot?.id_anak,
-        item?.target_id
-      ];
-      return possibleIds.some(id => toIdString(id) === targetAnakId);
-    });
-  };
+  const updateFormData = useCallback((field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  }, []);
 
-  const unwrapCollection = (data) => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.data)) return data.data;
-    if (Array.isArray(data?.records)) return data.records;
-    if (Array.isArray(data?.items)) return data.items;
-    return [];
-  };
-
-  const inferMembershipFromActivity = (activity) => {
-    if (!activity) return null;
-
-    if (
-      anakData?.kelompok?.nama_kelompok &&
-      activity?.nama_kelompok &&
-      activity.nama_kelompok === anakData.kelompok.nama_kelompok
-    ) {
-      return true;
-    }
-
-    const candidateCollections = [
-      activity.members,
-      activity.participants,
-      activity.peserta,
-      activity.anak,
-      activity.anak_binaan,
-      activity.students,
-      activity.child_list,
-      activity.attendance_members,
-      activity?.attendance_summary?.members,
-      activity?.kelompok?.anggota,
-      activity?.kelompok?.members
-    ];
-
-    for (const raw of candidateCollections) {
-      const collection = unwrapCollection(raw);
-      if (collection.length === 0) continue;
-      if (collectionHasTargetChild(collection)) {
-        return true;
-      }
-    }
-
-    return null;
-  };
-
-  const extractMembersFromPayload = (payload) => {
-    if (!payload) return [];
-
-    if (Array.isArray(payload)) {
-      return payload;
-    }
-
-    if (Array.isArray(payload.members)) {
-      return payload.members;
-    }
-
-    if (Array.isArray(payload.data?.members)) {
-      return payload.data.members;
-    }
-
-    if (Array.isArray(payload.data)) {
-      return payload.data;
-    }
-
-    if (Array.isArray(payload.data?.data?.members)) {
-      return payload.data.data.members;
-    }
-
-    return [];
-  };
-
-  const parseDateSafe = (value) => {
-    if (!value) return null;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  };
-
-  const sortActivitiesByLatest = (activities) => {
-    return activities.slice().sort((a, b) => {
-      const dateA = parseDateSafe(a?.tanggal);
-      const dateB = parseDateSafe(b?.tanggal);
-
-      if (dateA && dateB) {
-        return dateB.getTime() - dateA.getTime();
-      }
-
-      if (dateB) return 1;
-      if (dateA) return -1;
-      return 0;
-    });
-  };
-
-  const filterActivitiesForChild = async (activities, usedActivityIds, allowedActivityId) => {
-    if (!Array.isArray(activities)) return { list: [], unresolved: 0 };
-
-    const allowedIdString = toIdString(allowedActivityId);
-    const result = [];
-    const pendingVerification = [];
-
-    activities.forEach(activity => {
-      if (!activity?.id_aktivitas) return;
-
-      const aktivitasIdString = toIdString(activity.id_aktivitas);
-      if (!aktivitasIdString) return;
-
-      if (usedActivityIds.has(aktivitasIdString) && aktivitasIdString !== allowedIdString) {
-        return;
-      }
-
-      const inferred = inferMembershipFromActivity(activity);
-      if (inferred === true) {
-        result.push(activity);
-        return;
-      }
-
-      if (inferred === false) {
-        return;
-      }
-
-      pendingVerification.push(activity);
-    });
-
-    let unresolvedCount = 0;
-
-    if (pendingVerification.length > 0 && targetAnakId) {
-      const verificationResults = await Promise.allSettled(
-        pendingVerification.map(activity =>
-          attendanceApi.getActivityMembers(activity.id_aktivitas, { include_summary: true })
-        )
-      );
-
-      verificationResults.forEach((verification, index) => {
-        const activity = pendingVerification[index];
-
-        if (verification.status !== 'fulfilled') {
-          unresolvedCount += 1;
-          result.push(activity);
-          return;
-        }
-
-        const payload = verification.value?.data;
-        const members = extractMembersFromPayload(payload?.data ?? payload);
-
-        if (collectionHasTargetChild(members)) {
-          result.push(activity);
-        }
-      });
-    }
-
-    return {
-      list: sortActivitiesByLatest(result),
-      unresolved: unresolvedCount
-    };
-  };
-
-  const fetchInitialData = async () => {
+  const fetchInitialData = useCallback(async () => {
     try {
       setLoadingData(true);
       setError(null);
@@ -312,10 +161,15 @@ const PenilaianFormScreen = () => {
 
       // Fetch aktivitas with kelompok filter
       const aktivitasParams = {
-        jenis_kegiatan: 'Bimbel',
         limit: 100,
-        semester_id: formData.id_semester
+        semester_id: currentSemesterId
       };
+
+      const aktivitasDateQuery = formatDateForQuery(selectedAktivitasDate);
+      if (aktivitasDateQuery) {
+        aktivitasParams.date_from = aktivitasDateQuery;
+        aktivitasParams.date_to = aktivitasDateQuery;
+      }
       
       // Add nama_kelompok filter if anak has kelompok
       if (anakData?.kelompok?.nama_kelompok) {
@@ -325,9 +179,9 @@ const PenilaianFormScreen = () => {
       const aktivitasPromise = aktivitasApi.getAllAktivitas(aktivitasParams);
       const jenisPenilaianPromise = penilaianApi.getJenisPenilaian();
       const materiPromise = kurikulumShelterApi.getAllMateri();
-      const existingPenilaianPromise = anakId && formData.id_semester
+      const existingPenilaianPromise = anakId && currentSemesterId
         ? penilaianApi
-            .getByAnakSemester(anakId, formData.id_semester)
+            .getByAnakSemester(anakId, currentSemesterId)
             .catch(err => {
               console.warn('Failed to fetch existing penilaian:', err?.response?.data || err);
               return null;
@@ -367,7 +221,12 @@ const PenilaianFormScreen = () => {
       const { list: filteredActivities, unresolved } = await filterActivitiesForChild(
         aktivitasData,
         usedAktivitasIds,
-        penilaian?.id_aktivitas
+        {
+          allowedActivityId: penilaian?.id_aktivitas,
+          targetAnakId,
+          anakData,
+          attendanceApi
+        }
       );
 
       // Handle aktivitas response
@@ -418,7 +277,12 @@ const PenilaianFormScreen = () => {
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [anakData, anakId, currentSemesterId, penilaian?.id_aktivitas, selectedAktivitasDate, targetAnakId, updateFormData, isEdit]);
+
+  useEffect(() => {
+    if (!anakId) return;
+    fetchInitialData();
+  }, [selectedAktivitasDate, anakId, fetchInitialData]);
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
@@ -520,17 +384,17 @@ const PenilaianFormScreen = () => {
   };
   
 
-  const updateFormData = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
   const onDateChange = (event, selectedDate) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
       updateFormData('tanggal_penilaian', selectedDate);
+    }
+  };
+
+  const onAktivitasDateChange = (event, selectedDate) => {
+    setShowAktivitasDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setSelectedAktivitasDate(selectedDate);
     }
   };
 
@@ -547,6 +411,35 @@ const PenilaianFormScreen = () => {
         <View style={styles.infoCard}>
           <Text style={styles.label}>Nama Anak</Text>
           <Text style={styles.infoText}>{anakData?.full_name || 'Unknown'}</Text>
+        </View>
+
+        {/* Aktivitas Date Filter */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Tanggal Aktivitas</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => setShowAktivitasDatePicker(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={20} color="#2c3e50" />
+            <Text style={styles.dateText}>
+              {selectedAktivitasDate
+                ? selectedAktivitasDate.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })
+                : 'Pilih tanggal aktivitas'}
+            </Text>
+          </TouchableOpacity>
+          {showAktivitasDatePicker && (
+            <DateTimePicker
+              value={selectedAktivitasDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={onAktivitasDateChange}
+            />
+          )}
         </View>
 
         {/* Aktivitas Picker */}

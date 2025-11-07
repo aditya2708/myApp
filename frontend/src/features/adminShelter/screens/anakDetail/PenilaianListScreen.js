@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,20 +6,49 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSelector } from 'react-redux';
 
 // Import components
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
-import Button from '../../../../common/components/Button';
+const toDateKey = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 // Import API
 import { penilaianApi } from '../../api/penilaianApi';
 import { semesterApi } from '../../api/semesterApi';
+
+const collectPenilaianDates = (data) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return [];
+  }
+
+  const dates = new Set();
+  Object.values(data).forEach(group => {
+    if (!Array.isArray(group)) return;
+    group.forEach(item => {
+      const key = toDateKey(item?.tanggal_penilaian);
+      if (key) {
+        dates.add(key);
+      }
+    });
+  });
+
+  return Array.from(dates).sort((a, b) => new Date(b) - new Date(a));
+};
 
 const PenilaianListScreen = () => {
   const navigation = useNavigation();
@@ -33,6 +62,37 @@ const PenilaianListScreen = () => {
   const [activeSemester, setActiveSemester] = useState(null);
   const [selectedSemester, setSelectedSemester] = useState(null);
   const [semesterId, setSemesterId] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
+
+  const filteredPenilaianEntries = useMemo(() => {
+    if (!penilaianList || Array.isArray(penilaianList)) {
+      return [];
+    }
+
+    const groups = Object.entries(penilaianList);
+
+    if (!selectedDateKey) {
+      return groups;
+    }
+
+    return groups
+      .map(([mapel, penilaianGroup]) => {
+        if (!Array.isArray(penilaianGroup)) {
+          return null;
+        }
+
+        const filteredGroup = penilaianGroup.filter(item => toDateKey(item?.tanggal_penilaian) === selectedDateKey);
+        if (filteredGroup.length === 0) {
+          return null;
+        }
+
+        return [mapel, filteredGroup];
+      })
+      .filter(Boolean);
+  }, [penilaianList, selectedDateKey]);
 
   useEffect(() => {
     if (!anakId) {
@@ -108,7 +168,16 @@ const PenilaianListScreen = () => {
       
       if (response.data.success) {
         console.log('✅ [PenilaianList] Penilaian data loaded:', response.data.data);
-        setPenilaianList(response.data.data);
+        const payload = response.data.data;
+        setPenilaianList(payload);
+
+        const availableDates = collectPenilaianDates(payload);
+        if (availableDates.length > 0) {
+          const firstDate = availableDates[0];
+          if (!selectedDateKey || !availableDates.includes(selectedDateKey)) {
+            setSelectedDate(new Date(firstDate));
+          }
+        }
       } else {
         console.warn('⚠️ [PenilaianList] Penilaian API failed:', response.data.message);
         setError(response.data.message || 'Gagal memuat data penilaian');
@@ -133,8 +202,16 @@ const PenilaianListScreen = () => {
       anakId,
       anakData,
       penilaian,
-      semesterId
+      semesterId,
+      initialActivityDate: penilaian?.tanggal_penilaian || selectedDateKey
     });
+  };
+
+  const handleFilterDateChange = (event, date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (date) {
+      setSelectedDate(date);
+    }
   };
 
   const handleDelete = (id) => {
@@ -161,9 +238,11 @@ const PenilaianListScreen = () => {
   };
 
   const renderPenilaianCard = ({ item }) => {
+    const mataPelajaranData = item.materi?.mataPelajaran || item.materi?.mata_pelajaran;
     const subjectLabel = item.mata_pelajaran_manual
-      || item.materi?.mataPelajaran?.nama_mata_pelajaran
-      || item.materi?.mata_pelajaran
+      || (typeof mataPelajaranData === 'string'
+        ? mataPelajaranData
+        : mataPelajaranData?.nama_mata_pelajaran || mataPelajaranData?.nama)
       || '';
 
     const materiLabel = item.materi_manual
@@ -172,6 +251,17 @@ const PenilaianListScreen = () => {
       || 'Tanpa Materi';
 
     const kelasLabel = item.materi?.kelas?.nama_kelas;
+    const jenisPenilaianLabel =
+      item.jenis_penilaian_manual ||
+      item.jenis_penilaian?.nama_jenis ||
+      item.jenis_penilaian?.nama ||
+      item.jenisPenilaian?.nama_jenis ||
+      item.jenisPenilaian?.nama ||
+      item.jenis_penilaian ||
+      item.jenisPenilaian ||
+      'Jenis tidak diketahui';
+    const mataPelajaranDisplay = subjectLabel || 'Tanpa Mata Pelajaran';
+    const materiDisplay = materiLabel || 'Tanpa Materi';
 
     return (
       <TouchableOpacity
@@ -180,38 +270,34 @@ const PenilaianListScreen = () => {
       >
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>
-            {materiLabel || 'Tanpa Materi'}
+            {jenisPenilaianLabel}
           </Text>
           <Text style={[styles.nilaiHuruf, { color: getNilaiColor(item.nilai) }]}>
             {item.nilai_huruf || 'N/A'}
           </Text>
         </View>
         
-        {(subjectLabel || kelasLabel) && (
-          <View style={styles.materiInfo}>
-            <Text style={styles.materiText}>
-              {subjectLabel || 'Tanpa Mata Pelajaran'}
-              {kelasLabel ? ` • ${kelasLabel}` : ''}
-            </Text>
-          </View>
-        )}
-        
         <View style={styles.cardBody}>
-          <View style={styles.infoRow}>
-            <Ionicons name="document-text-outline" size={16} color="#7f8c8d" />
-            <Text style={styles.infoText}>
-              {item.jenisPenilaian?.nama_jenis || 'Jenis tidak diketahui'}
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Mata Pelajaran :</Text>
+            <Text style={styles.detailValue}>
+              {kelasLabel ? `${mataPelajaranDisplay} • ${kelasLabel}` : mataPelajaranDisplay}
             </Text>
           </View>
-          
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={16} color="#7f8c8d" />
-            <Text style={styles.infoText}>{formatDate(item.tanggal_penilaian)}</Text>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Materi :</Text>
+            <Text style={styles.detailValue}>{materiDisplay}</Text>
           </View>
 
           <View style={styles.infoRow}>
             <Ionicons name="star-outline" size={16} color="#7f8c8d" />
             <Text style={styles.infoText}>Nilai: {item.nilai || '0'}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Ionicons name="calendar-outline" size={16} color="#7f8c8d" />
+            <Text style={styles.infoText}>{formatDate(item.tanggal_penilaian)}</Text>
           </View>
         </View>
 
@@ -266,6 +352,32 @@ const PenilaianListScreen = () => {
         </View>
       )}
 
+      <View style={styles.filterContainer}>
+        <Text style={styles.filterLabel}>Tanggal Aktivitas</Text>
+        <TouchableOpacity
+          style={styles.filterDateInput}
+          onPress={() => setShowDatePicker(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="calendar-outline" size={20} color="#2c3e50" />
+          <Text style={styles.filterDateText}>
+            {selectedDate.toLocaleDateString('id-ID', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            })}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            onChange={handleFilterDateChange}
+          />
+        )}
+      </View>
+
       {error && (
         <ErrorMessage
           message={error}
@@ -274,7 +386,7 @@ const PenilaianListScreen = () => {
       )}
 
       <FlatList
-        data={penilaianList && typeof penilaianList === 'object' && !Array.isArray(penilaianList) ? Object.entries(penilaianList) : []}
+        data={filteredPenilaianEntries}
         renderItem={({ item: [mapel, penilaianGroup] }) => (
           <View key={mapel}>
             <Text style={styles.sectionHeader}>
@@ -287,7 +399,7 @@ const PenilaianListScreen = () => {
             ))}
           </View>
         )}
-        keyExtractor={(item) => item[0]}
+        keyExtractor={(item) => `${item[0]}-${selectedDateKey}`}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
@@ -296,7 +408,15 @@ const PenilaianListScreen = () => {
           <View style={styles.emptyContainer}>
             <Ionicons name="document-text-outline" size={64} color="#bdc3c7" />
             <Text style={styles.emptyText}>Belum ada penilaian</Text>
-            <Text style={styles.emptySubText}>Tap tombol + untuk menambah penilaian</Text>
+            <Text style={styles.emptySubText}>
+              {selectedDateKey
+                ? `Tidak ada penilaian pada ${new Date(selectedDate).toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })}. Tap tombol + untuk menambah penilaian.`
+                : 'Tap tombol + untuk menambah penilaian'}
+            </Text>
           </View>
         }
       />
@@ -325,6 +445,33 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#bbdefb',
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: '#f5f5f5',
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  filterDateInput: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterDateText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#2c3e50',
   },
   semesterText: {
     marginLeft: 8,
@@ -370,13 +517,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-  materiInfo: {
-    marginBottom: 8,
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 6,
   },
-  materiText: {
-    fontSize: 12,
-    color: '#95a5a6',
-    fontStyle: 'italic',
+  detailLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginRight: 6,
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: 13,
+    color: '#34495e',
   },
   cardBody: {
     marginBottom: 12,

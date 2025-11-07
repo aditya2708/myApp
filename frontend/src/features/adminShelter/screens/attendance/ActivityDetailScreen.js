@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert
 } from 'react-native';
@@ -7,12 +7,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { useFocusEffect } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import GroupStudentsList from '../../components/GroupStudentsList';
 import { useGpsNavigation } from '../../../../common/hooks/useGpsNavigation';
 import { qrTokenApi } from '../../api/qrTokenApi';
+import {
+  MANUAL_ATTENDANCE_ACTIVITY_SET,
+  MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET,
+} from '../../constants/activityTypes';
 
 import {
   fetchAktivitasDetail,
@@ -24,13 +29,16 @@ import {
   fetchActivityReport,
   selectAktivitasAttendanceSummary,
   selectActivityReportCache,
-  ACTIVITY_REPORT_CACHE_TTL,
-  ACTIVITY_REPORT_ERROR_RETRY_DELAY
+  ACTIVITY_REPORT_CACHE_TTL
 } from '../../redux/aktivitasSlice';
 
 const ActivityDetailScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
-  const { id_aktivitas, attendanceSummary: routeAttendanceSummary } = route.params || {};
+  const {
+    id_aktivitas,
+    attendanceSummary: routeAttendanceSummary,
+    activityType: routeActivityType,
+  } = route.params || {};
   
   const activity = useSelector(selectAktivitasDetail);
   const loading = useSelector(selectAktivitasLoading);
@@ -41,6 +49,20 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   const reportCache = useSelector(selectActivityReportCache);
   const reportCacheEntry = id_aktivitas ? reportCache?.[id_aktivitas] : null;
   
+  const manualEligibleActivity = useMemo(() => {
+    const resolvedType = activity?.jenis_kegiatan || routeActivityType || null;
+
+    if (!resolvedType) {
+      return false;
+    }
+
+    if (MANUAL_ATTENDANCE_ACTIVITY_SET.has(resolvedType)) {
+      return true;
+    }
+
+    return MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET.has(resolvedType.toLowerCase());
+  }, [activity?.jenis_kegiatan, routeActivityType]);
+
   const [activePhoto, setActivePhoto] = useState(0);
 
   const kelompokIds = useMemo(() => {
@@ -113,37 +135,142 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   };
 
   const shelterGpsConfig = getShelterGpsConfig();
-  const [reportExists, setReportExists] = useState(false);
-  const [dynamicGpsConfig, setDynamicGpsConfig] = useState(null);
-  const [loadingGpsConfig, setLoadingGpsConfig] = useState(false);
 
-  // Fetch GPS config from API if not available in profile
+  const {
+    refetch: refetchActivityDetail,
+  } = useQuery({
+    queryKey: ['adminShelterAktivitasDetail', id_aktivitas],
+    queryFn: () => dispatch(fetchAktivitasDetail(id_aktivitas)).unwrap(),
+    enabled: !!id_aktivitas,
+    staleTime: 30 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const hasFocusedOnceRef = useRef(false);
+
   useEffect(() => {
-    const fetchGpsConfig = async () => {
-      if (shelterGpsConfig || !id_aktivitas) {
+    hasFocusedOnceRef.current = false;
+  }, [id_aktivitas]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!id_aktivitas) {
         return;
       }
 
-      try {
-        setLoadingGpsConfig(true);
-        const result = await qrTokenApi.getActivityGpsConfig(id_aktivitas);
-        const apiData = result.data; // Axios response
+      if (hasFocusedOnceRef.current) {
+        refetchActivityDetail();
+        refetchActivityReportStatus();
+      } else {
+        hasFocusedOnceRef.current = true;
+      }
+    }, [id_aktivitas, refetchActivityDetail, refetchActivityReportStatus])
+  );
 
-        if (apiData.success && apiData.data) {
-          setDynamicGpsConfig(apiData.data);
+  const gpsConfigQuery = useQuery({
+    queryKey: ['activityGpsConfig', id_aktivitas],
+    enabled: !!id_aktivitas && !shelterGpsConfig,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    queryFn: async () => {
+      try {
+        const result = await qrTokenApi.getActivityGpsConfig(id_aktivitas);
+        const apiData = result?.data;
+
+        if (apiData?.success && apiData?.data) {
+          return apiData.data;
         }
+
+        return null;
       } catch (error) {
         console.error('Error fetching GPS config:', error);
-      } finally {
-        setLoadingGpsConfig(false);
+        return null;
       }
+    },
+  });
+
+  const finalGpsConfig = useMemo(
+    () => shelterGpsConfig || gpsConfigQuery.data || null,
+    [shelterGpsConfig, gpsConfigQuery.data]
+  );
+
+  const resolveReportPayload = useCallback((payload) => {
+    if (!payload) {
+      return null;
+    }
+
+    if (payload?.data && typeof payload.data === 'object') {
+      return payload.data;
+    }
+
+    return payload;
+  }, []);
+
+  const initialReportData = useMemo(() => {
+    if (!reportCacheEntry) {
+      return undefined;
+    }
+
+    return {
+      status: reportCacheEntry.status || null,
+      data: reportCacheEntry.data || null,
     };
+  }, [reportCacheEntry]);
 
-    fetchGpsConfig();
-  }, [id_aktivitas, shelterGpsConfig]);
+  const initialReportFetchedAt = reportCacheEntry?.fetchedAt ?? undefined;
 
-  // Get final GPS config (profile first, then API fallback)
-  const finalGpsConfig = shelterGpsConfig || dynamicGpsConfig;
+  const {
+    data: reportStatusData,
+    refetch: refetchActivityReportStatus,
+  } = useQuery({
+    queryKey: ['adminShelterActivityReportStatus', id_aktivitas],
+    enabled: !!id_aktivitas && !!activity,
+    initialData: initialReportData,
+    initialDataUpdatedAt: initialReportFetchedAt,
+    staleTime: ACTIVITY_REPORT_CACHE_TTL,
+    gcTime: ACTIVITY_REPORT_CACHE_TTL,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+    queryFn: async () => {
+      try {
+        const reportPayload = await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
+        const reportData = resolveReportPayload(reportPayload);
+        return {
+          status: reportData ? 'exists' : 'missing',
+          data: reportData,
+        };
+      } catch (err) {
+        const statusCode = err?.status || err?.response?.status || err?.originalStatus;
+        const rawMessage = typeof err === 'string' ? err : err?.message;
+        const normalizedMessage = typeof rawMessage === 'string' ? rawMessage.toLowerCase() : '';
+        const isNotFound =
+          statusCode === 404 ||
+          normalizedMessage.includes('tidak ditemukan') ||
+          normalizedMessage.includes('not found');
+
+        if (isNotFound) {
+          return {
+            status: 'missing',
+            data: null,
+          };
+        }
+
+        console.error('Error checking activity report:', err);
+        return {
+          status: 'error',
+          data: null,
+          error: err,
+        };
+      }
+    },
+  });
+
+  const reportStatus = reportStatusData?.status || null;
+  const reportExists = reportStatus === 'exists';
   
   // Parse time string (backend format like "09:35") - memoized
   const parseTimeForStatus = useCallback((timeInput) => {
@@ -221,14 +348,6 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     return now > endDateTime;
   }, [activity?.end_time, activity?.tanggal]);
   
-  useFocusEffect(
-    useCallback(() => {
-      if (id_aktivitas) {
-        dispatch(fetchAktivitasDetail(id_aktivitas));
-      }
-    }, [dispatch, id_aktivitas])
-  );
-
   useEffect(() => {
     if (!activity) {
       return;
@@ -239,65 +358,6 @@ const ActivityDetailScreen = ({ navigation, route }) => {
       attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
     });
   }, [activity, cachedAttendanceSummary, navigation, routeAttendanceSummary]);
-  
-  // Check if activity report exists once the activity detail is loaded
-  useEffect(() => {
-    if (!activity || !id_aktivitas) return;
-
-    const cacheEntry = reportCacheEntry;
-    const now = Date.now();
-
-    if (cacheEntry) {
-      if (cacheEntry.status === 'exists') {
-        setReportExists(true);
-      } else if (cacheEntry.status === 'missing') {
-        setReportExists(false);
-      }
-
-      const cacheAge = cacheEntry.fetchedAt ? now - cacheEntry.fetchedAt : Number.POSITIVE_INFINITY;
-      const cacheTtl = cacheEntry.status === 'error'
-        ? ACTIVITY_REPORT_ERROR_RETRY_DELAY
-        : ACTIVITY_REPORT_CACHE_TTL;
-
-      if (cacheAge < cacheTtl) {
-        return;
-      }
-    }
-
-    let isActive = true;
-
-    const checkActivityReport = async () => {
-      try {
-        await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
-        if (isActive) {
-          setReportExists(true);
-        }
-      } catch (err) {
-        if (!isActive) return;
-
-        const statusCode = err?.status || err?.response?.status || err?.originalStatus;
-        const rawMessage = typeof err === 'string' ? err : err?.message;
-        const normalizedMessage = typeof rawMessage === 'string' ? rawMessage.toLowerCase() : '';
-        const isNotFound =
-          statusCode === 404 ||
-          normalizedMessage.includes('tidak ditemukan') ||
-          normalizedMessage.includes('not found');
-
-        if (!isNotFound && statusCode !== 429) {
-          console.error('Error checking activity report:', err);
-        }
-
-        const hadExistingReport = cacheEntry?.status === 'exists';
-        setReportExists(hadExistingReport && !isNotFound);
-      }
-    };
-
-    checkActivityReport();
-
-    return () => {
-      isActive = false;
-    };
-  }, [dispatch, id_aktivitas, activity, reportCacheEntry]);
   
   const handleEditActivity = () => navigation.navigate('ActivityForm', { activity });
   
@@ -346,6 +406,13 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   
   const handleManualAttendance = () => {
     if (!activity) return;
+
+    if (!manualEligibleActivity) {
+      Alert.alert('Absen Manual Tidak Tersedia', 'Jenis kegiatan ini tidak mendukung absen manual.', [
+        { text: 'Mengerti', style: 'default' },
+      ]);
+      return;
+    }
     
     const navigationCallback = () => {
       navigation.navigate('ManualAttendance', {
@@ -598,13 +665,14 @@ const ActivityDetailScreen = ({ navigation, route }) => {
       component: (
         <View>
           <View style={styles.attendanceActions}>
-            <ActionButton
-              onPress={handleRecordAttendance}
-              icon="calendar"
-              text="Absen QR"
-              style={styles.fullWidthButton}
-              disabled={!hasKelompokContext}
-            />
+          <ActionButton
+            onPress={handleRecordAttendance}
+            icon="calendar"
+            text="Absen QR"
+            style={styles.fullWidthButton}
+            disabled={!hasKelompokContext}
+          />
+          {manualEligibleActivity && (
             <ActionButton
               onPress={handleManualAttendance}
               icon="create"
@@ -612,8 +680,9 @@ const ActivityDetailScreen = ({ navigation, route }) => {
               style={styles.manualButton}
               disabled={!hasKelompokContext}
             />
-          </View>
-          <ActionButton
+          )}
+        </View>
+        <ActionButton
             onPress={handleActivityReport}
             icon={(reportExists || activity.status === 'reported') ? "document-text" : "camera"}
             text={(reportExists || activity.status === 'reported') ? "Lihat Laporan" : "Buat Laporan"}

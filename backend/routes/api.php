@@ -311,9 +311,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/aktivitas-stats', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'getAktivitasStats']);
 
         // Activity Reports
+        Route::get('/activity-reports', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'index']);
         Route::post('/activity-reports', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'store']);
         Route::get('/activity-reports/by-activity/{id_aktivitas}', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'getByActivity']);
-        Route::delete('/activity-reports/{id}', [App\Http\Controllers\API\AdminShelter\ActivityReportController::class, 'destroy']);
+
+        // Achievement Reports
+        Route::get('/achievement-reports', [App\Http\Controllers\API\AdminShelter\AchievementReportController::class, 'index']);
 
         // Kurikulum read endpoints (index, detail, preview, dropdown)
         Route::get('/kurikulum', [App\Http\Controllers\API\AdminShelter\AdminShelterKurikulumController::class, 'index']);

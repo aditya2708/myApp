@@ -1,7 +1,7 @@
 // API base URLs
-//export const API_BASE_URL = 'http://192.168.1.25:8000/api';
-//export const API_BASE_URL = 'http://192.168.8.105:8000/api';
-export const API_BASE_URL = 'https://bp.berbagipendidikan.org/api';
+//export const API_BASE_URL = 'http://192.168.1.23:8000/api';
+export const API_BASE_URL = 'http://192.168.8.105:8000/api';
+//export const API_BASE_URL = 'https://bp.berbagipendidikan.org/api';
 
 const sanitizeUrlValue = (value) =>
   typeof value === 'string' ? value.trim() : '';

@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format, isFuture, isPast, startOfDay } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
 import NetInfo from '@react-native-community/netinfo';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
@@ -21,6 +22,10 @@ import {
   selectDuplicateError, resetAttendanceError
 } from '../../redux/attendanceSlice';
 import OfflineSync from '../../utils/offlineSync';
+import {
+  MANUAL_ATTENDANCE_ACTIVITY_SET,
+  MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET,
+} from '../../constants/activityTypes';
 
 const STATUS_COLOR_MAP = {
   absent: '#e74c3c',
@@ -64,67 +69,188 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
 
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [notes, setNotes] = useState('');
-  const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  const [studentError, setStudentError] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
-  const [isBimbel, setIsBimbel] = useState(activityType === 'Bimbel');
   const [showDuplicate, setShowDuplicate] = useState(false);
-  const [activityDetails, setActivityDetails] = useState(null);
-  const [loadingActivity, setLoadingActivity] = useState(false);
   const [expectedStatus, setExpectedStatus] = useState('present');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [arrivalTime, setArrivalTime] = useState(new Date());
-  const [dateStatus, setDateStatus] = useState('valid');
   const flatListRef = useRef(null);
   const footerPropsRef = useRef({});
+  const ineligibleWarningShown = useRef(false);
 
-  const fetchStudentsByGroups = useCallback(async (idsParam) => {
-    const uniqueIds = Array.from(
-      new Set((Array.isArray(idsParam) ? idsParam : []).filter(Boolean)),
-    );
-
-    if (uniqueIds.length === 0) {
-      setStudents([]);
-      setSelectedStudents([]);
-      setLoadingStudents(false);
-      setStudentError(null);
-      return;
+  const dateStatus = useMemo(() => {
+    if (!activityDate) {
+      return 'unknown';
     }
 
-    try {
-      setLoadingStudents(true);
-      setStudentError(null);
+    const today = startOfDay(new Date());
+    const actDate = startOfDay(new Date(activityDate));
 
-      const responses = await Promise.all(
-        uniqueIds.map(id => adminShelterKelompokApi.getGroupChildren(id)),
-      );
+    if (isFuture(actDate)) {
+      return 'future';
+    }
 
-      const aggregated = responses.flatMap(response => {
-        if (response?.data?.data && Array.isArray(response.data.data)) {
-          return response.data.data;
+    if (isPast(actDate)) {
+      return 'past';
+    }
+
+    return 'valid';
+  }, [activityDate]);
+
+  const activityDetailQuery = useQuery({
+    queryKey: ['manualAttendanceActivityDetail', id_aktivitas],
+    enabled: !!id_aktivitas,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    queryFn: async () => {
+      if (!id_aktivitas) {
+        return null;
+      }
+
+      const response = await aktivitasApi.getAktivitasDetail(id_aktivitas);
+      return response?.data?.data || null;
+    },
+  });
+
+  const activityDetails = activityDetailQuery.data || null;
+  const loadingActivity = activityDetailQuery.isFetching;
+
+  const effectiveActivityType = useMemo(() => {
+    if (activityDetails?.jenis_kegiatan) {
+      return activityDetails.jenis_kegiatan;
+    }
+    return activityType || null;
+  }, [activityDetails?.jenis_kegiatan, activityType]);
+
+  const isManualEligible = useMemo(() => {
+    if (!effectiveActivityType) {
+      return false;
+    }
+
+    if (MANUAL_ATTENDANCE_ACTIVITY_SET.has(effectiveActivityType)) {
+      return true;
+    }
+
+    return MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET.has(effectiveActivityType.toLowerCase());
+  }, [effectiveActivityType]);
+
+  const studentsQuery = useQuery({
+    queryKey: [
+      'manualAttendanceStudents',
+      {
+        id: id_aktivitas || 'manual',
+        groups: resolvedKelompokIds,
+        eligible: isManualEligible,
+        kelompok: kelompokId || null,
+        dateStatus,
+      },
+    ],
+    enabled: dateStatus === 'valid',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    queryFn: async () => {
+      const uniqueGroupIds = Array.from(new Set(resolvedKelompokIds.filter(Boolean)));
+
+      if (uniqueGroupIds.length > 0) {
+        const responses = await Promise.all(
+          uniqueGroupIds.map(async (groupId) => {
+            try {
+              return await adminShelterKelompokApi.getGroupChildren(groupId);
+            } catch (error) {
+              console.error('Error fetching kelompok students:', error);
+              throw error;
+            }
+          })
+        );
+
+        const uniqueStudentsMap = new Map();
+
+        responses.forEach((response) => {
+          const list = response?.data?.data;
+          if (!Array.isArray(list)) {
+            return;
+          }
+
+          list.forEach((student) => {
+            if (!student?.id_anak) {
+              return;
+            }
+            if (student.status_validasi && student.status_validasi !== 'aktif') {
+              return;
+            }
+            uniqueStudentsMap.set(student.id_anak, student);
+          });
+        });
+
+        return Array.from(uniqueStudentsMap.values());
+      }
+
+      if (isManualEligible && kelompokId) {
+        try {
+          const response = await adminShelterKelompokApi.getGroupChildren(kelompokId);
+          const list = response?.data?.data || [];
+          return list.filter(
+            (student) =>
+              !student.status_validasi || student.status_validasi === 'aktif'
+          );
+        } catch (error) {
+          console.error('Error fetching kelompok students:', error);
+          throw error;
         }
-        return [];
-      });
+      }
 
-      const uniqueStudentsMap = new Map();
-      aggregated.forEach(student => {
-        if (!student?.id_anak) return;
-        if (student.status_validasi && student.status_validasi !== 'aktif') return;
-        uniqueStudentsMap.set(student.id_anak, student);
-      });
+      try {
+        let allStudents = [];
+        const response = await adminShelterAnakApi.getAllAnak({ page: 1 });
+        const pagination = response?.data?.pagination;
+        const initialData = response?.data?.data || [];
+        allStudents = [...initialData];
 
-      setStudents(Array.from(uniqueStudentsMap.values()));
+        if (pagination?.last_page && pagination.last_page > 1) {
+          for (let page = 2; page <= pagination.last_page; page++) {
+            const pageResponse = await adminShelterAnakApi.getAllAnak({ page });
+            const pageData = pageResponse?.data?.data;
+            if (Array.isArray(pageData)) {
+              allStudents = allStudents.concat(pageData);
+            }
+          }
+        } else if (!pagination) {
+          const fallbackResponse = await adminShelterAnakApi.getAllAnak({ per_page: 1000 });
+          allStudents = fallbackResponse?.data?.data || [];
+        }
+
+        return allStudents.filter(
+          (student) => student.status_validasi === 'aktif'
+        );
+      } catch (error) {
+        console.error('Gagal mengambil siswa:', error);
+        throw error;
+      }
+    },
+  });
+
+  const students = dateStatus === 'valid' ? studentsQuery.data || [] : [];
+
+  useEffect(() => {
+    if (dateStatus === 'valid' && studentsQuery.isSuccess) {
       setSelectedStudents([]);
-    } catch (err) {
-      console.error('Error fetching kelompok students:', err);
-      setStudentError('Gagal memuat siswa untuk kelompok terpilih');
-    } finally {
-      setLoadingStudents(false);
     }
-  }, []);
-  
+  }, [dateStatus, studentsQuery.data, studentsQuery.isSuccess]);
+
+  const studentErrorMessage = useMemo(() => {
+    if (!studentsQuery.error) {
+      return null;
+    }
+
+    const error = studentsQuery.error;
+    if (typeof error?.message === 'string') {
+      return error.message;
+    }
+
+    return 'Gagal memuat siswa. Silakan coba lagi.';
+  }, [studentsQuery.error]);
+
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected && state.isInternetReachable);
@@ -133,53 +259,33 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   }, []);
   
   useEffect(() => {
-    setIsBimbel(activityType === 'Bimbel');
-    fetchActivityDetails();
-    validateDate();
-  }, [activityType, id_aktivitas, activityDate]);
-
-  useEffect(() => {
-    if (dateStatus === 'valid') {
-      if (resolvedKelompokIds.length > 0) {
-        fetchStudentsByGroups(resolvedKelompokIds);
-      } else if (isBimbel && kelompokId) {
-        fetchStudentsByGroup(kelompokId);
-      } else {
-        fetchAllStudents();
-      }
-    }
-  }, [resolvedKelompokIds, isBimbel, kelompokId, dateStatus, fetchStudentsByGroups]);
-  
-  useEffect(() => {
     if (duplicateError) setShowDuplicate(true);
     return () => dispatch(resetAttendanceError());
   }, [duplicateError, dispatch]);
   
   useEffect(() => {
     updateExpectedStatus();
-  }, [arrivalTime, activityDetails]);
-  
-  const validateDate = () => {
-    if (!activityDate) { setDateStatus('unknown'); return; }
-    
-    const today = startOfDay(new Date());
-    const actDate = startOfDay(new Date(activityDate));
-    
-    setDateStatus(isFuture(actDate) ? 'future' : isPast(actDate) ? 'past' : 'valid');
-  };
-  
-  const fetchActivityDetails = async () => {
-    if (!id_aktivitas) return;
-    setLoadingActivity(true);
-    try {
-      const response = await aktivitasApi.getAktivitasDetail(id_aktivitas);
-      if (response.data?.data) setActivityDetails(response.data.data);
-    } catch (err) {
-      console.error('Gagal mengambil detail aktivitas:', err);
-    } finally {
-      setLoadingActivity(false);
+  }, [arrivalTime, activityDetails, dateStatus]);
+
+  useEffect(() => {
+    if (
+      effectiveActivityType &&
+      !isManualEligible &&
+      !ineligibleWarningShown.current
+    ) {
+      ineligibleWarningShown.current = true;
+      Alert.alert(
+        'Absen Manual Tidak Tersedia',
+        'Jenis kegiatan ini tidak mendukung absen manual.',
+        [
+          {
+            text: 'Oke',
+            onPress: () => navigation.goBack(),
+          },
+        ],
+      );
     }
-  };
+  }, [effectiveActivityType, isManualEligible, navigation]);
   
   const updateExpectedStatus = () => {
     if (!activityDetails || !arrivalTime) return;
@@ -221,49 +327,6 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     }
     
     setExpectedStatus(status);
-  };
-  
-  const fetchAllStudents = async () => {
-    setLoadingStudents(true);
-    setStudentError(null);
-    try {
-      let allStudents = [];
-      const response = await adminShelterAnakApi.getAllAnak({ page: 1 });
-      
-      if (response.data?.pagination) {
-        const { last_page } = response.data.pagination;
-        allStudents = [...response.data.data];
-        
-        if (last_page > 1) {
-          for (let page = 2; page <= last_page; page++) {
-            const pageResponse = await adminShelterAnakApi.getAllAnak({ page });
-            if (pageResponse.data?.data) {
-              allStudents = [...allStudents, ...pageResponse.data.data];
-            }
-          }
-        }
-      } else {
-        const fallback = await adminShelterAnakApi.getAllAnak({ per_page: 1000 });
-        allStudents = fallback.data?.data || [];
-      }
-      
-      setStudents(allStudents.filter(s => s.status_validasi === 'aktif'));
-    } catch (err) {
-      console.error('Gagal mengambil siswa:', err);
-      setStudentError('Gagal memuat siswa. Silakan coba lagi.');
-    } finally {
-      setLoadingStudents(false);
-    }
-  };
-  
-  const fetchStudentsByGroup = async (kelompokId) => {
-    if (!kelompokId) {
-      setStudents([]);
-      setSelectedStudents([]);
-      return;
-    }
-
-    await fetchStudentsByGroups([kelompokId]);
   };
   
   const handleTimeChange = useCallback((event, selectedTime) => {
@@ -442,6 +505,15 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   };
 
   const getDateStatusInfo = () => {
+    if (!isManualEligible) {
+      return {
+        show: true,
+        color: '#7f8c8d',
+        icon: 'information-circle-outline',
+        text: 'Jenis kegiatan ini tidak mendukung absen manual - form dinonaktifkan',
+      };
+    }
+
     switch(dateStatus) {
       case 'future':
         return { show: true, color: '#f39c12', icon: 'time-outline', text: 'Aktivitas belum dimulai - form dinonaktifkan' };
@@ -452,7 +524,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     }
   };
 
-  const isFormDisabled = dateStatus === 'future';
+  const isFormDisabled = dateStatus === 'future' || !isManualEligible;
   const statusInfo = getDateStatusInfo();
   const handleOpenTimePicker = useCallback(() => {
     if (!isFormDisabled) {
@@ -493,7 +565,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const Header = () => (
     <>
       <Text style={styles.label}>
-        {`Siswa${isBimbel ? ` dari ${kelompokName || 'kelompok ini'}` : ''}`}
+        {`Siswa${isManualEligible ? ` dari ${kelompokName || 'kelompok ini'}` : ''}`}
       </Text>
 
       {!isFormDisabled && (
@@ -512,7 +584,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     </>
   );
   
-  const isAnyLoading = loading || loadingStudents || loadingActivity;
+  const isAnyLoading = loading || studentsQuery.isFetching || loadingActivity;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -525,7 +597,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
           <Text style={styles.activityName}>{activityName || 'Aktivitas'}</Text>
           <Text style={styles.activityDate}>{activityDate || 'Tanggal tidak ditentukan'}</Text>
           
-          {isBimbel && kelompokName && (
+          {isManualEligible && kelompokName && (
             <View style={styles.kelompokContainer}>
               <Text style={styles.kelompokInfo}>Kelompok: {kelompokName}</Text>
             </View>
@@ -559,7 +631,12 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
         )}
         
         {error && <ErrorMessage message={error} />}
-        {studentError && <ErrorMessage message={studentError} onRetry={fetchAllStudents} />}
+        {studentErrorMessage && (
+          <ErrorMessage
+            message={studentErrorMessage}
+            onRetry={() => studentsQuery.refetch()}
+          />
+        )}
         
         <View style={styles.formContainer}>
           {isAnyLoading ? (

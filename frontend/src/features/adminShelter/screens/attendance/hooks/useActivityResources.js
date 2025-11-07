@@ -10,6 +10,10 @@ import {
 import { adminShelterKelompokApi } from '../../../api/adminShelterKelompokApi';
 import { adminShelterTutorApi } from '../../../api/adminShelterTutorApi';
 import { deriveKelompokDisplayLevel } from '../utils/activityFormUtils';
+import {
+  ALLOWED_ACTIVITY_TYPE_SET,
+  ALLOWED_ACTIVITY_TYPES,
+} from '../../../constants/activityTypes';
 
 const defaultLoadingState = { kelompok: false, tutor: false };
 const defaultErrorState = { kelompok: null, tutor: null };
@@ -30,6 +34,55 @@ const useActivityResources = ({
   const [tutorList, setTutorList] = useState([]);
   const [loadingStates, setLoadingStates] = useState(defaultLoadingState);
   const [errors, setErrors] = useState(defaultErrorState);
+
+  const filteredKegiatanOptions = useMemo(() => {
+    if (!Array.isArray(kegiatanOptions)) {
+      return [];
+    }
+
+    const orderIndex = ALLOWED_ACTIVITY_TYPES.reduce((acc, name, index) => {
+      acc[name] = index;
+      return acc;
+    }, {});
+
+    const filtered = kegiatanOptions.filter(option =>
+      option &&
+      option.nama_kegiatan &&
+      ALLOWED_ACTIVITY_TYPE_SET.has(option.nama_kegiatan),
+    );
+
+    if (
+      activity &&
+      activity.jenis_kegiatan &&
+      !ALLOWED_ACTIVITY_TYPE_SET.has(activity.jenis_kegiatan)
+    ) {
+      const existing = kegiatanOptions.find(option =>
+        option &&
+        (
+          option.id_kegiatan === activity.id_kegiatan ||
+          option.nama_kegiatan === activity.jenis_kegiatan
+        ),
+      );
+
+      if (
+        existing &&
+        !filtered.some(option => option.id_kegiatan === existing.id_kegiatan)
+      ) {
+        return [...filtered, existing];
+      }
+    }
+
+    return [...filtered].sort((a, b) => {
+      const aIndex = orderIndex[a.nama_kegiatan] ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = orderIndex[b.nama_kegiatan] ?? Number.MAX_SAFE_INTEGER;
+
+      if (aIndex !== bIndex) {
+        return aIndex - bIndex;
+      }
+
+      return (a.nama_kegiatan || '').localeCompare(b.nama_kegiatan || '');
+    });
+  }, [activity, kegiatanOptions]);
 
   const hasSelectedKegiatan = useMemo(
     () => Boolean(formData.id_kegiatan),
@@ -146,9 +199,9 @@ const useActivityResources = ({
       isEditing &&
       activity &&
       !formData.id_kegiatan &&
-      kegiatanOptions.length > 0
+      filteredKegiatanOptions.length > 0
     ) {
-      const matched = kegiatanOptions.find(
+      const matched = filteredKegiatanOptions.find(
         option => option.id_kegiatan === activity.id_kegiatan ||
           option.nama_kegiatan === activity.jenis_kegiatan,
       );
@@ -170,7 +223,7 @@ const useActivityResources = ({
   }, [fetchKelompokData, hasSelectedKegiatan, kelompokList.length, loadingStates.kelompok]);
 
   return {
-    kegiatanOptions,
+    kegiatanOptions: filteredKegiatanOptions,
     kegiatanOptionsLoading,
     kegiatanOptionsError,
     kelompokList,

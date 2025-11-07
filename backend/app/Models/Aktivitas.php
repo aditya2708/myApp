@@ -76,6 +76,11 @@ class Aktivitas extends Model
         return $this->belongsTo(Materi::class, 'id_materi', 'id_materi');
     }
 
+    public function materiRelation(): BelongsTo
+    {
+        return $this->belongsTo(Materi::class, 'id_materi', 'id_materi');
+    }
+
     public function kegiatan(): BelongsTo
     {
         return $this->belongsTo(Kegiatan::class, 'id_kegiatan', 'id_kegiatan');

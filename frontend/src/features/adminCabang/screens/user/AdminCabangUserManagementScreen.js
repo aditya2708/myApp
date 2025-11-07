@@ -1,7 +1,7 @@
 // FEATURES PATH: features/adminCabang/screens/user/AdminCabangUserManagementScreen.js
 // DESC: Screen daftar user untuk Admin Cabang (kelola admin cabang & admin shelter)
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,10 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { adminCabangUserManagementApi } from '../../api/adminCabangUserManagementApi';
+import { useAuth } from '../../../../common/hooks/useAuth';
 
 const LEVELS = [
   { key: 'admin_cabang', label: 'Admin Cabang' },
@@ -26,70 +28,67 @@ const DEFAULT_PER_PAGE = 10;
 
 const AdminCabangUserManagementScreen = () => {
   const navigation = useNavigation();
+  const { profile } = useAuth();
   const [level, setLevel] = useState('admin_cabang');
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  const [users, setUsers] = useState([]);
   const [q, setQ] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [meta, setMeta] = useState(null);
-  const [links, setLinks] = useState(null);
-  const requestTokenRef = useRef(0);
-  const hasMountedRef = useRef(false);
+  const hasFocusedRef = useRef(false);
 
-  const resetListState = useCallback(() => {
-    setUsers([]);
-    setMeta(null);
-    setLinks(null);
-  }, []);
+  const kacabId = profile?.id_kacab;
+  const isQueryEnabled = Boolean(kacabId && level);
 
-  const fetchUsers = useCallback(
-    async ({ page: targetPage = 1, append = false, isRefresh = false } = {}) => {
-      const requestToken = ++requestTokenRef.current;
-      const isLoadMore = append && targetPage > 1;
+  const {
+    data,
+    error,
+    isLoading,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+    isRefetching,
+  } = useInfiniteQuery({
+    queryKey: [
+      'adminCabangUsers',
+      { level, search: searchTerm, kacabId },
+    ],
+    enabled: isQueryEnabled,
+    initialPageParam: 1,
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await adminCabangUserManagementApi.getUsers({
+        level,
+        page: pageParam,
+        perPage: DEFAULT_PER_PAGE,
+        search: searchTerm || undefined,
+      });
 
-      try {
-        setError(null);
-        if (isLoadMore) {
-          setLoadingMore(true);
-        } else if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
+      return response;
+    },
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage?.meta ?? {};
+      const links = lastPage?.links ?? {};
+      const current = Number(meta.current_page ?? meta.page ?? 1);
+      const last = Number(meta.last_page ?? meta.total_pages ?? current);
 
-        const { data: list = [], meta: metaRes = null, links: linksRes = null } =
-          await adminCabangUserManagementApi.getUsers({
-            level,
-            page: targetPage,
-            perPage: DEFAULT_PER_PAGE,
-            search: searchTerm || undefined,
-          });
+      if (Number.isFinite(current) && Number.isFinite(last) && current < last) {
+        return current + 1;
+      }
 
-        if (requestToken !== requestTokenRef.current) {
-          return;
-        }
+      const nextLinkRaw = typeof links?.next === 'string' ? links.next : links?.next?.url;
 
-        setUsers((prev) => (append ? [...prev, ...list] : list));
-        setMeta(metaRes);
-        setLinks(linksRes);
-      } catch (err) {
-        if (requestToken === requestTokenRef.current) {
-          const msg = err?.response?.data?.message || err?.message || 'Gagal memuat data user';
-          setError(String(msg));
-        }
-      } finally {
-        if (requestToken === requestTokenRef.current) {
-          setLoading(false);
-          setLoadingMore(false);
-          setRefreshing(false);
+      if (typeof nextLinkRaw === 'string') {
+        const match = nextLinkRaw.match(/[?&]page=(\d+)/);
+        if (match) {
+          const nextPage = Number(match[1]);
+          if (Number.isInteger(nextPage) && nextPage > current) {
+            return nextPage;
+          }
         }
       }
+
+      return undefined;
     },
-    [level, searchTerm]
-  );
+  });
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -99,78 +98,76 @@ const AdminCabangUserManagementScreen = () => {
     return () => clearTimeout(handler);
   }, [q]);
 
-  useEffect(() => {
-    resetListState();
-    fetchUsers({ page: 1 });
-    hasMountedRef.current = true;
-  }, [level, searchTerm, fetchUsers, resetListState]);
-
   useFocusEffect(
     useCallback(() => {
-      if (hasMountedRef.current) {
-        fetchUsers({ page: 1, append: false, isRefresh: true });
+      if (!isQueryEnabled) {
+        return;
       }
-    }, [fetchUsers])
+
+      if (hasFocusedRef.current) {
+        refetch();
+      } else {
+        hasFocusedRef.current = true;
+      }
+    }, [isQueryEnabled, refetch])
   );
 
   const onRefresh = () => {
-    fetchUsers({ page: 1, append: false, isRefresh: true });
+    if (!isQueryEnabled) {
+      return;
+    }
+    refetch();
   };
 
   const loadMore = () => {
-    if (loading || loadingMore) return;
-
-    const hasNextPage = (() => {
-      const currentPage = Number(meta?.current_page);
-      const lastPage = Number(meta?.last_page);
-      if (Number.isFinite(currentPage) && Number.isFinite(lastPage)) {
-        return currentPage < lastPage;
-      }
-      return Boolean(links?.next);
-    })();
-
-    if (!hasNextPage) return;
-
-    const derivedNextPage = (() => {
-      const currentPage = Number(meta?.current_page);
-      if (Number.isFinite(currentPage)) {
-        const potentialNext = currentPage + 1;
-        if (Number.isInteger(potentialNext) && potentialNext > 0) {
-          return potentialNext;
-        }
-      }
-      return null;
-    })();
-
-    let nextPage = derivedNextPage;
-
-    if (!Number.isInteger(nextPage) && links?.next) {
-      const nextLink = links.next;
-      let nextLinkUrl = null;
-
-      if (typeof nextLink === 'string') {
-        nextLinkUrl = nextLink;
-      } else if (typeof nextLink === 'object' && nextLink !== null) {
-        if (typeof nextLink.url === 'string') {
-          nextLinkUrl = nextLink.url;
-        }
-      }
-
-      if (typeof nextLinkUrl === 'string') {
-        const match = nextLinkUrl.match(/[?&]page=(\d+)/);
-        const parsedPage = match ? Number(match[1]) : null;
-        if (Number.isInteger(parsedPage) && parsedPage > 0) {
-          nextPage = parsedPage;
-        }
-      }
-    }
-
-    if (!Number.isInteger(nextPage) || !Number.isFinite(nextPage)) {
+    if (!isQueryEnabled || !hasNextPage || isFetchingNextPage) {
       return;
     }
-
-    fetchUsers({ page: nextPage, append: true });
+    fetchNextPage();
   };
+
+  const users = useMemo(() => {
+    if (!data?.pages?.length) {
+      return [];
+    }
+
+    return data.pages.flatMap((page) => {
+      if (!page) {
+        return [];
+      }
+      const list = Array.isArray(page?.data) ? page.data : [];
+      return list;
+    });
+  }, [data]);
+
+  const hasData = users.length > 0;
+  const isInitialLoading = isLoading && !hasData;
+  const isRefreshing = isRefetching && !isFetchingNextPage && !isInitialLoading;
+
+  const errorMessage = useMemo(() => {
+    if (!error) {
+      return null;
+    }
+
+    const responseMessage =
+      error?.response?.data?.message ??
+      error?.response?.data?.error ??
+      error?.response?.message;
+
+    if (responseMessage) {
+      return String(responseMessage);
+    }
+
+    if (error?.message) {
+      return String(error.message);
+    }
+
+    return 'Gagal memuat data user';
+  }, [error]);
+
+  const showFullError = Boolean(errorMessage && !hasData && !isInitialLoading);
+  const showInlineError = Boolean(errorMessage && hasData);
+
 
   const gotoCreate = () => {
     navigation.navigate('AdminCabangUserForm', { mode: 'create', defaultLevel: level });
@@ -290,37 +287,53 @@ const AdminCabangUserManagementScreen = () => {
         )}
       </View>
 
-      {loading ? (
+      {!isQueryEnabled ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>Data cabang tidak ditemukan.</Text>
+        </View>
+      ) : isInitialLoading ? (
         <View style={{ paddingTop: 40 }}>
           <ActivityIndicator size="large" />
         </View>
-      ) : error ? (
+      ) : showFullError ? (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchUsers}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={refetch}>
             <Text style={styles.retryText}>Coba Lagi</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={users}
-          keyExtractor={(item, idx) =>
-            String(item?.user?.id_users ?? item?.id_users ?? item?.id ?? idx)
-          }
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Belum ada data.</Text>}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.2}
-          ListFooterComponent={
-            loadingMore ? (
-              <View style={{ paddingVertical: 16 }}>
-                <ActivityIndicator size="small" />
-              </View>
-            ) : null
-          }
-        />
+        <>
+          {showInlineError ? (
+            <View style={styles.inlineErrorBox}>
+              <Ionicons name="warning-outline" size={16} color="#e67e22" />
+              <Text style={styles.inlineErrorText}>{errorMessage}</Text>
+            </View>
+          ) : null}
+          <FlatList
+            data={users}
+            keyExtractor={(item, idx) =>
+              String(item?.user?.id_users ?? item?.id_users ?? item?.id ?? idx)
+            }
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                {isFetching ? 'Memuat data...' : 'Belum ada data.'}
+              </Text>
+            }
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.2}
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View style={{ paddingVertical: 16 }}>
+                  <ActivityIndicator size="small" />
+                </View>
+              ) : null
+            }
+          />
+        </>
       )}
     </View>
   );
@@ -357,6 +370,18 @@ const styles = StyleSheet.create({
   errorText: { color: '#e74c3c', marginBottom: 10, textAlign: 'center' },
   retryBtn: { backgroundColor: '#e74c3c', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   retryText: { color: '#fff', fontWeight: '600' },
+  inlineErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3e6',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  inlineErrorText: { flex: 1, color: '#d35400', fontSize: 12 },
   emptyText: { textAlign: 'center', color: '#999', marginTop: 24 },
 });
 

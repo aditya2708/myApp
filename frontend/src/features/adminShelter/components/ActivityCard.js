@@ -10,13 +10,25 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import {
+  MANUAL_ATTENDANCE_ACTIVITY_SET,
+  MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET,
+} from '../constants/activityTypes';
 
 const { width } = Dimensions.get('window');
 
 const ActivityCard = ({ activity, onPress, onEdit, onDelete }) => {
+  const jenisKegiatan = activity?.jenis_kegiatan || '';
+  const isManualEligibleActivity =
+    jenisKegiatan &&
+    (
+      MANUAL_ATTENDANCE_ACTIVITY_SET.has(jenisKegiatan) ||
+      MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET.has(jenisKegiatan.toLowerCase())
+    );
+
   // Determine icon based on activity type
   const getActivityIcon = () => {
-    if (activity.jenis_kegiatan?.toLowerCase() === 'bimbel') {
+    if (isManualEligibleActivity) {
       return 'book';
     }
     return 'people';
@@ -24,7 +36,7 @@ const ActivityCard = ({ activity, onPress, onEdit, onDelete }) => {
 
   // Get badge color based on activity type
   const getBadgeColor = () => {
-    if (activity.jenis_kegiatan?.toLowerCase() === 'bimbel') {
+    if (isManualEligibleActivity) {
       return '#3498db';
     }
     return '#9b59b6';
@@ -95,7 +107,7 @@ const ActivityCard = ({ activity, onPress, onEdit, onDelete }) => {
             }
           </Text>
           
-          {activity.jenis_kegiatan === 'Bimbel' && (
+          {isManualEligibleActivity && (
             <View style={styles.bimbelInfo}>
               {activity.nama_kelompok && (
                 <Text style={styles.group} numberOfLines={1}>

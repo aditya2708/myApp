@@ -1,13 +1,14 @@
 // FEATURES PATH: features/adminCabang/screens/user/AdminCabangUserDetailScreen.js
 // DESC: Detail user admin cabang (user + relasi cabang/wilbin/shelter)
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { adminCabangUserManagementApi } from '../../api/adminCabangUserManagementApi';
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
 
 const Line = () => <View style={styles.separator} />;
 
@@ -62,34 +63,49 @@ const AdminCabangUserDetailScreen = () => {
   const navigation = useNavigation();
   const { idUsers, preset } = route.params || {};
 
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  const [detail, setDetail] = useState(() => preset || null);
+  const {
+    data: detail,
+    error,
+    isLoading,
+    isFetching,
+    isRefetching,
+    refetch,
+  } = useQuery({
+    queryKey: ['adminCabangUserDetail', idUsers],
+    enabled: Boolean(idUsers),
+    initialData: preset || null,
+    queryFn: async () => {
+      const res = await adminCabangUserManagementApi.getUserDetail(idUsers);
+      return res?.data ?? null;
+    },
+  });
 
   const container = useMemo(() => (detail?.data ? detail.data : detail) || {}, [detail]);
   const user = useMemo(() => container?.user ?? container ?? null, [container]);
   const resolvedProfileRaw = useMemo(() => extractProfile(container) || extractProfile(preset) || null, [container, preset]);
   const profile = useMemo(() => normalizeProfile(resolvedProfileRaw), [resolvedProfileRaw]);
 
-  const fetchDetail = useCallback(async () => {
-    if (!idUsers) {
-      setError('ID user tidak tersedia.');
-      return;
+  const isInitialLoading = isLoading && !detail;
+  const errorMessage = useMemo(() => {
+    if (!error) {
+      return null;
     }
-    try {
-      setError(null);
-      setLoading(true);
-      const res = await adminCabangUserManagementApi.getUserDetail(idUsers);
-      setDetail(res?.data);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Gagal memuat detail user';
-      setError(String(msg));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+
+    const responseMessage =
+      error?.response?.data?.message ??
+      error?.response?.data?.error ??
+      error?.response?.message ??
+      error?.message;
+
+    if (!responseMessage) {
+      return 'Gagal memuat detail user';
     }
-  }, [idUsers]);
+
+    return String(responseMessage);
+  }, [error]);
+
+  const showErrorView = Boolean(errorMessage && !detail);
+  const isRefreshing = isRefetching && !isInitialLoading;
 
   useEffect(() => {
     const uname = user?.username || preset?.user?.username || preset?.username;
@@ -98,20 +114,16 @@ const AdminCabangUserDetailScreen = () => {
     }
   }, [navigation, preset, user?.username]);
 
-  useEffect(() => {
-    if (!preset) {
-      fetchDetail();
-    }
-  }, [fetchDetail, preset]);
-
   const onRefresh = () => {
-    setRefreshing(true);
-    fetchDetail();
+    if (!idUsers) {
+      return;
+    }
+    refetch();
   };
 
   const computedId = useMemo(() => safePickId(user), [user]);
 
-  if (loading && !detail) {
+  if (isInitialLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -120,12 +132,12 @@ const AdminCabangUserDetailScreen = () => {
     );
   }
 
-  if (error && !detail) {
+  if (showErrorView) {
     return (
       <View style={styles.center}>
         <Ionicons name="alert-circle" size={28} color="#e74c3c" />
-        <Text style={{ color: '#e74c3c', marginTop: 8, textAlign: 'center' }}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchDetail}>
+        <Text style={{ color: '#e74c3c', marginTop: 8, textAlign: 'center' }}>{errorMessage}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={refetch}>
           <Text style={styles.retryText}>Coba Lagi</Text>
         </TouchableOpacity>
       </View>
@@ -135,9 +147,16 @@ const AdminCabangUserDetailScreen = () => {
   return (
     <ScrollView
       style={styles.containerRoot}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       contentContainerStyle={{ paddingBottom: 24 }}
     >
+      {errorMessage && detail ? (
+        <View style={styles.inlineErrorBox}>
+          <Ionicons name="warning-outline" size={16} color="#e67e22" />
+          <Text style={styles.inlineErrorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+
       {/* Header card */}
       <View style={styles.headerCard}>
         <View style={styles.avatarLg}>
@@ -181,7 +200,7 @@ const AdminCabangUserDetailScreen = () => {
         )}
       </Box>
 
-      {loading ? (
+      {isFetching && !isInitialLoading ? (
         <View style={{ paddingTop: 10 }}>
           <ActivityIndicator />
         </View>
@@ -257,6 +276,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: { color: '#fff', fontWeight: '600' },
+  inlineErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3e6',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  inlineErrorText: { flex: 1, color: '#d35400', fontSize: 12 },
 });
 
 export default AdminCabangUserDetailScreen;

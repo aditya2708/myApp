@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,195 +13,218 @@ import {
   Platform,
   Modal
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { id } from 'date-fns/locale';
 
-// Components
 import ActivityCard from '../../components/ActivityCard';
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
+import { deleteAktivitas } from '../../redux/aktivitasSlice';
+import { aktivitasApi } from '../../api/aktivitasApi';
 
-// Redux
-import {
-  fetchAllAktivitas,
-  deleteAktivitas,
-  selectAktivitasList,
-  selectAktivitasLoading,
-  selectAktivitasError,
-  selectAktivitasPagination,
-  selectIsLoadingMore,
-  resetAktivitasError
-} from '../../redux/aktivitasSlice';
+const ITEMS_PER_PAGE = 20;
 
 const ActivitiesListScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
-  
-  // Redux state
-  const activities = useSelector(selectAktivitasList);
-  const loading = useSelector(selectAktivitasLoading);
-  const error = useSelector(selectAktivitasError);
-  const pagination = useSelector(selectAktivitasPagination);
-  const isLoadingMore = useSelector(selectIsLoadingMore);
-  
-  // Get navigation params
-  const { filterDate, filterType: navFilterType } = route?.params || {};
-  
-  // Local state
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { filterDate: routeFilterDate, filterType: navFilterType } = route?.params || {};
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState(navFilterType || 'all'); // 'all', 'Bimbel', 'Kegiatan'
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [filterType, setFilterType] = useState(navFilterType || 'all');
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(
-    filterDate ? new Date(filterDate) : new Date()
+    routeFilterDate ? new Date(routeFilterDate) : new Date()
   );
-  const [isDateFilterActive, setIsDateFilterActive] = useState(!!filterDate);
-  
-  // Load activities on mount
+  const [isDateFilterActive, setIsDateFilterActive] = useState(!!routeFilterDate);
+  const [specificDate, setSpecificDate] = useState(routeFilterDate ?? null);
+
   useEffect(() => {
-    fetchActivities(1);
-    
-    return () => {
-      dispatch(resetAktivitasError());
-    };
-  }, [dispatch]);
-  
-  // Fetch activities data with pagination
-  const fetchActivities = async (page = 1, overrides = {}) => {
-    const params = {
-      page,
-      per_page: 20
-    };
-
-    const effectiveSearch = overrides.searchQuery ?? searchQuery;
-    if (effectiveSearch) {
-      params.search = effectiveSearch;
+    if (routeFilterDate) {
+      setIsDateFilterActive(true);
+      setSpecificDate(routeFilterDate);
+      setSelectedMonth(new Date(routeFilterDate));
+    } else if (routeFilterDate === null) {
+      setSpecificDate(null);
     }
+  }, [routeFilterDate]);
 
-    const effectiveFilterType = overrides.filterType ?? filterType;
-    if (effectiveFilterType !== 'all') {
-      params.jenis_kegiatan = effectiveFilterType;
-    }
+  const trimmedSearch = useMemo(() => appliedSearch.trim(), [appliedSearch]);
+  const monthKey = useMemo(
+    () => format(selectedMonth, 'yyyy-MM'),
+    [selectedMonth]
+  );
+  const effectiveSpecificDate = isDateFilterActive ? specificDate : null;
 
-    const effectiveDateFilterActive =
-      overrides.isDateFilterActive !== undefined ? overrides.isDateFilterActive : isDateFilterActive;
+  const {
+    data,
+    error,
+    isLoading,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: [
+      'adminShelterAktivitasList',
+      {
+        search: trimmedSearch || null,
+        filterType,
+        isDateFilterActive,
+        specificDate: effectiveSpecificDate,
+        month: isDateFilterActive ? monthKey : null,
+      },
+    ],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = {
+        page: pageParam,
+        per_page: ITEMS_PER_PAGE,
+      };
 
-    const effectiveFilterDate =
-      overrides.filterDate !== undefined ? overrides.filterDate : filterDate;
-
-    const effectiveSelectedMonth = overrides.selectedMonth ?? selectedMonth;
-
-    if (effectiveDateFilterActive) {
-      if (effectiveFilterDate) {
-        // If filtering by specific date, use exact date
-        params.date_from = effectiveFilterDate;
-        params.date_to = effectiveFilterDate;
-      } else {
-        // If filtering by month, use month range
-        params.date_from = format(startOfMonth(effectiveSelectedMonth), 'yyyy-MM-dd');
-        params.date_to = format(endOfMonth(effectiveSelectedMonth), 'yyyy-MM-dd');
+      if (trimmedSearch) {
+        params.search = trimmedSearch;
       }
+
+      if (filterType && filterType !== 'all') {
+        params.jenis_kegiatan = filterType;
+      }
+
+      if (isDateFilterActive) {
+        if (effectiveSpecificDate) {
+          params.date_from = effectiveSpecificDate;
+          params.date_to = effectiveSpecificDate;
+        } else {
+          params.date_from = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+          params.date_to = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+        }
+      }
+
+      const response = await aktivitasApi.getAllAktivitas(params);
+      const payload = response?.data || {};
+
+      if (payload.success === false) {
+        throw new Error(payload.message || 'Gagal memuat aktivitas');
+      }
+
+      const activitiesData = payload.data || [];
+      const meta = payload.meta || payload.pagination || {};
+
+      return {
+        data: activitiesData,
+        meta,
+      };
+    },
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage?.meta || {};
+      const current =
+        meta.current_page ??
+        meta.currentPage ??
+        meta.page ??
+        1;
+      const last =
+        meta.last_page ??
+        meta.lastPage ??
+        meta.total_pages ??
+        meta.totalPages ??
+        1;
+
+      if (Number(current) < Number(last)) {
+        return Number(current) + 1;
+      }
+
+      if (!meta || (Array.isArray(lastPage?.data) && lastPage.data.length === 0)) {
+        return undefined;
+      }
+
+      return undefined;
+    },
+  });
+
+  const activities = useMemo(() => {
+    if (!data?.pages?.length) {
+      return [];
     }
 
-    try {
-      await dispatch(fetchAllAktivitas(params)).unwrap();
-    } catch (err) {
-      console.error('Failed to fetch activities:', err);
-    } finally {
-      setRefreshing(false);
+    return data.pages.flatMap(page => page?.data || []);
+  }, [data]);
+
+  const errorMessage = useMemo(() => {
+    if (!error) {
+      return null;
     }
-  };
-  
-  // Handle refresh
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchActivities(1);
-  };
-  
-  // Handle search
+
+    if (typeof error?.message === 'string') {
+      return error.message;
+    }
+
+    return 'Gagal memuat aktivitas. Silakan coba lagi.';
+  }, [error]);
+
   const handleSearch = () => {
-    fetchActivities(1);
+    setAppliedSearch(searchQuery.trim());
   };
-  
-  // Handle type filter
+
   const handleFilterChange = (type) => {
     setFilterType(type);
-    fetchActivities(1, { filterType: type });
   };
-  
-  // Handle date filter
-  const applyDateFilter = () => {
-    setShowDateFilter(false);
-    setIsDateFilterActive(true);
-    if (navigation?.setParams) {
-      navigation.setParams({ filterDate: null });
-    }
-    fetchActivities(1, { isDateFilterActive: true, filterDate: null });
+
+  const handleRefresh = () => {
+    refetch();
   };
-  
-  // Clear date filter
-  const clearDateFilter = () => {
-    const resetMonth = new Date();
-    setIsDateFilterActive(false);
-    setSelectedMonth(resetMonth);
-    setShowDateFilter(false);
-    if (navigation?.setParams) {
-      navigation.setParams({ filterDate: null });
-    }
-    fetchActivities(1, { isDateFilterActive: false, filterDate: null, selectedMonth: resetMonth });
-  };
-  
-  // Handle load more
+
   const handleLoadMore = () => {
-    if (!isLoadingMore && pagination.currentPage < pagination.lastPage) {
-      fetchActivities(pagination.currentPage + 1);
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
   };
-  
-  // Handle activity selection
+
   const handleSelectActivity = (activity) => {
-    navigation.navigate('ActivityDetail', { 
-      id_aktivitas: activity.id_aktivitas
+    navigation.navigate('ActivityDetail', {
+      id_aktivitas: activity.id_aktivitas,
     });
   };
-  
-  // Handle create new activity
+
   const handleCreateActivity = () => {
     navigation.navigate('ActivityForm');
   };
-  
-  // Handle edit activity
+
   const handleEditActivity = (activity) => {
     navigation.navigate('ActivityForm', { activity });
   };
-  
-  // Handle delete activity
+
   const handleDeleteActivity = (id) => {
     Alert.alert(
       'Hapus Aktivitas',
       'Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan.',
       [
         { text: 'Batal', style: 'cancel' },
-        { 
-          text: 'Hapus', 
+        {
+          text: 'Hapus',
           style: 'destructive',
           onPress: async () => {
             try {
               await dispatch(deleteAktivitas(id)).unwrap();
+              await queryClient.invalidateQueries({ queryKey: ['adminShelterAktivitasList'] });
               Alert.alert('Berhasil', 'Aktivitas berhasil dihapus');
-              handleRefresh();
             } catch (err) {
-              Alert.alert('Error', err || 'Gagal menghapus aktivitas');
+              const message =
+                err?.response?.data?.message ||
+                err?.message ||
+                'Gagal menghapus aktivitas';
+              Alert.alert('Error', message);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
-  
-  // Render activity item
+
   const renderActivityItem = ({ item }) => (
     <ActivityCard
       activity={item}
@@ -210,46 +233,64 @@ const ActivitiesListScreen = ({ navigation, route }) => {
       onDelete={() => handleDeleteActivity(item.id_aktivitas)}
     />
   );
-  
-  // Render empty list
+
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="calendar-outline" size={64} color="#bdc3c7" />
       <Text style={styles.emptyText}>Tidak Ada Aktivitas Yang Ditemukan</Text>
       <Text style={styles.emptySubText}>
-        {searchQuery || filterType !== 'all' || isDateFilterActive
-          ? 'Coba ubah pencarian atau filter Anda' 
+        {trimmedSearch || filterType !== 'all' || isDateFilterActive
+          ? 'Coba ubah pencarian atau filter Anda'
           : 'Ketuk tombol + untuk membuat aktivitas'}
       </Text>
     </View>
   );
-  
+
   const renderFooter = () => {
-    if (!isLoadingMore) return null;
-    
+    if (!isFetchingNextPage) return null;
+
     return (
       <View style={styles.footerLoader}>
         <Text style={styles.loadingMoreText}>Memuat Lebih Banyak...</Text>
       </View>
     );
   };
-  
-  // Month navigation
+
   const navigateMonth = (direction) => {
     if (direction === 'prev') {
       setSelectedMonth(subMonths(selectedMonth, 1));
     } else {
-      setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1));
+      const nextMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1);
+      setSelectedMonth(nextMonth);
+    }
+  };
+
+  const applyDateFilter = () => {
+    setShowDateFilter(false);
+    setIsDateFilterActive(true);
+    setSpecificDate(null);
+    if (navigation?.setParams) {
+      navigation.setParams({ filterDate: null });
+    }
+  };
+
+  const clearDateFilter = () => {
+    const resetMonth = new Date();
+    setIsDateFilterActive(false);
+    setSelectedMonth(resetMonth);
+    setSpecificDate(null);
+    setShowDateFilter(false);
+    if (navigation?.setParams) {
+      navigation.setParams({ filterDate: null });
     }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        {/* Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchInputContainer}>
             <Ionicons name="search" size={20} color="#7f8c8d" />
@@ -266,86 +307,79 @@ const ActivitiesListScreen = ({ navigation, route }) => {
           <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
             <Ionicons name="search" size={20} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.filterButton, isDateFilterActive && styles.activeFilterButton]} 
+          <TouchableOpacity
+            style={[styles.filterButton, isDateFilterActive && styles.activeFilterButton]}
             onPress={() => setShowDateFilter(true)}
           >
-            <Ionicons name="calendar" size={20} color={isDateFilterActive ? "#fff" : "#3498db"} />
+            <Ionicons name="calendar" size={20} color={isDateFilterActive ? '#fff' : '#3498db'} />
           </TouchableOpacity>
         </View>
-        
-        {/* Active Date Filter Indicator */}
+
         {isDateFilterActive && (
           <View style={styles.activeFilterContainer}>
             <Text style={styles.activeFilterText}>
-              Filter: {filterDate ? 
-                format(new Date(filterDate), 'dd MMMM yyyy', { locale: id }) : 
-                format(selectedMonth, 'MMMM yyyy', { locale: id })
-              }
+              Filter:{' '}
+              {effectiveSpecificDate
+                ? format(new Date(effectiveSpecificDate), 'dd MMMM yyyy', { locale: id })
+                : format(selectedMonth, 'MMMM yyyy', { locale: id })}
             </Text>
             <TouchableOpacity onPress={clearDateFilter}>
               <Ionicons name="close-circle" size={20} color="#e74c3c" />
             </TouchableOpacity>
           </View>
         )}
-        
-        {/* Filter Tabs */}
+
         <View style={styles.filterTabs}>
           <TouchableOpacity
-            style={[
-              styles.filterTab,
-              filterType === 'all' && styles.activeFilterTab
-            ]}
+            style={[styles.filterTab, filterType === 'all' && styles.activeFilterTab]}
             onPress={() => handleFilterChange('all')}
           >
-            <Text style={[
-              styles.filterTabText,
-              filterType === 'all' && styles.activeFilterTabText
-            ]}>
+            <Text
+              style={[
+                styles.filterTabText,
+                filterType === 'all' && styles.activeFilterTabText
+              ]}
+            >
               Semua
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
-            style={[
-              styles.filterTab,
-              filterType === 'Bimbel' && styles.activeFilterTab
-            ]}
+            style={[styles.filterTab, filterType === 'Bimbel' && styles.activeFilterTab]}
             onPress={() => handleFilterChange('Bimbel')}
           >
-            <Text style={[
-              styles.filterTabText,
-              filterType === 'Bimbel' && styles.activeFilterTabText
-            ]}>
+            <Text
+              style={[
+                styles.filterTabText,
+                filterType === 'Bimbel' && styles.activeFilterTabText
+              ]}
+            >
               Bimbel
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
-            style={[
-              styles.filterTab,
-              filterType === 'Kegiatan' && styles.activeFilterTab
-            ]}
+            style={[styles.filterTab, filterType === 'Kegiatan' && styles.activeFilterTab]}
             onPress={() => handleFilterChange('Kegiatan')}
           >
-            <Text style={[
-              styles.filterTabText,
-              filterType === 'Kegiatan' && styles.activeFilterTabText
-            ]}>
+            <Text
+              style={[
+                styles.filterTabText,
+                filterType === 'Kegiatan' && styles.activeFilterTabText
+              ]}
+            >
               Kegiatan
             </Text>
           </TouchableOpacity>
         </View>
-        
-        {/* Error Message */}
-        {error && (
+
+        {errorMessage && (
           <ErrorMessage
-            message={error}
-            onRetry={() => fetchActivities(1)}
+            message={errorMessage}
+            onRetry={handleRefresh}
           />
         )}
-        
-        {/* Activities List */}
+
         <FlatList
           data={activities}
           renderItem={renderActivityItem}
@@ -354,7 +388,7 @@ const ActivitiesListScreen = ({ navigation, route }) => {
           ListEmptyComponent={renderEmptyList}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
+              refreshing={isRefetching}
               onRefresh={handleRefresh}
               colors={['#3498db']}
             />
@@ -363,30 +397,27 @@ const ActivitiesListScreen = ({ navigation, route }) => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           removeClippedSubviews={false}
-          showsVerticalScrollIndicator={true}
+          showsVerticalScrollIndicator
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={10}
         />
-        
-        {/* Create Activity Button */}
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.fab}
           onPress={handleCreateActivity}
         >
           <Ionicons name="add" size={30} color="#fff" />
         </TouchableOpacity>
-        
-        {/* Loading Overlay */}
-        {loading && !refreshing && activities.length === 0 && (
+
+        {isLoading && !isRefetching && activities.length === 0 && (
           <LoadingSpinner fullScreen />
         )}
-        
-        {/* Date Filter Modal */}
+
         <Modal
           visible={showDateFilter}
           animationType="slide"
-          transparent={true}
+          transparent
           onRequestClose={() => setShowDateFilter(false)}
         >
           <View style={styles.modalOverlay}>
@@ -397,41 +428,41 @@ const ActivitiesListScreen = ({ navigation, route }) => {
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.monthSelector}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.monthNavButton}
                   onPress={() => navigateMonth('prev')}
                 >
                   <Ionicons name="chevron-back" size={24} color="#3498db" />
                 </TouchableOpacity>
-                
+
                 <Text style={styles.monthText}>
                   {format(selectedMonth, 'MMMM yyyy', { locale: id })}
                 </Text>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.monthNavButton}
                   onPress={() => navigateMonth('next')}
                   disabled={selectedMonth >= new Date()}
                 >
-                  <Ionicons 
-                    name="chevron-forward" 
-                    size={24} 
-                    color={selectedMonth >= new Date() ? '#ccc' : '#3498db'} 
+                  <Ionicons
+                    name="chevron-forward"
+                    size={24}
+                    color={selectedMonth >= new Date() ? '#ccc' : '#3498db'}
                   />
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.modalButtons}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.modalButton, styles.clearButton]}
                   onPress={clearDateFilter}
                 >
                   <Text style={styles.clearButtonText}>Hapus Filter</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={[styles.modalButton, styles.applyButton]}
                   onPress={applyDateFilter}
                 >

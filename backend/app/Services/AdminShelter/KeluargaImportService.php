@@ -52,6 +52,19 @@ class KeluargaImportService
         'wali' => 'Wali',
     ];
 
+    private const TEMPLATE_HEADERS = [
+        'NAMA ANAK',
+        'NIK',
+        'TTL',
+        'ALAMAT',
+        'JENJANG SEKOLAH',
+        'KELAS',
+        'ALAMAT SEKOLAH',
+        'NAMA IBU',
+        'NAMA AYAH',
+        'DHUAFA/NON DHUAFA',
+    ];
+
     /**
      * Parse spreadsheet rows and validate each line.
      *
@@ -61,6 +74,8 @@ class KeluargaImportService
      */
     public function validateFile(UploadedFile $file, array $context): array
     {
+        $this->assertValidTemplate($file);
+
         $rows = $this->readRows($file);
 
         $summary = [
@@ -180,6 +195,81 @@ class KeluargaImportService
         return $result;
     }
 
+    private function assertValidTemplate(UploadedFile $file): void
+    {
+        $header = $this->readCsvHeaderRow($file);
+
+        if (empty($header)) {
+            throw new \InvalidArgumentException('File import tidak memiliki header atau tidak dapat dibaca.');
+        }
+
+        if (!$this->isTemplateHeaderMatch($header)) {
+            throw new \InvalidArgumentException('Header file tidak sesuai template terbaru. Unduh ulang template dan pastikan kolom-kolomnya persis.');
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function readCsvHeaderRow(UploadedFile $file): array
+    {
+        $path = $file->getRealPath();
+
+        if ($path === false || !is_readable($path)) {
+            return [];
+        }
+
+        $handle = fopen($path, 'rb');
+
+        if ($handle === false) {
+            return [];
+        }
+
+        $row = fgetcsv($handle);
+        fclose($handle);
+
+        if ($row === false) {
+            return [];
+        }
+
+        return array_map([$this, 'cleanHeaderValue'], $row);
+    }
+
+    private function cleanHeaderValue(?string $header): string
+    {
+        if ($header === null) {
+            return '';
+        }
+
+        $header = preg_replace('/^\xEF\xBB\xBF/', '', $header) ?? $header;
+
+        return trim($header);
+    }
+
+    private function isTemplateHeaderMatch(array $header): bool
+    {
+        if (count($header) !== count(self::TEMPLATE_HEADERS)) {
+            return false;
+        }
+
+        foreach ($header as $index => $value) {
+            if ($this->normalizeHeaderForComparison($value) !== $this->normalizeHeaderForComparison(self::TEMPLATE_HEADERS[$index])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function normalizeHeaderForComparison(string $header): string
+    {
+        $normalized = strtoupper($header);
+        $normalized = str_replace(' / ', '/', $normalized);
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+
+        return trim($normalized);
+    }
+
     /**
      * Read rows from spreadsheet with heading row.
      *
@@ -243,7 +333,12 @@ class KeluargaImportService
                 continue;
             }
 
-            $key = Str::snake(trim((string) $header));
+            $key = $this->normalizeHeaderKey((string) $header);
+
+            if ($key === 'ttl') {
+                $this->applyTtlValue($normalized, $value);
+                continue;
+            }
 
             if ($key === 'tanggal_lahir' && is_string($value) && Str::contains($value, ',')) {
                 [$location, $datePart] = array_pad(array_map('trim', explode(',', $value, 2)), 2, null);
@@ -256,6 +351,7 @@ class KeluargaImportService
             $normalized[$key] = $this->cleanValue($key, $value);
         }
 
+        $normalized = $this->applyTemplateAliases($normalized);
         // Merge contextual defaults (shelter assignment etc.)
         $normalized['id_kacab'] = $context['id_kacab'] ?? null;
         $normalized['id_wilbin'] = $context['id_wilbin'] ?? null;
@@ -304,6 +400,114 @@ class KeluargaImportService
         $normalized = $this->applyDefaultValues($normalized);
 
         return $normalized;
+    }
+
+    private function normalizeHeaderKey(string $header): string
+    {
+        $header = preg_replace('/^\xEF\xBB\xBF/', '', $header) ?? $header;
+        $header = strtolower($header);
+        $header = str_replace(['/', '\\'], ' ', $header);
+        $header = preg_replace('/[^a-z0-9]+/', '_', $header) ?? $header;
+
+        return trim($header, '_');
+    }
+
+    private function applyTtlValue(array &$row, $value): void
+    {
+        if ($value === null) {
+            return;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            $row['tanggal_lahir'] = Carbon::instance($value)->format('Y-m-d');
+            return;
+        }
+
+        $raw = is_string($value) ? trim($value) : trim((string) $value);
+
+        if ($raw === '') {
+            return;
+        }
+
+        $raw = preg_replace('/\s+/', ' ', $raw) ?? $raw;
+
+        $location = null;
+        $datePart = $raw;
+
+        if (Str::contains($raw, ',')) {
+            [$location, $datePart] = array_pad(explode(',', $raw, 2), 2, null);
+        }
+
+        $location = $location !== null ? trim($location) : null;
+        $datePart = $datePart !== null ? trim($datePart) : null;
+
+        if (!empty($location) && (empty($row['tempat_lahir']) || $row['tempat_lahir'] === '-')) {
+            $row['tempat_lahir'] = $this->cleanValue('tempat_lahir', $location);
+        }
+
+        if ($datePart === null || $datePart === '') {
+            return;
+        }
+
+        $cleanDate = $this->sanitizeDateComponent($datePart);
+        $normalizedDate = $this->normalizeDateValue($cleanDate);
+
+        if ($normalizedDate !== null) {
+            $row['tanggal_lahir'] = $normalizedDate;
+            return;
+        }
+
+        if (!isset($row['tanggal_lahir'])) {
+            $row['tanggal_lahir'] = $cleanDate;
+        }
+    }
+
+    private function sanitizeDateComponent(string $value): string
+    {
+        $value = trim($value);
+        $value = preg_replace('/\s*([\\/\\-.])\s*/', '$1', $value) ?? $value;
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+
+        return $value;
+    }
+
+    private function applyTemplateAliases(array $row): array
+    {
+        if (isset($row['nama_anak']) && $row['nama_anak'] !== null && $row['nama_anak'] !== '') {
+            if (!isset($row['full_name']) || $row['full_name'] === null || $row['full_name'] === '') {
+                $row['full_name'] = $row['nama_anak'];
+            }
+
+            if (!isset($row['nick_name']) || $row['nick_name'] === null || $row['nick_name'] === '') {
+                $row['nick_name'] = $row['nama_anak'];
+            }
+        }
+
+        if (isset($row['nik']) && $row['nik'] !== null && $row['nik'] !== '') {
+            if (!isset($row['nik_anak']) || $row['nik_anak'] === null || $row['nik_anak'] === '') {
+                $row['nik_anak'] = $row['nik'];
+            }
+        }
+
+        if (isset($row['jenjang_sekolah']) && $row['jenjang_sekolah'] !== null && $row['jenjang_sekolah'] !== '') {
+            if (!isset($row['jenjang']) || $row['jenjang'] === null || $row['jenjang'] === '') {
+                $row['jenjang'] = $row['jenjang_sekolah'];
+            }
+        }
+
+        if (isset($row['nama_ayah']) && $row['nama_ayah'] !== null && $row['nama_ayah'] !== '') {
+            if (!isset($row['kepala_keluarga']) || $row['kepala_keluarga'] === null || $row['kepala_keluarga'] === '') {
+                $row['kepala_keluarga'] = $row['nama_ayah'];
+            }
+        }
+
+        if (isset($row['dhuafa_non_dhuafa']) && $row['dhuafa_non_dhuafa'] !== null && $row['dhuafa_non_dhuafa'] !== '') {
+            if (!isset($row['status_ortu']) || $row['status_ortu'] === null || $row['status_ortu'] === '') {
+                $row['status_ortu'] = $this->cleanValue('status_ortu', $row['dhuafa_non_dhuafa']);
+            }
+        }
+
+        return $row;
     }
 
     /**
@@ -561,10 +765,10 @@ class KeluargaImportService
             'id_kacab' => 'required|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'required|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'required|integer|exists:shelter,id_shelter',
-            'no_kk' => 'required|digits:16',
+            'no_kk' => 'nullable|digits:16',
             'full_name' => 'required|string|max:255',
-            'tanggal_lahir' => 'required|date_format:Y-m-d',
-            'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
+            'tanggal_lahir' => 'nullable|date_format:Y-m-d',
+            'jenis_kelamin' => 'nullable|in:Laki-laki,Perempuan',
         ];
 
         $optionalRules = [
@@ -616,7 +820,6 @@ class KeluargaImportService
             'id_kacab.required' => 'ID Kacab tidak boleh kosong (gunakan konteks admin atau isi kolom).',
             'id_wilbin.required' => 'ID Wilbin tidak boleh kosong.',
             'id_shelter.required' => 'ID Shelter tidak boleh kosong.',
-            'no_kk.required' => 'Nomor KK wajib diisi.',
             'no_kk.digits' => 'Nomor KK harus 16 digit.',
             'kepala_keluarga.required' => 'Nama kepala keluarga wajib diisi.',
             'status_ortu.in' => 'Status orang tua tidak sesuai pilihan sistem.',
@@ -640,6 +843,7 @@ class KeluargaImportService
     private function prepareForPersistence(array $normalized, array $validated, array $context): array
     {
         $payload = $validated;
+        $payload['no_kk'] = $normalized['no_kk'] ?? null;
 
         // Keep additional optional columns
         $optionalKeys = [
@@ -681,7 +885,7 @@ class KeluargaImportService
             'id_kacab' => $payload['id_kacab'] ?? null,
             'id_wilbin' => $payload['id_wilbin'] ?? null,
             'id_shelter' => $payload['id_shelter'] ?? null,
-            'no_kk' => $payload['no_kk'],
+            'no_kk' => $payload['no_kk'] ?? null,
             'kepala_keluarga' => $payload['kepala_keluarga'] ?? null,
             'status_ortu' => $payload['status_ortu'] ?? null,
             'id_bank' => $payload['id_bank'] ?? null,
@@ -691,7 +895,11 @@ class KeluargaImportService
             'an_tlp' => $payload['an_tlp'] ?? null,
         ];
 
-        $existingFamily = Keluarga::where('no_kk', $baseData['no_kk'])->first();
+        $existingFamily = null;
+
+        if (!empty($baseData['no_kk'])) {
+            $existingFamily = Keluarga::where('no_kk', $baseData['no_kk'])->first();
+        }
 
         if ($existingFamily) {
             $updateData = $this->filterData($baseData);
@@ -853,7 +1061,7 @@ class KeluargaImportService
             $child = $childQuery->where('nik_anak', $payload['nik_anak'])->first();
         } else {
             $normalizedName = Str::lower($payload['full_name']);
-            $incomingDate = $this->normalizeDateValue($payload['tanggal_lahir']);
+            $incomingDate = $this->normalizeDateValue($payload['tanggal_lahir'] ?? null);
 
             $candidates = $childQuery
                 ->where(function ($query) {
@@ -886,8 +1094,8 @@ class KeluargaImportService
             'full_name' => $payload['full_name'],
             'agama' => $payload['agama'] ?? null,
             'tempat_lahir' => $payload['tempat_lahir'] ?? null,
-            'tanggal_lahir' => $payload['tanggal_lahir'],
-            'jenis_kelamin' => $payload['jenis_kelamin'],
+            'tanggal_lahir' => $payload['tanggal_lahir'] ?? null,
+            'jenis_kelamin' => $payload['jenis_kelamin'] ?? null,
             'tinggal_bersama' => $payload['tinggal_bersama'] ?? null,
             'hafalan' => $payload['hafalan'] ?? null,
             'pelajaran_favorit' => $payload['pelajaran_favorit'] ?? null,

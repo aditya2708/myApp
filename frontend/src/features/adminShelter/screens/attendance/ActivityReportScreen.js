@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
   Alert, ActivityIndicator
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
 
@@ -40,78 +41,140 @@ const ActivityReportScreen = ({ navigation, route }) => {
   const [sharedCampaign, setSharedCampaign] = useState(null);
   
   // Debug logging
-  console.log('ActivityReportScreen state:', { 
-    showCampaignModal, 
-    hasSharedCampaign, 
-    sharedCampaign: !!sharedCampaign 
+  console.log('ActivityReportScreen state:', {
+    showCampaignModal,
+    hasSharedCampaign,
+    sharedCampaign: !!sharedCampaign
   });
-  
-  // Check if report already exists when component mounts
+
+  const resolveReportPayload = useCallback((payload) => (
+    payload?.data && typeof payload.data === 'object' ? payload.data : payload
+  ), []);
+
+  const cacheMeta = useMemo(() => {
+    if (!cachedReportEntry) {
+      return null;
+    }
+
+    const fetchedAt = cachedReportEntry.fetchedAt ?? 0;
+    const cacheAge = Date.now() - fetchedAt;
+    const ttl = cachedReportEntry.status === 'error'
+      ? ACTIVITY_REPORT_ERROR_RETRY_DELAY
+      : ACTIVITY_REPORT_CACHE_TTL;
+
+    return {
+      cacheAge,
+      ttl,
+      isFresh: cacheAge < ttl,
+    };
+  }, [cachedReportEntry]);
+
+  const shouldSkipFetch = cacheMeta?.isFresh ?? false;
+
+  const initialReportData = useMemo(() => {
+    if (!cachedReportEntry) {
+      return undefined;
+    }
+
+    return {
+      status: cachedReportEntry.status || null,
+      data: cachedReportEntry.data || null,
+    };
+  }, [cachedReportEntry]);
+
+  const reportStatusQuery = useQuery({
+    queryKey: ['adminShelterActivityReportStatus', id_aktivitas],
+    enabled: !!id_aktivitas && !shouldSkipFetch,
+    initialData: initialReportData,
+    initialDataUpdatedAt: cachedReportEntry?.fetchedAt,
+    staleTime: ACTIVITY_REPORT_CACHE_TTL,
+    gcTime: ACTIVITY_REPORT_CACHE_TTL,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+    queryFn: async () => {
+      if (!id_aktivitas) {
+        return { status: 'missing', data: null };
+      }
+
+      try {
+        const reportPayload = await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
+        const reportData = resolveReportPayload(reportPayload);
+        return {
+          status: reportData ? 'exists' : 'missing',
+          data: reportData,
+        };
+      } catch (err) {
+        const statusCode = err?.status || err?.response?.status || err?.originalStatus;
+        const rawMessage = typeof err === 'string' ? err : err?.message;
+        const normalizedMessage = typeof rawMessage === 'string' ? rawMessage.toLowerCase() : '';
+        const isNotFound =
+          statusCode === 404 ||
+          normalizedMessage.includes('tidak ditemukan') ||
+          normalizedMessage.includes('not found');
+
+        if (isNotFound) {
+          return {
+            status: 'missing',
+            data: null,
+          };
+        }
+
+        console.error('Error fetching activity report:', err);
+        return {
+          status: 'error',
+          data: null,
+          error: err,
+        };
+      }
+    },
+  });
+
+  const reportStatusData = reportStatusQuery.data;
+  const hasNavigatedRef = useRef(false);
+
   useEffect(() => {
     if (!id_aktivitas) {
       setCheckingExisting(false);
       return;
     }
 
-    const now = Date.now();
-    const cacheEntry = cachedReportEntry;
+    const status = reportStatusData?.status;
 
-    if (cacheEntry) {
-      const cacheAge = cacheEntry.fetchedAt ? now - cacheEntry.fetchedAt : Number.POSITIVE_INFINITY;
-      const cacheTtl = cacheEntry.status === 'error'
-        ? ACTIVITY_REPORT_ERROR_RETRY_DELAY
-        : ACTIVITY_REPORT_CACHE_TTL;
-
-      if (cacheEntry.status === 'exists' && cacheEntry.data && cacheAge < cacheTtl) {
-        navigation.replace('ViewReportScreen', {
-          report: cacheEntry.data,
-          activityName,
-          activityDate
-        });
-        return;
-      }
-
-      if ((cacheEntry.status === 'missing' || cacheEntry.status === 'error') && cacheAge < cacheTtl) {
-        setCheckingExisting(false);
-        return;
-      }
+    if (status === 'exists' && reportStatusData?.data && !hasNavigatedRef.current) {
+      hasNavigatedRef.current = true;
+      navigation.replace('ViewReportScreen', {
+        report: reportStatusData.data,
+        activityName,
+        activityDate
+      });
+      return;
     }
 
-    let isActive = true;
+    if (
+      status === 'missing' ||
+      status === 'error' ||
+      (!reportStatusQuery.isFetching && status)
+    ) {
+      setCheckingExisting(false);
+    }
 
-    const resolveReportPayload = (payload) => (
-      payload?.data && typeof payload.data === 'object' ? payload.data : payload
-    );
+    if (reportStatusQuery.isError) {
+      setCheckingExisting(false);
+    }
 
-    const checkExistingReport = async () => {
-      try {
-        const reportPayload = await dispatch(fetchActivityReport(id_aktivitas)).unwrap();
-        if (!isActive) return;
-
-        const reportData = resolveReportPayload(reportPayload);
-        navigation.replace('ViewReportScreen', {
-          report: reportData,
-          activityName,
-          activityDate
-        });
-      } catch (err) {
-        if (!isActive) return;
-        setCheckingExisting(false);
-      }
-    };
-    
-    checkExistingReport();
-
-    return () => {
-      isActive = false;
-    };
+    if (shouldSkipFetch && !status) {
+      setCheckingExisting(false);
+    }
   }, [
     id_aktivitas,
-    cachedReportEntry,
-    dispatch,
-    navigation,
     activityName,
-    activityDate
+    activityDate,
+    navigation,
+    reportStatusData,
+    reportStatusQuery.isFetching,
+    reportStatusQuery.isError,
+    shouldSkipFetch
   ]);
   
   // Show loading while checking existing report

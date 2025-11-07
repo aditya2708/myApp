@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 
 import Button from '../../../common/components/Button';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
@@ -26,83 +27,94 @@ const KelompokDetailScreen = () => {
   
   const { id } = route.params || {};
   
-  const [kelompok, setKelompok] = useState(null);
-  const [children, setChildren] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  
-  // Supporting data for kelas gabungan display
-  const [availableKelas, setAvailableKelas] = useState([]);
-  
-  const fetchKelompokDetails = async () => {
-    try {
-      setError(null);
-      
+  const {
+    data: kelompokData,
+    error: detailError,
+    isLoading,
+    isRefetching,
+    refetch: refetchKelompok,
+  } = useQuery({
+    queryKey: ['adminShelterKelompokDetail', id],
+    enabled: !!id,
+    queryFn: async () => {
       const response = await adminShelterKelompokApi.getKelompokDetail(id);
+      const payload = response?.data || {};
       
-      if (response.data.success) {
-        const kelompokData = response.data.data;
-        setKelompok(kelompokData);
-        setChildren(kelompokData.anak || []);
-        navigation.setOptions({ 
-          headerTitle: kelompokData.nama_kelompok || 'Detail Kelompok' 
-        });
-      } else {
-        setError(response.data.message || 'Failed to load group details');
+      if (!payload.success) {
+        throw new Error(payload.message || 'Failed to load group details');
       }
-    } catch (err) {
-      console.error('Error fetching kelompok details:', err);
-      setError('Failed to load group details. Please try again.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+      
+      return payload.data;
+    },
+  });
 
-  // Fetch available kelas for displaying kelas gabungan info
-  const fetchAvailableKelas = async () => {
-    try {
+  const {
+    data: availableKelasData,
+    isFetching: isFetchingAvailableKelas,
+    refetch: refetchAvailableKelas,
+  } = useQuery({
+    queryKey: ['adminShelterAvailableKelas'],
+    queryFn: async () => {
       const response = await adminShelterKelompokApi.getAvailableKelas();
-      if (response.data.success) {
-        setAvailableKelas(response.data.data.kelas_list || []);
+      const payload = response?.data || {};
+      
+      if (!payload.success) {
+        throw new Error(payload.message || 'Failed to load available kelas');
       }
-    } catch (err) {
-      console.error('Error fetching available kelas:', err);
+      
+      return payload.data?.kelas_list || [];
+    },
+  });
+  
+  const kelompok = kelompokData || null;
+  const children = React.useMemo(() => kelompok?.anak || [], [kelompok]);
+  const availableKelas = React.useMemo(
+    () => availableKelasData || [],
+    [availableKelasData]
+  );
+
+  const errorMessage = React.useMemo(() => {
+    if (!detailError) {
+      return null;
     }
-  };
+    const apiMessage = detailError.response?.data?.message;
+    return apiMessage || detailError.message || 'Failed to load group details. Please try again.';
+  }, [detailError]);
+
+  const loading = isLoading && !kelompok;
+  const refreshing = (isRefetching || isFetchingAvailableKelas) && !!kelompok;
+
+  const handleRefresh = React.useCallback(() => {
+    refetchKelompok();
+    refetchAvailableKelas();
+  }, [refetchKelompok, refetchAvailableKelas]);
   
   useEffect(() => {
-    if (id) {
-      Promise.all([
-        fetchKelompokDetails(),
-        fetchAvailableKelas()
-      ]);
+    if (kelompok?.nama_kelompok) {
+      navigation.setOptions({
+        headerTitle: kelompok.nama_kelompok,
+      });
     }
-  }, [id]);
+  }, [kelompok?.nama_kelompok, navigation]);
   
-  // Handle refresh when coming back from AddChildrenToKelompok
   useEffect(() => {
     if (route.params?.refresh) {
       handleRefresh();
-      // Reset the refresh param
       navigation.setParams({ refresh: false });
     }
-  }, [route.params?.refresh]);
-  
-  const handleRefresh = () => {
-    setRefreshing(true);
-    Promise.all([
-      fetchKelompokDetails(),
-      fetchAvailableKelas()
-    ]);
-  };
+  }, [route.params?.refresh, handleRefresh, navigation]);
   
   const handleEditKelompok = () => {
+    if (!kelompok) {
+      return;
+    }
     navigation.navigate('KelompokForm', { kelompok });
   };
   
   const handleDeleteKelompok = () => {
+    if (!kelompok) {
+      return;
+    }
     Alert.alert(
       'Hapus Kelompok',
       `Apakah Anda yakin ingin menghapus ${kelompok.nama_kelompok}?`,
@@ -113,15 +125,12 @@ const KelompokDetailScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              setLoading(true);
-              
               if (children.length > 0) {
                 Alert.alert(
                   'Tidak Dapat Menghapus',
                   'Kelompok ini masih memiliki anak binaan. Pindahkan semua anak terlebih dahulu.',
                   [{ text: 'OK' }]
                 );
-                setLoading(false);
                 return;
               }
               
@@ -139,13 +148,11 @@ const KelompokDetailScreen = () => {
                   ]
                 );
               } else {
-                setError(response.data.message || 'Failed to delete group');
-                setLoading(false);
+                Alert.alert('Error', response.data.message || 'Failed to delete group');
               }
             } catch (err) {
               console.error('Error deleting kelompok:', err);
-              setError('Failed to delete group. Please try again.');
-              setLoading(false);
+              Alert.alert('Error', 'Failed to delete group. Please try again.');
             }
           }
         }
@@ -164,23 +171,19 @@ const KelompokDetailScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              setLoading(true);
-              
               const response = await adminShelterKelompokApi.removeAnak(
                 id,
                 child.id_anak
               );
               
               if (response.data.success) {
-                handleRefresh();
+                await refetchKelompok();
               } else {
-                setError(response.data.message || 'Failed to remove child');
-                setLoading(false);
+                Alert.alert('Error', response.data.message || 'Failed to remove child');
               }
             } catch (err) {
               console.error('Error removing child:', err);
-              setError('Failed to remove child. Please try again.');
-              setLoading(false);
+              Alert.alert('Error', 'Failed to remove child. Please try again.');
             }
           }
         }
@@ -189,9 +192,12 @@ const KelompokDetailScreen = () => {
   };
   
   const handleAddChildren = () => {
+    if (!kelompok) {
+      return;
+    }
     navigation.navigate('AddChildrenToKelompok', {
       kelompokId: id,
-      kelompokName: kelompok?.nama_kelompok,
+      kelompokName: kelompok.nama_kelompok,
       shelterId: kelompok?.shelter?.id_shelter || profile?.shelter?.id_shelter
     });
   };
@@ -323,10 +329,10 @@ const KelompokDetailScreen = () => {
     </View>
   );
   
-  if (loading && !refreshing) {
+  if (loading) {
     return <LoadingSpinner fullScreen message="Memuat detail kelompok..." />;
   }
-  
+
   return (
     <ScrollView 
       style={styles.container}
@@ -335,9 +341,9 @@ const KelompokDetailScreen = () => {
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
-      {error && (
+      {errorMessage && (
         <ErrorMessage
-          message={error}
+          message={errorMessage}
           onRetry={handleRefresh}
         />
       )}
