@@ -17,12 +17,14 @@ const initialState = {
   actionStatus: {
     create: 'idle',
     update: 'idle',
-    delete: 'idle'
+    delete: 'idle',
+    toggle: 'idle',
   },
   actionError: {
     create: null,
     update: null,
-    delete: null
+    delete: null,
+    toggle: null,
   }
 };
 
@@ -90,6 +92,20 @@ export const deleteTutor = createAsyncThunk(
       return { id, response: response.data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete tutor');
+    }
+  }
+);
+
+export const toggleTutorStatus = createAsyncThunk(
+  'tutor/toggleTutorStatus',
+  async ({ id, isActive }, { rejectWithValue }) => {
+    try {
+      const response = await adminShelterTutorApi.toggleTutorStatus(id, {
+        is_active: isActive,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update tutor status');
     }
   }
 );
@@ -218,6 +234,28 @@ const tutorSlice = createSlice({
       .addCase(deleteTutor.rejected, (state, action) => {
         state.actionStatus.delete = 'failed';
         state.actionError.delete = action.payload || 'Failed to delete tutor';
+      })
+      
+    // Toggle Tutor Status
+      .addCase(toggleTutorStatus.pending, (state) => {
+        state.actionStatus.toggle = 'loading';
+      })
+      .addCase(toggleTutorStatus.fulfilled, (state, action) => {
+        state.actionStatus.toggle = 'succeeded';
+        const updatedTutor = action.payload.data;
+
+        const index = state.tutorList.findIndex(t => t.id_tutor === updatedTutor.id_tutor);
+        if (index !== -1) {
+          state.tutorList[index] = updatedTutor;
+        }
+
+        if (state.selectedTutor && state.selectedTutor.id_tutor === updatedTutor.id_tutor) {
+          state.selectedTutor = updatedTutor;
+        }
+      })
+      .addCase(toggleTutorStatus.rejected, (state, action) => {
+        state.actionStatus.toggle = 'failed';
+        state.actionError.toggle = action.payload || 'Failed to update tutor status';
       });
   }
 });

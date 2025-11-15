@@ -15,8 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
 import { adminCabangApi } from '../api/adminCabangApi';
-import { adminCabangSurveyApi } from '../api/adminCabangSurveyApi';
-import { adminCabangDonaturApi } from '../api/adminCabangDonaturApi';
 import { useAuth } from '../../../common/hooks/useAuth';
 import DonationAdModal from '../../../common/components/DonationAdModal';
 import { useDonationAd } from '../../../common/hooks/useDonationAd';
@@ -27,8 +25,6 @@ const AdminCabangDashboardScreen = () => {
   const navigation = useNavigation();
   const { user, profile } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
-  const [surveyStats, setSurveyStats] = useState({});
-  const [donaturStats, setDonaturStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -43,14 +39,8 @@ const AdminCabangDashboardScreen = () => {
   const fetchDashboardData = async () => {
     try {
       setError(null);
-      const [dashboardResponse, statsResponse, donaturStatsResponse] = await Promise.all([
-        adminCabangApi.getDashboard(),
-        adminCabangSurveyApi.getStats(),
-        adminCabangDonaturApi.getStats()
-      ]);
+      const dashboardResponse = await adminCabangApi.getDashboard();
       setDashboardData(dashboardResponse.data.data);
-      setSurveyStats(statsResponse.data.data);
-      setDonaturStats(donaturStatsResponse.data.data);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Gagal memuat data dashboard. Silakan coba lagi.');
@@ -78,6 +68,8 @@ const AdminCabangDashboardScreen = () => {
 
   if (loading && !refreshing) return <LoadingSpinner fullScreen message="Memuat dashboard..." />;
 
+  const summary = dashboardData?.summary || {};
+
   const quickActions = [
     { 
       title: 'Manajemen Survey', 
@@ -85,7 +77,7 @@ const AdminCabangDashboardScreen = () => {
       icon: 'document-text', 
       color: '#f39c12', 
       onPress: navigateToSurveyManagement, 
-      badge: surveyStats.pending 
+      badge: summary.pending_surveys 
     },
     {
       title: 'Manajemen Donatur',
@@ -93,7 +85,7 @@ const AdminCabangDashboardScreen = () => {
       icon: 'people',
       color: '#3498db',
       onPress: navigateToDonaturManagement,
-      badge: donaturStats.total_donatur
+      badge: summary.donatur
     },
     {
       title: 'Manajemen Pengguna',
@@ -125,15 +117,17 @@ const AdminCabangDashboardScreen = () => {
       icon: 'location', 
       color: '#e74c3c', 
       onPress: navigateToGpsApproval, 
-      badge: dashboardData?.pending_gps_requests || null 
+      badge: summary.pending_gps_requests || null 
     }
   ];
 
   const statsData = [
-    { icon: 'map-outline', color: '#2ecc71', value: dashboardData?.wilbin_count || 0, label: 'Wilayah Binaan' },
-    { icon: 'home-outline', color: '#e74c3c', value: dashboardData?.shelter_count || 0, label: 'Shelter' },
-    { icon: 'people-outline', color: '#3498db', value: donaturStats.total_donatur || 0, label: 'Donatur' },
-    { icon: 'document-text-outline', color: '#f39c12', value: surveyStats.pending || 0, label: 'Survey Tertunda' }
+    { icon: 'map-outline', color: '#2ecc71', value: summary.wilayah || 0, label: 'Wilayah Binaan' },
+    { icon: 'home-outline', color: '#e74c3c', value: summary.shelter || 0, label: 'Shelter' },
+    { icon: 'people-outline', color: '#3498db', value: summary.donatur || 0, label: 'Donatur' },
+    { icon: 'document-text-outline', color: '#f39c12', value: summary.pending_surveys || 0, label: 'Survey Tertunda' },
+    { icon: 'school-outline', color: '#8e44ad', value: summary.total_children || 0, label: 'Total Anak' },
+    { icon: 'person-outline', color: '#16a085', value: summary.total_tutors || 0, label: 'Total Tutor' }
   ];
 
   const StatCard = ({ icon, color, value, label }) => (

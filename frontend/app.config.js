@@ -56,13 +56,23 @@ export default {
           locationAlwaysAndWhenInUsePermission: "This app uses location to verify attendance at shelter activities."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-build-properties",
+        {
+          android: {
+            enableProguardInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+            useLegacyPackaging: true
+          }
+        }
+      ]
     ],
     extra: {
       eas: {
-        projectId: "2e83c4d0-499c-413b-ad59-f173fff2ae4f"
+        // projectId: "2e83c4d0-499c-413b-ad59-f173fff2ae4f"
+        "projectId": "6f64b611-69a2-400f-b9b0-8ca4cc19045a"
       }
-    },
-    owner: "aditya2708"
+    }
   }
 };

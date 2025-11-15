@@ -65,6 +65,18 @@ export const adminShelterTutorApi = {
   },
 
   /**
+   * Toggle tutor active status
+   * @param {number|string} tutorId
+   * @param {Object} payload - { is_active: boolean }
+   */
+  toggleTutorStatus: async (tutorId, payload) => {
+    return await api.patch(
+      ADMIN_SHELTER_ENDPOINTS.TUTOR.TOGGLE_STATUS(tutorId),
+      payload
+    );
+  },
+
+  /**
  * Get active tutors for dropdown selection
  * @param {Object} params - Query parameters (optional)
  * @returns {Promise} - API response with active tutors data

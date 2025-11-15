@@ -24,6 +24,8 @@ import AdminCabangReportHomeScreen from '../features/adminCabang/screens/reports
 import AdminCabangChildReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildReportScreen';
 import AdminCabangChildReportDetailScreen from '../features/adminCabang/screens/reports/child/AdminCabangChildReportDetailScreen';
 import AdminCabangTutorReportScreen from '../features/adminCabang/screens/reports/AdminCabangTutorReportScreen';
+import AdminCabangAchievementReport from '../features/adminCabang/screens/reports/AdminCabangAchievementReport';
+import AdminCabangActivityReport from '../features/adminCabang/screens/reports/AdminCabangActivityReport';
 
 // Kurikulum screens
 import KurikulumHomeScreen from '../features/adminCabang/screens/kurikulum/KurikulumHomeScreen';
@@ -52,7 +54,7 @@ const DashboardStackNavigator = () => (
     <DashboardStack.Screen
       name="DashboardHome"
       component={AdminCabangDashboardScreen}
-      options={{ headerTitle: 'Dashboard' }}
+      options={{ headerTitle: 'Dashboard Cabang' }}
     />
     <DashboardStack.Screen
       name="SurveyStatusFilter"
@@ -220,6 +222,16 @@ const ReportsStackNavigator = () => (
       component={AdminCabangTutorReportScreen}
       options={{ headerTitle: 'Laporan Tutor' }}
     />
+    <ReportsStack.Screen
+      name="AdminCabangAchievementReport"
+      component={AdminCabangAchievementReport}
+      options={{ headerTitle: 'Laporan Pencapaian Anak' }}
+    />
+    <ReportsStack.Screen
+      name="AdminCabangActivityReport"
+      component={AdminCabangActivityReport}
+      options={{ headerTitle: 'Laporan Kegiatan' }}
+    />
   </ReportsStack.Navigator>
 );
 
@@ -274,4 +286,3 @@ const AdminCabangNavigator = () => (
 );
 
 export default AdminCabangNavigator;
-

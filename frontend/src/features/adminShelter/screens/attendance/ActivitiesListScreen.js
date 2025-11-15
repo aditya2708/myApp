@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -52,6 +53,25 @@ const ActivitiesListScreen = ({ navigation, route }) => {
       setSpecificDate(null);
     }
   }, [routeFilterDate]);
+
+  // Auto-refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // Refresh data when screen is focused to ensure we have the latest data
+      const refreshData = async () => {
+        try {
+          await queryClient.invalidateQueries({ queryKey: ['adminShelterAktivitasList'] });
+        } catch (error) {
+          console.warn('Failed to refresh data on focus:', error);
+        }
+      };
+
+      // Small delay to ensure navigation is complete
+      const timeoutId = setTimeout(refreshData, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }, [queryClient])
+  );
 
   const trimmedSearch = useMemo(() => appliedSearch.trim(), [appliedSearch]);
   const monthKey = useMemo(
@@ -209,8 +229,7 @@ const ActivitiesListScreen = ({ navigation, route }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await dispatch(deleteAktivitas(id)).unwrap();
-              await queryClient.invalidateQueries({ queryKey: ['adminShelterAktivitasList'] });
+              await dispatch(deleteAktivitas({ id, queryClient })).unwrap();
               Alert.alert('Berhasil', 'Aktivitas berhasil dihapus');
             } catch (err) {
               const message =
@@ -218,6 +237,13 @@ const ActivitiesListScreen = ({ navigation, route }) => {
                 err?.message ||
                 'Gagal menghapus aktivitas';
               Alert.alert('Error', message);
+              
+              // Fallback: If Redux action fails, try to refresh React Query directly
+              try {
+                await queryClient.invalidateQueries({ queryKey: ['adminShelterAktivitasList'] });
+              } catch (fallbackError) {
+                console.warn('Fallback refresh failed:', fallbackError);
+              }
             }
           },
         },

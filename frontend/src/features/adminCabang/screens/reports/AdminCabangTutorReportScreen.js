@@ -440,31 +440,12 @@ const AdminCabangTutorReportScreen = () => {
           ) : null}
         </View>
 
-        <TutorAttendanceSummary summary={attendanceSummary} />
+        <TutorAttendanceSummary
+          summary={attendanceSummary}
+          style={styles.summaryRow}
+        />
 
         <Text style={styles.filterStatusText}>{filterSummaryText}</Text>
-
-        <TouchableOpacity
-          style={[
-            styles.inlineFilterButton,
-            filtersActive && styles.inlineFilterButtonActive,
-          ]}
-          onPress={handleOpenFilters}
-        >
-          <Ionicons
-            name="options-outline"
-            size={16}
-            color={filtersActive ? '#ffffff' : '#2563eb'}
-          />
-          <Text
-            style={[
-              styles.inlineFilterButtonText,
-              filtersActive && styles.inlineFilterButtonTextActive,
-            ]}
-          >
-            Kelola Filter
-          </Text>
-        </TouchableOpacity>
       </View>
     );
   }, [
@@ -574,6 +555,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
   },
+  summaryRow: {
+    marginTop: 12,
+  },
   pageMetaText: {
     fontSize: 12,
     color: '#94a3b8',
@@ -609,30 +593,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#ffffff',
-  },
-  inlineFilterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    backgroundColor: '#f8fbff',
-    gap: 8,
-  },
-  inlineFilterButtonActive: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
-  },
-  inlineFilterButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2563eb',
-  },
-  inlineFilterButtonTextActive: {
-    color: '#ffffff',
   },
 });
 

@@ -158,8 +158,8 @@ class AktivitasController extends Controller
             // Default pagination
             $perPage = $request->per_page ?? 10;
             
-            // Order by date (most recent first)
-            $aktivitas = $query->orderBy('tanggal', 'desc')->paginate($perPage);
+            // Order by date (most recent first), then by ID (most recent created first)
+            $aktivitas = $query->orderBy('tanggal', 'desc')->orderBy('id_aktivitas', 'desc')->paginate($perPage);
             
             // Add kurikulum integration info to each activity (only for activities with id_materi)
             $aktivitas->getCollection()->transform(function ($activity) {
@@ -238,6 +238,13 @@ class AktivitasController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => 'Invalid tutor selected. Tutor must belong to your shelter.'
+                    ], 400);
+                }
+
+                if (!$tutor->is_active) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Tutor sedang nonaktif dan tidak dapat dipilih.'
                     ], 400);
                 }
             }
@@ -508,15 +515,22 @@ class AktivitasController extends Controller
             }
             
             // Validate tutor belongs to the same shelter if provided
-            if ($request->id_tutor) {
-                $tutor = Tutor::find($request->id_tutor);
-                if (!$tutor || $tutor->id_shelter != $shelterId) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Invalid tutor selected. Tutor must belong to your shelter.'
-                    ], 400);
-                }
+        if ($request->id_tutor) {
+            $tutor = Tutor::find($request->id_tutor);
+            if (!$tutor || $tutor->id_shelter != $shelterId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid tutor selected. Tutor must belong to your shelter.'
+                ], 400);
             }
+
+            if (!$tutor->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tutor sedang nonaktif dan tidak dapat dipilih.'
+                ], 400);
+            }
+        }
             
             $kegiatan = Kegiatan::find($request->id_kegiatan);
             if (!$kegiatan) {
@@ -611,6 +625,7 @@ class AktivitasController extends Controller
                     }
                 }
             } else {
+                // For "Kegiatan" type, set empty values
                 $aktivitas->nama_kelompok = '';
                 $aktivitas->level = '';
                 $aktivitas->id_materi = null;
@@ -880,7 +895,7 @@ class AktivitasController extends Controller
 
             // Pagination
             $perPage = $request->get('per_page', 15);
-            $aktivitas = $query->orderBy('tanggal', 'desc')->paginate($perPage);
+            $aktivitas = $query->orderBy('tanggal', 'desc')->orderBy('id_aktivitas', 'desc')->paginate($perPage);
 
             // Add kurikulum info
             $aktivitas->getCollection()->transform(function ($activity) {
@@ -964,7 +979,7 @@ class AktivitasController extends Controller
 
             // Pagination
             $perPage = $request->get('per_page', 15);
-            $aktivitas = $query->orderBy('tanggal', 'desc')->paginate($perPage);
+            $aktivitas = $query->orderBy('tanggal', 'desc')->orderBy('id_aktivitas', 'desc')->paginate($perPage);
 
             // Usage statistics
             $stats = [

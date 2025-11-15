@@ -142,9 +142,20 @@ export const fetchKelompokByName = createAsyncThunk(
 
 export const createAktivitas = createAsyncThunk(
   'aktivitas/create',
-  async (aktivitasData, { rejectWithValue }) => {
+  async ({ aktivitasData, queryClient }, { rejectWithValue }) => {
     try {
       const response = await aktivitasApi.createAktivitas(aktivitasData);
+      
+      // Invalidate React Query cache to refresh the list
+      try {
+        if (queryClient) {
+          await queryClient.invalidateQueries({ queryKey: ['adminShelterAktivitasList'] });
+        }
+      } catch (invalidateError) {
+        console.warn('Failed to invalidate React Query cache:', invalidateError);
+        // Don't fail the action if invalidation fails
+      }
+      
       return response.data;
     } catch (error) {
       // Preserve full error response for conflict handling
@@ -160,9 +171,20 @@ export const createAktivitas = createAsyncThunk(
 
 export const updateAktivitas = createAsyncThunk(
   'aktivitas/update',
-  async ({ id, aktivitasData }, { rejectWithValue }) => {
+  async ({ id, aktivitasData, queryClient }, { rejectWithValue }) => {
     try {
       const response = await aktivitasApi.updateAktivitas(id, aktivitasData);
+      
+      // Invalidate React Query cache to refresh the list
+      try {
+        if (queryClient) {
+          await queryClient.invalidateQueries({ queryKey: ['adminShelterAktivitasList'] });
+        }
+      } catch (invalidateError) {
+        console.warn('Failed to invalidate React Query cache:', invalidateError);
+        // Don't fail the action if invalidation fails
+      }
+      
       return response.data;
     } catch (error) {
       // Preserve full error response for conflict handling
@@ -197,9 +219,20 @@ export const updateAktivitasStatus = createAsyncThunk(
 
 export const deleteAktivitas = createAsyncThunk(
   'aktivitas/delete',
-  async (id, { rejectWithValue }) => {
+  async ({ id, queryClient }, { rejectWithValue }) => {
     try {
       const response = await aktivitasApi.deleteAktivitas(id);
+      
+      // Invalidate React Query cache to refresh the list
+      try {
+        if (queryClient) {
+          await queryClient.invalidateQueries({ queryKey: ['adminShelterAktivitasList'] });
+        }
+      } catch (invalidateError) {
+        console.warn('Failed to invalidate React Query cache:', invalidateError);
+        // Don't fail the action if invalidation fails
+      }
+      
       return { id, data: response.data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Gagal menghapus aktivitas');

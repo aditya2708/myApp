@@ -26,6 +26,7 @@ import {
   MANUAL_ATTENDANCE_ACTIVITY_SET,
   MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET,
 } from '../../constants/activityTypes';
+import { isActivityCompleted, blockIfCompleted } from '../../utils/activityStatusHelper';
 
 const STATUS_COLOR_MAP = {
   absent: '#e74c3c',
@@ -46,7 +47,7 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
   
   const { 
-    id_aktivitas, activityName, activityDate, kelompokId, kelompokIds, kelompokName, activityType 
+    id_aktivitas, activityName, activityDate, kelompokId, kelompokIds, kelompokName, activityType, activityStatus 
   } = route.params || {};
   
   const loading = useSelector(selectAttendanceLoading);
@@ -286,6 +287,14 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
       );
     }
   }, [effectiveActivityType, isManualEligible, navigation]);
+
+  // Check if activity is completed and block access
+  useEffect(() => {
+    const effectiveActivityStatus = activityStatus || activityDetails?.status;
+    if (blockIfCompleted(effectiveActivityStatus, navigation, 'absen manual')) {
+      return;
+    }
+  }, [activityStatus, activityDetails?.status, navigation]);
   
   const updateExpectedStatus = () => {
     if (!activityDetails || !arrivalTime) return;

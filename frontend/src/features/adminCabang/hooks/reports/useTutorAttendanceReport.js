@@ -1,95 +1,72 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { adminCabangReportApi } from '../../api/adminCabangReportApi';
 
-const createInitialState = () => ({
-  data: [],
-  summary: null,
-  meta: {},
-});
+const REPORT_QUERY_KEY = 'adminCabangTutorAttendanceReport';
+
+const parseReportPayload = (response) => {
+  const payload = response?.data ?? response ?? {};
+  const tutors = Array.isArray(payload.data) ? payload.data : payload.tutors ?? [];
+  const summary = typeof payload.summary === 'object' || payload.summary === null
+    ? payload.summary
+    : null;
+  const meta = payload.meta ?? payload.metadata ?? {};
+
+  return {
+    tutors,
+    summary,
+    meta,
+  };
+};
 
 export const useTutorAttendanceReport = (initialParams = {}) => {
   const initialParamsRef = useRef({ ...initialParams });
-  const paramsRef = useRef({ ...initialParamsRef.current });
-
-  const [state, setState] = useState(createInitialState);
-  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState(() => ({ ...initialParamsRef.current }));
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
 
-  const fetchReport = useCallback(
-    async (overrides = {}, { replace = false, isRefresh = false } = {}) => {
-      const nextParams = replace
-        ? { ...initialParamsRef.current, ...overrides }
-        : { ...paramsRef.current, ...overrides };
-
-      paramsRef.current = nextParams;
-
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      try {
-        const response = await adminCabangReportApi.getTutorAttendanceReport(nextParams);
-        const payload = response?.data ?? response ?? {};
-        const nextData = payload.data ?? [];
-        const { meta: payloadMeta, metadata: legacyMetadata } = payload || {};
-
-        const summaryPayload = typeof payload.summary === 'object' || payload.summary === null
-          ? payload.summary
-          : null;
-
-        setState({
-          data: nextData,
-          summary: summaryPayload,
-          meta: payloadMeta ?? legacyMetadata ?? {},
-        });
-
-        setError(null);
-      } catch (err) {
-        setError(err);
-      } finally {
-        if (isRefresh) {
-          setRefreshing(false);
-        }
-        setLoading(false);
-      }
-    },
-    [],
+  const queryKey = useMemo(
+    () => [REPORT_QUERY_KEY, filters],
+    [filters],
   );
 
-  useEffect(() => {
-    paramsRef.current = { ...initialParamsRef.current };
-    fetchReport(paramsRef.current, { replace: true });
-  }, [fetchReport]);
+  const {
+    data: report,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: () => adminCabangReportApi.getTutorAttendanceReport(filters),
+    select: parseReportPayload,
+    keepPreviousData: true,
+  });
 
-  const refetch = useCallback(
-    () => fetchReport({}, { replace: false }),
-    [fetchReport],
-  );
+  const loading = (isLoading || isFetching) && !refreshing;
 
-  const refresh = useCallback(
-    () => fetchReport({}, { replace: false, isRefresh: true }),
-    [fetchReport],
-  );
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
-  const updateFilters = useCallback(
-    (nextFilters = {}) => fetchReport({ ...nextFilters }, { replace: false }),
-    [fetchReport],
-  );
+  const updateFilters = useCallback((nextFilters = {}) => {
+    setFilters((prev) => ({ ...prev, ...nextFilters }));
+  }, []);
 
   const resetFilters = useCallback(() => {
-    paramsRef.current = { ...initialParamsRef.current };
-    return fetchReport(paramsRef.current, { replace: true });
-  }, [fetchReport]);
+    setFilters({ ...initialParamsRef.current });
+  }, []);
 
   return {
-    tutors: state.data,
-    summary: state.summary,
-    meta: state.meta ?? {},
-    params: paramsRef.current,
+    tutors: report?.tutors ?? [],
+    summary: report?.summary ?? null,
+    meta: report?.meta ?? {},
+    params: filters,
     loading,
     refreshing,
     error,

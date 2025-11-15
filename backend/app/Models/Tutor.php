@@ -25,7 +25,12 @@ class Tutor extends Model
         'id_shelter', 
         'maple', 
         'jenis_tutor',
-        'foto'
+        'foto',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     protected $appends = ['foto_url', 'full_name'];
@@ -75,5 +80,13 @@ class Tutor extends Model
     public function aktivitas(): HasMany
     {
         return $this->hasMany(Aktivitas::class, 'id_tutor', 'id_tutor');
+    }
+
+    /**
+     * Scope a query to only include active tutors.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

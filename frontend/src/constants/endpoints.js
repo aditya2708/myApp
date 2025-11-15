@@ -285,6 +285,7 @@ export const ADMIN_SHELTER_ENDPOINTS = {
     CREATE: "/admin-shelter/tutor",
     UPDATE: (id) => `/admin-shelter/tutor/${id}`,
     AVAILABLE: "/admin-shelter/tutor/available",
+    TOGGLE_STATUS: (id) => `/admin-shelter/tutor/${id}/toggle-status`,
   },
   TUTOR_HONOR: {
     GET_TUTOR_HONOR: (tutorId) => `/admin-shelter/tutor-honor/tutor/${tutorId}`,

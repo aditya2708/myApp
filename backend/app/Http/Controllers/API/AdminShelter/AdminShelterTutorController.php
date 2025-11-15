@@ -129,12 +129,16 @@ class AdminShelterTutorController extends Controller
             'maple' => 'required|string|max:255',
             'jenis_tutor' => 'required|in:tahfidz,non_tahfidz',
             'foto' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'is_active' => 'nullable|boolean',
         ]);
 
         // Add shelter ID, wilbin ID, and kacab ID from authenticated user
         $validatedData['id_shelter'] = $user->adminShelter->shelter->id_shelter;
         $validatedData['id_wilbin'] = $user->adminShelter->shelter->id_wilbin;
         $validatedData['id_kacab'] = $user->adminShelter->shelter->wilbin->id_kacab;
+
+        // Default active when not provided
+        $validatedData['is_active'] = $request->boolean('is_active', true);
 
         // Create Tutor record
         $tutor = Tutor::create($validatedData);
@@ -188,6 +192,7 @@ class AdminShelterTutorController extends Controller
             'maple' => 'sometimes|required|string|max:255',
             'jenis_tutor' => 'sometimes|required|in:tahfidz,non_tahfidz',
             'foto' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         // Important: Only update the fields that were sent in the request
@@ -212,12 +217,47 @@ class AdminShelterTutorController extends Controller
             }
         }
 
+        if ($request->has('is_active')) {
+            $validatedData['is_active'] = $request->boolean('is_active');
+        }
+
         // Update only the fields that were validated
         $tutor->update($validatedData);
 
         return response()->json([
             'success' => true,
             'message' => 'Tutor berhasil diperbarui',
+            'data' => $tutor->fresh()->load(['kacab', 'wilbin', 'shelter'])
+        ], 200);
+    }
+
+    /**
+     * Toggle tutor active status.
+     */
+    public function toggleStatus(Request $request, $id)
+    {
+        $user = Auth::user();
+
+        if (!$user->adminShelter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'is_active' => 'required|boolean',
+        ]);
+
+        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
+            ->findOrFail($id);
+
+        $tutor->is_active = $validated['is_active'];
+        $tutor->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status tutor berhasil diperbarui',
             'data' => $tutor->fresh()->load(['kacab', 'wilbin', 'shelter'])
         ], 200);
     }
@@ -281,6 +321,7 @@ class AdminShelterTutorController extends Controller
 
             // Get tutors from the same shelter - simple list for form selection
             $tutors = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
+                ->where('is_active', true)
                 ->select('id_tutor', 'nama', 'maple', 'jenis_tutor', 'email')
                 ->orderBy('nama')
                 ->get();

@@ -188,11 +188,27 @@ const HomeStackNavigator = () => {
     
     {/* Attendance screens */}
     <HomeStack.Screen name="AttendanceDetail" component={AttendanceDetailScreen} options={{ headerTitle: 'Detail Kehadiran' }} />
-    <HomeStack.Screen name="ManualAttendance" component={ManualAttendanceScreen} options={{ headerTitle: 'Absen Manual' }} />
+    <HomeStack.Screen 
+      name="ManualAttendance" 
+      component={ManualAttendanceScreen} 
+      options={{ headerTitle: 'Absen Manual' }}
+      initialParams={{
+        activityStatus: null,
+        attendanceSummary: null
+      }}
+    />
     <HomeStack.Screen name="ActivitiesList" component={ActivitiesListScreen} options={{ headerTitle: 'Daftar Aktivitas' }} />
     <HomeStack.Screen name="ActivityForm" component={ActivityFormScreen} options={{ headerTitle: 'Form Aktivitas' }} />
     <HomeStack.Screen name="ActivityDetail" component={ActivityDetailScreen} options={{ headerTitle: 'Detail Aktivitas' }} />
-    <HomeStack.Screen name="ActivityReport" component={ActivityReportScreen} options={{ headerTitle: 'Laporan Aktivitas' }} />
+    <HomeStack.Screen 
+      name="ActivityReport" 
+      component={ActivityReportScreen} 
+      options={{ headerTitle: 'Laporan Aktivitas' }}
+      initialParams={{
+        activityStatus: null,
+        attendanceSummary: null
+      }}
+    />
     <HomeStack.Screen name="AttendanceManagement" component={AttendanceManagementScreen} options={{ headerTitle: 'Kelola Presensi' }} />
     
     

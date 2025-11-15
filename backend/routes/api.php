@@ -259,6 +259,7 @@ Route::middleware('auth:sanctum')->group(function () {
         
         Route::get('/tutor/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterTutorController::class, 'show']);
         Route::post('/tutor/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterTutorController::class, 'update']);
+        Route::patch('/tutor/{id}/toggle-status', [App\Http\Controllers\API\AdminShelter\AdminShelterTutorController::class, 'toggleStatus']);
         Route::delete('/tutor/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterTutorController::class, 'destroy']);
 
         Route::get('/jenis-kompetensi', [App\Http\Controllers\API\AdminShelter\TutorCompetencyController::class, 'getJenisKompetensi']);

@@ -53,16 +53,21 @@ class KeluargaImportService
     ];
 
     private const TEMPLATE_HEADERS = [
-        'NAMA ANAK',
-        'NIK',
-        'TTL',
-        'ALAMAT',
-        'JENJANG SEKOLAH',
-        'KELAS',
-        'ALAMAT SEKOLAH',
-        'NAMA IBU',
-        'NAMA AYAH',
-        'DHUAFA/NON DHUAFA',
+        'NO',
+        'Shelter', 
+        'Nomor KK',
+        'Nama Ayah',
+        'NIK Ayah',
+        'Nama Ibu', 
+        'NIK Ibu',
+        'Status Anak',
+        'Nama Lengkap Anak',
+        'NIK Anak',
+        'Jenis Kelamin',
+        'Tanggal Lahir',
+        'Kelas',
+        'Jenjang',
+        'Alamat'
     ];
 
     /**
@@ -335,6 +340,11 @@ class KeluargaImportService
 
             $key = $this->normalizeHeaderKey((string) $header);
 
+            // Skip ignored columns
+            if (in_array($key, ['no', 'shelter'])) {
+                continue;
+            }
+
             if ($key === 'ttl') {
                 $this->applyTtlValue($normalized, $value);
                 continue;
@@ -473,6 +483,59 @@ class KeluargaImportService
 
     private function applyTemplateAliases(array $row): array
     {
+        // New template mappings
+        if (isset($row['nomor_kk']) && $row['nomor_kk'] !== null && $row['nomor_kk'] !== '') {
+            $row['no_kk'] = $row['nomor_kk'];
+        }
+
+        if (isset($row['nama_ayah']) && $row['nama_ayah'] !== null && $row['nama_ayah'] !== '') {
+            if (!isset($row['kepala_keluarga']) || $row['kepala_keluarga'] === null || $row['kepala_keluarga'] === '') {
+                $row['kepala_keluarga'] = $row['nama_ayah'];
+            }
+        }
+
+        if (isset($row['nik_ayah']) && $row['nik_ayah'] !== null && $row['nik_ayah'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        if (isset($row['nik_ibu']) && $row['nik_ibu'] !== null && $row['nik_ibu'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        if (isset($row['status_anak']) && $row['status_anak'] !== null && $row['status_anak'] !== '') {
+            $row['status_ortu'] = $this->cleanValue('status_ortu', $row['status_anak']);
+        }
+
+        if (isset($row['nama_lengkap_anak']) && $row['nama_lengkap_anak'] !== null && $row['nama_lengkap_anak'] !== '') {
+            $row['full_name'] = $row['nama_lengkap_anak'];
+            $row['nick_name'] = $row['nama_lengkap_anak'];
+        }
+
+        if (isset($row['nik_anak']) && $row['nik_anak'] !== null && $row['nik_anak'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        if (isset($row['jenis_kelamin']) && $row['jenis_kelamin'] !== null && $row['jenis_kelamin'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        if (isset($row['tanggal_lahir']) && $row['tanggal_lahir'] !== null && $row['tanggal_lahir'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        if (isset($row['kelas']) && $row['kelas'] !== null && $row['kelas'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        if (isset($row['jenjang']) && $row['jenjang'] !== null && $row['jenjang'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        if (isset($row['alamat']) && $row['alamat'] !== null && $row['alamat'] !== '') {
+            // Keep as is, already mapped correctly
+        }
+
+        // Legacy template mappings (keep for backward compatibility)
         if (isset($row['nama_anak']) && $row['nama_anak'] !== null && $row['nama_anak'] !== '') {
             if (!isset($row['full_name']) || $row['full_name'] === null || $row['full_name'] === '') {
                 $row['full_name'] = $row['nama_anak'];
@@ -492,12 +555,6 @@ class KeluargaImportService
         if (isset($row['jenjang_sekolah']) && $row['jenjang_sekolah'] !== null && $row['jenjang_sekolah'] !== '') {
             if (!isset($row['jenjang']) || $row['jenjang'] === null || $row['jenjang'] === '') {
                 $row['jenjang'] = $row['jenjang_sekolah'];
-            }
-        }
-
-        if (isset($row['nama_ayah']) && $row['nama_ayah'] !== null && $row['nama_ayah'] !== '') {
-            if (!isset($row['kepala_keluarga']) || $row['kepala_keluarga'] === null || $row['kepala_keluarga'] === '') {
-                $row['kepala_keluarga'] = $row['nama_ayah'];
             }
         }
 
@@ -523,7 +580,7 @@ class KeluargaImportService
             return $value->format('Y-m-d');
         }
 
-        if (is_numeric($value) && in_array($key, ['no_kk', 'nik_ayah', 'nik_ibu', 'nik_wali', 'nik_anak'], true)) {
+        if (is_numeric($value) && in_array($key, ['no_kk', 'nomor_kk', 'nik_ayah', 'nik_ibu', 'nik_wali', 'nik_anak'], true)) {
             return preg_replace('/[^0-9]/', '', (string) $value);
         }
 
@@ -582,7 +639,7 @@ class KeluargaImportService
             }
 
             if ($this->isExcelSerialDateKey($key)) {
-                $parsed = $this->parseFlexibleDateString($trimmed);
+                $parsed = $this->parseDDMMYYYYDateString($trimmed);
                 if ($parsed !== null) {
                     return $parsed;
                 }
@@ -703,6 +760,30 @@ class KeluargaImportService
         return null;
     }
 
+    private function parseDDMMYYYYDateString(string $value): ?string
+    {
+        // Try DD-MM-YYYY format first (new requirement)
+        $formats = ['d-m-Y', 'd/m/Y', 'd.m.Y', 'd m Y', 'Y-m-d'];
+
+        foreach ($formats as $format) {
+            try {
+                $parsed = Carbon::createFromFormat($format, $value);
+                if ($parsed !== false) {
+                    return $parsed->format('Y-m-d');
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        try {
+            $parsed = Carbon::parse($value);
+            return $parsed->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     private function parseFlexibleDateString(string $value): ?string
     {
         $formats = ['Y-m-d', 'd-m-Y', 'd/m/Y', 'd.m.Y', 'd m Y'];
@@ -765,8 +846,9 @@ class KeluargaImportService
             'id_kacab' => 'required|integer|exists:kacab,id_kacab',
             'id_wilbin' => 'required|integer|exists:wilbin,id_wilbin',
             'id_shelter' => 'required|integer|exists:shelter,id_shelter',
-            'no_kk' => 'nullable|digits:16',
-            'full_name' => 'required|string|max:255',
+            'no_kk' => 'required|digits:16', // WAJIB 16 digit
+            'full_name' => 'required|string|max:255', // WAJIB
+            'jenjang' => 'required|string|max:255', // WAJIB
             'tanggal_lahir' => 'nullable|date_format:Y-m-d',
             'jenis_kelamin' => 'nullable|in:Laki-laki,Perempuan',
         ];
@@ -774,14 +856,15 @@ class KeluargaImportService
         $optionalRules = [
             'kepala_keluarga' => 'nullable|string|max:255',
             'status_ortu' => 'nullable|in:yatim,piatu,yatim piatu,dhuafa,non dhuafa',
-            'nik_anak' => 'nullable|digits:16',
+            'nik_anak' => 'nullable|digits:16', // Optional tapi jika ada harus 16 digit
+            'nik_ayah' => 'nullable|digits:16', // Optional tapi jika ada harus 16 digit
+            'nik_ibu' => 'nullable|digits:16', // Optional tapi jika ada harus 16 digit
             'anak_ke' => 'nullable|integer|min:1',
             'dari_bersaudara' => 'nullable|integer|min:1',
             'nick_name' => 'nullable|string|max:255',
             'agama' => 'nullable|string|max:255',
             'tempat_lahir' => 'nullable|string|max:255',
             'tinggal_bersama' => 'nullable|string|max:255',
-            'jenjang' => 'nullable|string|max:255',
             'kelas' => 'nullable|string|max:255',
             'nama_sekolah' => 'nullable|string|max:255',
             'alamat_sekolah' => 'nullable|string|max:255',
@@ -820,12 +903,17 @@ class KeluargaImportService
             'id_kacab.required' => 'ID Kacab tidak boleh kosong (gunakan konteks admin atau isi kolom).',
             'id_wilbin.required' => 'ID Wilbin tidak boleh kosong.',
             'id_shelter.required' => 'ID Shelter tidak boleh kosong.',
+            'no_kk.required' => 'Nomor KK wajib diisi.',
             'no_kk.digits' => 'Nomor KK harus 16 digit.',
+            'nik_ayah.digits' => 'NIK Ayah harus 16 digit.',
+            'nik_ibu.digits' => 'NIK Ibu harus 16 digit.',
+            'nik_anak.digits' => 'NIK Anak harus 16 digit.',
+            'full_name.required' => 'Nama lengkap anak wajib diisi.',
+            'jenjang.required' => 'Jenjang wajib diisi.',
             'kepala_keluarga.required' => 'Nama kepala keluarga wajib diisi.',
             'status_ortu.in' => 'Status orang tua tidak sesuai pilihan sistem.',
-            'full_name.required' => 'Nama lengkap anak wajib diisi.',
             'nick_name.required' => 'Nama panggilan anak wajib diisi.',
-            'tanggal_lahir.date_format' => 'Tanggal lahir harus berformat YYYY-MM-DD.',
+            'tanggal_lahir.date_format' => 'Tanggal lahir harus berformat DD-MM-YYYY.',
             'jenis_kelamin.in' => 'Jenis kelamin hanya boleh Laki-laki atau Perempuan.',
             'nama_ayah.required' => 'Nama ayah wajib diisi.',
             'nama_ibu.required' => 'Nama ibu wajib diisi.',

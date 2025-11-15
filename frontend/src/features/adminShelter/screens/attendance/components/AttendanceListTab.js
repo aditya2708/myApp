@@ -35,6 +35,7 @@ import {
   selectAktivitasStatusUpdating,
   selectAktivitasAttendanceSummary as selectAktivitasDetailSummary
 } from '../../../redux/aktivitasSlice';
+import { isActivityCompleted } from '../../../utils/activityStatusHelper';
 
 const AttendanceListTab = ({
   navigation,
@@ -306,6 +307,14 @@ const AttendanceListTab = ({
       dispatch(resetAttendanceError());
     };
   }, [id_aktivitas, refreshData, dispatch]);
+
+  // Auto-trigger refresh and UI update when activity status changes to completed
+  useEffect(() => {
+    if (isActivityCompleted(effectiveActivityStatus)) {
+      // Refresh data to ensure UI is up to date with completed status
+      refreshData({ force: true });
+    }
+  }, [effectiveActivityStatus, refreshData]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

@@ -481,7 +481,9 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     navigation.navigate('ActivityReport', {
       id_aktivitas,
       activityName: activity.jenis_kegiatan,
-      activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null
+      activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
+      activityStatus: activity.status,
+      attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
     });
   };
   

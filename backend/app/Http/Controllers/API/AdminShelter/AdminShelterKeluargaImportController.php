@@ -20,29 +20,39 @@ class AdminShelterKeluargaImportController extends Controller
     public function template(): StreamedResponse
     {
         $headers = [
-            'NAMA ANAK',
-            'NIK',
-            'TTL',
-            'ALAMAT',
-            'JENJANG SEKOLAH',
-            'KELAS',
-            'ALAMAT SEKOLAH',
-            'NAMA IBU',
-            'NAMA AYAH',
-            'DHUAFA/NON DHUAFA',
+            'NO',
+            'Shelter', 
+            'Nomor KK',
+            'Nama Ayah',
+            'NIK Ayah',
+            'Nama Ibu', 
+            'NIK Ibu',
+            'Status Anak',
+            'Nama Lengkap Anak',
+            'NIK Anak',
+            'Jenis Kelamin',
+            'Tanggal Lahir',
+            'Kelas',
+            'Jenjang',
+            'Alamat'
         ];
 
         $sampleRow = [
-            'Aufar Taufik Haidar',
-            '321181402140001',
-            'Sumedang, 14 - 02 - 2014',
-            'Dusun Pangjeleran RT. 03 RW. 01',
-            'SD',
+            '1',
+            'Shelter A',
+            '3201012345678901',
+            'Ahmad Wijaya',
+            '3201012345678901',
+            'Siti Nurhaliza',
+            '3201012345678901',
+            'dhuafa',
+            'Budi Santoso',
+            '3201012345678901',
+            'Laki-laki',
+            '15-01-2010',
             'V',
-            'Dusun Cibitung Desa Padasuka',
-            'Elly Anggawati',
-            'Wawan Taufik',
-            'DHUAFA',
+            'SD',
+            'Jl. Merdeka No. 123'
         ];
 
         return response()->streamDownload(

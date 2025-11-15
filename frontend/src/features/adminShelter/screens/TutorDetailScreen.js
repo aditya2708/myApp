@@ -21,9 +21,11 @@ import HonorSummaryCard from '../components/HonorSummaryCard';
 import {
   fetchTutorDetail,
   deleteTutor,
+  toggleTutorStatus,
   selectSelectedTutor,
   selectTutorStatus,
-  selectTutorError
+  selectTutorError,
+  selectTutorActionStatus
 } from '../redux/tutorSlice';
 
 const TutorDetailScreen = () => {
@@ -36,6 +38,8 @@ const TutorDetailScreen = () => {
   const tutor = useSelector(selectSelectedTutor);
   const status = useSelector(selectTutorStatus);
   const error = useSelector(selectTutorError);
+  const toggleStatusState = useSelector(state => selectTutorActionStatus(state, 'toggle'));
+  const isTutorActive = tutor?.is_active ?? true;
 
   useEffect(() => {
     dispatch(fetchTutorDetail(tutorId));
@@ -113,6 +117,30 @@ const TutorDetailScreen = () => {
     }
   };
 
+  const handleToggleTutorStatus = () => {
+    const nextStatus = !isTutorActive;
+    Alert.alert(
+      nextStatus ? 'Aktifkan Tutor' : 'Nonaktifkan Tutor',
+      `Apakah Anda yakin ingin ${nextStatus ? 'mengaktifkan' : 'menonaktifkan'} ${tutor.nama}?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Ya',
+          onPress: () => {
+            dispatch(toggleTutorStatus({ id: tutor.id_tutor, isActive: nextStatus }))
+              .unwrap()
+              .then(() => {
+                Alert.alert('Berhasil', `Tutor berhasil ${nextStatus ? 'diaktifkan' : 'dinonaktifkan'}`);
+              })
+              .catch((toggleError) => {
+                Alert.alert('Gagal', toggleError || 'Gagal memperbarui status tutor');
+              });
+          }
+        }
+      ]
+    );
+  };
+
   if (status === 'loading') {
     return <LoadingSpinner fullScreen message="Memuat detail tutor..." />;
   }
@@ -145,7 +173,19 @@ const TutorDetailScreen = () => {
         )}
       </View>
 
-      <Text style={styles.nameText}>{tutor.nama}</Text>
+      <View style={styles.nameRow}>
+        <Text style={styles.nameText}>{tutor.nama}</Text>
+        <View style={[styles.statusBadge, isTutorActive ? styles.activeBadge : styles.inactiveBadge]}>
+          <Text
+            style={[
+              styles.statusBadgeText,
+              isTutorActive ? styles.activeBadgeText : styles.inactiveBadgeText
+            ]}
+          >
+            {isTutorActive ? 'Aktif' : 'Nonaktif'}
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.contactActions}>
         <TouchableOpacity 
@@ -219,6 +259,22 @@ const TutorDetailScreen = () => {
         )}
       </View>
 
+      <View style={styles.toggleButtonWrapper}>
+        <Button
+          title={isTutorActive ? 'Nonaktifkan Tutor' : 'Aktifkan Tutor'}
+          onPress={handleToggleTutorStatus}
+          type={isTutorActive ? 'danger' : 'primary'}
+          disabled={toggleStatusState === 'loading'}
+          leftIcon={
+            <Ionicons
+              name={isTutorActive ? 'close-circle-outline' : 'checkmark-circle-outline'}
+              size={20}
+              color="#ffffff"
+            />
+          }
+        />
+      </View>
+
       <View style={styles.actionButtons}>
         <Button
           title="Edit"
@@ -276,6 +332,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
+  nameRow: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statusBadge: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  activeBadge: {
+    backgroundColor: '#e8f8f2',
+  },
+  inactiveBadge: {
+    backgroundColor: '#fdecea',
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeBadgeText: {
+    color: '#2ecc71',
+  },
+  inactiveBadgeText: {
+    color: '#e74c3c',
+  },
   contactActions: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -328,6 +410,9 @@ const styles = StyleSheet.create({
   deleteButton: {
     flex: 1,
     marginLeft: 8,
+  },
+  toggleButtonWrapper: {
+    marginBottom: 16,
   },
 });
 

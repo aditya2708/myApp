@@ -21,6 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 const TutorListItem = ({ tutor, onPress, onEdit, onDelete }) => {
   if (!tutor) return null;
 
+  const isActive = tutor.is_active !== undefined ? tutor.is_active : true;
+
   return (
     <TouchableOpacity 
       style={styles.container}
@@ -47,7 +49,14 @@ const TutorListItem = ({ tutor, onPress, onEdit, onDelete }) => {
       
       {/* Middle section - Tutor info */}
       <View style={styles.infoSection}>
-        <Text style={styles.title} numberOfLines={2}>{tutor.nama}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2}>{tutor.nama}</Text>
+          <View style={[styles.statusBadge, isActive ? styles.activeBadge : styles.inactiveBadge]}>
+            <Text style={[styles.statusText, isActive ? styles.activeText : styles.inactiveText]}>
+              {isActive ? 'Aktif' : 'Nonaktif'}
+            </Text>
+          </View>
+        </View>
         
         <View style={styles.detailsRow}>
           <View style={styles.detailItem}>
@@ -141,11 +150,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   title: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333333',
-    marginBottom: 6,
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  activeBadge: {
+    backgroundColor: '#e8f8f2',
+  },
+  inactiveBadge: {
+    backgroundColor: '#fdecea',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeText: {
+    color: '#2ecc71',
+  },
+  inactiveText: {
+    color: '#e74c3c',
   },
   detailsRow: {
     flexDirection: 'row',

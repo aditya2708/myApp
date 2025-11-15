@@ -21,10 +21,11 @@ import {
   ACTIVITY_REPORT_ERROR_RETRY_DELAY
 } from '../../redux/aktivitasSlice';
 import CampaignShareModal from '../../components/CampaignShareModal';
+import { isActivityCompleted, blockIfCompleted } from '../../utils/activityStatusHelper';
 
 const ActivityReportScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
-  const { id_aktivitas, activityName, activityDate } = route.params || {};
+  const { id_aktivitas, activityName, activityDate, activityStatus } = route.params || {};
   
   const { reportLoading, reportError } = useSelector(state => state.aktivitas);
   const reportCache = useSelector(selectActivityReportCache);
@@ -176,6 +177,13 @@ const ActivityReportScreen = ({ navigation, route }) => {
     reportStatusQuery.isError,
     shouldSkipFetch
   ]);
+
+  // Check if activity is completed and block access
+  useEffect(() => {
+    if (blockIfCompleted(activityStatus, navigation, 'laporan kegiatan')) {
+      return;
+    }
+  }, [activityStatus, navigation]);
   
   // Show loading while checking existing report
   if (checkingExisting) {
@@ -288,6 +296,29 @@ const ActivityReportScreen = ({ navigation, route }) => {
     );
   };
 
+  // Handle campaign skip completion (when API error occurs)
+  const handleCampaignSkipComplete = () => {
+    console.log('Campaign skipped due to API error - allowing report submission');
+    setHasSharedCampaign(true);
+    setSharedCampaign({ title: 'Dilewati (API Error)' });
+    setShowCampaignModal(false);
+    
+    // Show information message to user
+    Alert.alert(
+      'Informasi',
+      'Anda telah melewati berbagi kampanye karena API tidak dapat diakses. Sekarang Anda dapat melanjutkan dengan mengirim laporan aktivitas.',
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Just close the alert, user can now submit the form manually
+            console.log('Campaign skipped due to API error');
+          }
+        }
+      ]
+    );
+  };
+
   const PhotoBox = ({ photoKey, uri, onTakePhoto, onRemove }) => (
     <View style={styles.photoBox}>
       {uri ? (
@@ -394,6 +425,7 @@ const ActivityReportScreen = ({ navigation, route }) => {
         visible={showCampaignModal}
         onClose={() => setShowCampaignModal(false)}
         onShareComplete={handleCampaignShareComplete}
+        onSkipCampaign={handleCampaignSkipComplete}
       />
     </View>
   );

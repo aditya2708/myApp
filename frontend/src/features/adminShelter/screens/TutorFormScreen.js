@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Image,
   Platform,
-  Alert
+  Alert,
+  Switch
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -57,6 +58,7 @@ const TutorFormScreen = () => {
     no_hp: existingTutor?.no_hp || '',
     maple: existingTutor?.maple || '',
     jenis_tutor: existingTutor?.jenis_tutor || 'non_tahfidz',
+    is_active: existingTutor?.is_active ?? true,
   });
 
   // Photo state
@@ -126,7 +128,11 @@ const TutorFormScreen = () => {
     // Add form fields
     Object.entries(formData).forEach(([key, value]) => {
       if (value !== null && value !== undefined && value !== '') {
-        submitData.append(key, String(value));
+        if (key === 'is_active') {
+          submitData.append(key, value ? '1' : '0');
+        } else {
+          submitData.append(key, String(value));
+        }
       }
     });
     
@@ -246,6 +252,22 @@ const TutorFormScreen = () => {
           value={formData.maple}
           onChangeText={(value) => handleChange('maple', value)}
           placeholder="Masukkan mata pelajaran"
+        />
+      </View>
+
+      {/* Status Aktif */}
+      <View style={styles.statusRow}>
+        <View>
+          <Text style={styles.label}>Status Tutor</Text>
+          <Text style={styles.statusHint}>
+            Atur apakah tutor dapat dipilih pada aktivitas
+          </Text>
+        </View>
+        <Switch
+          value={formData.is_active}
+          onValueChange={(value) => handleChange('is_active', value)}
+          trackColor={{ false: '#d9534f', true: '#2ecc71' }}
+          thumbColor="#ffffff"
         />
       </View>
 
@@ -374,6 +396,22 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 8,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    elevation: 1,
+  },
+  statusHint: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
   },
   removePhotoButton: {
     position: 'absolute',

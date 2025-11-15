@@ -10,7 +10,6 @@ import { useNavigation } from '@react-navigation/native';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
-import ReportSummaryCard from '../../components/reports/ReportSummaryCard';
 import ReportQuickLinkTile from '../../components/reports/ReportQuickLinkTile';
 import ReportQuickActionTile from '../../components/reports/ReportQuickActionTile';
 import { adminCabangReportApi } from '../../api/adminCabangReportApi';
@@ -49,49 +48,28 @@ const DEFAULT_LINKS = [
     color: '#9b59b6',
     route: 'AdminCabangTutorReport',
   },
-];
-
-const DEFAULT_ACTIONS = [
   {
-    key: 'shelterOverview',
-    title: 'Shelter',
-    description: 'Ringkasan kapasitas dan kebutuhan shelter.',
-    icon: 'home',
-    color: '#e67e22',
-    route: 'AdminCabangReportHome',
-  },
-];
-
-const DEFAULT_SUMMARY = [
-  {
-    key: 'childrenTotal',
-    label: 'Total Anak Binaan',
-    value: 0,
-    icon: 'people',
+    key: 'achievement',
+    title: 'Laporan Pencapaian Anak',
+    description: 'Pantau pencapaian dan perkembangan anak binaan.',
+    icon: 'trophy',
     color: '#27ae60',
-    description: 'Jumlah keseluruhan anak binaan aktif.',
+    route: 'AdminCabangAchievementReport',
   },
   {
-    key: 'shelterTotal',
-    label: 'Total Shelter',
-    value: 0,
-    icon: 'home',
+    key: 'activities',
+    title: 'Laporan Kegiatan',
+    description: 'Lihat ringkasan kegiatan yang telah dilaksanakan.',
+    icon: 'calendar',
     color: '#e67e22',
-    description: 'Jumlah shelter aktif di cabang Anda.',
-  },
-  {
-    key: 'tutorTotal',
-    label: 'Total Tutor',
-    value: 0,
-    icon: 'person',
-    color: '#8e44ad',
-    description: 'Tutor aktif yang terdaftar dalam cabang.',
+    route: 'AdminCabangActivityReport',
   },
 ];
+
+const DEFAULT_ACTIONS = [];
 
 const AdminCabangReportHomeScreen = () => {
   const navigation = useNavigation();
-  const [summaryCards, setSummaryCards] = useState(DEFAULT_SUMMARY);
   const [quickLinks, setQuickLinks] = useState(DEFAULT_LINKS);
   const [quickActions, setQuickActions] = useState(DEFAULT_ACTIONS);
   const [loading, setLoading] = useState(true);
@@ -102,6 +80,8 @@ const AdminCabangReportHomeScreen = () => {
     () => ({
       children: 'AdminCabangChildReport',
       tutors: 'AdminCabangTutorReport',
+      achievement: 'AdminCabangAchievementReport',
+      activities: 'AdminCabangActivityReport',
     }),
     []
   );
@@ -138,101 +118,6 @@ const AdminCabangReportHomeScreen = () => {
     },
     [createSignature]
   );
-
-  const parseSummaryCards = useCallback((payload) => {
-    if (!payload) return DEFAULT_SUMMARY;
-
-    if (Array.isArray(payload) && payload.length > 0) {
-      return payload.map((item = {}, index) => {
-        const { key, ref: _ref, ...rest } = item;
-
-        return {
-          key: key || `${rest.label || rest.title || 'summary'}-${index}`,
-          label: rest.label || rest.title || 'Ringkasan',
-          value: rest.value ?? rest.total ?? 0,
-          icon: rest.icon || 'stats-chart',
-          color: rest.color || '#2ecc71',
-          description: rest.description || rest.subtitle || null,
-        };
-      });
-    }
-
-    const cards = [];
-    if (payload.children) {
-      cards.push({
-        key: 'children',
-        label: payload.children.label || 'Total Anak Binaan',
-        value: payload.children.total ?? payload.children.value ?? 0,
-        icon: payload.children.icon || 'people',
-        color: payload.children.color || '#27ae60',
-        description: payload.children.description || payload.children.active_text,
-      });
-    } else if (payload.total_children || payload.children_total) {
-      cards.push({
-        key: 'children',
-        label: 'Total Anak Binaan',
-        value: payload.total_children ?? payload.children_total ?? 0,
-        icon: 'people',
-        color: '#27ae60',
-        description: payload.active_children
-          ? `${payload.active_children.toLocaleString('id-ID')} aktif`
-          : undefined,
-      });
-    }
-
-    if (payload.shelters) {
-      cards.push({
-        key: 'shelters',
-        label: payload.shelters.label || 'Total Shelter',
-        value: payload.shelters.total ?? payload.shelters.value ?? 0,
-        icon: payload.shelters.icon || 'home',
-        color: payload.shelters.color || '#e67e22',
-        description: payload.shelters.description || null,
-      });
-    } else if (payload.total_shelter || payload.shelter_total) {
-      cards.push({
-        key: 'shelters',
-        label: 'Total Shelter',
-        value: payload.total_shelter ?? payload.shelter_total ?? 0,
-        icon: 'home',
-        color: '#e67e22',
-        description: null,
-      });
-    }
-
-    if (payload.tutors) {
-      cards.push({
-        key: 'tutors',
-        label: payload.tutors.label || 'Total Tutor',
-        value: payload.tutors.total ?? payload.tutors.value ?? 0,
-        icon: payload.tutors.icon || 'people-circle',
-        color: payload.tutors.color || '#8e44ad',
-        description: payload.tutors.description || null,
-      });
-    } else if (payload.total_tutors || payload.tutor_total) {
-      cards.push({
-        key: 'tutors',
-        label: 'Total Tutor',
-        value: payload.total_tutors ?? payload.tutor_total ?? 0,
-        icon: 'people-circle',
-        color: '#8e44ad',
-        description: null,
-      });
-    }
-
-    if (payload.attendance_rate || payload.average_attendance) {
-      cards.push({
-        key: 'attendance',
-        label: 'Rata-rata Kehadiran',
-        value: `${Math.round((payload.attendance_rate ?? payload.average_attendance) * 100) / 100}%`,
-        icon: 'calendar',
-        color: '#16a085',
-        description: 'Rerata kehadiran seluruh kegiatan.',
-      });
-    }
-
-    return cards.length > 0 ? cards : DEFAULT_SUMMARY;
-  }, []);
 
   const parseQuickLinks = useCallback(
     (payload) => {
@@ -318,10 +203,6 @@ const AdminCabangReportHomeScreen = () => {
       setError(null);
       const response = await adminCabangReportApi.getSummary();
       const responseData = response?.data?.data || response?.data || {};
-      setSummaryCards(
-        parseSummaryCards(responseData.summary || responseData.cards || responseData)
-      );
-
       const parsedLinks = parseQuickLinks(responseData.quick_links || responseData.links || []);
       setQuickLinks(parsedLinks);
 
@@ -331,7 +212,6 @@ const AdminCabangReportHomeScreen = () => {
     } catch (err) {
       console.error('Failed to fetch report summary:', err);
       setError('Gagal memuat ringkasan laporan. Silakan coba lagi.');
-      setSummaryCards(DEFAULT_SUMMARY);
 
       const fallbackLinks = parseQuickLinks();
       setQuickLinks(fallbackLinks);
@@ -340,7 +220,7 @@ const AdminCabangReportHomeScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [parseQuickActions, parseQuickLinks, parseSummaryCards]);
+  }, [parseQuickActions, parseQuickLinks]);
 
   useEffect(() => {
     fetchSummary({ showLoading: true });
@@ -387,13 +267,6 @@ const AdminCabangReportHomeScreen = () => {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Ringkasan</Text>
-        {summaryCards.map(({ key, ...cardProps }) => (
-          <ReportSummaryCard key={key} {...cardProps} />
-        ))}
-      </View>
-
-      <View style={styles.section}>
         <View style={styles.quickActionsGrid}>
           {quickActions.map((action) => (
             <ReportQuickActionTile
@@ -411,7 +284,7 @@ const AdminCabangReportHomeScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Laporan Detail</Text>
+        <Text style={styles.sectionTitle}>List Laporan</Text>
         {quickLinks.map((link) => (
           <ReportQuickLinkTile
             key={link.key}

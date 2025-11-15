@@ -17,13 +17,15 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const CampaignShareModal = ({ visible, onClose, onShareComplete }) => {
+const CampaignShareModal = ({ visible, onClose, onShareComplete, onSkipCampaign }) => {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [apiError, setApiError] = useState(false);
 
   const fetchCampaigns = async () => {
     setLoading(true);
+    setApiError(false);
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -47,6 +49,8 @@ const CampaignShareModal = ({ visible, onClose, onShareComplete }) => {
       setCampaigns(result.data || []);
     } catch (err) {
       console.error('Error fetching campaigns:', err);
+      setApiError(true);
+      console.log('API Error detected, setting apiError to true');
       if (err.name === 'AbortError') {
         Alert.alert('Error', 'Koneksi timeout. Silakan periksa koneksi internet Anda dan coba lagi.');
       } else {
@@ -121,6 +125,30 @@ const CampaignShareModal = ({ visible, onClose, onShareComplete }) => {
       console.error('Error opening link:', error);
       Alert.alert('Error', 'Gagal membuka link kampanye.');
     }
+  };
+
+  const handleSkipCampaign = () => {
+    console.log('User attempting to skip campaign sharing due to API error');
+    Alert.alert(
+      'Konfirmasi Lewati Kampanye',
+      'API kampanye sedang bermasalah. Apakah Anda ingin melanjutkan tanpa berbagi kampanye?',
+      [
+        {
+          text: 'Tidak',
+          style: 'cancel',
+          onPress: () => console.log('User cancelled skip campaign')
+        },
+        {
+          text: 'Ya, Lanjutkan',
+          onPress: () => {
+            console.log('User confirmed skip campaign - allowing report submission');
+            if (onSkipCampaign) {
+              onSkipCampaign();
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderCampaignCard = (campaign) => {
@@ -217,6 +245,18 @@ const CampaignShareModal = ({ visible, onClose, onShareComplete }) => {
                 <TouchableOpacity style={styles.retryButton} onPress={fetchCampaigns}>
                   <Text style={styles.retryButtonText}>Coba Lagi</Text>
                 </TouchableOpacity>
+                
+                {apiError && (
+                  <View style={styles.skipContainer}>
+                    <Ionicons name="warning" size={20} color="#f39c12" />
+                    <Text style={styles.skipText}>
+                      API kampanye tidak dapat diakses. Anda dapat melewati langkah ini jika ingin melanjutkan.
+                    </Text>
+                    <TouchableOpacity style={styles.skipButton} onPress={handleSkipCampaign}>
+                      <Text style={styles.skipButtonText}>Lewati Berbagi Kampanye</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </ScrollView>
@@ -419,6 +459,36 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  skipContainer: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+    alignItems: 'center',
+  },
+  skipText: {
+    fontSize: 14,
+    color: '#856404',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  skipButton: {
+    backgroundColor: '#f39c12',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#e67e22',
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });
 

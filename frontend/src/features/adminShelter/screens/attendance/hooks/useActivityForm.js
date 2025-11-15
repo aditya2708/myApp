@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -64,6 +65,7 @@ const initialUiState = {
 
 const useActivityForm = ({ activity, onSuccess }) => {
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
   const isEditing = Boolean(activity);
 
   const loading = useSelector(selectAktivitasLoading);
@@ -574,12 +576,19 @@ const useActivityForm = ({ activity, onSuccess }) => {
 
     try {
       if (isEditing) {
-        await dispatch(updateAktivitas({ id: activity.id_aktivitas, aktivitasData: data })).unwrap();
+        await dispatch(updateAktivitas({ 
+          id: activity.id_aktivitas, 
+          aktivitasData: data, 
+          queryClient 
+        })).unwrap();
         Alert.alert('Berhasil', 'Aktivitas berhasil diperbarui', [
           { text: 'Oke', onPress: onSuccess },
         ]);
       } else {
-        await dispatch(createAktivitas(data)).unwrap();
+        await dispatch(createAktivitas({ 
+          aktivitasData: data, 
+          queryClient 
+        })).unwrap();
         Alert.alert('Berhasil', 'Aktivitas berhasil dibuat', [
           { text: 'Oke', onPress: onSuccess },
         ]);
@@ -602,7 +611,7 @@ const useActivityForm = ({ activity, onSuccess }) => {
         Alert.alert('Gagal Menyimpan', errorMessage, [{ text: 'Oke' }]);
       }
     }
-  }, [activity, conflicts, dispatch, error, isEditing, onSuccess, prepareFormData, validateForm]);
+  }, [activity, conflicts, dispatch, error, isEditing, onSuccess, prepareFormData, queryClient, validateForm]);
 
   return {
     isEditing,
