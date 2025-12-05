@@ -28,14 +28,17 @@ export class GPSNavigationService {
       // Device GPS is ready, now check location distance if coordinates available
       if (shelterGpsConfig?.latitude && shelterGpsConfig?.longitude) {
         const locationValidation = await this.validateUserLocation(shelterGpsConfig);
-        
+
         if (!locationValidation.allowed) {
+          // Allow navigation but flag for review when jarak di luar radius
           return {
-            allowed: false,
+            allowed: true,
             reason: locationValidation.reason,
             gpsStatus,
             locationValidation,
-            requiresGps: true
+            requiresGps: true,
+            flagged: true,
+            flagType: 'distance_outside_radius'
           };
         }
 
@@ -62,23 +65,11 @@ export class GPSNavigationService {
   }
 
   static isGpsRequiredForActivity(activityType, shelterGpsConfig) {
-    // For Bimbel activities, GPS is required if shelter has GPS config
-    if (activityType === 'Bimbel' && shelterGpsConfig) {
-      return true;
-    }
-
-    // For other activities, check shelter require_gps setting
-    if (shelterGpsConfig?.require_gps) {
-      return true;
-    }
-
-    return false;
+    // GPS hanya wajib jika shelter memang mensyaratkan
+    return !!shelterGpsConfig?.require_gps;
   }
 
   static getGpsRequirementReason(activityType, shelterGpsConfig) {
-    if (activityType === 'Bimbel' && shelterGpsConfig) {
-      return 'Aktivitas Bimbel memerlukan validasi GPS';
-    }
     if (shelterGpsConfig?.require_gps) {
       return 'Shelter memerlukan validasi GPS untuk semua aktivitas';
     }
@@ -126,12 +117,19 @@ export class GPSNavigationService {
     return 'GPS tidak tersedia.';
   }
 
-  static showGPSRequiredModal(reason, gpsStatus, onRetry, onCancel, locationValidation = null) {
+  static showGPSRequiredModal(
+    reason,
+    gpsStatus,
+    onRetry,
+    onCancel,
+    locationValidation = null,
+    onContinue = null
+  ) {
     const title = 'GPS Diperlukan';
     
-    let message = `${reason}\n\nUntuk melanjutkan, pastikan:\n- GPS aktif di pengaturan perangkat\n- Izin lokasi diberikan untuk aplikasi\n- Akurasi GPS dalam kondisi baik`;
+    let message = `${reason}\n\nAnda dapat mencoba ulang atau melanjutkan tanpa validasi. Jika tetap lanjut, data akan ditandai untuk review.`;
+    message += '\n\nTips:\n- Pastikan GPS aktif\n- Beri izin lokasi untuk aplikasi\n- Tunggu beberapa detik jika akurasi rendah';
     
-    // Add location distance info if available
     if (locationValidation && locationValidation.distance && locationValidation.maxDistance) {
       message += `\n\nInfo Lokasi:\n- Jarak saat ini: ${Math.round(locationValidation.distance)}m\n- Jarak maksimal: ${locationValidation.maxDistance}m\n- Status: ${locationValidation.distance <= locationValidation.maxDistance ? 'Dalam radius' : 'Di luar radius'}`;
     }
@@ -145,6 +143,12 @@ export class GPSNavigationService {
           style: 'cancel',
           onPress: () => {
             if (onCancel) onCancel();
+          }
+        },
+        {
+          text: 'Lanjutkan',
+          onPress: () => {
+            if (onContinue) onContinue();
           }
         },
         {

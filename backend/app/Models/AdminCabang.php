@@ -21,7 +21,8 @@ class AdminCabang extends Model
         'nama_lengkap',
         'alamat',
         'no_hp',
-        'foto'
+        'foto',
+        'company_id',
     ];
 
     public function user()

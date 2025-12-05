@@ -7,15 +7,20 @@ use App\Models\Kurikulum;
 use App\Models\KurikulumMateri;
 use App\Models\Semester;
 use Illuminate\Http\Request;
+use App\Support\AdminShelterScope;
+use Illuminate\Support\Facades\Schema;
 
 class AdminShelterKurikulumController extends Controller
 {
+    use AdminShelterScope;
+
     public function index(Request $request)
     {
         try {
             $adminShelter = auth()->user()->adminShelter;
+            $companyId = $this->companyId();
             $query = Kurikulum::with(['kacab'])
-                ->byKacab($adminShelter->shelter->wilbin->id_kacab)
+                ->byKacab($adminShelter->shelter->wilbin->id_kacab, $companyId)
                 ->active();
             
             if ($request->has('tahun_berlaku')) {
@@ -55,8 +60,9 @@ class AdminShelterKurikulumController extends Controller
     {
         try {
             $adminShelter = auth()->user()->adminShelter;
+            $companyId = $this->companyId();
             $kurikulum = Kurikulum::with(['kacab', 'kurikulumMateri.mataPelajaran', 'kurikulumMateri.materi'])
-                ->byKacab($adminShelter->shelter->wilbin->id_kacab)
+                ->byKacab($adminShelter->shelter->wilbin->id_kacab, $companyId)
                 ->findOrFail($id);
             
             return response()->json([
@@ -78,10 +84,11 @@ class AdminShelterKurikulumController extends Controller
     {
         try {
             $adminShelter = auth()->user()->adminShelter;
+            $companyId = $this->companyId();
             $kurikulum = Kurikulum::with([
                 'kurikulumMateri.mataPelajaran',
                 'kurikulumMateri.materi'
-            ])->byKacab($adminShelter->shelter->wilbin->id_kacab)
+            ])->byKacab($adminShelter->shelter->wilbin->id_kacab, $companyId)
               ->findOrFail($id);
 
             $preview = [
@@ -122,7 +129,8 @@ class AdminShelterKurikulumController extends Controller
     {
         try {
             $adminShelter = auth()->user()->adminShelter;
-            $kurikulum = Kurikulum::byKacab($adminShelter->shelter->wilbin->id_kacab)
+            $companyId = $this->companyId();
+            $kurikulum = Kurikulum::byKacab($adminShelter->shelter->wilbin->id_kacab, $companyId)
                 ->active()
                 ->select('id_kurikulum', 'nama_kurikulum', 'tahun_berlaku')
                 ->orderBy('tahun_berlaku', 'desc')
@@ -150,13 +158,17 @@ class AdminShelterKurikulumController extends Controller
             $adminShelter = auth()->user()->adminShelter;
             $kacabId = $adminShelter->shelter->wilbin->id_kacab;
             $shelterId = $adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
 
             // Ensure kurikulum exists for this cabang
-            $kurikulum = Kurikulum::where('id_kacab', $kacabId)->findOrFail($id);
+            $kurikulum = Kurikulum::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('kurikulum', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->findOrFail($id);
 
             // Find active semester for this shelter
             $query = Semester::where('id_kacab', $kacabId)
-                ->where('id_shelter', $shelterId);
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId));
 
             if (\Schema::hasColumn('semester', 'status')) {
                 $query->where('status', 'active');

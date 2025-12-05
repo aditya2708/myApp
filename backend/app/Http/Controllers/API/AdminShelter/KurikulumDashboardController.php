@@ -12,9 +12,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Support\AdminShelterScope;
+use Illuminate\Support\Facades\Schema;
 
 class KurikulumDashboardController extends Controller
 {
+    use AdminShelterScope;
+
     /**
      * Get comprehensive kurikulum dashboard data for AdminShelter
      */
@@ -25,15 +29,16 @@ class KurikulumDashboardController extends Controller
             $adminShelter = $user->adminShelter;
             $kacabId = $adminShelter->id_kacab;
             $shelterId = $adminShelter->id_shelter;
+            $companyId = $this->companyId();
 
             // Get active semester
-            $semesterAktif = $this->getSemesterAktif($kacabId);
+            $semesterAktif = $this->getSemesterAktif($kacabId, $companyId);
             
             // Get today's statistics
-            $todayStats = $this->getTodayStatistics($shelterId, $semesterAktif);
+            $todayStats = $this->getTodayStatistics($shelterId, $semesterAktif, $companyId);
             
             // Get recent activities (today's schedule)
-            $recentActivity = $this->getRecentActivity($shelterId);
+            $recentActivity = $this->getRecentActivity($shelterId, $companyId);
 
             // Compile dashboard data
             $dashboardData = [
@@ -64,12 +69,17 @@ class KurikulumDashboardController extends Controller
     /**
      * Get active semester data
      */
-    private function getSemesterAktif($kacabId)
+    private function getSemesterAktif($kacabId, ?int $companyId = null)
     {
         $hasStatusColumn = \Schema::hasColumn('semester', 'status');
         
         $query = Semester::where('id_kacab', $kacabId)
-            ->with(['kurikulum']);
+            ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+            ->with(['kurikulum' => function ($q) use ($companyId) {
+                if ($companyId && Schema::hasColumn('kurikulum', 'company_id')) {
+                    $q->where('company_id', $companyId);
+                }
+            }]);
 
         if ($hasStatusColumn) {
             $query->where('status', 'active');
@@ -129,12 +139,13 @@ class KurikulumDashboardController extends Controller
     /**
      * Get today's statistics
      */
-    private function getTodayStatistics($shelterId, $semesterAktif)
+    private function getTodayStatistics($shelterId, $semesterAktif, ?int $companyId = null)
     {
         $today = Carbon::today();
 
         // Count total kelompok (check if status column exists)
-        $kelompokQuery = Kelompok::where('id_shelter', $shelterId);
+        $kelompokQuery = Kelompok::where('id_shelter', $shelterId)
+            ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId));
         if (\Schema::hasColumn('kelompok', 'status')) {
             $kelompokQuery->where('status', 'aktif');
         }
@@ -142,16 +153,20 @@ class KurikulumDashboardController extends Controller
 
         // Count today's activities
         $aktivitasHariIni = Aktivitas::where('id_shelter', $shelterId)
+            ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
             ->whereDate('tanggal', $today)
             ->count();
 
         // Count active students (anak binaan) - use status_validasi with proper constants
         $siswaAktif = Anak::where('id_shelter', $shelterId)
+            ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
             ->whereIn('status_validasi', Anak::STATUS_AKTIF)
             ->count();
 
         // Count active tutors - no status column exists, count all tutors for the shelter
-        $tutorAktif = Tutor::where('id_shelter', $shelterId)->count();
+        $tutorAktif = Tutor::where('id_shelter', $shelterId)
+            ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+            ->count();
 
         return [
             'totalKelompok' => $totalKelompok,
@@ -165,7 +180,7 @@ class KurikulumDashboardController extends Controller
     /**
      * Get recent activities - prioritize today, fallback to recent activities (last 7 days)
      */
-    private function getRecentActivity($shelterId)
+    private function getRecentActivity($shelterId, ?int $companyId = null)
     {
         try {
             $today = Carbon::today();
@@ -175,6 +190,7 @@ class KurikulumDashboardController extends Controller
 
             // First, try to get today's activities without eager loading to avoid relationship issues
             $todayActivities = Aktivitas::where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->whereDate('tanggal', $today)
                 ->orderBy($orderByColumn)
                 ->limit(5)
@@ -184,6 +200,7 @@ class KurikulumDashboardController extends Controller
             if ($todayActivities->isEmpty()) {
                 $sevenDaysAgo = Carbon::today()->subDays(7);
                 $todayActivities = Aktivitas::where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->whereBetween('tanggal', [$sevenDaysAgo, $today])
                     ->orderBy('tanggal', 'desc')
                     ->orderBy($orderByColumn, 'desc')
@@ -191,7 +208,7 @@ class KurikulumDashboardController extends Controller
                     ->get();
             }
 
-            return $todayActivities->map(function ($activity) {
+            return $todayActivities->map(function ($activity) use ($companyId) {
                 // Handle jam_mulai column existence
                 $jamMulai = 'TBD';
                 if (\Schema::hasColumn('aktivitas', 'jam_mulai') && $activity->jam_mulai) {
@@ -214,7 +231,9 @@ class KurikulumDashboardController extends Controller
                 try {
                     // Get tutor name - direct query by id_tutor
                     if ($activity->id_tutor) {
-                        $tutor = Tutor::find($activity->id_tutor);
+                        $tutor = Tutor::where('id_tutor', $activity->id_tutor)
+                            ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                            ->first();
                         if ($tutor) {
                             $tutorName = $tutor->nama ?? $tutor->nama_tutor ?? $tutorName;
                         }
@@ -272,7 +291,7 @@ class KurikulumDashboardController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminShelter->id_kacab;
-            $semesterAktif = $this->getSemesterAktif($kacabId);
+            $semesterAktif = $this->getSemesterAktif($kacabId, $this->companyId());
 
             return response()->json([
                 'success' => true,
@@ -295,7 +314,7 @@ class KurikulumDashboardController extends Controller
     {
         try {
             $shelterId = auth()->user()->adminShelter->id_shelter;
-            $activities = $this->getRecentActivity($shelterId);
+            $activities = $this->getRecentActivity($shelterId, $this->companyId());
 
             return response()->json([
                 'success' => true,

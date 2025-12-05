@@ -11,9 +11,14 @@ use App\Services\AdminShelter\KeluargaService;
 use App\Services\AdminShelter\KeluargaValidationService;
 use App\Models\AnakPendidikan;
 use App\Models\Anak;
+use App\Support\SsoContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class AdminShelterKeluargaController extends Controller
 {
@@ -71,6 +76,11 @@ class AdminShelterKeluargaController extends Controller
                 'message' => 'Detail Keluarga',
                 'data' => $data
             ], 200);
+        } catch (AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -91,6 +101,7 @@ class AdminShelterKeluargaController extends Controller
                 'data' => $result
             ], 201);
         } catch (\Exception $e) {
+            Log::error('AdminShelterKeluargaController@store failed', ['message' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menambahkan data: ' . $e->getMessage()
@@ -118,6 +129,12 @@ class AdminShelterKeluargaController extends Controller
                 'message' => 'Data keluarga berhasil diperbarui',
                 'data' => new KeluargaResource($keluarga)
             ], 200);
+        } catch (AuthorizationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
@@ -144,6 +161,11 @@ class AdminShelterKeluargaController extends Controller
                 'message' => 'Keluarga berhasil dihapus',
                 'data' => $responseData
             ], 200);
+        } catch (AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
         } catch (\Exception $e) {
             if ($e->getMessage() === 'HAS_ACTIVE_CHILDREN') {
                 return response()->json([
@@ -177,6 +199,11 @@ class AdminShelterKeluargaController extends Controller
                 'message' => 'Keluarga berhasil dihapus dan ' . $result['affected_children'] . ' anak diubah statusnya menjadi tanpa keluarga',
                 'data' => $result
             ], 200);
+        } catch (AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -256,6 +283,7 @@ class AdminShelterKeluargaController extends Controller
     {
         // Get the first child from the family
         $anak = Anak::where('id_keluarga', $keluarga->id_keluarga)->first();
+        $companyId = $this->getCompanyId();
         
         if (!$anak) {
             throw new \Exception('Child data not found for this family');
@@ -273,6 +301,10 @@ class AdminShelterKeluargaController extends Controller
             'alamat_pt' => $request->input('alamat_pt'),
         ];
 
+        if ($companyId && Schema::hasColumn('anak_pend', 'company_id')) {
+            $educationData['company_id'] = $companyId;
+        }
+
         // Remove null values
         $educationData = array_filter($educationData, function ($value) {
             return $value !== null && $value !== '';
@@ -283,5 +315,14 @@ class AdminShelterKeluargaController extends Controller
             ['id_keluarga' => $keluarga->id_keluarga],
             $educationData
         );
+    }
+
+    private function getCompanyId(): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return Auth::user()->adminShelter->company_id ?? null;
     }
 }

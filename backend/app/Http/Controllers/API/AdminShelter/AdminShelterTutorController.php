@@ -12,9 +12,29 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class AdminShelterTutorController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
+    protected function applyCompanyScope($query, ?int $companyId = null)
+    {
+        $companyId = $companyId ?? $this->companyId();
+
+        if ($companyId && Schema::hasColumn($query->getModel()->getTable(), 'company_id')) {
+            $query->where($query->getModel()->getTable() . '.company_id', $companyId);
+        }
+
+        return $query;
+    }
+
     /**
      * Display a listing of tutors.
      *
@@ -24,6 +44,7 @@ class AdminShelterTutorController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
@@ -34,6 +55,7 @@ class AdminShelterTutorController extends Controller
         }
 
         $query = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter);
+        $this->applyCompanyScope($query, $companyId);
 
         // Search filter
         if ($request->has('search')) {
@@ -79,6 +101,7 @@ class AdminShelterTutorController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
@@ -89,9 +112,12 @@ class AdminShelterTutorController extends Controller
         }
 
         // Find tutor by ID and ensure it belongs to the shelter
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                    ->with(['kacab', 'wilbin', 'shelter'])
-                    ->findOrFail($id);
+        $tutor = $this->applyCompanyScope(
+            Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter),
+            $companyId
+        )
+            ->with(['kacab', 'wilbin', 'shelter'])
+            ->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -110,12 +136,20 @@ class AdminShelterTutorController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access'
+            ], 403);
+        }
+
+        if (!$companyId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Company scope is required'
             ], 403);
         }
 
@@ -136,6 +170,7 @@ class AdminShelterTutorController extends Controller
         $validatedData['id_shelter'] = $user->adminShelter->shelter->id_shelter;
         $validatedData['id_wilbin'] = $user->adminShelter->shelter->id_wilbin;
         $validatedData['id_kacab'] = $user->adminShelter->shelter->wilbin->id_kacab;
+        $validatedData['company_id'] = $companyId;
 
         // Default active when not provided
         $validatedData['is_active'] = $request->boolean('is_active', true);
@@ -169,6 +204,7 @@ class AdminShelterTutorController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
@@ -179,8 +215,10 @@ class AdminShelterTutorController extends Controller
         }
 
         // Find tutor by ID and ensure it belongs to the shelter
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                    ->findOrFail($id);
+        $tutor = $this->applyCompanyScope(
+            Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter),
+            $companyId
+        )->findOrFail($id);
 
         // Validation rules
         $validatedData = $request->validate([
@@ -237,6 +275,7 @@ class AdminShelterTutorController extends Controller
     public function toggleStatus(Request $request, $id)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
 
         if (!$user->adminShelter) {
             return response()->json([
@@ -249,8 +288,10 @@ class AdminShelterTutorController extends Controller
             'is_active' => 'required|boolean',
         ]);
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-            ->findOrFail($id);
+        $tutor = $this->applyCompanyScope(
+            Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter),
+            $companyId
+        )->findOrFail($id);
 
         $tutor->is_active = $validated['is_active'];
         $tutor->save();
@@ -272,6 +313,7 @@ class AdminShelterTutorController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
@@ -282,8 +324,10 @@ class AdminShelterTutorController extends Controller
         }
 
         // Find tutor by ID and ensure it belongs to the shelter
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                    ->findOrFail($id);
+        $tutor = $this->applyCompanyScope(
+            Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter),
+            $companyId
+        )->findOrFail($id);
 
         // Delete associated foto if exists
         if ($tutor->foto) {
@@ -310,6 +354,7 @@ class AdminShelterTutorController extends Controller
         try {
             // Get the authenticated admin_shelter
             $user = Auth::user();
+            $companyId = $this->companyId();
             
             // Ensure the user has an admin_shelter profile
             if (!$user->adminShelter) {
@@ -320,7 +365,10 @@ class AdminShelterTutorController extends Controller
             }
 
             // Get tutors from the same shelter - simple list for form selection
-            $tutors = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
+            $tutors = $this->applyCompanyScope(
+                Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter),
+                $companyId
+            )
                 ->where('is_active', true)
                 ->select('id_tutor', 'nama', 'maple', 'jenis_tutor', 'email')
                 ->orderBy('nama')

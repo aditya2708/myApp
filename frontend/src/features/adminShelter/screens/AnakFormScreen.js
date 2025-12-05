@@ -41,6 +41,16 @@ const AnakFormScreen = () => {
   const route = useRoute();
   const { anakData } = route.params || {};
 
+  const mapStatusToJenisAnakBinaan = (statusCpb) => {
+    const mapping = {
+      BCPB: 'BCPB',
+      NPB: 'NPB',
+      CPB: 'CPB',
+      PB: 'PB',
+    };
+    return mapping[statusCpb] || '';
+  };
+
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -104,6 +114,8 @@ const AnakFormScreen = () => {
   const childTypeOptions = [
     { label: 'BCPB', value: 'BCPB' },
     { label: 'NPB', value: 'NPB' },
+    { label: 'CPB', value: 'CPB' },
+    { label: 'PB', value: 'PB' },
   ];
 
   const hafalanOptions = [
@@ -153,14 +165,17 @@ const AnakFormScreen = () => {
         nick_name: anakData.nick_name || '',
         nik_anak: anakData.nik_anak || '',
         tempat_lahir: anakData.tempat_lahir || '',
-        tanggal_lahir: anakData.tanggal_lahir || '',
+        tanggal_lahir: (() => {
+          const parsed = parseDateValue(anakData.tanggal_lahir);
+          return parsed ? format(parsed, 'yyyy-MM-dd') : '';
+        })(),
         alamat: anakData.alamat || '',
         jenis_kelamin: anakData.jenis_kelamin || 'Laki-laki',
         agama: anakData.agama || 'Islam',
         anak_ke: anakData.anak_ke?.toString() || '',
         dari_bersaudara: anakData.dari_bersaudara?.toString() || '',
         tinggal_bersama: anakData.tinggal_bersama || 'Ayah',
-        jenis_anak_binaan: anakData.jenis_anak_binaan || 'BCPB',
+        jenis_anak_binaan: anakData.jenis_anak_binaan || mapStatusToJenisAnakBinaan(anakData.status_cpb) || 'BCPB',
         hafalan: anakData.hafalan || 'Tahfidz',
         jenjang: pendidikan.jenjang || '',
         kelas: pendidikan.kelas || '',
@@ -248,6 +263,9 @@ const AnakFormScreen = () => {
             : '',
       };
 
+      const parsedBirthDate = selectedBirthDate || parseDateValue(formData.tanggal_lahir);
+      sanitizedData.tanggal_lahir = parsedBirthDate ? format(parsedBirthDate, 'yyyy-MM-dd') : '';
+
       Object.entries(sanitizedData).forEach(([key, value]) => {
         if (key === 'foto') {
           if (value) {
@@ -301,8 +319,19 @@ const AnakFormScreen = () => {
         Alert.alert('Error', response.data.message || 'Gagal memperbarui data');
       }
     } catch (error) {
-      console.error('Error updating anak:', error);
-      Alert.alert('Error', 'Gagal memperbarui data anak');
+      const resp = error.response?.data;
+      const errors = resp?.errors;
+      const firstError =
+        errors && typeof errors === 'object'
+          ? Object.values(errors).flat().find(Boolean)
+          : null;
+      const message =
+        firstError ||
+        resp?.message ||
+        'Gagal memperbarui data anak. Mohon periksa kembali input Anda.';
+
+      console.error('Error updating anak:', resp || error);
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
@@ -408,7 +437,7 @@ const AnakFormScreen = () => {
               onChange={(date) => {
                 if (date) {
                   setSelectedBirthDate(date);
-                  updateField('tanggal_lahir', format(date, 'dd/MM/yyyy'));
+                  updateField('tanggal_lahir', format(date, 'yyyy-MM-dd'));
                 }
                 setShowDatePicker(false);
               }}

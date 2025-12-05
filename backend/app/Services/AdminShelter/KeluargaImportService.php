@@ -14,6 +14,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
@@ -932,6 +933,7 @@ class KeluargaImportService
     {
         $payload = $validated;
         $payload['no_kk'] = $normalized['no_kk'] ?? null;
+        $payload['company_id'] = $context['company_id'] ?? null;
 
         // Keep additional optional columns
         $optionalKeys = [
@@ -969,7 +971,7 @@ class KeluargaImportService
      */
     private function upsertFamily(array $payload): Keluarga
     {
-        $baseData = [
+        $baseData = array_merge($this->companyIdPayload($payload, 'keluarga'), [
             'id_kacab' => $payload['id_kacab'] ?? null,
             'id_wilbin' => $payload['id_wilbin'] ?? null,
             'id_shelter' => $payload['id_shelter'] ?? null,
@@ -981,7 +983,7 @@ class KeluargaImportService
             'an_rek' => $payload['an_rek'] ?? null,
             'no_tlp' => $payload['no_tlp'] ?? null,
             'an_tlp' => $payload['an_tlp'] ?? null,
-        ];
+        ]);
 
         $existingFamily = null;
 
@@ -1034,7 +1036,7 @@ class KeluargaImportService
         if (!empty($payload['nama_ayah'])) {
             Ayah::updateOrCreate(
                 ['id_keluarga' => $familyId],
-                $this->filterData([
+                $this->filterData(array_merge($this->companyIdPayload($payload, 'ayah'), [
                     'id_keluarga' => $familyId,
                     'nik_ayah' => $payload['nik_ayah'] ?? null,
                     'nama_ayah' => $payload['nama_ayah'],
@@ -1045,14 +1047,14 @@ class KeluargaImportService
                     'penghasilan' => $payload['penghasilan_ayah'] ?? null,
                     'tanggal_kematian' => $payload['tanggal_kematian_ayah'] ?? null,
                     'penyebab_kematian' => $payload['penyebab_kematian_ayah'] ?? null,
-                ])
+                ]))
             );
         }
 
         if (!empty($payload['nama_ibu'])) {
             Ibu::updateOrCreate(
                 ['id_keluarga' => $familyId],
-                $this->filterData([
+                $this->filterData(array_merge($this->companyIdPayload($payload, 'ibu'), [
                     'id_keluarga' => $familyId,
                     'nik_ibu' => $payload['nik_ibu'] ?? null,
                     'nama_ibu' => $payload['nama_ibu'],
@@ -1063,7 +1065,7 @@ class KeluargaImportService
                     'penghasilan' => $payload['penghasilan_ibu'] ?? null,
                     'tanggal_kematian' => $payload['tanggal_kematian_ibu'] ?? null,
                     'penyebab_kematian' => $payload['penyebab_kematian_ibu'] ?? null,
-                ])
+                ]))
             );
         }
     }
@@ -1079,7 +1081,7 @@ class KeluargaImportService
         if (($payload['status_ortu'] ?? null) === 'yatim piatu' && !empty($payload['nama_wali'])) {
             Wali::updateOrCreate(
                 ['id_keluarga' => $familyId],
-                $this->filterData([
+                $this->filterData(array_merge($this->companyIdPayload($payload, 'wali'), [
                     'id_keluarga' => $familyId,
                     'nik_wali' => $payload['nik_wali'] ?? null,
                     'nama_wali' => $payload['nama_wali'],
@@ -1089,7 +1091,7 @@ class KeluargaImportService
                     'alamat' => $payload['alamat_wali'] ?? null,
                     'penghasilan' => $payload['penghasilan_wali'] ?? null,
                     'hub_kerabat' => $payload['hub_kerabat_wali'] ?? null,
-                ])
+                ]))
             );
         } else {
             Wali::where('id_keluarga', $familyId)->delete();
@@ -1105,7 +1107,7 @@ class KeluargaImportService
      */
     private function upsertEducation(int $familyId, array $payload): ?AnakPendidikan
     {
-        $educationData = $this->filterData([
+        $educationData = $this->filterData(array_merge($this->companyIdPayload($payload, 'anak_pend'), [
             'id_keluarga' => $familyId,
             'jenjang' => $payload['jenjang'] ?? null,
             'kelas' => $payload['kelas'] ?? null,
@@ -1115,7 +1117,7 @@ class KeluargaImportService
             'semester' => $payload['semester'] ?? null,
             'nama_pt' => $payload['nama_pt'] ?? null,
             'alamat_pt' => $payload['alamat_pt'] ?? null,
-        ]);
+        ]));
 
         // If only id_keluarga is present, skip creation/update.
         if (count($educationData) === 1 && array_key_exists('id_keluarga', $educationData)) {
@@ -1171,7 +1173,7 @@ class KeluargaImportService
             }
         }
 
-        $data = $this->filterData([
+        $data = $this->filterData(array_merge($this->companyIdPayload($payload, 'anak'), [
             'id_keluarga' => $familyId,
             'id_shelter' => $payload['id_shelter'],
             'id_anak_pend' => $educationId,
@@ -1196,7 +1198,7 @@ class KeluargaImportService
             'status_cpb' => $payload['status_cpb'] ?? Anak::STATUS_CPB_BCPB,
             'status_keluarga' => $payload['status_keluarga'] ?? Anak::STATUS_KELUARGA_DENGAN,
             'status' => $payload['status'] ?? null,
-        ]);
+        ]));
 
         if ($child) {
             $child->fill($data);
@@ -1206,6 +1208,17 @@ class KeluargaImportService
 
         Anak::create($data);
         return 'created';
+    }
+
+    private function companyIdPayload(array $payload, string $table): array
+    {
+        $companyId = $payload['company_id'] ?? null;
+
+        if ($companyId && Schema::hasColumn($table, 'company_id')) {
+            return ['company_id' => $companyId];
+        }
+
+        return [];
     }
 
     /**

@@ -15,7 +15,8 @@ class KurikulumMateri extends Model
         'id_kurikulum',
         'id_mata_pelajaran',
         'id_materi',
-        'urutan'
+        'urutan',
+        'company_id'
     ];
 
     protected $casts = [

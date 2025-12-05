@@ -17,6 +17,7 @@ class Ibu extends Model
         'id_keluarga',
         'nik_ibu',
         'nama_ibu',
+        'company_id',
         'agama',
         'tempat_lahir',
         'tanggal_lahir',

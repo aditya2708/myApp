@@ -12,6 +12,8 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Support\AdminShelterScope;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * KurikulumConsumerController - SIMPLIFIED VERSION
@@ -21,6 +23,8 @@ use Illuminate\Support\Facades\Cache;
  */
 class KurikulumConsumerController extends Controller
 {
+    use AdminShelterScope;
+
     /**
      * Get all materi from cabang (for frontend caching & filtering)
      */
@@ -28,6 +32,7 @@ class KurikulumConsumerController extends Controller
     {
         try {
             $adminShelter = Auth::user()->adminShelter;
+            $companyId = $this->companyId();
 
             if (!$adminShelter || !$adminShelter->shelter) {
                 return response()->json([
@@ -48,10 +53,11 @@ class KurikulumConsumerController extends Controller
             $kacabId = $shelter->wilbin->kacab->id_kacab;
 
             // Cache key for all materi
-            $cacheKey = "all_materi_kacab_{$kacabId}";
+            $cacheKey = "all_materi_kacab_{$kacabId}_company_" . ($companyId ?: 'none');
             
-            $materiData = Cache::remember($cacheKey, 600, function () use ($kacabId) { // 10 minutes cache
+            $materiData = Cache::remember($cacheKey, 600, function () use ($kacabId, $companyId) { // 10 minutes cache
                 return Materi::where('id_kacab', $kacabId)
+                    ->when($companyId && Schema::hasColumn('materi', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->with(['mataPelajaran', 'kelas.jenjang'])
                     ->orderBy('urutan')
                     ->get();
@@ -151,7 +157,8 @@ class KurikulumConsumerController extends Controller
             }
 
             $kacabId = $shelter->wilbin->kacab->id_kacab;
-            $semesterAktif = $this->getSemesterAktifData($kacabId);
+            $companyId = $this->companyId();
+            $semesterAktif = $this->getSemesterAktifData($kacabId, $companyId);
 
             return response()->json([
                 'success' => true,
@@ -196,10 +203,12 @@ class KurikulumConsumerController extends Controller
             }
 
             $kacabId = $shelter->wilbin->kacab->id_kacab;
+            $companyId = $this->companyId();
 
             // Get materi detail with validation
             $materi = Materi::where('id_materi', $materiId)
                 ->where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('materi', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->with(['mataPelajaran', 'kelas.jenjang', 'kacab'])
                 ->first();
 
@@ -214,9 +223,11 @@ class KurikulumConsumerController extends Controller
             $usageStats = [
                 'total_usage_in_shelter' => \App\Models\Aktivitas::where('id_materi', $materiId)
                     ->where('id_shelter', $adminShelter->shelter->id_shelter)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->count(),
                 'recent_usage' => \App\Models\Aktivitas::where('id_materi', $materiId)
                     ->where('id_shelter', $adminShelter->shelter->id_shelter)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->where('tanggal', '>=', now()->subDays(30))
                     ->count()
             ];
@@ -256,9 +267,10 @@ class KurikulumConsumerController extends Controller
     /**
      * Helper method to get semester aktif data
      */
-    private function getSemesterAktifData($kacabId)
+    private function getSemesterAktifData($kacabId, ?int $companyId = null)
     {
         $semesterAktif = Semester::where('id_kacab', $kacabId)
+            ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
             ->where('is_active', true)
             ->orderBy('tanggal_mulai', 'desc')
             ->first();

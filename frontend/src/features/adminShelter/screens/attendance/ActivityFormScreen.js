@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, View } from 'react-native';
+import { useDispatch } from 'react-redux';
 
 import Button from '../../../../common/components/Button';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
@@ -13,9 +14,64 @@ import ScheduleSection from './components/activityForm/ScheduleSection';
 import TutorPickerSection from './components/activityForm/TutorPickerSection';
 import styles from './styles/activityFormStyles';
 import { MIN_ACTIVITY_DURATION } from './utils/activityFormUtils';
+import { setQuickFlowActivity, updateQuickFlowStep } from '../../redux/quickFlowSlice';
 
 const ActivityFormScreen = ({ navigation, route }) => {
   const { activity } = route.params || {};
+  const dispatch = useDispatch();
+  const isQuickFlow = route?.params?.quickFlow || false;
+
+  const handleFormSuccess = (createdActivity) => {
+    if (isQuickFlow) {
+      const newActivityId =
+        createdActivity?.id_aktivitas ||
+        createdActivity?.id ||
+        activity?.id_aktivitas ||
+        null;
+      const resolvedStatus = createdActivity?.status || activity?.status || null;
+
+      if (!newActivityId) {
+        dispatch(updateQuickFlowStep('activitiesList'));
+        navigation.navigate('ActivitiesList', {
+          quickFlow: true,
+        });
+        return;
+      }
+
+      const rawKelompokIds = Array.isArray(createdActivity?.kelompok_ids)
+        ? createdActivity.kelompok_ids.filter(Boolean)
+        : [];
+      const fallbackKelompokIds = Array.isArray(createdActivity?.selectedKelompokIds)
+        ? createdActivity.selectedKelompokIds.filter(Boolean)
+        : [];
+      const resolvedKelompokIds = rawKelompokIds.length ? rawKelompokIds : fallbackKelompokIds;
+      const resolvedKelompokId =
+        createdActivity?.kelompok_id ||
+        createdActivity?.selectedKelompokId ||
+        resolvedKelompokIds[0] ||
+        null;
+
+      if (newActivityId) {
+        dispatch(setQuickFlowActivity({ activityId: newActivityId, status: resolvedStatus }));
+      }
+
+      dispatch(updateQuickFlowStep('manualAttendance'));
+      navigation.navigate('ManualAttendance', {
+        id_aktivitas: newActivityId,
+        activityName: createdActivity?.jenis_kegiatan || activity?.jenis_kegiatan,
+        activityDateRaw: createdActivity?.tanggal || null,
+        activityType: createdActivity?.jenis_kegiatan || activity?.jenis_kegiatan,
+        kelompokId: resolvedKelompokId,
+        kelompokIds: resolvedKelompokIds,
+        kelompokName: createdActivity?.nama_kelompok || null,
+        activityStatus: resolvedStatus,
+        quickFlow: true,
+      });
+      return;
+    }
+
+    navigation.goBack();
+  };
 
   const {
     isEditing,
@@ -50,7 +106,7 @@ const ActivityFormScreen = ({ navigation, route }) => {
     handleSubmit,
   } = useActivityForm({
     activity,
-    onSuccess: () => navigation.goBack(),
+    onSuccess: handleFormSuccess,
   });
 
   return (

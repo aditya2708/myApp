@@ -24,7 +24,8 @@ class Kurikulum extends Model
         'tanggal_selesai',
         'is_active',
         'status',
-        'id_kacab'
+        'id_kacab',
+        'company_id',
     ];
 
     protected $casts = [
@@ -100,9 +101,10 @@ class Kurikulum extends Model
         return $query->where('is_active', false);
     }
 
-    public function scopeByKacab($query, $kacabId)
+    public function scopeByKacab($query, $kacabId, ?int $companyId = null)
     {
-        return $query->where('id_kacab', $kacabId);
+        return $query->where('id_kacab', $kacabId)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId));
     }
 
     public function scopeByTahun($query, $tahun)

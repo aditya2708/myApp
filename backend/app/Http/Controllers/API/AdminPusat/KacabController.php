@@ -7,17 +7,23 @@ use App\Http\Requests\Kacab\StoreKacabRequest;
 use App\Http\Requests\Kacab\UpdateKacabRequest;
 use App\Http\Resources\KacabResource;
 use App\Models\Kacab;
+use App\Support\AdminPusatScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Schema;
 
 class KacabController extends Controller
 {
+    use AdminPusatScope;
+
     /**
      * Display a listing of the resource.
      */
     public function index(): AnonymousResourceCollection
     {
-        $kacab = Kacab::query()
+        $companyId = $this->companyId();
+
+        $kacab = $this->applyCompanyScope(Kacab::query(), $companyId, 'kacab')
             ->latest('id_kacab')
             ->paginate();
 
@@ -30,11 +36,16 @@ class KacabController extends Controller
     public function store(StoreKacabRequest $request)
     {
         $data = $request->validated();
+        $companyId = $this->companyId();
 
         if (!empty($data['no_telpon']) && empty($data['no_telp'])) {
             $data['no_telp'] = $data['no_telpon'];
         } elseif (!empty($data['no_telp']) && empty($data['no_telpon'])) {
             $data['no_telpon'] = $data['no_telp'];
+        }
+
+        if ($companyId && Schema::hasColumn('kacab', 'company_id')) {
+            $data['company_id'] = $companyId;
         }
 
         $kacab = Kacab::create($data);
@@ -49,6 +60,9 @@ class KacabController extends Controller
      */
     public function show(Kacab $kacab): KacabResource
     {
+        $companyId = $this->companyId();
+        $kacab = $this->applyCompanyScope(Kacab::whereKey($kacab->getKey()), $companyId, 'kacab')->firstOrFail();
+
         return new KacabResource($kacab);
     }
 
@@ -57,6 +71,9 @@ class KacabController extends Controller
      */
     public function update(UpdateKacabRequest $request, Kacab $kacab): KacabResource
     {
+        $companyId = $this->companyId();
+        $kacab = $this->applyCompanyScope(Kacab::whereKey($kacab->getKey()), $companyId, 'kacab')->firstOrFail();
+
         $data = $request->validated();
 
         if (!empty($data['no_telpon']) && empty($data['no_telp'])) {
@@ -76,6 +93,9 @@ class KacabController extends Controller
      */
     public function destroy(Kacab $kacab): JsonResponse
     {
+        $companyId = $this->companyId();
+        $kacab = $this->applyCompanyScope(Kacab::whereKey($kacab->getKey()), $companyId, 'kacab')->firstOrFail();
+
         $kacab->delete();
 
         return response()->json([

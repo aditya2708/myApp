@@ -19,7 +19,8 @@ class AttendanceVerification extends Model
         'verification_notes',
         'verified_by',
         'verified_at',
-        'metadata'
+        'metadata',
+        'company_id'
     ];
 
     protected $casts = [

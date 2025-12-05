@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\AdminCabang\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Services\AdminCabang\Reports\ReportSummaryService;
+use App\Support\AdminCabangScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -11,6 +12,8 @@ use RuntimeException;
 
 class AdminCabangReportSummaryController extends Controller
 {
+    use AdminCabangScope;
+
     public function getSummary(Request $request, ReportSummaryService $reportSummaryService): JsonResponse
     {
         $user = $request->user();
@@ -27,6 +30,18 @@ class AdminCabangReportSummaryController extends Controller
             return response()->json([
                 'message' => 'Admin cabang tidak ditemukan'
             ], 404);
+        }
+
+        $companyId = $this->companyId($adminCabang->company_id ?? null);
+
+        if ($companyId && $adminCabang->company_id && $adminCabang->company_id !== $companyId) {
+            return response()->json([
+                'message' => 'Admin cabang tidak ditemukan untuk company ini',
+            ], 404);
+        }
+
+        if ($companyId && !$adminCabang->company_id) {
+            $adminCabang->company_id = $companyId;
         }
 
         $startDateInput = $request->query('start_date');

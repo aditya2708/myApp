@@ -12,6 +12,7 @@ use App\Models\Anak;
 use App\Helpers\CurrencyHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class TutorHonorService
 {
@@ -299,12 +300,16 @@ class TutorHonorService
         ];
     }
 
-    public function getHonorByPeriod($tutorId, $filters = [])
+    public function getHonorByPeriod($tutorId, $filters = [], ?int $companyId = null)
     {
         $query = TutorHonor::byTutor($tutorId)
             ->with(['details.aktivitas', 'tutor'])
             ->orderBy('tahun', 'desc')
             ->orderBy('bulan', 'desc');
+
+        if ($companyId && Schema::hasColumn('tutor_honor', 'company_id')) {
+            $query->where('tutor_honor.company_id', $companyId);
+        }
 
         // Apply date filters
         if (isset($filters['start_date'])) {
@@ -385,9 +390,13 @@ class TutorHonorService
         return $query->paginate($perPage, ['*'], 'page', $page);
     }
 
-    public function generatePeriodStatistics($tutorId, $filters = [])
+    public function generatePeriodStatistics($tutorId, $filters = [], ?int $companyId = null)
     {
         $query = TutorHonor::byTutor($tutorId);
+
+        if ($companyId && Schema::hasColumn('tutor_honor', 'company_id')) {
+            $query->where('tutor_honor.company_id', $companyId);
+        }
 
         // Apply same filters as getHonorByPeriod
         if (isset($filters['start_date'])) {

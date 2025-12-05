@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\AdminShelter;
 use App\Http\Controllers\Controller;
 use App\Models\SuratAb;
 use App\Models\Anak;
+use App\Support\SsoContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,13 @@ use Illuminate\Support\Facades\Validator;
 
 class AdminShelterSuratController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
     /**
      * Get surat list for specific child
      */
@@ -19,6 +27,7 @@ class AdminShelterSuratController extends Controller
     {
         try {
             $user = Auth::user();
+            $companyId = $this->companyId();
             
             if (!$user->adminShelter) {
                 return response()->json([
@@ -30,6 +39,7 @@ class AdminShelterSuratController extends Controller
             // Verify child belongs to this shelter
             $child = Anak::where('id_anak', $childId)
                 ->where('id_shelter', $user->adminShelter->id_shelter)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->first();
 
             if (!$child) {
@@ -40,6 +50,7 @@ class AdminShelterSuratController extends Controller
             }
 
             $suratList = SuratAb::where('id_anak', $childId)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->with('anak')
                 ->orderBy('tanggal', 'desc')
                 ->get()
@@ -81,6 +92,7 @@ class AdminShelterSuratController extends Controller
     {
         try {
             $user = Auth::user();
+            $companyId = $this->companyId();
             
             if (!$user->adminShelter) {
                 return response()->json([
@@ -92,6 +104,7 @@ class AdminShelterSuratController extends Controller
             // Verify child belongs to this shelter
             $child = Anak::where('id_anak', $childId)
                 ->where('id_shelter', $user->adminShelter->id_shelter)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->first();
 
             if (!$child) {
@@ -103,6 +116,7 @@ class AdminShelterSuratController extends Controller
 
             $surat = SuratAb::where('id_surat', $suratId)
                 ->where('id_anak', $childId)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->with('anak')
                 ->first();
 

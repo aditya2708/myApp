@@ -27,6 +27,7 @@ class Tutor extends Model
         'jenis_tutor',
         'foto',
         'is_active',
+        'company_id',
     ];
 
     protected $casts = [

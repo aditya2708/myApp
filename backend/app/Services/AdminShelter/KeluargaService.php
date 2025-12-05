@@ -11,9 +11,13 @@ use App\Models\Ibu;
 use App\Models\Wali;
 use App\Models\Survey;
 use Illuminate\Http\Request;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class KeluargaService
 {
@@ -21,9 +25,8 @@ class KeluargaService
     {
         $perPage = $request->get('per_page', 10);
         $search = $request->get('search', '');
-        
-        $query = Keluarga::with(['shelter', 'wilbin', 'kacab'])
-            ->where('id_shelter', Auth::user()->adminShelter->id_shelter);
+
+        $query = $this->keluargaQuery()->with(['shelter', 'wilbin', 'kacab']);
             
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -31,7 +34,7 @@ class KeluargaService
                   ->orWhere('no_kk', 'like', "%{$search}%");
             });
         }
-        
+
         $keluarga = $query->orderBy('created_at', 'desc')->paginate($perPage);
         
         return [
@@ -47,7 +50,7 @@ class KeluargaService
 
     public function getKeluargaDetail($id)
     {
-        $keluarga = Keluarga::with([
+        $keluarga = $this->keluargaQuery()->with([
             'ayah',
             'ibu',
             'wali',
@@ -57,8 +60,15 @@ class KeluargaService
             'bank',
             'surveys.submittedBy'
         ])->findOrFail($id);
+
+        $this->ensureKeluargaInScope($keluarga);
         
-        $anak = Anak::with(['anakPendidikan'])->where('id_keluarga', $id)->get();
+        $anak = Anak::with(['anakPendidikan'])
+            ->where('id_keluarga', $id)
+            ->when($this->currentCompanyId() && Schema::hasColumn('anak', 'company_id'), function ($q) {
+                $q->where('company_id', $this->currentCompanyId());
+            })
+            ->get();
         
         return [
             'keluarga' => $keluarga,
@@ -99,7 +109,8 @@ class KeluargaService
     public function updateKeluarga($id, array $data)
     {
         return DB::transaction(function () use ($id, $data) {
-            $keluarga = Keluarga::findOrFail($id);
+            $keluarga = $this->keluargaQuery()->findOrFail($id);
+            $this->ensureKeluargaInScope($keluarga);
             $submitSurvey = $this->resolveSubmitSurveyFlag($data);
             
             // Update family data
@@ -130,7 +141,8 @@ class KeluargaService
     public function deleteKeluarga($id)
     {
         return DB::transaction(function () use ($id) {
-            $keluarga = Keluarga::findOrFail($id);
+            $keluarga = $this->keluargaQuery()->findOrFail($id);
+            $this->ensureKeluargaInScope($keluarga);
             
             // Check for active children
             $activeChildren = Anak::where('id_keluarga', $id)
@@ -154,7 +166,8 @@ class KeluargaService
     public function forceDeleteKeluarga($id)
     {
         return DB::transaction(function () use ($id) {
-            $keluarga = Keluarga::findOrFail($id);
+            $keluarga = $this->keluargaQuery()->findOrFail($id);
+            $this->ensureKeluargaInScope($keluarga);
             
             // Update children status to 'tanpa keluarga'
             $affectedChildren = Anak::where('id_keluarga', $id)
@@ -180,8 +193,8 @@ class KeluargaService
         $shelter = $adminShelter->shelter;
         $wilbin = $shelter->wilbin;
         $kacab = $wilbin->kacab;
-        
-        return [
+
+        $payload = [
             'id_shelter' => $shelter->id_shelter,
             'id_wilbin' => $wilbin->id_wilbin,
             'id_kacab' => $kacab->id_kacab,
@@ -194,12 +207,13 @@ class KeluargaService
             'no_tlp' => $data['no_tlp'] ?? null,
             'an_tlp' => $data['an_tlp'] ?? null,
         ];
+
+        return array_merge($this->companyIdPayload('keluarga'), $payload);
     }
 
     private function createParentData($keluargaId, array $data): void
     {
-        // Create father
-        Ayah::create([
+        Ayah::create(array_merge($this->companyIdPayload('ayah'), [
             'id_keluarga' => $keluargaId,
             'nik_ayah' => $data['nik_ayah'] ?? null,
             'nama_ayah' => $data['nama_ayah'],
@@ -210,10 +224,9 @@ class KeluargaService
             'penghasilan' => $data['penghasilan_ayah'] ?? null,
             'tanggal_kematian' => $data['tanggal_kematian_ayah'] ?? null,
             'penyebab_kematian' => $data['penyebab_kematian_ayah'] ?? null,
-        ]);
-        
-        // Create mother
-        Ibu::create([
+        ]));
+
+        Ibu::create(array_merge($this->companyIdPayload('ibu'), [
             'id_keluarga' => $keluargaId,
             'nik_ibu' => $data['nik_ibu'] ?? null,
             'nama_ibu' => $data['nama_ibu'],
@@ -224,15 +237,14 @@ class KeluargaService
             'penghasilan' => $data['penghasilan_ibu'] ?? null,
             'tanggal_kematian' => $data['tanggal_kematian_ibu'] ?? null,
             'penyebab_kematian' => $data['penyebab_kematian_ibu'] ?? null,
-        ]);
+        ]));
     }
 
     private function updateParentData($keluargaId, array $data): void
     {
-        // Update father
         Ayah::updateOrCreate(
             ['id_keluarga' => $keluargaId],
-            [
+            array_merge($this->companyIdPayload('ayah'), [
                 'nik_ayah' => $data['nik_ayah'] ?? null,
                 'nama_ayah' => $data['nama_ayah'],
                 'agama' => $data['agama_ayah'] ?? null,
@@ -242,13 +254,12 @@ class KeluargaService
                 'penghasilan' => $data['penghasilan_ayah'] ?? null,
                 'tanggal_kematian' => $data['tanggal_kematian_ayah'] ?? null,
                 'penyebab_kematian' => $data['penyebab_kematian_ayah'] ?? null,
-            ]
+            ])
         );
-        
-        // Update mother
+
         Ibu::updateOrCreate(
             ['id_keluarga' => $keluargaId],
-            [
+            array_merge($this->companyIdPayload('ibu'), [
                 'nik_ibu' => $data['nik_ibu'] ?? null,
                 'nama_ibu' => $data['nama_ibu'],
                 'agama' => $data['agama_ibu'] ?? null,
@@ -258,14 +269,14 @@ class KeluargaService
                 'penghasilan' => $data['penghasilan_ibu'] ?? null,
                 'tanggal_kematian' => $data['tanggal_kematian_ibu'] ?? null,
                 'penyebab_kematian' => $data['penyebab_kematian_ibu'] ?? null,
-            ]
+            ])
         );
     }
 
     private function createGuardianData($keluargaId, array $data): void
     {
         if (isset($data['nama_wali'])) {
-            Wali::create([
+            Wali::create(array_merge($this->companyIdPayload('wali'), [
                 'id_keluarga' => $keluargaId,
                 'nik_wali' => $data['nik_wali'],
                 'nama_wali' => $data['nama_wali'],
@@ -275,7 +286,7 @@ class KeluargaService
                 'alamat' => $data['alamat_wali'],
                 'penghasilan' => $data['penghasilan_wali'],
                 'hub_kerabat' => $data['hub_kerabat_wali'],
-            ]);
+            ]));
         }
     }
 
@@ -284,7 +295,7 @@ class KeluargaService
         if (isset($data['nama_wali'])) {
             Wali::updateOrCreate(
                 ['id_keluarga' => $keluargaId],
-                [
+                array_merge($this->companyIdPayload('wali'), [
                     'nik_wali' => $data['nik_wali'],
                     'nama_wali' => $data['nama_wali'],
                     'agama' => $data['agama_wali'],
@@ -293,7 +304,7 @@ class KeluargaService
                     'alamat' => $data['alamat_wali'],
                     'penghasilan' => $data['penghasilan_wali'],
                     'hub_kerabat' => $data['hub_kerabat_wali'],
-                ]
+                ])
             );
         }
     }
@@ -302,7 +313,7 @@ class KeluargaService
     {
         $shelterId = Auth::user()->adminShelter->id_shelter;
         
-        $childData = $this->sanitizeChildData([
+        $childData = $this->sanitizeChildData(array_merge([
             'id_keluarga' => $keluargaId,
             'id_shelter' => $shelterId,
             'id_anak_pend' => $idAnakPend,
@@ -324,7 +335,7 @@ class KeluargaService
             'transportasi' => $data['transportasi'],
             'status_validasi' => 'aktif',
             'status_cpb' => 'BCPB',
-        ]);
+        ], $this->companyIdPayload('anak')));
 
         $anak = Anak::create($childData);
 
@@ -342,7 +353,11 @@ class KeluargaService
 
     private function updateChildData($keluargaId, array $data): void
     {
-        $anak = Anak::where('id_keluarga', $keluargaId)->first();
+        $anak = Anak::where('id_keluarga', $keluargaId)
+            ->when($this->currentCompanyId() && Schema::hasColumn('anak', 'company_id'), function ($q) {
+                $q->where('company_id', $this->currentCompanyId());
+            })
+            ->first();
         
         if ($anak) {
             $shelterId = Auth::user()->adminShelter->id_shelter;
@@ -350,7 +365,7 @@ class KeluargaService
             // Get the education record to link with id_anak_pend
             $anakPendidikan = AnakPendidikan::where('id_keluarga', $keluargaId)->first();
             
-            $childData = $this->sanitizeChildData([
+            $childData = $this->sanitizeChildData(array_merge([
                 'id_shelter' => $shelterId,
                 'id_anak_pend' => $anakPendidikan ? $anakPendidikan->id_anak_pend : null,
                 'nik_anak' => $data['nik_anak'],
@@ -369,7 +384,7 @@ class KeluargaService
                 'prestasi' => $data['prestasi'] ?? null,
                 'jarak_rumah' => $data['jarak_rumah'],
                 'transportasi' => $data['transportasi'],
-            ]);
+            ], $this->companyIdPayload('anak')));
 
             // Handle photo upload
             if (isset($data['foto'])) {
@@ -402,7 +417,7 @@ class KeluargaService
 
     private function createEducationData($keluargaId, array $data): AnakPendidikan
     {
-        $educationData = [
+        $educationData = array_merge($this->companyIdPayload('anak_pend'), [
             'id_keluarga' => $keluargaId,
             'jenjang' => $data['jenjang'],
             'kelas' => $data['kelas'] ?? null,
@@ -412,7 +427,7 @@ class KeluargaService
             'semester' => $data['semester'] ?? null,
             'nama_pt' => $data['nama_pt'] ?? null,
             'alamat_pt' => $data['alamat_pt'] ?? null,
-        ];
+        ]);
 
         return AnakPendidikan::create(array_filter($educationData, function ($value) {
             return $value !== null && $value !== '';
@@ -422,6 +437,7 @@ class KeluargaService
     private function createSurveyData($keluargaId, array $data, ?bool $submitSurvey): void
     {
         $surveyData = array_merge(
+            $this->companyIdPayload('survey'),
             ['id_keluarga' => $keluargaId],
             $this->buildSurveyDataPayload($data)
         );
@@ -441,7 +457,10 @@ class KeluargaService
 
     private function updateSurveyData($keluargaId, array $data, ?bool $submitSurvey): void
     {
-        $surveyData = $this->buildSurveyDataPayload($data);
+        $surveyData = array_merge(
+            $this->companyIdPayload('survey'),
+            $this->buildSurveyDataPayload($data)
+        );
 
         $survey = Survey::firstOrNew(['id_keluarga' => $keluargaId]);
         $survey->fill($surveyData);
@@ -572,5 +591,57 @@ class KeluargaService
         Wali::where('id_keluarga', $keluargaId)->delete();
         Ibu::where('id_keluarga', $keluargaId)->delete();
         Ayah::where('id_keluarga', $keluargaId)->delete();
+    }
+
+    private function keluargaQuery(): Builder
+    {
+        $shelterId = $this->adminShelter()->id_shelter;
+        $companyId = $this->currentCompanyId();
+
+        return Keluarga::query()
+            ->where('id_shelter', $shelterId)
+            ->when($companyId && Schema::hasColumn('keluarga', 'company_id'), function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            });
+    }
+
+    private function ensureKeluargaInScope(Keluarga $keluarga): void
+    {
+        $adminShelter = $this->adminShelter();
+
+        if ((int) $keluarga->id_shelter !== (int) $adminShelter->id_shelter) {
+            throw new AuthorizationException('Family does not belong to current shelter');
+        }
+
+        if ($adminShelter->company_id && Schema::hasColumn('keluarga', 'company_id')) {
+            if ((int) $keluarga->company_id !== (int) $adminShelter->company_id) {
+                throw new AuthorizationException('Family does not belong to current company');
+            }
+        }
+    }
+
+    private function currentCompanyId(): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return Auth::user()?->adminShelter->company_id ?? null;
+    }
+
+    private function companyIdPayload(string $table): array
+    {
+        $companyId = $this->currentCompanyId();
+
+        if ($companyId && Schema::hasColumn($table, 'company_id')) {
+            return ['company_id' => $companyId];
+        }
+
+        return [];
+    }
+
+    private function adminShelter()
+    {
+        return Auth::user()->adminShelter;
     }
 }

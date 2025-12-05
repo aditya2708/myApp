@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +26,15 @@ import { adminPusatApi } from '../api/adminPusatApi';
 
 const AdminPusatProfileScreen = () => {
   const navigation = useNavigation();
-  const { user, profile, refreshUser, logout } = useAuth();
+  const {
+    user,
+    profile,
+    refreshUser,
+    logout,
+    roles = [],
+    currentRole,
+    selectRole,
+  } = useAuth();
   
   // Profile state
   const [profileData, setProfileData] = useState({
@@ -38,6 +47,9 @@ const AdminPusatProfileScreen = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [roleModalVisible, setRoleModalVisible] = useState(false);
+  const [roleSwitching, setRoleSwitching] = useState(false);
+  const [roleSwitchError, setRoleSwitchError] = useState(null);
 
   // Initialize profile data from Redux state
   useEffect(() => {
@@ -155,6 +167,32 @@ const AdminPusatProfileScreen = () => {
     );
   };
 
+  const handleOpenRoleModal = () => {
+    if (!roles || roles.length === 0) {
+      Alert.alert('Peran tidak ditemukan', 'Akun ini belum memiliki peran lain.');
+      return;
+    }
+    setRoleSwitchError(null);
+    setRoleModalVisible(true);
+  };
+
+  const handleSelectRole = async (role) => {
+    try {
+      setRoleSwitching(true);
+      setRoleSwitchError(null);
+      const result = await selectRole(role);
+      if (result?.success) {
+        setRoleModalVisible(false);
+      } else {
+        setRoleSwitchError(result?.message || 'Gagal mengubah peran');
+      }
+    } catch (err) {
+      setRoleSwitchError(err?.message || 'Gagal mengubah peran');
+    } finally {
+      setRoleSwitching(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       {/* Error Message */}
@@ -197,6 +235,28 @@ const AdminPusatProfileScreen = () => {
 
       {/* Profile Content */}
       <View style={styles.profileContent}>
+        <View style={styles.roleCard}>
+          <View>
+            <Text style={styles.sectionTitle}>Peran Aktif</Text>
+            <Text style={styles.activeRoleValue}>{currentRole?.name || currentRole?.slug || user?.level || 'Admin Pusat'}</Text>
+            {(currentRole?.scope_type || currentRole?.scope_id) && (
+              <Text style={styles.scopeInfo}>
+                {currentRole?.scope_type}{currentRole?.scope_id ? ` #${currentRole.scope_id}` : ''}
+              </Text>
+            )}
+          </View>
+          {roles?.length > 0 && (
+            <TouchableOpacity
+              style={styles.switchRoleButton}
+              onPress={handleOpenRoleModal}
+              disabled={roleSwitching}
+            >
+              <Ionicons name="swap-horizontal-outline" size={18} color="#3498db" />
+              <Text style={styles.switchRoleText}>Ganti Peran</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Edit/Save Button */}
         <View style={styles.editButtonContainer}>
           {!isEditing ? (
@@ -303,6 +363,17 @@ const AdminPusatProfileScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
+          {roles?.length > 1 && (
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={handleOpenRoleModal}
+            >
+              <Ionicons name="swap-horizontal-outline" size={24} color="#d35400" />
+              <Text style={[styles.settingsText, { color: '#d35400' }]}>Ganti Peran Aktif</Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={styles.settingsItem}
             onPress={handleLogout}
@@ -320,6 +391,63 @@ const AdminPusatProfileScreen = () => {
           <LoadingSpinner message="Memperbarui profil..." />
         </View>
       )}
+
+      <Modal
+        visible={roleModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRoleModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Pilih Peran Aktif</Text>
+            <Text style={styles.modalSubtitle}>Tanpa logout. Permintaan selanjutnya akan memakai header peran yang dipilih.</Text>
+            {roleSwitchError && (
+              <Text style={styles.modalError}>{roleSwitchError}</Text>
+            )}
+            <View style={styles.roleList}>
+              {roles?.map((role, index) => {
+                const isActive = currentRole?.slug === role.slug
+                  && (currentRole?.scope_type ?? null) === (role.scope_type ?? null)
+                  && (currentRole?.scope_id ?? null) === (role.scope_id ?? null);
+                return (
+                  <TouchableOpacity
+                    key={`${role.slug}-${role.scope_type || 'global'}-${role.scope_id || index}`}
+                    style={[
+                      styles.roleItem,
+                      isActive && styles.roleItemActive,
+                    ]}
+                    onPress={() => handleSelectRole(role)}
+                    disabled={roleSwitching}
+                  >
+                    <View style={styles.roleItemText}>
+                      <Text style={styles.roleName}>{role.name || role.slug}</Text>
+                      <Text style={styles.roleSlug}>{role.slug}</Text>
+                      {(role.scope_type || role.scope_id) && (
+                        <Text style={styles.roleScope}>
+                          {role.scope_type}{role.scope_id ? ` #${role.scope_id}` : ''}
+                        </Text>
+                      )}
+                    </View>
+                    {isActive && (
+                      <Ionicons name="checkmark-circle" size={22} color="#3498db" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.modalActions}>
+              <Button
+                title="Tutup"
+                type="outline"
+                onPress={() => setRoleModalVisible(false)}
+                disabled={roleSwitching}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -387,6 +515,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
+  roleCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e8f4fb', borderWidth: 1, borderColor: '#c5d9f6', padding: 12, borderRadius: 12, marginBottom: 14 },
+  activeRoleValue: { fontSize: 16, fontWeight: '700', color: '#2980b9' },
+  scopeInfo: { fontSize: 12, color: '#7f8c8d', marginTop: 2 },
+  switchRoleButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#3498db', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
+  switchRoleText: { marginLeft: 6, color: '#3498db', fontWeight: '600' },
   editButtonContainer: {
     alignItems: 'flex-end',
     marginBottom: 20,
@@ -436,6 +569,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '70%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#2c3e50' },
+  modalSubtitle: { fontSize: 13, color: '#7f8c8d', marginTop: 4, marginBottom: 12 },
+  modalError: { color: '#e74c3c', marginBottom: 10 },
+  roleList: { marginBottom: 10 },
+  roleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  roleItemActive: { backgroundColor: '#f8fffb' },
+  roleItemText: { flex: 1 },
+  roleName: { fontSize: 15, fontWeight: '700', color: '#2c3e50' },
+  roleSlug: { fontSize: 12, color: '#7f8c8d' },
+  roleScope: { fontSize: 12, color: '#95a5a6', marginTop: 2 },
+  modalActions: { marginTop: 12 },
+  modalButton: { alignSelf: 'flex-end' },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255, 255, 255, 0.8)',

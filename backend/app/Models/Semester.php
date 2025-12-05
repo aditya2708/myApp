@@ -27,7 +27,8 @@ class Semester extends Model
         'status',
         'type',
         'tahun_mulai',
-        'tahun_selesai'
+        'tahun_selesai',
+        'company_id'
     ];
 
     protected $casts = [

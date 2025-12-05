@@ -19,7 +19,8 @@ class TemplateAdoption extends Model
         'status',
         'adopted_by',
         'adoption_notes',
-        'adopted_at'
+        'adopted_at',
+        'company_id'
     ];
 
     protected $casts = [
@@ -63,8 +64,9 @@ class TemplateAdoption extends Model
         return $query->where('status', 'customized');
     }
 
-    public function scopeByKacab($query, $kacabId)
+    public function scopeByKacab($query, $kacabId, ?int $companyId = null)
     {
-        return $query->where('id_kacab', $kacabId);
+        return $query->where('id_kacab', $kacabId)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId));
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Prestasi;
 use App\Models\Anak;
 use App\Http\Resources\Prestasi\PrestasiCollection;
+use App\Support\SsoContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,13 @@ use Illuminate\Support\Str;
 
 class AdminShelterPrestasiController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
     /**
      * Display a listing of prestasi for a specific child.
      *
@@ -24,6 +32,7 @@ class AdminShelterPrestasiController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
@@ -35,6 +44,7 @@ class AdminShelterPrestasiController extends Controller
 
         // Check if this child belongs to the admin's shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_anak', $anakId)
                     ->first();
         
@@ -61,14 +71,17 @@ class AdminShelterPrestasiController extends Controller
         $perPage = $request->per_page ?? 10;
 
         // Eager loading with anak
-        $query->with('anak');
+        $query->with('anak')
+              ->when($companyId, fn ($q) => $q->where('company_id', $companyId));
 
         // Paginate
         $prestasi = $query->latest()->paginate($perPage);
 
         // Calculate summary
         $summary = [
-            'total_prestasi' => Prestasi::where('id_anak', $anakId)->count(),
+            'total_prestasi' => Prestasi::where('id_anak', $anakId)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->count(),
         ];
 
         return response()->json([
@@ -98,6 +111,7 @@ class AdminShelterPrestasiController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
@@ -109,6 +123,7 @@ class AdminShelterPrestasiController extends Controller
 
         // Check if this child belongs to the admin's shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_anak', $anakId)
                     ->first();
         
@@ -122,6 +137,7 @@ class AdminShelterPrestasiController extends Controller
         // Find prestasi and ensure it belongs to the specified child
         $prestasi = Prestasi::where('id_anak', $anakId)
                             ->where('id_prestasi', $prestasiId)
+                            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                             ->with('anak')
                             ->firstOrFail();
 
@@ -149,6 +165,7 @@ class AdminShelterPrestasiController extends Controller
     {
         // Get the authenticated admin_shelter
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
@@ -160,6 +177,7 @@ class AdminShelterPrestasiController extends Controller
 
         // Check if this child belongs to the admin's shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_anak', $anakId)
                     ->first();
         

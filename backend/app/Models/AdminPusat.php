@@ -23,6 +23,7 @@ class AdminPusat extends Model
         'alamat',
         'no_hp',
         'foto',
+        'company_id',
     ];
 
     /**

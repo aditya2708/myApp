@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class KurikulumMateriController extends Controller
 {
@@ -23,8 +25,9 @@ class KurikulumMateriController extends Controller
         try {
             $adminCabang = auth()->user()->adminCabang ?? null;
             $kacabId = $adminCabang->id_kacab ?? null;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
-            if ($kurikulum->id_kacab !== $kacabId) {
+            if ($kurikulum->id_kacab !== $kacabId || ($companyId && Schema::hasColumn('kurikulum', 'company_id') && $kurikulum->company_id !== $companyId)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak memiliki akses ke kurikulum ini.'
@@ -32,6 +35,9 @@ class KurikulumMateriController extends Controller
             }
 
             $query = KurikulumMateri::where('id_kurikulum', $kurikulum->id_kurikulum)
+                ->when($companyId && Schema::hasColumn('kurikulum_materi', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->with([
                     'materi.mataPelajaran',
                     'materi.kelas.jenjang',
@@ -71,8 +77,9 @@ class KurikulumMateriController extends Controller
         try {
             $adminCabang = auth()->user()->adminCabang ?? null;
             $kacabId = $adminCabang->id_kacab ?? null;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
-            if ($kurikulum->id_kacab !== $kacabId) {
+            if ($kurikulum->id_kacab !== $kacabId || ($companyId && Schema::hasColumn('kurikulum', 'company_id') && $kurikulum->company_id !== $companyId)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak memiliki akses ke kurikulum ini.'
@@ -81,10 +88,13 @@ class KurikulumMateriController extends Controller
 
             $data = $request->validated();
             $data['id_kurikulum'] = $kurikulum->id_kurikulum;
+            if ($companyId && Schema::hasColumn('kurikulum_materi', 'company_id')) {
+                $data['company_id'] = $companyId;
+            }
 
             $materi = Materi::where('id_materi', $data['id_materi'])->first();
 
-            if (!$materi || ($materi->id_kacab && $materi->id_kacab !== $kacabId)) {
+            if (!$materi || ($materi->id_kacab && $materi->id_kacab !== $kacabId) || ($companyId && Schema::hasColumn('materi', 'company_id') && $materi->company_id !== $companyId)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Materi tidak ditemukan untuk cabang ini.'
@@ -134,8 +144,9 @@ class KurikulumMateriController extends Controller
         try {
             $adminCabang = auth()->user()->adminCabang ?? null;
             $kacabId = $adminCabang->id_kacab ?? null;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
-            if ($kurikulum->id_kacab !== $kacabId) {
+            if ($kurikulum->id_kacab !== $kacabId || ($companyId && Schema::hasColumn('kurikulum', 'company_id') && $kurikulum->company_id !== $companyId)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak memiliki akses ke kurikulum ini.'
@@ -144,6 +155,9 @@ class KurikulumMateriController extends Controller
 
             $record = KurikulumMateri::where('id_kurikulum', $kurikulum->id_kurikulum)
                 ->where('id_materi', $materi)
+                ->when($companyId && Schema::hasColumn('kurikulum_materi', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->first();
 
             if (!$record) {
@@ -182,6 +196,7 @@ class KurikulumMateriController extends Controller
         try {
             $adminCabang = auth()->user()->adminCabang ?? null;
             $kacabId = $adminCabang->id_kacab ?? null;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
             if ($kurikulum->id_kacab !== $kacabId) {
                 return response()->json([
@@ -214,6 +229,9 @@ class KurikulumMateriController extends Controller
 
             $existingIds = KurikulumMateri::where('id_kurikulum', $kurikulum->id_kurikulum)
                 ->where('id_mata_pelajaran', $mataPelajaranId)
+                ->when($companyId && Schema::hasColumn('kurikulum_materi', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->pluck('id_materi');
 
             if ($order->unique()->count() !== $order->count()) {
@@ -267,5 +285,17 @@ class KurikulumMateriController extends Controller
                 'message' => 'Gagal memperbarui urutan materi: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Ambil company id dari SSO context atau fallback.
+     */
+    private function companyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
     }
 }

@@ -1,4 +1,7 @@
+import path from 'path';
+
 const IS_DEV = process.env.APP_VARIANT === 'dev';
+const assetPath = (file) => path.resolve(__dirname, file);
 
 export default {
   expo: {
@@ -6,11 +9,11 @@ export default {
     slug: "BPEXPO2",
     version: "1.0.3",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: assetPath('./assets/icon.png'),
     userInterfaceStyle: "light",
     newArchEnabled: true,
     splash: {
-      image: "./assets/icon.png",
+      image: assetPath('./assets/icon.png'),
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
@@ -23,7 +26,7 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/icon.png",
+        foregroundImage: assetPath('./assets/icon.png'),
         backgroundColor: "#ffffff"
       },
       edgeToEdgeEnabled: true,
@@ -36,9 +39,10 @@ export default {
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
+      usesCleartextTraffic: true
     },
     web: {
-      favicon: "./assets/favicon.png"
+      favicon: assetPath('./assets/favicon.png')
     },
     plugins: [
       "expo-secure-store",
@@ -69,6 +73,8 @@ export default {
       ]
     ],
     extra: {
+      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:9000",
+      managementBaseUrl: process.env.EXPO_PUBLIC_MANAGEMENT_BASE_URL || "http://127.0.0.1:8000",
       eas: {
         // projectId: "2e83c4d0-499c-413b-ad59-f173fff2ae4f"
         "projectId": "6f64b611-69a2-400f-b9b0-8ca4cc19045a"

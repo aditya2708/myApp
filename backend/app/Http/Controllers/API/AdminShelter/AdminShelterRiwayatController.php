@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\AdminShelter;
 use App\Http\Controllers\Controller;
 use App\Models\Histori;
 use App\Models\Anak;
+use App\Support\SsoContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -12,9 +13,17 @@ use Illuminate\Support\Str;
 
 class AdminShelterRiwayatController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
     public function index(Request $request, $anakId)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -24,6 +33,7 @@ class AdminShelterRiwayatController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_anak', $anakId)
                     ->first();
 
@@ -45,7 +55,9 @@ class AdminShelterRiwayatController extends Controller
         }
 
         $perPage = $request->per_page ?? 10;
-        $riwayat = $query->latest('tanggal')->paginate($perPage);
+        $riwayat = $query->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                        ->latest('tanggal')
+                        ->paginate($perPage);
 
         foreach ($riwayat as $item) {
             if ($item->foto) {
@@ -71,6 +83,7 @@ class AdminShelterRiwayatController extends Controller
     public function show($anakId, $riwayatId)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -80,6 +93,7 @@ class AdminShelterRiwayatController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_anak', $anakId)
                     ->first();
 
@@ -92,6 +106,7 @@ class AdminShelterRiwayatController extends Controller
 
         $riwayat = Histori::where('id_anak', $anakId)
                           ->where('id_histori', $riwayatId)
+                          ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                           ->with('anak')
                           ->first();
 

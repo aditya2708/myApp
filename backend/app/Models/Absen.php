@@ -28,6 +28,13 @@ class Absen extends Model
         'gps_valid',      // Whether GPS validation passed
         'location_name',  // Human-readable location name
         'gps_validation_notes', // Notes about GPS validation
+        'auto_flag',
+        'auto_flag_payload',
+        'review_status',
+        'reviewed_at',
+        'reviewed_by',
+        'review_notes',
+        'company_id',
         'created_at',     // Waktu pembuatan
         'updated_at',     // Waktu pembaruan
     ]; // Kolom yang bisa diisi
@@ -40,7 +47,9 @@ class Absen extends Model
         'longitude' => 'decimal:8',
         'gps_accuracy' => 'decimal:2',
         'distance_from_activity' => 'decimal:2',
-        'gps_valid' => 'boolean'
+        'gps_valid' => 'boolean',
+        'auto_flag_payload' => 'array',
+        'reviewed_at' => 'datetime'
     ];
 
     const TEXT_YA = "Ya";
@@ -55,6 +64,11 @@ class Absen extends Model
     const VERIFICATION_VERIFIED = 'verified';
     const VERIFICATION_REJECTED = 'rejected';
     const VERIFICATION_MANUAL = 'manual';
+
+    const REVIEW_STATUS_CLEAN = 'clean';
+    const REVIEW_STATUS_NEEDS_REVIEW = 'needs_review';
+    const REVIEW_STATUS_DISMISSED = 'dismissed';
+    const REVIEW_STATUS_CONFIRMED = 'confirmed';
 
     // Relasi dengan AbsenUser
     public function absenUser() {
@@ -71,6 +85,14 @@ class Absen extends Model
     public function donatur()
     {
         return $this->belongsTo(Donatur::class, 'id_donatur');
+    }
+
+    /**
+     * Reviewer relation for flagged attendance.
+     */
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by', 'id_users');
     }
 
     // New relation with AttendanceVerification

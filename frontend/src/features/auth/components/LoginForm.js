@@ -116,7 +116,7 @@ const LoginForm = ({ onLoginSuccess }) => {
 
     try {
       // Attempt login
-      const result = await login({ email, password });
+    const result = await login({ email, password });
       
       // Call success callback if provided
       if (onLoginSuccess) {

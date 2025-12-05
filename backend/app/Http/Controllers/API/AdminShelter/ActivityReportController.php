@@ -7,6 +7,7 @@ use App\Models\ActivityReport;
 use App\Models\Aktivitas;
 use App\Models\Kegiatan;
 use App\Services\AttendanceService;
+use App\Services\LocationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,15 +15,22 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use App\Support\AdminShelterScope;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class ActivityReportController extends Controller
 {
     protected AttendanceService $attendanceService;
+    protected LocationService $locationService;
 
-    public function __construct(AttendanceService $attendanceService)
+    public function __construct(AttendanceService $attendanceService, LocationService $locationService)
     {
         $this->attendanceService = $attendanceService;
+        $this->locationService = $locationService;
     }
+
+    use AdminShelterScope;
 
     /**
      * List activity reports for the authenticated admin shelter.
@@ -40,6 +48,7 @@ class ActivityReportController extends Controller
             }
 
             $shelterId = $user->adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
 
             $allowedJenisKegiatan = Kegiatan::whereIn('nama_kegiatan', ['Bimbel', 'Tahfidz', 'Lain-lain'])
                 ->pluck('nama_kegiatan', 'id_kegiatan');
@@ -82,6 +91,7 @@ class ActivityReportController extends Controller
             $perPage = (int) ($validated['per_page'] ?? 10);
 
             $query = ActivityReport::query()
+                ->when($companyId && Schema::hasColumn('activity_reports', 'company_id'), fn ($q) => $q->where('activity_reports.company_id', $companyId))
                 ->with([
                     'aktivitas' => function ($aktivitasQuery) {
                         $aktivitasQuery->select([
@@ -102,8 +112,12 @@ class ActivityReportController extends Controller
                     'aktivitas.materiRelation.mataPelajaran',
                     'aktivitas.tutor:id_tutor,nama'
                 ])
-                ->whereHas('aktivitas', function ($aktivitasQuery) use ($shelterId, $startDate, $endDate, $jenisKegiatanId) {
+                ->whereHas('aktivitas', function ($aktivitasQuery) use ($shelterId, $startDate, $endDate, $jenisKegiatanId, $companyId) {
                     $aktivitasQuery->where('id_shelter', $shelterId);
+
+                    if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                        $aktivitasQuery->where('aktivitas.company_id', $companyId);
+                    }
 
                     if ($startDate && $endDate) {
                         $aktivitasQuery->whereBetween('tanggal', [$startDate, $endDate]);
@@ -214,7 +228,13 @@ class ActivityReportController extends Controller
             'id_aktivitas' => 'required|exists:aktivitas,id_aktivitas',
             'foto_1' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'foto_2' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            'foto_3' => 'nullable|image|mimes:jpeg,png,jpg|max:2048'
+            'foto_3' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'location' => 'nullable|array',
+            'location.latitude' => 'required_with:location|numeric|between:-90,90',
+            'location.longitude' => 'required_with:location|numeric|between:-180,180',
+            'location.accuracy' => 'nullable|numeric|min:0',
+            'location.timestamp' => 'nullable|date',
+            'location.location_name' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -226,19 +246,53 @@ class ActivityReportController extends Controller
         }
 
         $reportData = ['id_aktivitas' => $request->id_aktivitas];
+        $companyId = null;
+        $shelterId = null;
 
         try {
-            DB::beginTransaction();
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
+            $hasReportCompany = Schema::hasColumn('activity_reports', 'company_id');
+            $hasActivityCompany = Schema::hasColumn('aktivitas', 'company_id');
 
-            $aktivitas = Aktivitas::find($request->id_aktivitas);
+            $aktivitas = Aktivitas::where('id_aktivitas', $request->id_aktivitas)
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && $hasActivityCompany, fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
             if (!$aktivitas) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Aktivitas tidak ditemukan'
+                    'message' => 'Aktivitas tidak ditemukan dalam scope Anda'
                 ], 404);
             }
 
-            $existingReport = ActivityReport::where('id_aktivitas', $request->id_aktivitas)->first();
+            DB::beginTransaction();
+
+            $locationInput = $request->input('location');
+            if (!$locationInput) {
+                $locationInput = $request->only(['latitude', 'longitude', 'accuracy', 'location_name', 'location_recorded_at', 'timestamp']);
+            }
+
+            $locationMeta = $this->buildLocationMetadata($aktivitas, $locationInput);
+            $flagBag = $locationMeta['flags'];
+            if (!empty($locationMeta['payload'])) {
+                $reportData = array_merge($reportData, $locationMeta['payload']);
+            }
+            $reportData['review_status'] = empty($flagBag)
+                ? ActivityReport::REVIEW_STATUS_CLEAN
+                : ActivityReport::REVIEW_STATUS_NEEDS_REVIEW;
+            if (!empty($flagBag)) {
+                $reportData['auto_flag'] = implode(',', array_map(
+                    static fn ($flag) => $flag['code'],
+                    $flagBag
+                ));
+                $reportData['auto_flag_payload'] = $flagBag;
+            }
+
+            $existingReport = ActivityReport::where('id_aktivitas', $request->id_aktivitas)
+                ->when($companyId && $hasReportCompany, fn ($q) => $q->where('company_id', $companyId))
+                ->first();
             if ($existingReport) {
                 return response()->json([
                     'success' => false,
@@ -264,6 +318,41 @@ class ActivityReportController extends Controller
                     $path = $file->storeAs('activity_reports', $filename, 'public');
                     $reportData[$photoField] = $path;
                 }
+            }
+
+            if ($hasReportCompany) {
+                $resolvedCompanyId = $companyId
+                    ?? ($hasActivityCompany ? $aktivitas->company_id : null)
+                    ?? ($aktivitas->shelter->company_id ?? null);
+
+                if ($companyId && $hasActivityCompany && $aktivitas->company_id && (int) $aktivitas->company_id !== (int) $companyId) {
+                    Log::warning('Company mismatch ketika membuat laporan aktivitas', [
+                        'id_aktivitas' => $request->id_aktivitas,
+                        'activity_company_id' => $aktivitas->company_id,
+                        'context_company_id' => $companyId,
+                        'user_id' => Auth::id(),
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Aktivitas berada di perusahaan yang berbeda'
+                    ], 403);
+                }
+
+                if (!$resolvedCompanyId) {
+                    Log::error('Gagal menentukan company_id untuk laporan aktivitas', [
+                        'id_aktivitas' => $request->id_aktivitas,
+                        'user_id' => Auth::id(),
+                        'shelter_id' => $shelterId,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Perusahaan tidak dapat ditentukan untuk laporan ini'
+                    ], 422);
+                }
+
+                $reportData['company_id'] = $resolvedCompanyId;
             }
 
             $report = ActivityReport::create($reportData);
@@ -302,16 +391,25 @@ class ActivityReportController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Laporan kegiatan berhasil dibuat',
-                'data' => $report->load('aktivitas')
+                'data' => $report->load('aktivitas'),
+                'flags' => $flagBag
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
 
             $this->cleanupUploadedPhotos($reportData);
 
+            Log::error('Gagal membuat laporan kegiatan', [
+                'exception' => $e,
+                'user_id' => Auth::id(),
+                'id_aktivitas' => $request->id_aktivitas ?? null,
+                'company_id' => $companyId,
+                'shelter_id' => $shelterId,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membuat laporan kegiatan: ' . $e->getMessage()
+                'message' => 'Gagal membuat laporan kegiatan. Silakan coba lagi.'
             ], 500);
         }
     }
@@ -322,7 +420,17 @@ class ActivityReportController extends Controller
     public function getByActivity($id_aktivitas)
     {
         try {
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
             $report = ActivityReport::where('id_aktivitas', $id_aktivitas)
+                ->when($companyId && Schema::hasColumn('activity_reports', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->whereHas('aktivitas', function ($query) use ($shelterId, $companyId) {
+                    $query->where('id_shelter', $shelterId);
+
+                    if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                        $query->where('aktivitas.company_id', $companyId);
+                    }
+                })
                 ->with('aktivitas')
                 ->first();
 
@@ -342,6 +450,132 @@ class ActivityReportController extends Controller
                 'success' => false,
                 'message' => 'Gagal mengambil laporan: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    private function buildLocationMetadata(Aktivitas $aktivitas, ?array $locationInput): array
+    {
+        $payload = [];
+        $flags = [];
+        $shelter = $aktivitas->shelter;
+        $requiresGps = $shelter && $shelter->require_gps;
+
+        if (!$locationInput) {
+            if ($requiresGps) {
+                $flags[] = [
+                    'code' => 'GPS_MISSING',
+                    'message' => 'Lokasi wajib diisi karena GPS shelter aktif.',
+                    'severity' => 'warning',
+                ];
+            }
+
+            return [
+                'payload' => $payload,
+                'flags' => $flags,
+            ];
+        }
+
+        $normalized = $this->normalizeLocationInput($locationInput);
+        if (empty($normalized)) {
+            if ($requiresGps) {
+                $flags[] = [
+                    'code' => 'GPS_INVALID',
+                    'message' => 'Data lokasi tidak valid.',
+                    'severity' => 'warning',
+                ];
+            }
+
+            return [
+                'payload' => $payload,
+                'flags' => $flags,
+            ];
+        }
+
+        $payload = $normalized;
+
+        if (!$shelter || !$shelter->latitude || !$shelter->longitude) {
+            $flags[] = [
+                'code' => 'SHELTER_LOCATION_INCOMPLETE',
+                'message' => 'GPS shelter belum dikonfigurasi.',
+                'severity' => 'warning',
+            ];
+
+            return [
+                'payload' => $payload,
+                'flags' => $flags,
+            ];
+        }
+
+        $distance = $this->locationService->calculateDistance(
+            (float) $normalized['latitude'],
+            (float) $normalized['longitude'],
+            (float) $shelter->latitude,
+            (float) $shelter->longitude
+        );
+
+        $maxDistance = $shelter->max_distance_meters ?: 100;
+        if ($distance > $maxDistance) {
+            $flags[] = [
+                'code' => 'GPS_OUT_OF_RANGE',
+                'message' => 'Lokasi di luar radius yang diizinkan.',
+                'severity' => 'warning',
+                'details' => [
+                    'distance' => round($distance, 2),
+                    'max_distance' => $maxDistance,
+                ],
+            ];
+        }
+
+        if (!empty($normalized['location_accuracy']) && $shelter->gps_accuracy_required && $normalized['location_accuracy'] > $shelter->gps_accuracy_required) {
+            $flags[] = [
+                'code' => 'LOW_ACCURACY',
+                'message' => 'Akurasi GPS di bawah ambang yang ditentukan.',
+                'severity' => 'warning',
+                'details' => [
+                    'accuracy' => $normalized['location_accuracy'],
+                    'required_accuracy' => $shelter->gps_accuracy_required,
+                ],
+            ];
+        }
+
+        return [
+            'payload' => $payload,
+            'flags' => $flags,
+        ];
+    }
+
+    private function normalizeLocationInput(?array $locationInput): array
+    {
+        if (!$locationInput) {
+            return [];
+        }
+
+        $latitude = $locationInput['latitude'] ?? $locationInput['lat'] ?? null;
+        $longitude = $locationInput['longitude'] ?? $locationInput['lng'] ?? null;
+        $accuracy = $locationInput['accuracy'] ?? $locationInput['location_accuracy'] ?? null;
+        $timestamp = $locationInput['timestamp'] ?? $locationInput['location_recorded_at'] ?? null;
+
+        return array_filter([
+            'latitude' => $latitude !== null ? (float) $latitude : null,
+            'longitude' => $longitude !== null ? (float) $longitude : null,
+            'location_accuracy' => $accuracy !== null ? (float) $accuracy : null,
+            'location_recorded_at' => $this->parseLocationTimestamp($timestamp),
+            'location_name' => $locationInput['location_name'] ?? null,
+        ], static function ($value) {
+            return $value !== null;
+        });
+    }
+
+    private function parseLocationTimestamp($timestamp): ?Carbon
+    {
+        if (!$timestamp) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($timestamp);
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 

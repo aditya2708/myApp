@@ -232,11 +232,15 @@ const KelompokFormScreen = () => {
         setError(response.data.message || 'Gagal menyimpan kelompok');
       }
     } catch (err) {
-      console.error('Error saving kelompok:', err);
-      setError(
-        err.response?.data?.message || 
-        'Gagal menyimpan kelompok. Silakan coba lagi.'
-      );
+      const resp = err.response?.data;
+      const errors = resp?.errors;
+      const firstError = errors && typeof errors === 'object'
+        ? Object.values(errors).flat().find(Boolean)
+        : null;
+      const message = firstError || resp?.message || 'Gagal menyimpan kelompok. Silakan coba lagi.';
+
+      console.error('Error saving kelompok:', resp || err);
+      setError(message);
     } finally {
       setLoading(false);
     }

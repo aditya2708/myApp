@@ -20,7 +20,8 @@ class Kelompok extends Model
         'id_level_anak_binaan',
         'nama_kelompok',
         'jumlah_anggota',
-        'kelas_gabungan'
+        'kelas_gabungan',
+        'company_id'
     ];
 
     protected $casts = [

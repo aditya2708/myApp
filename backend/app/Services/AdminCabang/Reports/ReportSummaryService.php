@@ -17,11 +17,17 @@ class ReportSummaryService
      */
     public function build(AdminCabang $adminCabang, ?Carbon $startDate = null, ?Carbon $endDate = null): array
     {
+        $companyId = (int) ($adminCabang->company_id ?? 0);
+
         $adminCabang->loadMissing('kacab');
         $kacab = $adminCabang->kacab;
 
         if (!$kacab) {
             throw new RuntimeException('Admin cabang tidak memiliki data cabang terkait.');
+        }
+
+        if ($companyId === 0) {
+            throw new RuntimeException('Company ID tidak ditemukan untuk admin cabang.');
         }
 
         $shelterIds = $kacab->shelters()->pluck('id_shelter');
@@ -30,13 +36,18 @@ class ReportSummaryService
         $totalActiveAnak = $shelterIds->isEmpty()
             ? 0
             : Anak::whereIn('id_shelter', $shelterIds)
+                ->where('company_id', $companyId)
                 ->whereIn('status_validasi', Anak::STATUS_AKTIF)
                 ->count();
 
-        $totalTutors = Tutor::where('id_kacab', $kacab->id_kacab)->count();
+        $totalTutors = Tutor::where('id_kacab', $kacab->id_kacab)
+            ->where('company_id', $companyId)
+            ->count();
         $wilbinCount = $kacab->wilbins()->count();
 
-        $activityQuery = Aktivitas::query()->whereIn('id_shelter', $shelterIds);
+        $activityQuery = Aktivitas::query()
+            ->whereIn('id_shelter', $shelterIds)
+            ->where('aktivitas.company_id', $companyId);
 
         if ($startDate) {
             $activityQuery->whereDate('tanggal', '>=', $startDate->toDateString());

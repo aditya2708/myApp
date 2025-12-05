@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
@@ -34,12 +34,6 @@ const GroupStudentsList = ({
 }) => {
   const navigation = useNavigation();
 
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  const [activeGroupCount, setActiveGroupCount] = useState(0);
-
   const resolvedKelompokIds = useMemo(() => {
     const ids = [];
 
@@ -54,22 +48,32 @@ const GroupStudentsList = ({
     return Array.from(new Set(ids));
   }, [kelompokId, kelompokIds]);
 
-  const fetchStudents = useCallback(async (ids = resolvedKelompokIds) => {
-    if (!ids || ids.length === 0) {
-      setStudents([]);
-      setActiveGroupCount(0);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+  const sortedKelompokIds = useMemo(
+    () => [...resolvedKelompokIds].sort((a, b) => a - b),
+    [resolvedKelompokIds]
+  );
 
-    try {
-      setError(null);
+  const queryEnabled = sortedKelompokIds.length > 0;
+
+  const {
+    data: students = [],
+    isLoading,
+    isRefetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['groupChildren', sortedKelompokIds],
+    enabled: queryEnabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    queryFn: async () => {
       const responses = await Promise.all(
-        ids.map(id => adminShelterKelompokApi.getGroupChildren(id)),
+        sortedKelompokIds.map((id) => adminShelterKelompokApi.getGroupChildren(id))
       );
 
-      const aggregated = responses.flatMap(response => {
+      const aggregated = responses.flatMap((response) => {
         if (response?.data?.data && Array.isArray(response.data.data)) {
           return response.data.data;
         }
@@ -77,38 +81,22 @@ const GroupStudentsList = ({
       });
 
       const uniqueStudentsMap = new Map();
-      aggregated.forEach(student => {
+      aggregated.forEach((student) => {
         if (!student?.id_anak) return;
         if (student.status_validasi && student.status_validasi !== 'aktif') return;
         uniqueStudentsMap.set(student.id_anak, { ...student });
       });
 
-      setStudents(Array.from(uniqueStudentsMap.values()));
-      setActiveGroupCount(ids.length);
-    } catch (err) {
-      console.error('Error fetching kelompok students:', err);
-      setError('Failed to load students in this group');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [resolvedKelompokIds]);
+      return Array.from(uniqueStudentsMap.values());
+    },
+  });
 
-  useEffect(() => {
-    if (!resolvedKelompokIds.length) {
-      setStudents([]);
-      setLoading(false);
-      setActiveGroupCount(0);
-      return;
-    }
-
-    setLoading(true);
-    fetchStudents(resolvedKelompokIds);
-  }, [resolvedKelompokIds, fetchStudents]);
+  const activeGroupCount = sortedKelompokIds.length;
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    fetchStudents(resolvedKelompokIds);
+    if (queryEnabled) {
+      refetch();
+    }
     if (onRefresh) {
       onRefresh();
     }
@@ -127,16 +115,6 @@ const GroupStudentsList = ({
       onPress={() => handleViewStudent(item)}
       activeOpacity={0.7}
     >
-      <View style={styles.avatarContainer}>
-        {item.foto_url ? (
-          <Image source={{ uri: item.foto_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={24} color="#bdc3c7" />
-          </View>
-        )}
-      </View>
-
       <View style={styles.studentDetails}>
         <Text style={styles.studentName} numberOfLines={1}>
           {item.full_name || item.nick_name || 'Unknown Student'}
@@ -175,6 +153,10 @@ const GroupStudentsList = ({
     </View>
   );
 
+  const loading = queryEnabled ? isLoading && !students.length : false;
+  const refreshing = queryEnabled ? isRefetching : false;
+  const normalizedError = error ? 'Failed to load students in this group' : null;
+
   if (loading && !refreshing && !students.length) {
     return <LoadingSpinner message="Loading students..." />;
   }
@@ -193,10 +175,10 @@ const GroupStudentsList = ({
         </Text>
       )}
 
-      {error && (
+      {normalizedError && (
         <ErrorMessage
-          message={error}
-          onRetry={() => fetchStudents(resolvedKelompokIds)}
+          message={normalizedError}
+          onRetry={handleRefresh}
         />
       )}
 
@@ -239,26 +221,13 @@ const styles = StyleSheet.create({
   },
   studentCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#f0f0f0',
-  },
-  avatarContainer: {
-    marginRight: 12,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  avatarPlaceholder: {
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   studentDetails: {
     flex: 1,

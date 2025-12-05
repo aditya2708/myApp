@@ -6,23 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Models\TemplateMateri;
 use App\Models\TemplateAdoption;
 use App\Models\Kacab;
+use App\Support\AdminPusatScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DistributionController extends Controller
 {
+    use AdminPusatScope;
+
     /**
      * Get available cabang untuk selection
      */
     public function getAvailableCabang(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $search = $request->query('search');
             $withStats = $request->query('with_stats', false);
 
-            $query = Kacab::where('status', 'active')
+            $query = $this->applyCompanyScope(Kacab::where('status', 'active'), $companyId, 'kacab')
                 ->orderBy('nama_kacab');
 
             if ($search) {
@@ -31,14 +36,19 @@ class DistributionController extends Controller
 
             if ($withStats) {
                 $query->withCount([
-                    'templateAdoptions as total_received',
-                    'templateAdoptions as pending_count' => function($q) {
+                    'templateAdoptions as total_received' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
+                    },
+                    'templateAdoptions as pending_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'pending');
                     },
-                    'templateAdoptions as adopted_count' => function($q) {
+                    'templateAdoptions as adopted_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'adopted');
                     },
-                    'templateAdoptions as customized_count' => function($q) {
+                    'templateAdoptions as customized_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'customized');
                     }
                 ]);
@@ -80,6 +90,7 @@ class DistributionController extends Controller
     public function distributeTemplate(Request $request, $templateId): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $validator = Validator::make($request->all(), [
                 'cabang_ids' => 'required|array|min:1',
                 'cabang_ids.*' => 'required|exists:kacab,id_kacab',
@@ -95,7 +106,7 @@ class DistributionController extends Controller
                 ], 422);
             }
 
-            $template = TemplateMateri::find($templateId);
+            $template = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->find($templateId);
 
             if (!$template) {
                 return response()->json([
@@ -125,9 +136,12 @@ class DistributionController extends Controller
             foreach ($cabangIds as $cabangId) {
                 try {
                     // Check if already distributed
-                    $existingDistribution = TemplateAdoption::where('id_template_materi', $templateId)
-                        ->where('id_kacab', $cabangId)
-                        ->first();
+                    $existingDistribution = $this->applyCompanyScope(
+                        TemplateAdoption::where('id_template_materi', $templateId)
+                            ->where('id_kacab', $cabangId),
+                        $companyId,
+                        'template_adoptions'
+                    )->first();
 
                     if ($existingDistribution && !$forceRedistribution) {
                         $skippedDuplicates[] = [
@@ -154,12 +168,18 @@ class DistributionController extends Controller
                         ];
                     } else {
                         // Create new distribution
-                        $adoption = TemplateAdoption::create([
+                        $payload = [
                             'id_template_materi' => $templateId,
                             'id_kacab' => $cabangId,
                             'status' => 'pending',
                             'adoption_notes' => $distributionNotes
-                        ]);
+                        ];
+
+                        if ($companyId && Schema::hasColumn('template_adoptions', 'company_id')) {
+                            $payload['company_id'] = $companyId;
+                        }
+
+                        $adoption = TemplateAdoption::create($payload);
 
                         $distributedTo[] = [
                             'cabang_id' => $cabangId,
@@ -212,6 +232,7 @@ class DistributionController extends Controller
     public function bulkDistribute(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $validator = Validator::make($request->all(), [
                 'template_ids' => 'required|array|min:1',
                 'template_ids.*' => 'required|exists:template_materi,id_template_materi',
@@ -235,9 +256,12 @@ class DistributionController extends Controller
             $distributionNotes = $request->distribution_notes;
 
             // Validate all templates are active
-            $inactiveTemplates = TemplateMateri::whereIn('id_template_materi', $templateIds)
-                ->where('is_active', false)
-                ->pluck('nama_template', 'id_template_materi');
+            $inactiveTemplates = $this->applyCompanyScope(
+                TemplateMateri::whereIn('id_template_materi', $templateIds)
+                    ->where('is_active', false),
+                $companyId,
+                'template_materi'
+            )->pluck('nama_template', 'id_template_materi');
 
             if ($inactiveTemplates->isNotEmpty()) {
                 return response()->json([
@@ -264,9 +288,12 @@ class DistributionController extends Controller
 
                 foreach ($cabangIds as $cabangId) {
                     try {
-                        $existingDistribution = TemplateAdoption::where('id_template_materi', $templateId)
-                            ->where('id_kacab', $cabangId)
-                            ->first();
+                        $existingDistribution = $this->applyCompanyScope(
+                            TemplateAdoption::where('id_template_materi', $templateId)
+                                ->where('id_kacab', $cabangId),
+                            $companyId,
+                            'template_adoptions'
+                        )->first();
 
                         if ($existingDistribution && !$forceRedistribution) {
                             $templateResults['skipped_duplicates'][] = [
@@ -292,12 +319,18 @@ class DistributionController extends Controller
                                 'action' => 'redistributed'
                             ];
                         } else {
-                            $adoption = TemplateAdoption::create([
+                            $payload = [
                                 'id_template_materi' => $templateId,
                                 'id_kacab' => $cabangId,
                                 'status' => 'pending',
                                 'adoption_notes' => $distributionNotes
-                            ]);
+                            ];
+
+                            if ($companyId && Schema::hasColumn('template_adoptions', 'company_id')) {
+                                $payload['company_id'] = $companyId;
+                            }
+
+                            $adoption = TemplateAdoption::create($payload);
 
                             $templateResults['distributed_to'][] = [
                                 'cabang_id' => $cabangId,
@@ -355,7 +388,8 @@ class DistributionController extends Controller
     public function getDistributionHistory($templateId): JsonResponse
     {
         try {
-            $template = TemplateMateri::find($templateId);
+            $companyId = $this->companyId();
+            $template = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->find($templateId);
 
             if (!$template) {
                 return response()->json([
@@ -365,7 +399,11 @@ class DistributionController extends Controller
                 ], 404);
             }
 
-            $distributions = TemplateAdoption::where('id_template_materi', $templateId)
+            $distributions = $this->applyCompanyScope(
+                TemplateAdoption::where('id_template_materi', $templateId),
+                $companyId,
+                'template_adoptions'
+            )
                 ->with(['kacab', 'adoptedBy'])
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -410,7 +448,8 @@ class DistributionController extends Controller
     public function cancelDistribution($adoptionId): JsonResponse
     {
         try {
-            $adoption = TemplateAdoption::find($adoptionId);
+            $companyId = $this->companyId();
+            $adoption = $this->applyCompanyScope(TemplateAdoption::query(), $companyId, 'template_adoptions')->find($adoptionId);
 
             if (!$adoption) {
                 return response()->json([
@@ -449,12 +488,13 @@ class DistributionController extends Controller
     public function getDistributionSummary(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $dateFrom = $request->query('date_from');
             $dateTo = $request->query('date_to');
             $templateId = $request->query('template_id');
             $kacabId = $request->query('kacab_id');
 
-            $query = TemplateAdoption::with(['templateMateri', 'kacab']);
+            $query = $this->applyCompanyScope(TemplateAdoption::with(['templateMateri', 'kacab']), $companyId, 'template_adoptions');
 
             if ($dateFrom) {
                 $query->whereDate('created_at', '>=', $dateFrom);

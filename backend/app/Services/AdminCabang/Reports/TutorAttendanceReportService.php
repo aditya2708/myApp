@@ -18,9 +18,14 @@ class TutorAttendanceReportService
     {
         $adminCabang->loadMissing('kacab');
         $kacab = $adminCabang->kacab;
+        $companyId = (int) ($adminCabang->company_id ?? 0);
 
         if (!$kacab) {
             throw new RuntimeException('Admin cabang tidak memiliki data cabang terkait.');
+        }
+
+        if ($companyId === 0) {
+            throw new RuntimeException('Company ID tidak ditemukan untuk admin cabang.');
         }
 
         $wilbins = $kacab->wilbins()
@@ -96,7 +101,8 @@ class TutorAttendanceReportService
             $allowedShelterIds = collect([$shelterIdFilter]);
         }
 
-        $baseActivityQuery = Aktivitas::query();
+        $baseActivityQuery = Aktivitas::query()
+            ->where('aktivitas.company_id', $companyId);
 
         if ($allowedShelterIds->isNotEmpty()) {
             $baseActivityQuery->whereIn('id_shelter', $allowedShelterIds->all());
@@ -151,6 +157,7 @@ class TutorAttendanceReportService
                     ->whereColumn('filtered_activities.id_tutor', 'absen_user.id_tutor');
             })
             ->where('absen.is_verified', true)
+            ->where('absen.company_id', $companyId)
             ->groupBy('absen_user.id_tutor');
 
         $tutorQuery = Tutor::query()
@@ -161,6 +168,7 @@ class TutorAttendanceReportService
                 $join->on('attendance_stats.id_tutor', '=', 'tutor.id_tutor');
             })
             ->leftJoin('shelter', 'shelter.id_shelter', '=', 'tutor.id_shelter')
+            ->where('tutor.company_id', $companyId)
             ->where(function ($query) use ($kacab, $allowedShelterIds) {
                 $query->where('tutor.id_kacab', $kacab->id_kacab);
 

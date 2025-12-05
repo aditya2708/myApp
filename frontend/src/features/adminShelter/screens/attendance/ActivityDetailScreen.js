@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 
 import LoadingSpinner from '../../../../common/components/LoadingSpinner';
@@ -31,6 +31,14 @@ import {
   selectActivityReportCache,
   ACTIVITY_REPORT_CACHE_TTL
 } from '../../redux/aktivitasSlice';
+import {
+  selectIsQuickFlowActive,
+  selectQuickFlowStep,
+  setQuickFlowActivity,
+  updateQuickFlowStep,
+  selectQuickFlowStatus,
+  resetQuickFlow,
+} from '../../redux/quickFlowSlice';
 
 const ActivityDetailScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
@@ -38,6 +46,8 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     id_aktivitas,
     attendanceSummary: routeAttendanceSummary,
     activityType: routeActivityType,
+    activityDate: routeActivityDate,
+    activityStatus: routeActivityStatus,
   } = route.params || {};
   
   const activity = useSelector(selectAktivitasDetail);
@@ -48,6 +58,10 @@ const ActivityDetailScreen = ({ navigation, route }) => {
   const cachedAttendanceSummary = useSelector(selectAktivitasAttendanceSummary);
   const reportCache = useSelector(selectActivityReportCache);
   const reportCacheEntry = id_aktivitas ? reportCache?.[id_aktivitas] : null;
+  const quickFlowActive = useSelector(selectIsQuickFlowActive);
+  const quickFlowStep = useSelector(selectQuickFlowStep);
+  const quickFlowStatus = useSelector(selectQuickFlowStatus);
+  const isQuickFlow = route?.params?.quickFlow || quickFlowActive;
   
   const manualEligibleActivity = useMemo(() => {
     const resolvedType = activity?.jenis_kegiatan || routeActivityType || null;
@@ -116,11 +130,11 @@ const ActivityDetailScreen = ({ navigation, route }) => {
       if (shelter) {
         // Check if this shelter has GPS configuration
         const hasGpsCoords = shelter.latitude && shelter.longitude;
-        const hasGpsRequirement = shelter.require_gps || hasGpsCoords; // GPS required if coords exist
+        const hasGpsRequirement = !!shelter.require_gps;
         
         if (hasGpsRequirement || hasGpsCoords) {
           const config = {
-            require_gps: shelter.require_gps || hasGpsCoords,
+            require_gps: !!shelter.require_gps,
             latitude: shelter.latitude,
             longitude: shelter.longitude,
             max_distance_meters: shelter.max_distance_meters || 50,
@@ -147,27 +161,6 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
-
-  const hasFocusedOnceRef = useRef(false);
-
-  useEffect(() => {
-    hasFocusedOnceRef.current = false;
-  }, [id_aktivitas]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!id_aktivitas) {
-        return;
-      }
-
-      if (hasFocusedOnceRef.current) {
-        refetchActivityDetail();
-        refetchActivityReportStatus();
-      } else {
-        hasFocusedOnceRef.current = true;
-      }
-    }, [id_aktivitas, refetchActivityDetail, refetchActivityReportStatus])
-  );
 
   const gpsConfigQuery = useQuery({
     queryKey: ['activityGpsConfig', id_aktivitas],
@@ -227,7 +220,7 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     refetch: refetchActivityReportStatus,
   } = useQuery({
     queryKey: ['adminShelterActivityReportStatus', id_aktivitas],
-    enabled: !!id_aktivitas && !!activity,
+    enabled: !!id_aktivitas,
     initialData: initialReportData,
     initialDataUpdatedAt: initialReportFetchedAt,
     staleTime: ACTIVITY_REPORT_CACHE_TTL,
@@ -271,6 +264,73 @@ const ActivityDetailScreen = ({ navigation, route }) => {
 
   const reportStatus = reportStatusData?.status || null;
   const reportExists = reportStatus === 'exists';
+  const resolvedStatus = useMemo(
+    () => activity?.status || routeActivityStatus || quickFlowStatus || null,
+    [activity?.status, routeActivityStatus, quickFlowStatus]
+  );
+
+  const activityDateRaw = activity?.tanggal || null;
+  const activityDateLabel = useMemo(() => {
+    if (activityDateRaw) {
+      try {
+        return format(new Date(activityDateRaw), 'EEEE, dd MMMM yyyy', { locale: id });
+      } catch (err) {
+        return null;
+      }
+    }
+
+    return routeActivityDate || null;
+  }, [activityDateRaw, routeActivityDate]);
+
+  const hasFocusedOnceRef = useRef(false);
+  const isScreenFocused = useIsFocused();
+
+  useEffect(() => {
+    hasFocusedOnceRef.current = false;
+  }, [id_aktivitas]);
+
+  const isReportSubmitted = useMemo(() => {
+    const normalizedStatus = typeof resolvedStatus === 'string' ? resolvedStatus.toLowerCase() : '';
+    return reportExists || normalizedStatus === 'reported' || normalizedStatus === 'selesai' || normalizedStatus === 'complete' || normalizedStatus === 'done';
+  }, [reportExists, resolvedStatus]);
+
+  const isActivityFinished = useMemo(() => {
+    const status = resolvedStatus || '';
+    if (!status || typeof status !== 'string') return false;
+    const normalized = status.toLowerCase();
+    return normalized === 'selesai' || normalized === 'reported' || normalized === 'complete' || normalized === 'done';
+  }, [resolvedStatus]);
+
+  useEffect(() => {
+    if (!isQuickFlow || !id_aktivitas) {
+      return;
+    }
+
+    if (isActivityFinished) {
+      dispatch(resetQuickFlow());
+      return;
+    }
+
+    dispatch(setQuickFlowActivity({ activityId: id_aktivitas, status: resolvedStatus || null }));
+    if (quickFlowStep !== 'activityDetail') {
+      dispatch(updateQuickFlowStep('activityDetail'));
+    }
+  }, [dispatch, id_aktivitas, isActivityFinished, isQuickFlow, quickFlowStep, resolvedStatus]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!id_aktivitas) {
+        return;
+      }
+
+      if (hasFocusedOnceRef.current) {
+        refetchActivityDetail();
+        refetchActivityReportStatus();
+      } else {
+        hasFocusedOnceRef.current = true;
+      }
+    }, [id_aktivitas, refetchActivityDetail, refetchActivityReportStatus])
+  );
   
   // Parse time string (backend format like "09:35") - memoized
   const parseTimeForStatus = useCallback((timeInput) => {
@@ -353,11 +413,13 @@ const ActivityDetailScreen = ({ navigation, route }) => {
       return;
     }
 
-    navigation.setParams({
-      activityStatus: activity.status,
-      attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
-    });
-  }, [activity, cachedAttendanceSummary, navigation, routeAttendanceSummary]);
+    if (typeof navigation?.setParams === 'function' && isScreenFocused) {
+      navigation.setParams({
+        activityStatus: resolvedStatus,
+        attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
+      });
+    }
+  }, [activity, cachedAttendanceSummary, navigation, resolvedStatus, routeAttendanceSummary, isScreenFocused]);
   
   const handleEditActivity = () => navigation.navigate('ActivityForm', { activity });
   
@@ -391,12 +453,13 @@ const ActivityDetailScreen = ({ navigation, route }) => {
       navigation.navigate('AttendanceManagement', {
         id_aktivitas,
         activityName: activity.jenis_kegiatan,
-        activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
+        activityDate: activityDateLabel,
+        activityDateRaw,
         activityType: activity.jenis_kegiatan,
         kelompokId: primaryKelompokId,
         kelompokIds,
         kelompokName: activity.nama_kelompok || null,
-        activityStatus: activity.status,
+        activityStatus: resolvedStatus,
         attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
       });
     };
@@ -415,15 +478,22 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     }
     
     const navigationCallback = () => {
+      if (isQuickFlow) {
+        dispatch(setQuickFlowActivity({ activityId: id_aktivitas, status: resolvedStatus }));
+        dispatch(updateQuickFlowStep('manualAttendance'));
+      }
+
       navigation.navigate('ManualAttendance', {
         id_aktivitas,
         activityName: activity.jenis_kegiatan,
-        activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
+        activityDate: activityDateLabel,
+        activityDateRaw,
         activityType: activity.jenis_kegiatan,
         kelompokId: primaryKelompokId,
         kelompokIds,
         kelompokName: activity.nama_kelompok || null,
-        activityStatus: activity.status
+        activityStatus: resolvedStatus,
+        quickFlow: isQuickFlow,
       });
     };
     
@@ -437,13 +507,14 @@ const ActivityDetailScreen = ({ navigation, route }) => {
       navigation.navigate('AttendanceManagement', {
         id_aktivitas,
         activityName: activity.jenis_kegiatan,
-        activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
+        activityDate: activityDateLabel,
+        activityDateRaw,
         activityType: activity.jenis_kegiatan,
         kelompokId: primaryKelompokId,
         kelompokIds,
         kelompokName: activity.nama_kelompok || null,
         initialTab: 'AttendanceList',
-        activityStatus: activity.status,
+        activityStatus: resolvedStatus,
         attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
       });
     };
@@ -458,7 +529,8 @@ const ActivityDetailScreen = ({ navigation, route }) => {
       navigation.navigate('AttendanceManagement', {
         id_aktivitas,
         activityName: activity.jenis_kegiatan,
-        activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
+        activityDate: activityDateLabel,
+        activityDateRaw,
         activityType: activity.jenis_kegiatan,
         kelompokId: primaryKelompokId,
         kelompokIds,
@@ -466,7 +538,7 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         level: activity.level || null,
         completeActivity: activity,
         initialTab: 'QrTokenGeneration',
-        activityStatus: activity.status,
+        activityStatus: resolvedStatus,
         attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
       });
     };
@@ -478,12 +550,19 @@ const ActivityDetailScreen = ({ navigation, route }) => {
     if (!activity) return;
     
     // Navigation will handle checking if report exists and redirect accordingly
+    if (isQuickFlow) {
+      dispatch(setQuickFlowActivity({ activityId: id_aktivitas, status: resolvedStatus }));
+      dispatch(updateQuickFlowStep('activityReport'));
+    }
+
     navigation.navigate('ActivityReport', {
       id_aktivitas,
       activityName: activity.jenis_kegiatan,
-      activityDate: activity.tanggal ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id }) : null,
-      activityStatus: activity.status,
-      attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null
+      activityDate: activityDateLabel,
+      activityDateRaw,
+      activityStatus: resolvedStatus,
+      attendanceSummary: cachedAttendanceSummary || routeAttendanceSummary || null,
+      quickFlow: isQuickFlow,
     });
   };
   
@@ -543,10 +622,10 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         color="#bdc3c7"
       />
       <Text style={styles.noPhotoText}>Aktivitas {activity.jenis_kegiatan}</Text>
-      {!reportExists && activity.status !== 'reported' && (
+      {!isReportSubmitted && (
         <Text style={styles.reportInfoText}>Belum ada laporan kegiatan. Gunakan tombol di bawah untuk membuatnya.</Text>
       )}
-      {(reportExists || activity.status === 'reported') && (
+      {isReportSubmitted && (
         <Text style={styles.reportExistsText}>Laporan sudah dikirim</Text>
       )}
     </View>
@@ -619,9 +698,7 @@ const ActivityDetailScreen = ({ navigation, route }) => {
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{activity.jenis_kegiatan}</Text>
             <Text style={styles.date}>
-              {activity.tanggal
-                ? format(new Date(activity.tanggal), 'EEEE, dd MMMM yyyy', { locale: id })
-                : 'Tidak ada tanggal'}
+              {activityDateLabel || 'Tidak ada tanggal'}
             </Text>
           </View>
           
@@ -686,12 +763,11 @@ const ActivityDetailScreen = ({ navigation, route }) => {
         </View>
         <ActionButton
             onPress={handleActivityReport}
-            icon={(reportExists || activity.status === 'reported') ? "document-text" : "camera"}
-            text={(reportExists || activity.status === 'reported') ? "Lihat Laporan" : "Buat Laporan"}
+            icon={isReportSubmitted ? "document-text" : "camera"}
+            text={isReportSubmitted ? "Lihat Laporan" : "Buat Laporan"}
             style={[
               styles.reportButtonFullWidth,
-              (reportExists || activity.status === 'reported') ? styles.viewReportButton :
-              styles.reportButton
+              isReportSubmitted ? styles.viewReportButton : styles.reportButton
             ]}
           />
           <ActionButton

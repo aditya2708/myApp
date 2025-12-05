@@ -17,6 +17,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class ChildAttendanceReportService
 {
@@ -25,6 +26,7 @@ class ChildAttendanceReportService
      */
     public function getSummaryAndList(AdminCabang $adminCabang, array $filters = []): array
     {
+        $companyId = $this->resolveCompanyId($adminCabang);
         [$start, $end] = $this->resolvePeriod($filters);
 
         $attendanceBandFilter = $this->normalizeAttendanceBand($filters['attendance_band'] ?? null);
@@ -39,13 +41,14 @@ class ChildAttendanceReportService
             return $this->emptyPayload($start, $end, $filters, [], [], $perPage, $page);
         }
 
-        $groups = $this->getAccessibleGroups($shelterIds);
+        $groups = $this->getAccessibleGroups($shelterIds, $companyId);
         $groupIds = array_keys($groups);
 
         $selectedShelterId = $this->normalizeIdFilter($filters['shelter_id'] ?? null, $shelterIds);
         $selectedGroupId = $this->normalizeIdFilter($filters['group_id'] ?? null, $groupIds);
 
         $childrenQuery = Anak::query()
+            ->where('company_id', $companyId)
             ->whereIn('status_validasi', Anak::STATUS_AKTIF)
             ->whereIn('id_shelter', $shelterIds);
 
@@ -102,7 +105,7 @@ class ChildAttendanceReportService
 
         $childIds = array_keys($childShelterMap);
 
-        $attendanceRows = $this->loadAttendanceRows($childIds, $shelterIds, $start, $end);
+        $attendanceRows = $this->loadAttendanceRows($childIds, $shelterIds, $start, $end, $companyId);
         $attendanceAggregates = $this->aggregateAttendance($attendanceRows, $start, $end);
 
         if ($attendanceBandFilter) {
@@ -136,7 +139,7 @@ class ChildAttendanceReportService
         $previousStart = $start->copy()->subDays($periodLength)->startOfDay();
         $previousEnd = $start->copy()->subDay()->endOfDay();
 
-        $previousRows = $this->loadAttendanceRows($childIds, $shelterIds, $previousStart, $previousEnd);
+        $previousRows = $this->loadAttendanceRows($childIds, $shelterIds, $previousStart, $previousEnd, $companyId);
         $previousAggregates = $this->aggregateAttendance($previousRows, $previousStart, $previousEnd, false);
 
         $paginated = $this->paginateChildren($childrenRecords, $perPage, $page);
@@ -287,6 +290,7 @@ class ChildAttendanceReportService
      */
     public function getChildDetail(AdminCabang $adminCabang, Anak $child, array $filters = []): array
     {
+        $companyId = $this->resolveCompanyId($adminCabang);
         [$start, $end] = $this->resolvePeriod($filters);
 
         $accessibleShelters = $this->getAccessibleShelters($adminCabang);
@@ -300,9 +304,9 @@ class ChildAttendanceReportService
             ? (string) $filters['jenis_kegiatan']
             : null;
 
-        $groups = $this->getAccessibleGroups($shelterIds);
+        $groups = $this->getAccessibleGroups($shelterIds, $companyId);
 
-        $attendanceRows = $this->loadAttendanceRows([$child->id_anak], $shelterIds, $start, $end, $jenisKegiatan);
+        $attendanceRows = $this->loadAttendanceRows([$child->id_anak], $shelterIds, $start, $end, $companyId, $jenisKegiatan);
         $aggregates = $this->aggregateAttendance($attendanceRows, $start, $end);
 
         $stats = $aggregates['children'][$child->id_anak] ?? $this->emptyChildStats();
@@ -535,13 +539,14 @@ class ChildAttendanceReportService
             ->all();
     }
 
-    protected function getAccessibleGroups(array $shelterIds): array
+    protected function getAccessibleGroups(array $shelterIds, int $companyId): array
     {
         if (empty($shelterIds)) {
             return [];
         }
 
         return Kelompok::query()
+            ->where('company_id', $companyId)
             ->whereIn('id_shelter', $shelterIds)
             ->select('id_kelompok', 'id_shelter', 'nama_kelompok')
             ->get()
@@ -556,7 +561,7 @@ class ChildAttendanceReportService
             ->all();
     }
 
-    protected function loadAttendanceRows(array $childIds, array $shelterIds, Carbon $start, Carbon $end, ?string $jenisKegiatan = null): Collection
+    protected function loadAttendanceRows(array $childIds, array $shelterIds, Carbon $start, Carbon $end, int $companyId, ?string $jenisKegiatan = null): Collection
     {
         if (empty($childIds) || empty($shelterIds)) {
             return collect();
@@ -568,6 +573,8 @@ class ChildAttendanceReportService
             ->whereIn('absen_user.id_anak', $childIds)
             ->whereBetween('aktivitas.tanggal', [$start->toDateString(), $end->toDateString()])
             ->whereIn('aktivitas.id_shelter', $shelterIds)
+            ->where('absen.company_id', $companyId)
+            ->where('aktivitas.company_id', $companyId)
             ->select([
                 'absen_user.id_anak as child_id',
                 'absen.id_absen as attendance_id',
@@ -1106,6 +1113,20 @@ class ChildAttendanceReportService
                 'last_refreshed_at' => Carbon::now()->toIso8601String(),
             ],
         ];
+    }
+
+    /**
+     * Resolve company id to enforce company-scoped queries.
+     */
+    protected function resolveCompanyId(AdminCabang $adminCabang): int
+    {
+        $companyId = (int) ($adminCabang->company_id ?? 0);
+
+        if ($companyId === 0) {
+            throw new RuntimeException('Company ID tidak ditemukan untuk admin cabang.');
+        }
+
+        return $companyId;
     }
 }
 

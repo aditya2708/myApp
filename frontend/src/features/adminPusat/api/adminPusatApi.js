@@ -36,52 +36,6 @@ export const adminPusatApi = {
   },
 
   /**
-   * Get list of users
-   * @param {Object} params - Query parameters
-   * @returns {Promise} - API response with users data
-   */
-  getUsers: async (params = {}) => {
-    return await api.get(MANAGEMENT_ENDPOINTS.USERS, { params });
-  },
-
-  /**
-   * Get user details
-   * @param {number|string} userId - User ID
-   * @returns {Promise} - API response with user details
-   */
-  getUserDetail: async (userId) => {
-    return await api.get(MANAGEMENT_ENDPOINTS.USER_DETAIL(userId));
-  },
-
-  /**
-   * Create new user
-   * @param {Object} userData - User data
-   * @returns {Promise} - API response
-   */
-  createUser: async (userData) => {
-    return await api.post(MANAGEMENT_ENDPOINTS.USERS, userData);
-  },
-
-  /**
-   * Update user
-   * @param {number|string} userId - User ID
-   * @param {Object} userData - User data
-   * @returns {Promise} - API response
-   */
-  updateUser: async (userId, userData) => {
-    return await api.put(MANAGEMENT_ENDPOINTS.USER_DETAIL(userId), userData);
-  },
-
-  /**
-   * Delete user
-   * @param {number|string} userId - User ID
-   * @returns {Promise} - API response
-   */
-  deleteUser: async (userId) => {
-    return await api.delete(MANAGEMENT_ENDPOINTS.USER_DETAIL(userId));
-  },
-
-  /**
    * Get list of kacab (cabang)
    * @param {Object} params - Query parameters
    * @returns {Promise} - API response with kacab data

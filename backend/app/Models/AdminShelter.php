@@ -24,7 +24,8 @@ class AdminShelter extends Model
         'nama_lengkap', 
         'alamat_adm', 
         'no_hp', 
-        'foto'
+        'foto',
+        'company_id',
     ];
 
     // Accessor for the photo URL

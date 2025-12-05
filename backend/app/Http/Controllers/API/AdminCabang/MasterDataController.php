@@ -12,6 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class MasterDataController extends Controller
 {
@@ -93,10 +95,15 @@ class MasterDataController extends Controller
                 ], 404);
             }
 
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
+
             $query = Kelas::with(['jenjang', 'kacab'])
                 ->where('jenis_kelas', 'custom')
                 ->where('is_active', true)
-                ->where('id_kacab', $adminCabang->id_kacab);
+                ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                });
 
             // Filter by jenjang if provided
             if ($request->has('id_jenjang') && $request->id_jenjang) {
@@ -180,10 +187,14 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
             // Check duplicate name within jenjang and cabang
             $exists = Kelas::where('id_jenjang', $request->id_jenjang)
                 ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->where('nama_kelas', $request->nama_kelas)
                 ->exists();
 
@@ -197,11 +208,15 @@ class MasterDataController extends Controller
             // Get next urutan
             $nextUrutan = Kelas::where('id_jenjang', $request->id_jenjang)
                 ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->max('urutan') + 1;
 
             $kelasCustom = Kelas::create([
                 'id_jenjang' => $request->id_jenjang,
                 'id_kacab' => $adminCabang->id_kacab,
+                'company_id' => $companyId,
                 'nama_kelas' => $request->nama_kelas,
                 'tingkat' => $request->tingkat,
                 'jenis_kelas' => 'custom',
@@ -243,10 +258,14 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
             $kelasCustom = Kelas::where('id_kelas', $id)
                 ->where('jenis_kelas', 'custom')
                 ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->firstOrFail();
 
             $kelasCustom->loadMissing('jenjang');
@@ -303,6 +322,9 @@ class MasterDataController extends Controller
             // Check duplicate name within jenjang and cabang (exclude current)
             $exists = Kelas::where('id_jenjang', $targetJenjangId)
                 ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->where('nama_kelas', $request->nama_kelas)
                 ->where('id_kelas', '!=', $id)
                 ->exists();
@@ -354,10 +376,14 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
             $kelasCustom = Kelas::where('id_kelas', $id)
                 ->where('jenis_kelas', 'custom')
                 ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->firstOrFail();
 
             // Check if kelas is being used
@@ -399,10 +425,14 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
             $query = MataPelajaran::with(['jenjang', 'kacab'])
                 ->where('status', 'active')
-                ->where('id_kacab', $adminCabang->id_kacab);
+                ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                });
 
             // Filter by jenjang if provided
             if ($request->has('id_jenjang') && $request->id_jenjang) {
@@ -471,6 +501,7 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             
             $targetJenjang = $this->normalizeTargetArray($request->input('target_jenjang'));
             $targetKelas = $this->normalizeTargetArray($request->input('target_kelas'));
@@ -485,7 +516,8 @@ class MasterDataController extends Controller
                 'id_jenjang' => $request->id_jenjang,
                 'is_global' => $request->is_global ?? false,
                 'target_jenjang' => $targetJenjang,
-                'target_kelas' => $targetKelas
+                'target_kelas' => $targetKelas,
+                'company_id' => $companyId,
             ]);
 
             $mataPelajaranCustom->load(['jenjang', 'kacab']);
@@ -517,9 +549,13 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             
             $mataPelajaranCustom = MataPelajaran::where('id_mata_pelajaran', $id)
                 ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->firstOrFail();
 
             $validator = Validator::make($request->all(), [
@@ -587,9 +623,13 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             
             $mataPelajaranCustom = MataPelajaran::where('id_mata_pelajaran', $id)
                 ->where('id_kacab', $adminCabang->id_kacab)
+                ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->firstOrFail();
 
             // Check if mata pelajaran is being used
@@ -631,6 +671,7 @@ class MasterDataController extends Controller
                     'message' => 'Admin cabang tidak ditemukan'
                 ], 404);
             }
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
             $data = [];
 
@@ -695,6 +736,9 @@ class MasterDataController extends Controller
             if ($request->has('include_kelas') && $request->include_kelas) {
                 $data['kelas_existing'] = Kelas::with('jenjang')
                     ->where('id_kacab', $adminCabang->id_kacab)
+                    ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId);
+                    })
                     ->where('is_active', true)
                     ->orderBy('id_jenjang')
                     ->orderBy('urutan')
@@ -719,5 +763,17 @@ class MasterDataController extends Controller
                 'message' => 'Gagal mengambil data dropdown: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Ambil company id dari SSO context atau fallback admin cabang.
+     */
+    private function companyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
     }
 }

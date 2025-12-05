@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert,
+  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +16,15 @@ import { adminShelterApi } from '../api/adminShelterApi';
 
 const AdminShelterProfileScreen = () => {
   const navigation = useNavigation();
-  const { user, profile, refreshUser, logout } = useAuth();
+  const {
+    user,
+    profile,
+    refreshUser,
+    logout,
+    roles = [],
+    currentRole,
+    selectRole,
+  } = useAuth();
   
   const [profileData, setProfileData] = useState({
     nama_lengkap: '', alamat_adm: '', no_hp: '', email: '',
@@ -25,6 +33,9 @@ const AdminShelterProfileScreen = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [roleModalVisible, setRoleModalVisible] = useState(false);
+  const [roleSwitching, setRoleSwitching] = useState(false);
+  const [roleSwitchError, setRoleSwitchError] = useState(null);
 
   useEffect(() => {
     if (profile) {
@@ -103,6 +114,32 @@ const AdminShelterProfileScreen = () => {
     ], { cancelable: true });
   };
 
+  const handleOpenRoleModal = () => {
+    if (!roles || roles.length === 0) {
+      Alert.alert('Peran tidak ditemukan', 'Akun ini belum memiliki peran lain.');
+      return;
+    }
+    setRoleSwitchError(null);
+    setRoleModalVisible(true);
+  };
+
+  const handleSelectRole = async (role) => {
+    try {
+      setRoleSwitching(true);
+      setRoleSwitchError(null);
+      const result = await selectRole(role);
+      if (result?.success) {
+        setRoleModalVisible(false);
+      } else {
+        setRoleSwitchError(result?.message || 'Gagal mengubah peran');
+      }
+    } catch (err) {
+      setRoleSwitchError(err?.message || 'Gagal mengubah peran');
+    } finally {
+      setRoleSwitching(false);
+    }
+  };
+
   const renderField = (label, field, placeholder, props = {}) => (
     <View style={styles.fieldContainer}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -148,6 +185,28 @@ const AdminShelterProfileScreen = () => {
       </View>
 
       <View style={styles.profileContent}>
+        <View style={styles.roleCard}>
+          <View>
+            <Text style={styles.sectionTitle}>Peran Aktif</Text>
+            <Text style={styles.activeRoleValue}>{currentRole?.name || currentRole?.slug || user?.level || 'Admin Shelter'}</Text>
+            {(currentRole?.scope_type || currentRole?.scope_id) && (
+              <Text style={styles.scopeInfo}>
+                {currentRole?.scope_type}{currentRole?.scope_id ? ` #${currentRole.scope_id}` : ''}
+              </Text>
+            )}
+          </View>
+          {roles?.length > 0 && (
+            <TouchableOpacity
+              style={styles.switchRoleButton}
+              onPress={handleOpenRoleModal}
+              disabled={roleSwitching}
+            >
+              <Ionicons name="swap-horizontal-outline" size={18} color="#e74c3c" />
+              <Text style={styles.switchRoleText}>Ganti Peran</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={styles.editButtonContainer}>
           {!isEditing ? (
             <Button
@@ -213,20 +272,80 @@ const AdminShelterProfileScreen = () => {
           {[ 
             { icon: 'location-outline', text: 'GPS Setting Shelter', route: 'ShelterGpsSetting', color: '#3498db' },
             { icon: 'settings-outline', text: 'Pengaturan', route: 'AdminShelterSettings', color: '#8e44ad' },
+            roles?.length > 1 && { icon: 'swap-horizontal-outline', text: 'Ganti Peran Aktif', onPress: handleOpenRoleModal, color: '#d35400' },
             { icon: 'log-out-outline', text: 'Keluar', onPress: handleLogout, color: '#e74c3c' }
           ].map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.settingsItem}
-              onPress={item.onPress || (() => navigation.navigate(item.route))}
-            >
-              <Ionicons name={item.icon} size={24} color={item.color} />
-              <Text style={[styles.settingsText, { color: item.color }]}>{item.text}</Text>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
-            </TouchableOpacity>
+            item && (
+              <TouchableOpacity
+                key={index}
+                style={styles.settingsItem}
+                onPress={item.onPress || (() => navigation.navigate(item.route))}
+              >
+                <Ionicons name={item.icon} size={24} color={item.color} />
+                <Text style={[styles.settingsText, { color: item.color }]}>{item.text}</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+            )
           ))}
         </View>
       </View>
+
+      <Modal
+        visible={roleModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRoleModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Pilih Peran Aktif</Text>
+            <Text style={styles.modalSubtitle}>Tanpa logout. Permintaan selanjutnya akan memakai header peran yang dipilih.</Text>
+            {roleSwitchError && (
+              <Text style={styles.modalError}>{roleSwitchError}</Text>
+            )}
+            <View style={styles.roleList}>
+              {roles?.map((role, index) => {
+                const isActive = currentRole?.slug === role.slug
+                  && (currentRole?.scope_type ?? null) === (role.scope_type ?? null)
+                  && (currentRole?.scope_id ?? null) === (role.scope_id ?? null);
+                return (
+                  <TouchableOpacity
+                    key={`${role.slug}-${role.scope_type || 'global'}-${role.scope_id || index}`}
+                    style={[
+                      styles.roleItem,
+                      isActive && styles.roleItemActive,
+                    ]}
+                    onPress={() => handleSelectRole(role)}
+                    disabled={roleSwitching}
+                  >
+                    <View style={styles.roleItemText}>
+                      <Text style={styles.roleName}>{role.name || role.slug}</Text>
+                      <Text style={styles.roleSlug}>{role.slug}</Text>
+                      {(role.scope_type || role.scope_id) && (
+                        <Text style={styles.roleScope}>
+                          {role.scope_type}{role.scope_id ? ` #${role.scope_id}` : ''}
+                        </Text>
+                      )}
+                    </View>
+                    {isActive && (
+                      <Ionicons name="checkmark-circle" size={22} color="#27ae60" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.modalActions}>
+              <Button
+                title="Tutup"
+                type="outline"
+                onPress={() => setRoleModalVisible(false)}
+                disabled={roleSwitching}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {loading && (
         <View style={styles.loadingOverlay}>
@@ -248,6 +367,11 @@ const styles = StyleSheet.create({
   profileRole: { fontSize: 16, color: '#fff', opacity: 0.8 },
   shelterName: { fontSize: 16, color: '#fff', marginTop: 4, opacity: 0.9, fontWeight: '500' },
   profileContent: { flex: 1, backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, marginTop: -50, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 40 },
+  roleCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fdf2f2', borderWidth: 1, borderColor: '#f5c6cb', padding: 12, borderRadius: 12, marginBottom: 14 },
+  activeRoleValue: { fontSize: 16, fontWeight: '700', color: '#c0392b' },
+  scopeInfo: { fontSize: 12, color: '#7f8c8d', marginTop: 2 },
+  switchRoleButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e74c3c', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
+  switchRoleText: { marginLeft: 6, color: '#e74c3c', fontWeight: '600' },
   editButtonContainer: { alignItems: 'flex-end', marginBottom: 20 },
   editButtonsRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   cancelButton: { marginRight: 10 },
@@ -267,6 +391,20 @@ const styles = StyleSheet.create({
   settingsContainer: { marginTop: 20 },
   settingsItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
   settingsText: { flex: 1, marginLeft: 15, fontSize: 16 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '70%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#2c3e50' },
+  modalSubtitle: { fontSize: 13, color: '#7f8c8d', marginTop: 4, marginBottom: 12 },
+  modalError: { color: '#e74c3c', marginBottom: 10 },
+  roleList: { marginBottom: 10 },
+  roleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  roleItemActive: { backgroundColor: '#f8fffb' },
+  roleItemText: { flex: 1 },
+  roleName: { fontSize: 15, fontWeight: '700', color: '#2c3e50' },
+  roleSlug: { fontSize: 12, color: '#7f8c8d' },
+  roleScope: { fontSize: 12, color: '#95a5a6', marginTop: 2 },
+  modalActions: { marginTop: 12 },
+  modalButton: { alignSelf: 'flex-end' },
   loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255, 255, 255, 0.8)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
 });
 

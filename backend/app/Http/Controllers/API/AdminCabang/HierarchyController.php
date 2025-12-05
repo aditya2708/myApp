@@ -8,42 +8,52 @@ use App\Models\Kelas;
 use App\Models\MataPelajaran;
 use App\Models\Materi;
 use App\Models\TemplateAdoption;
+use App\Support\AdminCabangScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Exception;
 
 class HierarchyController extends Controller
 {
+    use AdminCabangScope;
+
     /**
      * Get full kurikulum structure with counts
      */
     public function getStruktur(Request $request): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
-            $cacheKey = "kurikulum_struktur_{$kacabId}";
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
+            $cacheKey = "kurikulum_struktur_{$kacabId}_" . ($companyId ?? 'none');
 
-            $struktur = Cache::remember($cacheKey, 300, function () use ($kacabId) {
-                $jenjangList = Jenjang::active()
-                    ->with(['kelas' => function($query) {
-                        $query->active()->orderBy('urutan');
-                    }])
-                    ->orderBy('urutan')
-                    ->get();
+            $struktur = Cache::remember($cacheKey, 300, function () use ($kacabId, $companyId) {
+                $jenjangList = $this->applyCompanyScope(
+                    Jenjang::active()
+                        ->with(['kelas' => function($query) use ($companyId) {
+                            $this->applyCompanyScope($query, $companyId, 'kelas');
+                            $query->active()->orderBy('urutan');
+                        }])
+                        ->orderBy('urutan'),
+                    $companyId
+                )->get();
 
                 $result = [];
 
                 foreach ($jenjangList as $jenjang) {
                     // Count mata pelajaran untuk jenjang ini (ONCE per jenjang, not per kelas)
-                    $mataPelajaranCountJenjang = MataPelajaran::where('id_jenjang', $jenjang->id_jenjang)
-                        ->where(function($q) use ($kacabId) {
+                    $mataPelajaranCountJenjang = $this->applyCompanyScope(
+                        MataPelajaran::where('id_jenjang', $jenjang->id_jenjang)
+                            ->where(function($q) use ($kacabId) {
                             $q->where('is_global', true)
                               ->orWhere('id_kacab', $kacabId);
                         })
-                        ->active()
-                        ->count();
+                            ->active(),
+                        $companyId,
+                        'mata_pelajaran'
+                    )->count();
 
                     $jenjangData = [
                         'id_jenjang' => $jenjang->id_jenjang,
@@ -60,17 +70,24 @@ class HierarchyController extends Controller
                     foreach ($jenjang->kelas as $kelas) {
 
                         // Count materi untuk kelas ini
-                        $materiCount = Materi::where('id_kelas', $kelas->id_kelas)
-                            ->where('id_kacab', $kacabId)
-                            ->count();
+                        $materiCount = $this->applyCompanyScope(
+                            Materi::where('id_kelas', $kelas->id_kelas)
+                                ->where('id_kacab', $kacabId),
+                            $companyId,
+                            'materi'
+                        )->count();
 
                         // Count pending templates untuk kelas ini
-                        $pendingTemplatesCount = TemplateAdoption::where('id_kacab', $kacabId)
-                            ->whereHas('templateMateri', function($q) use ($kelas) {
+                        $pendingTemplatesCount = $this->applyCompanyScope(
+                            TemplateAdoption::where('id_kacab', $kacabId)
+                                ->whereHas('templateMateri', function($q) use ($kelas, $companyId) {
                                 $q->where('id_kelas', $kelas->id_kelas);
+                                $this->applyCompanyScope($q, $companyId, 'template_materi');
                             })
-                            ->pending()
-                            ->count();
+                                ->pending(),
+                            $companyId,
+                            'template_adoptions'
+                        )->count();
 
                         $kelasData = [
                             'id_kelas' => $kelas->id_kelas,
@@ -117,12 +134,18 @@ class HierarchyController extends Controller
     public function getKelas($jenjangId, Request $request): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             $includeCustom = $request->get('include_custom', true);
 
-            $query = Kelas::where('id_jenjang', $jenjangId)
-                ->active()
-                ->orderBy('urutan');
+            $query = $this->applyCompanyScope(
+                Kelas::where('id_jenjang', $jenjangId)
+                    ->active()
+                    ->orderBy('urutan'),
+                $companyId,
+                'kelas'
+            );
 
             if (!$includeCustom) {
                 $query->standard();
@@ -134,26 +157,36 @@ class HierarchyController extends Controller
 
             foreach ($kelasList as $kelas) {
                 // Count mata pelajaran untuk kelas ini
-                $mataPelajaranCount = MataPelajaran::where('id_jenjang', $jenjangId)
-                    ->where(function($q) use ($kacabId) {
+                $mataPelajaranCount = $this->applyCompanyScope(
+                    MataPelajaran::where('id_jenjang', $jenjangId)
+                        ->where(function($q) use ($kacabId) {
                         $q->where('is_global', true)
                           ->orWhere('id_kacab', $kacabId);
                     })
-                    ->active()
-                    ->count();
+                        ->active(),
+                    $companyId,
+                    'mata_pelajaran'
+                )->count();
 
                 // Count materi untuk kelas ini
-                $materiCount = Materi::where('id_kelas', $kelas->id_kelas)
-                    ->where('id_kacab', $kacabId)
-                    ->count();
+                $materiCount = $this->applyCompanyScope(
+                    Materi::where('id_kelas', $kelas->id_kelas)
+                        ->where('id_kacab', $kacabId),
+                    $companyId,
+                    'materi'
+                )->count();
 
                 // Count pending templates untuk kelas ini
-                $pendingTemplatesCount = TemplateAdoption::where('id_kacab', $kacabId)
-                    ->whereHas('templateMateri', function($q) use ($kelas) {
+                $pendingTemplatesCount = $this->applyCompanyScope(
+                    TemplateAdoption::where('id_kacab', $kacabId)
+                        ->whereHas('templateMateri', function($q) use ($kelas, $companyId) {
                         $q->where('id_kelas', $kelas->id_kelas);
+                        $this->applyCompanyScope($q, $companyId, 'template_materi');
                     })
-                    ->pending()
-                    ->count();
+                        ->pending(),
+                    $companyId,
+                    'template_adoptions'
+                )->count();
 
                 $result[] = [
                     'id_kelas' => $kelas->id_kelas,
@@ -191,14 +224,17 @@ class HierarchyController extends Controller
     public function getMataPelajaran($kelasId, Request $request): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             $includeCustom = $request->get('include_custom', true);
 
             // Get kelas info to get jenjang
-            $kelas = Kelas::findOrFail($kelasId);
+            $kelas = $this->applyCompanyScope(Kelas::query(), $companyId, 'kelas')->findOrFail($kelasId);
 
-            $query = MataPelajaran::where('id_jenjang', $kelas->id_jenjang)
-                ->where(function($q) use ($kacabId, $includeCustom) {
+            $query = $this->applyCompanyScope(
+                MataPelajaran::where('id_jenjang', $kelas->id_jenjang)
+                    ->where(function($q) use ($kacabId, $includeCustom) {
                     $q->where('is_global', true);
                     if ($includeCustom) {
                         $q->orWhere('id_kacab', $kacabId);
@@ -206,7 +242,10 @@ class HierarchyController extends Controller
                 })
                 ->active()
                 ->with(['jenjang'])
-                ->orderBy('nama_mata_pelajaran');
+                ->orderBy('nama_mata_pelajaran'),
+                $companyId,
+                'mata_pelajaran'
+            );
 
             $mataPelajaranList = $query->get();
 
@@ -214,19 +253,26 @@ class HierarchyController extends Controller
 
             foreach ($mataPelajaranList as $mataPelajaran) {
                 // Count materi untuk mata pelajaran dan kelas ini
-                $materiCount = Materi::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
-                    ->where('id_kelas', $kelasId)
-                    ->where('id_kacab', $kacabId)
-                    ->count();
+                $materiCount = $this->applyCompanyScope(
+                    Materi::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
+                        ->where('id_kelas', $kelasId)
+                        ->where('id_kacab', $kacabId),
+                    $companyId,
+                    'materi'
+                )->count();
 
                 // Count pending templates untuk mata pelajaran dan kelas ini
-                $pendingTemplatesCount = TemplateAdoption::where('id_kacab', $kacabId)
-                    ->whereHas('templateMateri', function($q) use ($mataPelajaran, $kelasId) {
+                $pendingTemplatesCount = $this->applyCompanyScope(
+                    TemplateAdoption::where('id_kacab', $kacabId)
+                        ->whereHas('templateMateri', function($q) use ($mataPelajaran, $kelasId, $companyId) {
                         $q->where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
                           ->where('id_kelas', $kelasId);
+                        $this->applyCompanyScope($q, $companyId, 'template_materi');
                     })
-                    ->pending()
-                    ->count();
+                        ->pending(),
+                    $companyId,
+                    'template_adoptions'
+                )->count();
 
                 $result[] = [
                     'id_mata_pelajaran' => $mataPelajaran->id_mata_pelajaran,
@@ -264,51 +310,76 @@ class HierarchyController extends Controller
     public function getMataPelajaranStats($mataPelajaranId, $kelasId, Request $request): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
-            $mataPelajaran = MataPelajaran::with(['jenjang'])
-                ->findOrFail($mataPelajaranId);
+            $mataPelajaran = $this->applyCompanyScope(
+                MataPelajaran::with(['jenjang']),
+                $companyId,
+                'mata_pelajaran'
+            )->findOrFail($mataPelajaranId);
 
-            $kelas = Kelas::with(['jenjang'])
-                ->findOrFail($kelasId);
+            $kelas = $this->applyCompanyScope(
+                Kelas::with(['jenjang']),
+                $companyId,
+                'kelas'
+            )->findOrFail($kelasId);
 
             // Get materi count
-            $materiCount = Materi::where('id_mata_pelajaran', $mataPelajaranId)
-                ->where('id_kelas', $kelasId)
-                ->where('id_kacab', $kacabId)
-                ->count();
+            $materiCount = $this->applyCompanyScope(
+                Materi::where('id_mata_pelajaran', $mataPelajaranId)
+                    ->where('id_kelas', $kelasId)
+                    ->where('id_kacab', $kacabId),
+                $companyId,
+                'materi'
+            )->count();
 
             // Get materi from template count
-            $materiFromTemplateCount = Materi::where('id_mata_pelajaran', $mataPelajaranId)
-                ->where('id_kelas', $kelasId)
-                ->where('id_kacab', $kacabId)
-                ->fromTemplate()
-                ->count();
+            $materiFromTemplateCount = $this->applyCompanyScope(
+                Materi::where('id_mata_pelajaran', $mataPelajaranId)
+                    ->where('id_kelas', $kelasId)
+                    ->where('id_kacab', $kacabId)
+                    ->fromTemplate(),
+                $companyId,
+                'materi'
+            )->count();
 
             // Get custom materi count
-            $customMateriCount = Materi::where('id_mata_pelajaran', $mataPelajaranId)
-                ->where('id_kelas', $kelasId)
-                ->where('id_kacab', $kacabId)
-                ->custom()
-                ->count();
+            $customMateriCount = $this->applyCompanyScope(
+                Materi::where('id_mata_pelajaran', $mataPelajaranId)
+                    ->where('id_kelas', $kelasId)
+                    ->where('id_kacab', $kacabId)
+                    ->custom(),
+                $companyId,
+                'materi'
+            )->count();
 
             // Get pending templates count
-            $pendingTemplatesCount = TemplateAdoption::where('id_kacab', $kacabId)
-                ->whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
+            $pendingTemplatesCount = $this->applyCompanyScope(
+                TemplateAdoption::where('id_kacab', $kacabId)
+                    ->whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId, $companyId) {
                     $q->where('id_mata_pelajaran', $mataPelajaranId)
                       ->where('id_kelas', $kelasId);
+                    $this->applyCompanyScope($q, $companyId, 'template_materi');
                 })
-                ->pending()
-                ->count();
+                    ->pending(),
+                $companyId,
+                'template_adoptions'
+            )->count();
 
             // Get adopted templates count
-            $adoptedTemplatesCount = TemplateAdoption::where('id_kacab', $kacabId)
-                ->whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
+            $adoptedTemplatesCount = $this->applyCompanyScope(
+                TemplateAdoption::where('id_kacab', $kacabId)
+                    ->whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId, $companyId) {
                     $q->where('id_mata_pelajaran', $mataPelajaranId)
                       ->where('id_kelas', $kelasId);
+                    $this->applyCompanyScope($q, $companyId, 'template_materi');
                 })
-                ->adopted()
-                ->count();
+                    ->adopted(),
+                $companyId,
+                'template_adoptions'
+            )->count();
 
             $result = [
                 'mata_pelajaran' => $mataPelajaran,
@@ -343,8 +414,10 @@ class HierarchyController extends Controller
     public function clearCache(): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
-            $cacheKey = "kurikulum_struktur_{$kacabId}";
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
+            $cacheKey = "kurikulum_struktur_{$kacabId}_" . ($companyId ?? 'none');
             
             Cache::forget($cacheKey);
 

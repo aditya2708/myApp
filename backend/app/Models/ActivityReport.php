@@ -9,14 +9,38 @@ class ActivityReport extends Model
 {
     use HasFactory;
 
+    public const REVIEW_STATUS_CLEAN = 'clean';
+    public const REVIEW_STATUS_NEEDS_REVIEW = 'needs_review';
+    public const REVIEW_STATUS_DISMISSED = 'dismissed';
+
     protected $table = 'activity_reports';
     protected $primaryKey = 'id_activity_report';
 
     protected $fillable = [
         'id_aktivitas',
+        'company_id',
         'foto_1',
         'foto_2',
-        'foto_3'
+        'foto_3',
+        'latitude',
+        'longitude',
+        'location_accuracy',
+        'location_recorded_at',
+        'auto_flag',
+        'auto_flag_payload',
+        'review_status',
+        'reviewed_at',
+        'reviewed_by',
+        'review_notes'
+    ];
+
+    protected $casts = [
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
+        'location_accuracy' => 'decimal:2',
+        'location_recorded_at' => 'datetime',
+        'auto_flag_payload' => 'array',
+        'reviewed_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -31,6 +55,14 @@ class ActivityReport extends Model
     public function aktivitas()
     {
         return $this->belongsTo(Aktivitas::class, 'id_aktivitas', 'id_aktivitas');
+    }
+
+    /**
+     * Reviewer relation for flagged reports.
+     */
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by', 'id_users');
     }
 
     /**

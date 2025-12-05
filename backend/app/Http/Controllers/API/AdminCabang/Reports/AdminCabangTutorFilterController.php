@@ -4,12 +4,15 @@ namespace App\Http\Controllers\API\AdminCabang\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Services\AdminCabang\Reports\TutorFilterHierarchyService;
+use App\Support\AdminCabangScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
 
 class AdminCabangTutorFilterController extends Controller
 {
+    use AdminCabangScope;
+
     public function wilayah(Request $request, TutorFilterHierarchyService $hierarchyService): JsonResponse
     {
         $validated = $request->validate([
@@ -24,6 +27,19 @@ class AdminCabangTutorFilterController extends Controller
                 'success' => false,
                 'message' => 'Admin cabang tidak ditemukan untuk pengguna saat ini.',
             ], 404);
+        }
+
+        $companyId = $this->companyId($adminCabang->company_id ?? null);
+
+        if ($companyId && $adminCabang->company_id && $adminCabang->company_id !== $companyId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Admin cabang tidak ditemukan untuk company ini.',
+            ], 404);
+        }
+
+        if ($companyId && !$adminCabang->company_id) {
+            $adminCabang->company_id = $companyId;
         }
 
         try {
@@ -67,6 +83,19 @@ class AdminCabangTutorFilterController extends Controller
                 'success' => false,
                 'message' => 'Admin cabang tidak ditemukan untuk pengguna saat ini.',
             ], 404);
+        }
+
+        $companyId = $this->companyId($adminCabang->company_id ?? null);
+
+        if ($companyId && $adminCabang->company_id && $adminCabang->company_id !== $companyId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Admin cabang tidak ditemukan untuk company ini.',
+            ], 404);
+        }
+
+        if ($companyId && !$adminCabang->company_id) {
+            $adminCabang->company_id = $companyId;
         }
 
         try {

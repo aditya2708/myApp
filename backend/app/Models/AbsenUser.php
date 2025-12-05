@@ -11,7 +11,7 @@ class AbsenUser extends Model
 
     protected $table = 'absen_user'; // Nama tabel
     protected $primaryKey = 'id_absen_user'; // Primary key
-    protected $fillable = ['id_anak', 'id_tutor']; // Kolom yang bisa diisi
+    protected $fillable = ['id_anak', 'id_tutor', 'company_id']; // Kolom yang bisa diisi
 
     /**
      * Relasi ke tabel Anak.

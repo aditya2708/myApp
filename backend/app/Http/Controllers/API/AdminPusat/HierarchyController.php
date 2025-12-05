@@ -8,24 +8,30 @@ use App\Models\Kelas;
 use App\Models\MataPelajaran;
 use App\Models\TemplateMateri;
 use App\Models\TemplateAdoption;
+use App\Support\AdminPusatScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class HierarchyController extends Controller
 {
+    use AdminPusatScope;
+
     /**
      * Get full hierarchy structure with template counts
      */
     public function getStruktur(): JsonResponse
     {
         try {
-            $cacheKey = 'admin_pusat_hierarchy_struktur';
+            $companyId = $this->companyId();
+            $cacheKey = 'admin_pusat_hierarchy_struktur_' . ($companyId ?? 'none');
             
-            $struktur = Cache::remember($cacheKey, 300, function () { // 5 minute cache
-                return Jenjang::active()
+            $struktur = Cache::remember($cacheKey, 300, function () use ($companyId) { // 5 minute cache
+                return $this->applyCompanyScope(Jenjang::active(), $companyId, 'jenjang')
                     ->with([
-                        'kelas' => function($query) {
+                        'kelas' => function($query) use ($companyId) {
+                            $this->applyCompanyScope($query, $companyId, 'kelas');
                             $query->active()->orderBy('urutan');
                         }
                     ])
@@ -34,45 +40,81 @@ class HierarchyController extends Controller
                     ->map(function($jenjang) {
                         // Add template statistics for jenjang
                         $jenjang->template_stats = [
-                            'total_templates' => TemplateMateri::whereHas('kelas', function($q) use ($jenjang) {
+                            'total_templates' => $this->applyCompanyScope(
+                                TemplateMateri::whereHas('kelas', function($q) use ($jenjang) {
                                 $q->where('id_jenjang', $jenjang->id_jenjang);
-                            })->count(),
-                            'active_templates' => TemplateMateri::where('is_active', true)
-                                ->whereHas('kelas', function($q) use ($jenjang) {
+                            }),
+                                $companyId,
+                                'template_materi'
+                            )->count(),
+                            'active_templates' => $this->applyCompanyScope(
+                                TemplateMateri::where('is_active', true)
+                                    ->whereHas('kelas', function($q) use ($jenjang) {
                                     $q->where('id_jenjang', $jenjang->id_jenjang);
-                                })->count(),
-                            'distributed_templates' => TemplateMateri::whereHas('templateAdoptions')
-                                ->whereHas('kelas', function($q) use ($jenjang) {
+                                }),
+                                $companyId,
+                                'template_materi'
+                            )->count(),
+                            'distributed_templates' => $this->applyCompanyScope(
+                                TemplateMateri::whereHas('templateAdoptions')
+                                    ->whereHas('kelas', function($q) use ($jenjang) {
                                     $q->where('id_jenjang', $jenjang->id_jenjang);
-                                })->count()
+                                }),
+                                $companyId,
+                                'template_materi'
+                            )->count()
                         ];
 
                         // Add template statistics for each kelas
-                        $jenjang->kelas = $jenjang->kelas->map(function($kelas) {
+                        $jenjang->kelas = $jenjang->kelas->map(function($kelas) use ($companyId) {
                             $kelas->template_stats = [
-                                'total_templates' => TemplateMateri::where('id_kelas', $kelas->id_kelas)->count(),
-                                'active_templates' => TemplateMateri::where('id_kelas', $kelas->id_kelas)
-                                    ->where('is_active', true)->count(),
-                                'distributed_templates' => TemplateMateri::where('id_kelas', $kelas->id_kelas)
-                                    ->whereHas('templateAdoptions')->count()
+                                'total_templates' => $this->applyCompanyScope(
+                                    TemplateMateri::where('id_kelas', $kelas->id_kelas),
+                                    $companyId,
+                                    'template_materi'
+                                )->count(),
+                                'active_templates' => $this->applyCompanyScope(
+                                    TemplateMateri::where('id_kelas', $kelas->id_kelas)
+                                        ->where('is_active', true),
+                                    $companyId,
+                                    'template_materi'
+                                )->count(),
+                                'distributed_templates' => $this->applyCompanyScope(
+                                    TemplateMateri::where('id_kelas', $kelas->id_kelas)
+                                        ->whereHas('templateAdoptions'),
+                                    $companyId,
+                                    'template_materi'
+                                )->count()
                             ];
 
                             // Get mata pelajaran for this kelas through jenjang relationship
-                            $mataPelajaranList = MataPelajaran::where('id_jenjang', $kelas->id_jenjang)
+                            $mataPelajaranList = $this->applyCompanyScope(
+                                MataPelajaran::where('id_jenjang', $kelas->id_jenjang),
+                                $companyId,
+                                'mata_pelajaran'
+                            )
                                 ->where(function($query) {
                                     $query->where('is_global', true)
                                           ->orWhereNotNull('id_kacab'); // Include all kacab-specific subjects for template management
                                 })
                                 ->where('status', 'active')
                                 ->get()
-                                ->map(function($mataPelajaran) use ($kelas) {
+                                ->map(function($mataPelajaran) use ($kelas, $companyId) {
                                     $mataPelajaran->template_stats = [
-                                        'total_templates' => TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
-                                            ->where('id_kelas', $kelas->id_kelas)->count(),
-                                        'active_templates' => TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
+                                        'total_templates' => $this->applyCompanyScope(
+                                            TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
+                                                ->where('id_kelas', $kelas->id_kelas),
+                                            $companyId,
+                                            'template_materi'
+                                        )->count(),
+                                        'active_templates' => $this->applyCompanyScope(
+                                            TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
                                             ->where('id_kelas', $kelas->id_kelas)
-                                            ->where('is_active', true)->count(),
-                                        'adoption_rate' => $this->calculateMataPelajaranAdoptionRate($mataPelajaran->id_mata_pelajaran, $kelas->id_kelas)
+                                            ->where('is_active', true),
+                                            $companyId,
+                                            'template_materi'
+                                        )->count(),
+                                        'adoption_rate' => $this->calculateMataPelajaranAdoptionRate($mataPelajaran->id_mata_pelajaran, $kelas->id_kelas, $companyId)
                                     ];
 
                                     return $mataPelajaran;
@@ -108,7 +150,8 @@ class HierarchyController extends Controller
     public function getKelas($jenjangId): JsonResponse
     {
         try {
-            $jenjang = Jenjang::find($jenjangId);
+            $companyId = $this->companyId();
+            $jenjang = $this->applyCompanyScope(Jenjang::query(), $companyId, 'jenjang')->find($jenjangId);
 
             if (!$jenjang) {
                 return response()->json([
@@ -118,31 +161,55 @@ class HierarchyController extends Controller
                 ], 404);
             }
 
-            $kelasList = Kelas::where('id_jenjang', $jenjangId)
+            $kelasList = $this->applyCompanyScope(Kelas::where('id_jenjang', $jenjangId), $companyId, 'kelas')
                 ->active()
                 ->orderBy('urutan')
                 ->get()
-                ->map(function($kelas) {
+                ->map(function($kelas) use ($companyId) {
                     // Add template statistics
                     $kelas->template_stats = [
-                        'total_templates' => TemplateMateri::where('id_kelas', $kelas->id_kelas)->count(),
-                        'active_templates' => TemplateMateri::where('id_kelas', $kelas->id_kelas)
-                            ->where('is_active', true)->count(),
-                        'distributed_templates' => TemplateMateri::where('id_kelas', $kelas->id_kelas)
-                            ->whereHas('templateAdoptions')->count(),
-                        'pending_distributions' => TemplateAdoption::whereHas('templateMateri', function($q) use ($kelas) {
-                            $q->where('id_kelas', $kelas->id_kelas);
-                        })->where('status', 'pending')->count()
+                        'total_templates' => $this->applyCompanyScope(
+                            TemplateMateri::where('id_kelas', $kelas->id_kelas),
+                            $companyId,
+                            'template_materi'
+                        )->count(),
+                        'active_templates' => $this->applyCompanyScope(
+                            TemplateMateri::where('id_kelas', $kelas->id_kelas)
+                                ->where('is_active', true),
+                            $companyId,
+                            'template_materi'
+                        )->count(),
+                        'distributed_templates' => $this->applyCompanyScope(
+                            TemplateMateri::where('id_kelas', $kelas->id_kelas)
+                                ->whereHas('templateAdoptions'),
+                            $companyId,
+                            'template_materi'
+                        )->count(),
+                        'pending_distributions' => $this->applyCompanyScope(
+                            TemplateAdoption::whereHas('templateMateri', function($q) use ($kelas) {
+                                $q->where('id_kelas', $kelas->id_kelas);
+                            }),
+                            $companyId,
+                            'template_adoptions'
+                        )->where('status', 'pending')->count()
                     ];
 
                     // Calculate overall adoption rate for this kelas
-                    $totalDistributions = TemplateAdoption::whereHas('templateMateri', function($q) use ($kelas) {
-                        $q->where('id_kelas', $kelas->id_kelas);
-                    })->count();
+                    $totalDistributions = $this->applyCompanyScope(
+                        TemplateAdoption::whereHas('templateMateri', function($q) use ($kelas) {
+                            $q->where('id_kelas', $kelas->id_kelas);
+                        }),
+                        $companyId,
+                        'template_adoptions'
+                    )->count();
 
-                    $adoptedDistributions = TemplateAdoption::whereHas('templateMateri', function($q) use ($kelas) {
-                        $q->where('id_kelas', $kelas->id_kelas);
-                    })->whereIn('status', ['adopted', 'customized'])->count();
+                    $adoptedDistributions = $this->applyCompanyScope(
+                        TemplateAdoption::whereHas('templateMateri', function($q) use ($kelas) {
+                            $q->where('id_kelas', $kelas->id_kelas);
+                        }),
+                        $companyId,
+                        'template_adoptions'
+                    )->whereIn('status', ['adopted', 'customized'])->count();
 
                     $kelas->adoption_rate = $totalDistributions > 0 
                         ? round(($adoptedDistributions / $totalDistributions) * 100, 2) 
@@ -175,7 +242,8 @@ class HierarchyController extends Controller
     public function getMataPelajaran($kelasId): JsonResponse
     {
         try {
-            $kelas = Kelas::with('jenjang')->find($kelasId);
+            $companyId = $this->companyId();
+            $kelas = $this->applyCompanyScope(Kelas::with('jenjang'), $companyId, 'kelas')->find($kelasId);
 
             if (!$kelas) {
                 return response()->json([
@@ -185,7 +253,7 @@ class HierarchyController extends Controller
                 ], 404);
             }
 
-            $mataPelajaranList = MataPelajaran::active()
+            $mataPelajaranList = $this->applyCompanyScope(MataPelajaran::active(), $companyId, 'mata_pelajaran')
                 ->where(function($query) use ($kelas) {
                     // Global mata pelajaran OR specific to this jenjang
                     $query->where('is_global', true)
@@ -193,21 +261,33 @@ class HierarchyController extends Controller
                 })
                 ->orderBy('nama_mata_pelajaran')
                 ->get()
-                ->map(function($mataPelajaran) use ($kelasId) {
+                ->map(function($mataPelajaran) use ($kelasId, $companyId) {
                     // Add template statistics for this mata pelajaran + kelas combination
                     $mataPelajaran->template_stats = [
-                        'total_templates' => TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
-                            ->where('id_kelas', $kelasId)->count(),
-                        'active_templates' => TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
-                            ->where('id_kelas', $kelasId)
-                            ->where('is_active', true)->count(),
-                        'distributed_templates' => TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
-                            ->where('id_kelas', $kelasId)
-                            ->whereHas('templateAdoptions')->count()
+                        'total_templates' => $this->applyCompanyScope(
+                            TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
+                                ->where('id_kelas', $kelasId),
+                            $companyId,
+                            'template_materi'
+                        )->count(),
+                        'active_templates' => $this->applyCompanyScope(
+                            TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
+                                ->where('id_kelas', $kelasId)
+                                ->where('is_active', true),
+                            $companyId,
+                            'template_materi'
+                        )->count(),
+                        'distributed_templates' => $this->applyCompanyScope(
+                            TemplateMateri::where('id_mata_pelajaran', $mataPelajaran->id_mata_pelajaran)
+                                ->where('id_kelas', $kelasId)
+                                ->whereHas('templateAdoptions'),
+                            $companyId,
+                            'template_materi'
+                        )->count()
                     ];
 
                     // Calculate adoption statistics
-                    $adoptionStats = $this->getDetailedAdoptionStats($mataPelajaran->id_mata_pelajaran, $kelasId);
+                    $adoptionStats = $this->getDetailedAdoptionStats($mataPelajaran->id_mata_pelajaran, $kelasId, $companyId);
                     $mataPelajaran->adoption_stats = $adoptionStats;
 
                     return $mataPelajaran;
@@ -357,7 +437,8 @@ class HierarchyController extends Controller
     public function clearCache(): JsonResponse
     {
         try {
-            Cache::forget('admin_pusat_hierarchy_struktur');
+            $companyId = $this->companyId();
+            Cache::forget('admin_pusat_hierarchy_struktur_' . ($companyId ?? 'none'));
             
             return response()->json([
                 'success' => true,
@@ -376,21 +457,29 @@ class HierarchyController extends Controller
     /**
      * Calculate adoption rate for mata pelajaran + kelas combination
      */
-    private function calculateMataPelajaranAdoptionRate($mataPelajaranId, $kelasId): float
+    private function calculateMataPelajaranAdoptionRate($mataPelajaranId, $kelasId, ?int $companyId = null): float
     {
-        $totalDistributions = TemplateAdoption::whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
+        $totalDistributions = $this->applyCompanyScope(
+            TemplateAdoption::whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
             $q->where('id_mata_pelajaran', $mataPelajaranId)
               ->where('id_kelas', $kelasId);
-        })->count();
+        }),
+            $companyId,
+            'template_adoptions'
+        )->count();
 
         if ($totalDistributions === 0) {
             return 0;
         }
 
-        $adoptedDistributions = TemplateAdoption::whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
+        $adoptedDistributions = $this->applyCompanyScope(
+            TemplateAdoption::whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
             $q->where('id_mata_pelajaran', $mataPelajaranId)
               ->where('id_kelas', $kelasId);
-        })->whereIn('status', ['adopted', 'customized'])->count();
+        }),
+            $companyId,
+            'template_adoptions'
+        )->whereIn('status', ['adopted', 'customized'])->count();
 
         return round(($adoptedDistributions / $totalDistributions) * 100, 2);
     }
@@ -398,12 +487,16 @@ class HierarchyController extends Controller
     /**
      * Get detailed adoption statistics for mata pelajaran + kelas
      */
-    private function getDetailedAdoptionStats($mataPelajaranId, $kelasId): array
+    private function getDetailedAdoptionStats($mataPelajaranId, $kelasId, ?int $companyId = null): array
     {
-        $adoptionData = TemplateAdoption::whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
+        $adoptionData = $this->applyCompanyScope(
+            TemplateAdoption::whereHas('templateMateri', function($q) use ($mataPelajaranId, $kelasId) {
             $q->where('id_mata_pelajaran', $mataPelajaranId)
               ->where('id_kelas', $kelasId);
-        })
+        }),
+            $companyId,
+            'template_adoptions'
+        )
         ->selectRaw('
             count(*) as total_distributions,
             sum(case when status = "pending" then 1 else 0 end) as pending,

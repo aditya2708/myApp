@@ -58,13 +58,11 @@ const AdminCabangDashboardScreen = () => {
     refreshAd();
   };
   const navigateToSurveyManagement = () => navigation.navigate('SurveyStatusFilter');
-  const navigateToDonaturManagement = () => navigation.navigate('DonaturList');
   const navigateToKurikulum = () => navigation.navigate('Kurikulum', { screen: 'KurikulumHome' });
   const navigateToGpsApproval = () => navigation.navigate('GpsApprovalScreen');
   const navigateToProfile = () => navigation.navigate('Profile');
   const navigateToReports = () => navigation.navigate('Reports', { screen: 'AdminCabangReportHome' });
-  const navigateToUserManagement = () =>
-    navigation.navigate('AdminCabangUserManagement');
+  // Manajemen pengguna dipindah ke IdP/Super Admin; navigasi dihilangkan.
 
   if (loading && !refreshing) return <LoadingSpinner fullScreen message="Memuat dashboard..." />;
 
@@ -78,22 +76,6 @@ const AdminCabangDashboardScreen = () => {
       color: '#f39c12', 
       onPress: navigateToSurveyManagement, 
       badge: summary.pending_surveys 
-    },
-    {
-      title: 'Manajemen Donatur',
-      description: 'Kelola data donatur cabang',
-      icon: 'people',
-      color: '#3498db',
-      onPress: navigateToDonaturManagement,
-      badge: summary.donatur
-    },
-    {
-      title: 'Manajemen Pengguna',
-      description: 'Kelola akses admin cabang & shelter',
-      icon: 'people-circle',
-      color: '#2980b9',
-      onPress: navigateToUserManagement,
-      badge: null
     },
     {
       title: 'Laporan',
@@ -124,7 +106,6 @@ const AdminCabangDashboardScreen = () => {
   const statsData = [
     { icon: 'map-outline', color: '#2ecc71', value: summary.wilayah || 0, label: 'Wilayah Binaan' },
     { icon: 'home-outline', color: '#e74c3c', value: summary.shelter || 0, label: 'Shelter' },
-    { icon: 'people-outline', color: '#3498db', value: summary.donatur || 0, label: 'Donatur' },
     { icon: 'document-text-outline', color: '#f39c12', value: summary.pending_surveys || 0, label: 'Survey Tertunda' },
     { icon: 'school-outline', color: '#8e44ad', value: summary.total_children || 0, label: 'Total Anak' },
     { icon: 'person-outline', color: '#16a085', value: summary.total_tutors || 0, label: 'Total Tutor' }

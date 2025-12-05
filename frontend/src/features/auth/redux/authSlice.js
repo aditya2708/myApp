@@ -4,11 +4,14 @@ import { createSlice } from '@reduxjs/toolkit';
  * Initial state for auth slice
  */
 const initialState = {
-  user: null,                 // User basic information
-  token: null,                // Authentication token
+  user: null,                 // User info fetched from IdP userinfo
+  token: null,                // Access token from IdP
   isAuthenticated: false,     // Authentication status
-  userLevel: null,            // User role (admin_pusat, admin_cabang, admin_shelter, donatur)
-  profile: null,              // User profile data based on role
+  userLevel: null,            // Local role (from bimbel API)
+  roles: [],                  // Available roles (multi-role)
+  currentRole: null,          // Currently selected role
+  profile: null,              // Additional profile data from tenant API
+  sso: null,                  // Raw payload from IdP userinfo
   loading: false,             // Loading state
   initializing: true,         // App initialization state
   error: null,                // Error message if any
@@ -47,23 +50,40 @@ const authSlice = createSlice({
     },
 
     loginSuccess: (state, action) => {
+      const payloadUser = action.payload.user || null;
+      const availableRoles = action.payload.roles || [];
+      const currentRole =
+        action.payload.currentRole ||
+        (availableRoles.length === 1 ? availableRoles[0] : null);
+      const resolvedUserLevel = currentRole?.slug
+        ? currentRole.slug
+        : availableRoles.length > 1
+          ? null
+          : payloadUser?.level ?? null;
+
       state.loading = false;
       state.isAuthenticated = true;
       state.token = action.payload.token;
-      state.user = {
-        id: action.payload.user.id,
-        email: action.payload.user.email,
-        level: action.payload.user.level
-      };
-      state.userLevel = action.payload.user.level;
-      state.profile = action.payload.user.profile;
+      state.user = payloadUser;
+      state.roles = availableRoles;
+      state.currentRole = currentRole;
+      state.userLevel = resolvedUserLevel;
+      state.profile =
+        action.payload.profile ?? payloadUser?.profile ?? null;
+      state.sso = action.payload.sso ?? action.payload.sso_profile ?? null;
       state.fieldErrors = null;
+      state.error = null;
     },
 
     loginFailure: (state, action) => {
       state.loading = false;
       state.error = action.payload?.message || 'Email atau kata sandi tidak sesuai.';
       state.fieldErrors = action.payload?.fieldErrors || null;
+      state.user = null;
+      state.userLevel = null;
+      state.roles = [];
+      state.currentRole = null;
+      state.sso = null;
     },
 
     // Logout actions
@@ -92,15 +112,34 @@ const authSlice = createSlice({
     },
     
     fetchUserSuccess: (state, action) => {
+      const payloadUser = action.payload?.user || null;
       state.loading = false;
       state.isAuthenticated = true;
-      state.user = {
-        id: action.payload.user.id,
-        email: action.payload.user.email,
-        level: action.payload.user.level
-      };
-      state.userLevel = action.payload.user.level;
-      state.profile = action.payload.user.profile;
+      state.user = payloadUser;
+      const availableRoles = action.payload?.roles || [];
+      const currentRole =
+        action.payload?.currentRole ||
+        (availableRoles.length === 1 ? availableRoles[0] : null);
+      const resolvedUserLevel = currentRole?.slug
+        ? currentRole.slug
+        : availableRoles.length > 1
+          ? null
+          : payloadUser?.level ?? null;
+
+      state.roles = availableRoles;
+      state.currentRole = currentRole;
+      state.userLevel = resolvedUserLevel;
+      state.profile =
+        action.payload?.profile ??
+        action.payload?.sso ??
+        action.payload?.sso_profile ??
+        payloadUser?.profile ??
+        null;
+      state.error = null;
+      state.fieldErrors = null;
+      if (action.payload?.sso || action.payload?.sso_profile) {
+        state.sso = action.payload.sso ?? action.payload.sso_profile;
+      }
     },
     
     fetchUserFailure: (state, action) => {
@@ -109,8 +148,11 @@ const authSlice = createSlice({
       state.error = action.payload?.message || 'Gagal mengambil data pengguna';
       state.user = null;
       state.userLevel = null;
+      state.roles = [];
+      state.currentRole = null;
       state.profile = null;
       state.token = null;
+      state.sso = null;
     },
 
     // Initialize auth action
@@ -124,7 +166,13 @@ const authSlice = createSlice({
     
     initializeFailure: (state) => {
       state.initializing = false;
-    }
+    },
+
+    setCurrentRole: (state, action) => {
+      const role = action.payload || null;
+      state.currentRole = role;
+      state.userLevel = role?.slug ?? null;
+    },
   }
 });
 
@@ -144,7 +192,8 @@ export const {
   fetchUserFailure,
   initializeStart,
   initializeSuccess,
-  initializeFailure
+  initializeFailure,
+  setCurrentRole
 } = authSlice.actions;
 
 // Export selectors
@@ -153,6 +202,8 @@ export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
 export const selectIsInitializing = (state) => state.auth.initializing;
 export const selectAuthToken = (state) => state.auth.token;
 export const selectUserLevel = (state) => state.auth.userLevel;
+export const selectAvailableRoles = (state) => state.auth.roles;
+export const selectCurrentRole = (state) => state.auth.currentRole;
 export const selectUser = (state) => state.auth.user;
 export const selectUserProfile = (state) => state.auth.profile;
 export const selectAuthLoading = (state) => state.auth.loading;

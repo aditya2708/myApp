@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Core screens
 import AdminShelterDashboardScreen from '../features/adminShelter/screens/AdminShelterDashboardScreen';
@@ -98,12 +100,19 @@ import ChildAchievementReportScreen from '../features/adminShelter/screens/repor
 import ChildAchievementDetailScreen from '../features/adminShelter/screens/reports/ChildAchievementDetailScreen';
 import TutorAttendanceReportScreen from '../features/adminShelter/screens/reports/TutorAttendanceReportScreen';
 
+import {
+  selectIsQuickFlowActive,
+  selectQuickFlowActivityId,
+  selectQuickFlowStep,
+  startQuickFlow,
+} from '../features/adminShelter/redux/quickFlowSlice';
 
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 const ManagementStack = createStackNavigator();
+const ReportsStack = createStackNavigator();
 
 const headerStyles = StyleSheet.create({
   headerButton: {
@@ -132,6 +141,33 @@ const headerStyles = StyleSheet.create({
   },
 });
 
+const tabStyles = StyleSheet.create({
+  quickButtonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: -40,
+  },
+  quickButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#3498db',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  quickLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#3498db',
+    fontWeight: '600',
+  },
+});
+
 const NotificationBell = ({ onPress, unreadCount }) => (
   <TouchableOpacity
     onPress={onPress}
@@ -149,6 +185,84 @@ const NotificationBell = ({ onPress, unreadCount }) => (
     </View>
   </TouchableOpacity>
 );
+
+const QuickFlowTabButton = (props) => {
+  const navigation = useNavigation();
+  const dispatch = useDispatch();
+  const quickFlowActive = useSelector(selectIsQuickFlowActive);
+  const quickFlowStep = useSelector(selectQuickFlowStep);
+  const quickFlowActivityId = useSelector(selectQuickFlowActivityId);
+
+  const navigateByStep = () => {
+    const targetId = quickFlowActivityId;
+    switch (quickFlowStep) {
+      case 'activityForm':
+        navigation.navigate('Home', { screen: 'ActivityForm', params: { quickFlow: true } });
+        break;
+      case 'activitiesList':
+        navigation.navigate('Home', {
+          screen: 'ActivitiesList',
+          params: { quickFlow: true, targetActivityId: targetId },
+        });
+        break;
+      case 'activityDetail':
+        if (targetId) {
+          navigation.navigate('Home', {
+            screen: 'ActivityDetail',
+            params: { id_aktivitas: targetId, quickFlow: true },
+          });
+        } else {
+          navigation.navigate('Home', { screen: 'ActivitiesList', params: { quickFlow: true } });
+        }
+        break;
+      case 'manualAttendance':
+        if (targetId) {
+          navigation.navigate('Home', {
+            screen: 'ManualAttendance',
+            params: { id_aktivitas: targetId, quickFlow: true },
+          });
+        } else {
+          navigation.navigate('Home', { screen: 'ActivityDetail', params: { quickFlow: true } });
+        }
+        break;
+      case 'activityReport':
+        if (targetId) {
+          navigation.navigate('Home', {
+            screen: 'ActivityReport',
+            params: { id_aktivitas: targetId, quickFlow: true },
+          });
+        } else {
+          navigation.navigate('Home', { screen: 'ActivityDetail', params: { quickFlow: true } });
+        }
+        break;
+      default:
+        navigation.navigate('Home', { screen: 'ActivityForm', params: { quickFlow: true } });
+    }
+  };
+
+  const handlePress = () => {
+    if (quickFlowActive) {
+      navigateByStep();
+      return;
+    }
+    dispatch(startQuickFlow({ step: 'activityForm', activityId: null }));
+    navigation.navigate('Home', { screen: 'ActivityForm', params: { quickFlow: true } });
+  };
+
+  return (
+    <TouchableOpacity
+      {...props}
+      onPress={handlePress}
+      style={[tabStyles.quickButtonContainer, props.style]}
+      accessibilityRole="button"
+    >
+      <View style={tabStyles.quickButton}>
+        <Ionicons name="flash" size={22} color="#ffffff" />
+      </View>
+      <Text style={tabStyles.quickLabel}>Quick</Text>
+    </TouchableOpacity>
+  );
+};
 
 const HomeStackNavigator = () => {
   const unreadCount = useSelector(selectUnreadNotificationCount);
@@ -344,41 +458,109 @@ const ManagementStackNavigator = () => (
   </ManagementStack.Navigator>
 );
 
-const AdminShelterNavigator = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      tabBarIcon: ({ focused, color, size }) => {
-        let iconName;
-        if (route.name === 'Home') {
-          iconName = focused ? 'home' : 'home-outline';
-        } else if (route.name === 'Management') {
-          iconName = focused ? 'settings' : 'settings-outline';
-        } else if (route.name === 'ProfileTab') {
-          iconName = focused ? 'person' : 'person-outline';
-        }
-        return <Ionicons name={iconName} size={size} color={color} />;
-      },
-      tabBarActiveTintColor: '#e74c3c',
-      tabBarInactiveTintColor: 'gray',
-      headerShown: false
-    })}
-  >
-    <Tab.Screen 
-      name="Home" 
-      component={HomeStackNavigator}
-      options={{ tabBarLabel: 'Home' }}
+const ReportsStackNavigator = () => (
+  <ReportsStack.Navigator>
+    <ReportsStack.Screen
+      name="LaporanKegiatanMain"
+      component={LaporanKegiatanMainScreen}
+      options={{ headerTitle: 'Laporan Kegiatan' }}
     />
+    <ReportsStack.Screen
+      name="ActivityReportList"
+      component={ActivityReportListScreen}
+      options={{ headerTitle: 'Daftar Laporan Kegiatan' }}
+    />
+    <ReportsStack.Screen
+      name="ChildAchievementReport"
+      component={ChildAchievementReportScreen}
+      options={{ headerTitle: 'Laporan Pencapaian Anak' }}
+    />
+    <ReportsStack.Screen
+      name="ChildAchievementDetail"
+      component={ChildAchievementDetailScreen}
+      options={{ headerTitle: 'Detail Pencapaian' }}
+    />
+    <ReportsStack.Screen
+      name="TutorAttendanceReport"
+      component={TutorAttendanceReportScreen}
+      options={{ headerTitle: 'Laporan Kehadiran Tutor' }}
+    />
+  </ReportsStack.Navigator>
+);
+
+const AdminShelterNavigator = () => {
+  const insets = useSafeAreaInsets();
+  const tabBarStyle = useMemo(
+    () => ({
+      height: 70 + Math.max(insets.bottom, 8),
+      paddingTop: 6,
+      paddingBottom: Math.max(insets.bottom, 12),
+    }),
+    [insets.bottom],
+  );
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'QuickAbsen') {
+            iconName = 'flash';
+          } else if (route.name === 'Management') {
+            iconName = focused ? 'settings' : 'settings-outline';
+          } else if (route.name === 'Reports') {
+            iconName = focused ? 'document-text' : 'document-text-outline';
+          } else if (route.name === 'ProfileTab') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#e74c3c',
+        tabBarInactiveTintColor: 'gray',
+        headerShown: false,
+        tabBarStyle,
+        tabBarLabelStyle: {
+          marginBottom: 4,
+        },
+      })}
+    >
+      <Tab.Screen 
+        name="Home" 
+        component={HomeStackNavigator}
+        options={{ tabBarLabel: 'Home' }}
+      />
     <Tab.Screen 
       name="Management" 
       component={ManagementStackNavigator}
       options={{ tabBarLabel: 'Management' }}
     />
     <Tab.Screen
+      name="QuickAbsen"
+      component={HomeStackNavigator}
+      options={{
+        tabBarLabel: '',
+        tabBarButton: (props) => <QuickFlowTabButton {...props} />,
+      }}
+      listeners={{
+        tabPress: (e) => {
+          e.preventDefault();
+        },
+      }}
+    />
+    <Tab.Screen
+      name="Reports"
+      component={ReportsStackNavigator}
+      options={{ tabBarLabel: 'Laporan' }}
+    />
+    <Tab.Screen
       name="ProfileTab"
       component={ProfileStackNavigator}
       options={{ tabBarLabel: 'Profile' }}
     />
-  </Tab.Navigator>
-);
+    </Tab.Navigator>
+  );
+};
 
 export default AdminShelterNavigator;

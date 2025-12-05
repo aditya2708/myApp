@@ -18,12 +18,6 @@ import WilbinFormScreen from '../features/adminPusat/screens/wilbin/WilbinFormSc
 import ShelterListScreen from '../features/adminPusat/screens/shelter/ShelterListScreen';
 import ShelterDetailScreen from '../features/adminPusat/screens/shelter/ShelterDetailScreen';
 import ShelterFormScreen from '../features/adminPusat/screens/shelter/ShelterFormScreen';
-
-// User Management Screens
-import AdminPusatUserManagementScreen from '../features/adminPusat/screens/user/AdminPusatUserManagementScreen';
-import AdminPusatUserFormScreen from '../features/adminPusat/screens/user/AdminPusatUserFormScreen';
-import AdminPusatUserDetailScreen from '../features/adminPusat/screens/user/AdminPusatUserDetailScreen'; // NEW
-
 // Template Screens
 import TemplateHomeScreen from '../features/adminPusat/screens/template/TemplateHomeScreen';
 import JenjangSelectionScreen from '../features/adminPusat/screens/template/JenjangSelectionScreen';
@@ -111,25 +105,6 @@ const HomeStackNavigator = () => {
         name="TutorHonorSettings"
         component={TutorHonorSettingsScreen}
         options={{ headerTitle: 'Setting Honor Tutor' }}
-      />
-
-      {/* User Management */}
-      <Stack.Screen
-        name="UserManagement"
-        component={AdminPusatUserManagementScreen}
-        options={{ headerTitle: 'Manajemen User' }}
-      />
-      <Stack.Screen
-        name="UserForm"
-        component={AdminPusatUserFormScreen}
-        options={{ headerTitle: 'Form User' }}
-      />
-      <Stack.Screen
-        name="UserDetail"
-        component={AdminPusatUserDetailScreen}
-        options={({ route }) => ({
-          headerTitle: route?.params?.title ?? 'Detail User',
-        })}
       />
     </Stack.Navigator>
   );

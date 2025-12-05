@@ -12,6 +12,7 @@ use App\Models\Penilaian;
 use App\Models\NilaiSikap;
 use App\Models\Absen;
 use App\Models\KurikulumMateri;
+use App\Support\SsoContext;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -345,8 +346,33 @@ class RaportController extends Controller
     public function getByAnak($idAnak)
     {
         try {
+            $user = auth()->user();
+            $companyId = app()->bound(SsoContext::class)
+                ? app(SsoContext::class)->company()?->id
+                : ($user?->adminShelter->company_id ?? null);
+
+            if (!$user || !$user->adminShelter) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $anak = Anak::where('id_anak', $idAnak)
+                ->where('id_shelter', $user->adminShelter->id_shelter)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
+            if (!$anak) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Child not found'
+                ], 404);
+            }
+
             $raport = Raport::with(['semester.kurikulum', 'anak.kelompok', 'anak.anakPendidikan', 'raportDetail'])
                 ->where('id_anak', $idAnak)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->orderBy('tanggal_terbit', 'desc')
                 ->get()
                 ->map(function ($raport) {
@@ -426,9 +452,34 @@ class RaportController extends Controller
     public function getNilaiSikap($idAnak, $idSemester)
     {
         try {
+            $user = auth()->user();
+            $companyId = app()->bound(SsoContext::class)
+                ? app(SsoContext::class)->company()?->id
+                : ($user?->adminShelter->company_id ?? null);
+
+            if (!$user || !$user->adminShelter) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $anak = Anak::where('id_anak', $idAnak)
+                ->where('id_shelter', $user->adminShelter->id_shelter)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
+            if (!$anak) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Child not found'
+                ], 404);
+            }
+
             $nilaiSikap = NilaiSikap::with(['semester'])
                 ->where('id_anak', $idAnak)
                 ->where('id_semester', $idSemester)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->first();
 
             if (!$nilaiSikap) {

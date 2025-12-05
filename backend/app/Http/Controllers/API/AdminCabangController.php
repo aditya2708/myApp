@@ -12,12 +12,14 @@ use App\Models\Wilbin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class AdminCabangController extends Controller
 {
-    public function dashboard()
+    public function dashboard(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         $adminCabang = $user->adminCabang;
 
         if (!$adminCabang) {
@@ -29,7 +31,10 @@ class AdminCabangController extends Controller
 
         $adminCabang->load(['kacab']);
 
-        $summary = $this->buildDashboardSummary($adminCabang->id_kacab);
+        $summary = $this->buildDashboardSummary(
+            $adminCabang->id_kacab,
+            $this->resolveCompanyId($adminCabang->company_id ?? null)
+        );
 
         $adminCabang->setAttribute('wilbin_count', $summary['wilayah']);
         $adminCabang->setAttribute('shelter_count', $summary['shelter']);
@@ -44,9 +49,9 @@ class AdminCabangController extends Controller
         ]);
     }
 
-    public function getProfile()
+    public function getProfile(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         $adminCabang = $user->adminCabang->load(['kacab']);
         
         return response()->json([
@@ -57,7 +62,7 @@ class AdminCabangController extends Controller
 
     public function updateProfile(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         $adminCabang = $user->adminCabang;
 
         $validator = Validator::make($request->all(), [
@@ -93,7 +98,7 @@ class AdminCabangController extends Controller
         ]);
     }
 
-    protected function buildDashboardSummary(?int $kacabId): array
+    protected function buildDashboardSummary(?int $kacabId, ?int $companyId = null): array
     {
         if (!$kacabId) {
             return [
@@ -107,10 +112,17 @@ class AdminCabangController extends Controller
             ];
         }
 
-        $wilbinCount = Wilbin::where('id_kacab', $kacabId)->count();
+        $wilbinCount = Wilbin::where('id_kacab', $kacabId)
+            ->when($companyId && Schema::hasColumn('wilbin', 'company_id'), function ($query) use ($companyId) {
+                $query->where('company_id', $companyId);
+            })
+            ->count();
 
         $shelterQuery = Shelter::whereHas('wilbin', function ($query) use ($kacabId) {
             $query->where('id_kacab', $kacabId);
+        })
+        ->when($companyId && Schema::hasColumn('shelter', 'company_id'), function ($query) use ($companyId) {
+            $query->where('company_id', $companyId);
         });
 
         $shelterCount = (clone $shelterQuery)->count();
@@ -118,18 +130,29 @@ class AdminCabangController extends Controller
             ->where('gps_approval_status', 'pending')
             ->count();
 
-        $donaturCount = Donatur::where('id_kacab', $kacabId)->count();
-        $pendingSurveys = Survey::pending()->byKacab($kacabId)->count();
+        $donaturCount = Donatur::where('id_kacab', $kacabId)
+            ->when($companyId && Schema::hasColumn('donatur', 'company_id'), function ($query) use ($companyId) {
+                $query->where('company_id', $companyId);
+            })
+            ->count();
+        $pendingSurveys = Survey::pending()->byKacab($kacabId, $companyId)->count();
 
         $totalChildren = Anak::whereHas('shelter', function ($shelterQuery) use ($kacabId) {
             $shelterQuery->whereHas('wilbin', function ($wilbinQuery) use ($kacabId) {
                 $wilbinQuery->where('id_kacab', $kacabId);
             });
         })
+            ->when($companyId && Schema::hasColumn('anak', 'company_id'), function ($query) use ($companyId) {
+                $query->where('company_id', $companyId);
+            })
             ->whereIn('status_validasi', Anak::STATUS_AKTIF)
             ->count();
 
-        $totalTutors = Tutor::where('id_kacab', $kacabId)->count();
+        $totalTutors = Tutor::where('id_kacab', $kacabId)
+            ->when($companyId && Schema::hasColumn('tutor', 'company_id'), function ($query) use ($companyId) {
+                $query->where('company_id', $companyId);
+            })
+            ->count();
 
         return [
             'wilayah' => $wilbinCount,
@@ -140,5 +163,17 @@ class AdminCabangController extends Controller
             'total_tutors' => $totalTutors,
             'pending_gps_requests' => $pendingGpsRequests,
         ];
+    }
+
+    /**
+     * Ambil company_id dari SSO context atau fallback ke record admin cabang.
+     */
+    protected function resolveCompanyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
     }
 }

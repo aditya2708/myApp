@@ -28,7 +28,8 @@ class Materi extends Model
         'file_size',
         'is_from_template',
         'is_customized',
-        'metadata'
+        'metadata',
+        'company_id'
     ];
 
     protected $casts = [

@@ -8,6 +8,8 @@ use App\Models\Kurikulum;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class SemesterController extends Controller
 {
@@ -18,11 +20,15 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
             $search = $request->query('search');
             $status = $request->query('status');
             $tahunAjaran = $request->query('tahun_ajaran');
 
             $query = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->with(['kurikulum']);
 
             if ($search) {
@@ -74,6 +80,7 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $validator = Validator::make($request->all(), [
                 'nama_semester' => 'required|string|max:255',
@@ -96,7 +103,10 @@ class SemesterController extends Controller
 
             // Check for overlapping semesters
             $hasStatusColumn = \Schema::hasColumn('semester', 'status');
-            $overlappingQuery = Semester::where('id_kacab', $kacabId);
+            $overlappingQuery = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                });
             
             if ($hasStatusColumn) {
                 $overlappingQuery->where('status', '!=', 'archived');
@@ -129,6 +139,9 @@ class SemesterController extends Controller
             $data['id_kacab'] = $kacabId;
             $data['status'] = $data['status'] ?? 'draft';
             $data['type'] = $data['type'] ?? 'cabang';
+            if ($companyId && Schema::hasColumn('semester', 'company_id')) {
+                $data['company_id'] = $companyId;
+            }
 
             // Extract tahun_mulai and tahun_selesai from dates
             $data['tahun_mulai'] = date('Y', strtotime($request->tanggal_mulai));
@@ -165,8 +178,12 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->with(['kurikulum'])
                 ->find($id);
 
@@ -197,8 +214,13 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
-            $semester = Semester::where('id_kacab', $kacabId)->find($id);
+            $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->find($id);
 
             if (!$semester) {
                 return response()->json([
@@ -232,6 +254,9 @@ class SemesterController extends Controller
                 $tanggalSelesai = $request->tanggal_selesai ?? $semester->tanggal_selesai;
 
                 $overlappingQuery = Semester::where('id_kacab', $kacabId)
+                    ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId);
+                    })
                     ->where('id_semester', '!=', $id);
                 
                 $hasStatusColumn = \Schema::hasColumn('semester', 'status');
@@ -303,8 +328,13 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
-            $semester = Semester::where('id_kacab', $kacabId)->find($id);
+            $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->find($id);
 
             if (!$semester) {
                 return response()->json([
@@ -342,11 +372,15 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             // Check if status column exists
             $hasStatusColumn = \Schema::hasColumn('semester', 'status');
 
             $query = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->with(['kurikulum']);
 
             if ($hasStatusColumn) {
@@ -377,8 +411,13 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
-            $semester = Semester::where('id_kacab', $kacabId)->find($id);
+            $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->find($id);
 
             if (!$semester) {
                 return response()->json([
@@ -389,11 +428,17 @@ class SemesterController extends Controller
 
             // Deactivate other active semesters
             Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->where('id_semester', '!=', $id)
                 ->update(['is_active' => false, 'status' => 'draft']);
 
             // Set this semester as active and assign active kurikulum
             $activeKurikulum = Kurikulum::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('kurikulum', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->where(function($q) {
                     $q->where('is_active', true)
                       ->orWhere('status', 'aktif');
@@ -443,8 +488,13 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
-            $semester = Semester::where('id_kacab', $kacabId)->find($id);
+            $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->find($id);
 
             if (!$semester) {
                 return response()->json([
@@ -484,8 +534,13 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
-            $semester = Semester::where('id_kacab', $kacabId)->find($id);
+            $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->find($id);
 
             if (!$semester) {
                 return response()->json([
@@ -525,8 +580,13 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
-            $semester = Semester::where('id_kacab', $kacabId)->find($id);
+            $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->find($id);
 
             if (!$semester) {
                 return response()->json([
@@ -572,21 +632,24 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             // Check if status column exists in semester table
             $hasStatusColumn = \Schema::hasColumn('semester', 'status');
 
             if ($hasStatusColumn) {
                 $stats = [
-                    'total' => Semester::where('id_kacab', $kacabId)->count(),
-                    'active' => Semester::where('id_kacab', $kacabId)->where('status', 'active')->count(),
-                    'draft' => Semester::where('id_kacab', $kacabId)->where('status', 'draft')->count(),
-                    'completed' => Semester::where('id_kacab', $kacabId)->where('status', 'completed')->count(),
-                    'archived' => Semester::where('id_kacab', $kacabId)->where('status', 'archived')->count(),
+                    'total' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn($q) => $q->where('company_id', $companyId))->count(),
+                    'active' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn($q) => $q->where('company_id', $companyId))->where('status', 'active')->count(),
+                    'draft' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn($q) => $q->where('company_id', $companyId))->where('status', 'draft')->count(),
+                    'completed' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn($q) => $q->where('company_id', $companyId))->where('status', 'completed')->count(),
+                    'archived' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn($q) => $q->where('company_id', $companyId))->where('status', 'archived')->count(),
                 ];
             } else {
                 // Fallback for when status column doesn't exist yet
-                $total = Semester::where('id_kacab', $kacabId)->count();
+                $total = Semester::where('id_kacab', $kacabId)
+                    ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn($q) => $q->where('company_id', $companyId))
+                    ->count();
                 $stats = [
                     'total' => $total,
                     'active' => 0, // Default when no status column
@@ -608,5 +671,17 @@ class SemesterController extends Controller
                 'message' => 'Gagal mengambil statistik: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Ambil company id dari SSO context atau fallback admin cabang.
+     */
+    private function companyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
     }
 }

@@ -1,7 +1,15 @@
+const getEnv = (key, fallback = '') =>
+  (typeof process !== 'undefined' && process?.env?.[key]
+    ? process.env[key]
+    : fallback
+  ).trim();
+
 // API base URLs
-//export const API_BASE_URL = 'http://192.168.1.3:8000/api';
-//export const API_BASE_URL = 'http://192.168.8.105:8000/api';
-export const API_BASE_URL = 'https://bp.berbagipendidikan.org/api';
+export const API_BASE_URL = getEnv('EXPO_PUBLIC_API_BASE_URL', 'http://127.0.0.1:9000/api');
+export const MANAGEMENT_BASE_URL = getEnv(
+  'EXPO_PUBLIC_MANAGEMENT_BASE_URL',
+  'http://127.0.0.1:8000'
+);
 
 const sanitizeUrlValue = (value) =>
   typeof value === 'string' ? value.trim() : '';
@@ -26,23 +34,19 @@ const resolveApiOrigin = () => {
 };
 
 export const API_ORIGIN = resolveApiOrigin();
-export const STORAGE_BASE_URL = API_ORIGIN
+const BASE_STORAGE = API_ORIGIN
   ? `${removeTrailingSlashes(API_ORIGIN)}/storage`
   : '';
+
+export const STORAGE_BASE_URL = BASE_STORAGE;
 export const STORAGE_CHILD_PHOTO_BASE_URL = STORAGE_BASE_URL
   ? `${removeTrailingSlashes(STORAGE_BASE_URL)}/Anak`
   : '';
 
 // Asset URLs
 const resolveDonationAssetBaseUrl = () => {
-  const env =
-    (typeof process !== 'undefined' && process?.env) ?
-      process.env.EXPO_PUBLIC_DONATION_ASSET_BASE_URL ||
-      process.env.DONATION_ASSET_BASE_URL :
-      null;
-
-  const value = typeof env === 'string' ? env.trim() : '';
-  return value || 'https://home.kilauindonesia.org';
+  const envValue = getEnv('EXPO_PUBLIC_DONATION_ASSET_BASE_URL') || getEnv('DONATION_ASSET_BASE_URL');
+  return envValue || 'https://home.kilauindonesia.org';
 };
 
 export const DONATION_ASSET_BASE_URL = resolveDonationAssetBaseUrl();
@@ -50,10 +54,18 @@ export const DONATION_ASSET_BASE_URL = resolveDonationAssetBaseUrl();
 // Storage keys
 export const STORAGE_TOKEN_KEY = 'berbagipendidikan_token';
 export const STORAGE_USER_KEY = 'berbagipendidikan_user';
+export const STORAGE_REFRESH_TOKEN_KEY = 'berbagipendidikan_refresh_token';
+export const STORAGE_CURRENT_ROLE_KEY = 'berbagipendidikan_current_role';
+
+// OAuth client (exposed for mobile refresh; keep scoped)
+export const SSO_CLIENT_ID = getEnv('EXPO_PUBLIC_SSO_CLIENT_ID', '');
+export const SSO_CLIENT_SECRET = getEnv('EXPO_PUBLIC_SSO_CLIENT_SECRET', '');
 
 // Image URLs
-export const IMAGE_BASE_URL = 'http://192.168.8.105/storage/AdminShelter/Shelter/';
-export const PROFILE_IMAGE_BASE_URL = 'http://192.168.8.105/storage/';
+export const PROFILE_IMAGE_BASE_URL = BASE_STORAGE || '';
+export const IMAGE_BASE_URL = PROFILE_IMAGE_BASE_URL
+  ? `${removeTrailingSlashes(PROFILE_IMAGE_BASE_URL)}/AdminShelter/Shelter`
+  : '';
 
 // App constants
 export const APP_NAME = 'Berbagi Pendidikan';
@@ -64,6 +76,7 @@ export const API_TIMEOUT = 15000; // 15 seconds
 
 // User roles
 export const USER_ROLES = {
+  SUPER_ADMIN: 'super_admin',
   ADMIN_PUSAT: 'admin_pusat',
   ADMIN_CABANG: 'admin_cabang',
   ADMIN_SHELTER: 'admin_shelter',

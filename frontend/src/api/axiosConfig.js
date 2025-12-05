@@ -1,6 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, STORAGE_TOKEN_KEY } from '../constants/config';
+import { getCurrentRole } from '../common/utils/storageHelpers';
+import { clearAuthState, refreshAccessToken } from './tokenRefresher';
 
 // Create axios instance
 const api = axios.create({
@@ -23,6 +25,17 @@ api.interceptors.request.use(
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
       }
+
+      const currentRole = await getCurrentRole();
+      if (currentRole?.slug) {
+        config.headers['X-Current-Role'] = currentRole.slug;
+        if (currentRole.scope_type) {
+          config.headers['X-Current-Scope-Type'] = currentRole.scope_type;
+        }
+        if (currentRole.scope_id !== null && currentRole.scope_id !== undefined) {
+          config.headers['X-Current-Scope-Id'] = currentRole.scope_id;
+        }
+      }
     } catch (error) {
       console.error('Error in request interceptor:', error);
     }
@@ -43,14 +56,19 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     
     // Handle 401 Unauthorized errors (token expired)
-    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+    if (error.response && error.response.status === 401 && !originalRequest?._retry) {
       originalRequest._retry = true;
-      
+
       try {
-        // Clear token and let auth state handle the redirect
-        await AsyncStorage.removeItem(STORAGE_TOKEN_KEY);
-      } catch (storageError) {
-        console.error('Error removing token:', storageError);
+        const newAccessToken = await refreshAccessToken();
+
+        if (newAccessToken) {
+          originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        console.warn('Token refresh failed:', refreshError?.message || refreshError);
+        await clearAuthState();
       }
     }
     

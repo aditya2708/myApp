@@ -7,28 +7,38 @@ use App\Models\KurikulumMateri;
 use App\Models\Materi;
 use App\Models\MataPelajaran;
 use App\Models\Kelas;
+use App\Support\AdminCabangScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class MateriController extends Controller
 {
+    use AdminCabangScope;
+
     /**
      * Get materi list by mata pelajaran and kelas
      */
     public function index(Request $request): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             $mataPelajaranId = $request->query('mata_pelajaran');
             $kelasId = $request->query('kelas');
             $search = $request->query('search');
 
-            $query = Materi::where('id_kacab', $kacabId)
-                ->with(['mataPelajaran', 'kelas.jenjang'])
-                ->orderBy('urutan');
+            $query = $this->applyCompanyScope(
+                Materi::where('id_kacab', $kacabId)
+                    ->with(['mataPelajaran', 'kelas.jenjang'])
+                    ->orderBy('urutan'),
+                $companyId,
+                'materi'
+            );
 
             if ($mataPelajaranId) {
                 $query->where('id_mata_pelajaran', $mataPelajaranId);
@@ -66,7 +76,9 @@ class MateriController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             $userId = auth()->id();
 
             $validator = Validator::make($request->all(), [
@@ -80,7 +92,10 @@ class MateriController extends Controller
                         return $query
                             ->where('id_kacab', $kacabId)
                             ->where('id_mata_pelajaran', $request->id_mata_pelajaran)
-                            ->where('id_kelas', $request->id_kelas);
+                            ->where('id_kelas', $request->id_kelas)
+                            ->when($this->companyId() && Schema::hasColumn('materi', 'company_id'), function ($q) {
+                                $q->where('company_id', $this->companyId());
+                            });
                     }),
                 ],
                 'deskripsi' => 'nullable|string',
@@ -105,8 +120,17 @@ class MateriController extends Controller
             }
 
             // Validate mata pelajaran and kelas consistency
-            $mataPelajaran = MataPelajaran::find($request->id_mata_pelajaran);
-            $kelas = Kelas::find($request->id_kelas);
+            $mataPelajaran = $this->applyCompanyScope(MataPelajaran::query(), $companyId, 'mata_pelajaran')
+                ->find($request->id_mata_pelajaran);
+            $kelas = $this->applyCompanyScope(Kelas::query(), $companyId, 'kelas')
+                ->find($request->id_kelas);
+
+            if (!$mataPelajaran || !$kelas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Mata pelajaran atau kelas tidak ditemukan untuk company ini'
+                ], 404);
+            }
 
             if ($mataPelajaran->id_jenjang && $kelas->id_jenjang && $mataPelajaran->id_jenjang !== $kelas->id_jenjang) {
                 return response()->json([
@@ -124,6 +148,9 @@ class MateriController extends Controller
             $data['created_by'] = $userId;
             $data['status'] = $data['status'] ?? 'draft';
             $data['tingkat_kesulitan'] = $data['tingkat_kesulitan'] ?? 'sedang';
+            if ($companyId && Schema::hasColumn('materi', 'company_id')) {
+                $data['company_id'] = $companyId;
+            }
 
             // Handle file upload
             if ($request->hasFile('file')) {
@@ -139,9 +166,12 @@ class MateriController extends Controller
 
             // Auto-assign urutan if not provided
             if (!$request->has('urutan')) {
-                $maxUrutan = Materi::where('id_mata_pelajaran', $request->id_mata_pelajaran)
-                    ->where('id_kelas', $request->id_kelas)
-                    ->max('urutan');
+                $maxUrutan = $this->applyCompanyScope(
+                    Materi::where('id_mata_pelajaran', $request->id_mata_pelajaran)
+                        ->where('id_kelas', $request->id_kelas),
+                    $companyId,
+                    'materi'
+                )->max('urutan');
                 $data['urutan'] = ($maxUrutan ?? 0) + 1;
             }
 
@@ -153,12 +183,18 @@ class MateriController extends Controller
                     $request->id_mata_pelajaran
                 ) ?? 1;
 
-                KurikulumMateri::create([
+                $kurikulumData = [
                     'id_kurikulum' => $request->kurikulum_id,
                     'id_mata_pelajaran' => $request->id_mata_pelajaran,
                     'id_materi' => $materi->id_materi,
-                    'urutan' => $kurikulumUrutan
-                ]);
+                    'urutan' => $kurikulumUrutan,
+                ];
+
+                if ($companyId && Schema::hasColumn('kurikulum_materi', 'company_id')) {
+                    $kurikulumData['company_id'] = $companyId;
+                }
+
+                KurikulumMateri::create($kurikulumData);
             }
 
             $materi->load(['mataPelajaran', 'kelas.jenjang']);
@@ -182,11 +218,16 @@ class MateriController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
-            $materi = Materi::where('id_kacab', $kacabId)
-                ->with(['mataPelajaran', 'kelas.jenjang'])
-                ->find($id);
+            $materi = $this->applyCompanyScope(
+                Materi::where('id_kacab', $kacabId)
+                    ->with(['mataPelajaran', 'kelas.jenjang']),
+                $companyId,
+                'materi'
+            )->find($id);
 
             if (!$materi) {
                 return response()->json([
@@ -214,10 +255,16 @@ class MateriController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
             $userId = auth()->id();
 
-            $materi = Materi::where('id_kacab', $kacabId)->find($id);
+            $materi = $this->applyCompanyScope(
+                Materi::where('id_kacab', $kacabId),
+                $companyId,
+                'materi'
+            )->find($id);
 
             if (!$materi) {
                 return response()->json([
@@ -291,9 +338,15 @@ class MateriController extends Controller
     public function destroy($id): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
-            $materi = Materi::where('id_kacab', $kacabId)->find($id);
+            $materi = $this->applyCompanyScope(
+                Materi::where('id_kacab', $kacabId),
+                $companyId,
+                'materi'
+            )->find($id);
 
             if (!$materi) {
                 return response()->json([
@@ -329,7 +382,9 @@ class MateriController extends Controller
     public function reorder(Request $request): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
             $validator = Validator::make($request->all(), [
                 'materi_ids' => 'required|array',
@@ -347,9 +402,12 @@ class MateriController extends Controller
             $materiIds = $request->materi_ids;
 
             foreach ($materiIds as $index => $materiId) {
-                Materi::where('id_kacab', $kacabId)
-                    ->where('id_materi', $materiId)
-                    ->update(['urutan' => $index + 1]);
+                $this->applyCompanyScope(
+                    Materi::where('id_kacab', $kacabId)
+                        ->where('id_materi', $materiId),
+                    $companyId,
+                    'materi'
+                )->update(['urutan' => $index + 1]);
             }
 
             return response()->json([
@@ -370,14 +428,19 @@ class MateriController extends Controller
     public function getByMataPelajaran($mataPelajaranId, $kelasId): JsonResponse
     {
         try {
-            $kacabId = auth()->user()->adminCabang->id_kacab;
+            $adminCabang = auth()->user()->adminCabang;
+            $kacabId = $adminCabang->id_kacab;
+            $companyId = $this->companyId($adminCabang->company_id ?? null);
 
-            $materi = Materi::where('id_kacab', $kacabId)
-                ->where('id_mata_pelajaran', $mataPelajaranId)
-                ->where('id_kelas', $kelasId)
-                ->with(['mataPelajaran', 'kelas'])
-                ->orderBy('urutan')
-                ->get();
+            $materi = $this->applyCompanyScope(
+                Materi::where('id_kacab', $kacabId)
+                    ->where('id_mata_pelajaran', $mataPelajaranId)
+                    ->where('id_kelas', $kelasId)
+                    ->with(['mataPelajaran', 'kelas'])
+                    ->orderBy('urutan'),
+                $companyId,
+                'materi'
+            )->get();
 
             return response()->json([
                 'success' => true,

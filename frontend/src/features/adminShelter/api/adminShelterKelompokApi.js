@@ -8,6 +8,8 @@ export const adminShelterKelompokApi = {
   updateKelompok: async (id, data) => api.post(ADMIN_SHELTER_ENDPOINTS.KELOMPOK.UPDATE(id), data),
   deleteKelompok: async (id) => api.delete(ADMIN_SHELTER_ENDPOINTS.KELOMPOK.DELETE(id)),
   getAvailableKelas: async () => api.get(ADMIN_SHELTER_ENDPOINTS.KELOMPOK.AVAILABLE_KELAS),
+  getAvailableChildren: async (shelterId) =>
+    api.get(ADMIN_SHELTER_ENDPOINTS.KELOMPOK.AVAILABLE_CHILDREN(shelterId)),
   getAvailableAnak: async (kelompokId) => api.get(ADMIN_SHELTER_ENDPOINTS.KELOMPOK.AVAILABLE_ANAK(kelompokId)),
   addAnak: async (kelompokId, data) => api.post(ADMIN_SHELTER_ENDPOINTS.KELOMPOK.ADD_ANAK(kelompokId), data),
   removeAnak: async (kelompokId, anakId) => api.delete(ADMIN_SHELTER_ENDPOINTS.KELOMPOK.REMOVE_ANAK(kelompokId, anakId)),

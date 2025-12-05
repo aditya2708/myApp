@@ -576,21 +576,21 @@ const useActivityForm = ({ activity, onSuccess }) => {
 
     try {
       if (isEditing) {
-        await dispatch(updateAktivitas({ 
+        const result = await dispatch(updateAktivitas({ 
           id: activity.id_aktivitas, 
           aktivitasData: data, 
           queryClient 
         })).unwrap();
         Alert.alert('Berhasil', 'Aktivitas berhasil diperbarui', [
-          { text: 'Oke', onPress: onSuccess },
+          { text: 'Oke', onPress: () => onSuccess?.(result?.data || result) },
         ]);
       } else {
-        await dispatch(createAktivitas({ 
+        const result = await dispatch(createAktivitas({ 
           aktivitasData: data, 
           queryClient 
         })).unwrap();
         Alert.alert('Berhasil', 'Aktivitas berhasil dibuat', [
-          { text: 'Oke', onPress: onSuccess },
+          { text: 'Oke', onPress: () => onSuccess?.(result?.data || result) },
         ]);
       }
     } catch (err) {

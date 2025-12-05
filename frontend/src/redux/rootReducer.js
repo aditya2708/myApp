@@ -16,6 +16,7 @@ import semesterReducer from '../features/adminShelter/redux/semesterSlice';
 import kurikulumShelterReducer from '../features/adminShelter/redux/kurikulumShelterSlice';
 import tutorAttendaceReducer from '../features/adminShelter/redux/tutorAttendanceSlice';
 import notificationReducer from '../features/adminShelter/redux/notificationSlice';
+import quickFlowReducer from '../features/adminShelter/redux/quickFlowSlice';
 
 // Admin Cabang reducers
 import kurikulumReducer from '../features/adminCabang/redux/kurikulumSlice';
@@ -47,6 +48,7 @@ const appReducer = combineReducers({
   kurikulumShelter: kurikulumShelterReducer,
   tutorAttendance: tutorAttendaceReducer,
   notification: notificationReducer,
+  quickFlow: quickFlowReducer,
   
   // Admin Cabang reducers
   kurikulum: kurikulumReducer,

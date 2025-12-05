@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -14,7 +14,7 @@ import {
   Platform,
   Modal
 } from 'react-native';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
@@ -25,12 +25,22 @@ import LoadingSpinner from '../../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../../common/components/ErrorMessage';
 import { deleteAktivitas } from '../../redux/aktivitasSlice';
 import { aktivitasApi } from '../../api/aktivitasApi';
+import {
+  selectIsQuickFlowActive,
+  selectQuickFlowActivityId,
+  selectQuickFlowStep,
+  updateQuickFlowStep,
+} from '../../redux/quickFlowSlice';
 
 const ITEMS_PER_PAGE = 20;
 
 const ActivitiesListScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const quickFlowActive = useSelector(selectIsQuickFlowActive);
+  const quickFlowStep = useSelector(selectQuickFlowStep);
+  const quickFlowActivityId = useSelector(selectQuickFlowActivityId);
+  const quickFlowNavigatedRef = useRef(false);
 
   const { filterDate: routeFilterDate, filterType: navFilterType } = route?.params || {};
 
@@ -185,6 +195,56 @@ const ActivitiesListScreen = ({ navigation, route }) => {
 
     return 'Gagal memuat aktivitas. Silakan coba lagi.';
   }, [error]);
+
+  const isQuickFlow = (route?.params?.quickFlow || quickFlowActive) && !!(route?.params?.targetActivityId || quickFlowActivityId);
+  const targetActivityId = route?.params?.targetActivityId || quickFlowActivityId || null;
+
+  useEffect(() => {
+    if (quickFlowStep === 'activitiesList') {
+      quickFlowNavigatedRef.current = false;
+    }
+  }, [quickFlowStep]);
+
+  useEffect(() => {
+    if (!isQuickFlow) {
+      return;
+    }
+
+    if (quickFlowStep && quickFlowStep !== 'activitiesList') {
+      return;
+    }
+
+    const targetId = targetActivityId;
+    if (!targetId || quickFlowNavigatedRef.current) {
+      return;
+    }
+
+    const found = activities.find(item => item.id_aktivitas === targetId);
+    if (!found) {
+      return;
+    }
+
+    quickFlowNavigatedRef.current = true;
+    dispatch(updateQuickFlowStep('manualAttendance'));
+    navigation.navigate('ManualAttendance', {
+      id_aktivitas: targetId,
+      quickFlow: true,
+      activityName: found?.jenis_kegiatan,
+      activityType: found?.jenis_kegiatan,
+      activityDateRaw: found?.tanggal || null,
+      kelompokId: found?.kelompok_id || found?.kelompokId || null,
+      kelompokIds: Array.isArray(found?.kelompok_ids) ? found.kelompok_ids.filter(Boolean) : [],
+      kelompokName: found?.nama_kelompok || null,
+      activityStatus: found?.status || null,
+    });
+  }, [
+    activities,
+    dispatch,
+    isQuickFlow,
+    navigation,
+    quickFlowStep,
+    targetActivityId,
+  ]);
 
   const handleSearch = () => {
     setAppliedSearch(searchQuery.trim());

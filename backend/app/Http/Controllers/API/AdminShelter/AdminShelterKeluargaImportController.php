@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\AdminShelter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminShelter\KeluargaImportRequest;
 use App\Services\AdminShelter\KeluargaImportService;
+use App\Support\SsoContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -80,12 +81,22 @@ class AdminShelterKeluargaImportController extends Controller
             'id_kacab' => $validated['id_kacab'] ?? $admin?->id_kacab,
             'id_wilbin' => $validated['id_wilbin'] ?? $admin?->id_wilbin,
             'id_shelter' => $validated['id_shelter'] ?? $admin?->id_shelter,
+            'company_id' => app()->bound(SsoContext::class)
+                ? app(SsoContext::class)->company()?->id
+                : ($admin?->company_id ?? null),
         ];
 
         if (!$context['id_kacab'] || !$context['id_wilbin'] || !$context['id_shelter']) {
             return response()->json([
                 'success' => false,
                 'message' => 'ID kacab, wilbin, dan shelter harus tersedia. Lengkapi kolom atau pastikan akun admin shelter memiliki relasi lengkap.',
+            ], 422);
+        }
+
+        if (!$context['company_id']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Company untuk admin tidak ditemukan. Pastikan akun memiliki company_id.',
             ], 422);
         }
 

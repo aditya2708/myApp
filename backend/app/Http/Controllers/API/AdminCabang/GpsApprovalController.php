@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\API\AdminCabang;
 
 use App\Http\Controllers\Controller;
+use App\Models\Absen;
+use App\Models\ActivityReport;
 use App\Models\Shelter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class GpsApprovalController extends Controller
 {
@@ -18,6 +22,7 @@ class GpsApprovalController extends Controller
     {
         try {
             $user = Auth::user();
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
             
             if (!$user->adminCabang) {
                 return response()->json([
@@ -31,6 +36,9 @@ class GpsApprovalController extends Controller
             }])
             ->whereHas('wilbin', function($q) use ($user) {
                 $q->where('id_kacab', $user->adminCabang->id_kacab);
+            })
+            ->when($companyId && Schema::hasColumn('shelter', 'company_id'), function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
             })
             ->whereIn('gps_approval_status', ['pending', 'approved', 'rejected']);
 
@@ -102,6 +110,7 @@ class GpsApprovalController extends Controller
     {
         try {
             $user = Auth::user();
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
             
             if (!$user->adminCabang) {
                 return response()->json([
@@ -114,6 +123,9 @@ class GpsApprovalController extends Controller
                 ->where('id_shelter', $shelterId)
                 ->whereHas('wilbin', function($q) use ($user) {
                     $q->where('id_kacab', $user->adminCabang->id_kacab);
+                })
+                ->when($companyId && Schema::hasColumn('shelter', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
                 })
                 ->whereIn('gps_approval_status', ['pending', 'approved', 'rejected'])
                 ->first();
@@ -185,6 +197,7 @@ class GpsApprovalController extends Controller
             DB::beginTransaction();
 
             $user = Auth::user();
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
             
             if (!$user->adminCabang) {
                 return response()->json([
@@ -196,6 +209,9 @@ class GpsApprovalController extends Controller
             $shelter = Shelter::where('id_shelter', $shelterId)
                 ->whereHas('wilbin', function($q) use ($user) {
                     $q->where('id_kacab', $user->adminCabang->id_kacab);
+                })
+                ->when($companyId && Schema::hasColumn('shelter', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
                 })
                 ->where('gps_approval_status', 'pending')
                 ->lockForUpdate()
@@ -301,6 +317,7 @@ class GpsApprovalController extends Controller
             DB::beginTransaction();
 
             $user = Auth::user();
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
             
             if (!$user->adminCabang) {
                 return response()->json([
@@ -312,6 +329,9 @@ class GpsApprovalController extends Controller
             $shelter = Shelter::where('id_shelter', $shelterId)
                 ->whereHas('wilbin', function($q) use ($user) {
                     $q->where('id_kacab', $user->adminCabang->id_kacab);
+                })
+                ->when($companyId && Schema::hasColumn('shelter', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
                 })
                 ->where('gps_approval_status', 'pending')
                 ->lockForUpdate()
@@ -442,5 +462,173 @@ class GpsApprovalController extends Controller
         }
 
         return $changes;
+    }
+
+    /**
+     * Return attendance/report logs that require GPS review.
+     */
+    public function getNeedsReviewItems(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
+
+            if (!$user->adminCabang) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $shelterIds = Shelter::whereHas('wilbin', function ($query) use ($user) {
+                $query->where('id_kacab', $user->adminCabang->id_kacab);
+            })
+            ->when($companyId && Schema::hasColumn('shelter', 'company_id'), function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            })
+            ->pluck('id_shelter');
+
+            if ($shelterIds->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Tidak ada data yang perlu ditinjau',
+                    'data' => [
+                        'attendance' => [],
+                        'activity_reports' => []
+                    ]
+                ]);
+            }
+
+            $attendanceLimit = (int) min(max($request->get('attendance_limit', 20), 1), 100);
+            $reportLimit = (int) min(max($request->get('report_limit', 20), 1), 100);
+
+            $attendanceFlags = Absen::with([
+                    'absenUser.anak',
+                    'absenUser.tutor',
+                    'aktivitas:id_aktivitas,id_shelter,tanggal,jenis_kegiatan,materi',
+                    'aktivitas.shelter:id_shelter,nama_shelter'
+                ])
+                ->where('review_status', Absen::REVIEW_STATUS_NEEDS_REVIEW)
+                ->whereHas('aktivitas', function ($query) use ($shelterIds) {
+                    $query->whereIn('id_shelter', $shelterIds);
+                })
+                ->when($companyId && Schema::hasColumn('absen', 'company_id'), function ($query) use ($companyId) {
+                    $query->where('company_id', $companyId);
+                })
+                ->latest('updated_at')
+                ->limit($attendanceLimit)
+                ->get();
+
+            $reportFlags = ActivityReport::with([
+                    'aktivitas:id_aktivitas,id_shelter,tanggal,jenis_kegiatan,materi',
+                    'aktivitas.shelter:id_shelter,nama_shelter'
+                ])
+                ->where('review_status', ActivityReport::REVIEW_STATUS_NEEDS_REVIEW)
+                ->whereHas('aktivitas', function ($query) use ($shelterIds) {
+                    $query->whereIn('id_shelter', $shelterIds);
+                })
+                ->when($companyId && Schema::hasColumn('activity_reports', 'company_id'), function ($query) use ($companyId) {
+                    $query->where('company_id', $companyId);
+                })
+                ->latest('updated_at')
+                ->limit($reportLimit)
+                ->get();
+
+            $attendanceData = $attendanceFlags->map(function (Absen $record) {
+                $absenUser = $record->absenUser;
+                $aktivitas = $record->aktivitas;
+                $shelter = $aktivitas?->shelter;
+
+                $memberType = $absenUser && $absenUser->id_anak ? 'student' : 'tutor';
+                $memberName = null;
+
+                if ($absenUser && $absenUser->anak) {
+                    $memberName = $absenUser->anak->full_name
+                        ?? $absenUser->anak->nama_lengkap
+                        ?? $absenUser->anak->nama_panggilan;
+                } elseif ($absenUser && $absenUser->tutor) {
+                    $memberName = $absenUser->tutor->nama;
+                }
+
+                return [
+                    'id_absen' => $record->id_absen,
+                    'activity_id' => $record->id_aktivitas,
+                    'activity_date' => optional($aktivitas)->tanggal,
+                    'activity_type' => optional($aktivitas)->jenis_kegiatan,
+                    'shelter' => [
+                        'id' => $shelter->id_shelter ?? null,
+                        'name' => $shelter->nama_shelter ?? null,
+                    ],
+                    'member' => [
+                        'type' => $memberType,
+                        'name' => $memberName,
+                    ],
+                    'status' => $record->absen,
+                    'auto_flag' => $record->auto_flag,
+                    'auto_flag_payload' => $record->auto_flag_payload,
+                    'review_status' => $record->review_status,
+                    'gps' => [
+                        'latitude' => $record->latitude,
+                        'longitude' => $record->longitude,
+                        'accuracy' => $record->gps_accuracy,
+                        'recorded_at' => optional($record->gps_recorded_at)?->toDateTimeString(),
+                        'distance' => $record->distance_from_activity,
+                    ],
+                    'updated_at' => optional($record->updated_at)?->toDateTimeString(),
+                ];
+            });
+
+            $reportData = $reportFlags->map(function (ActivityReport $report) {
+                $aktivitas = $report->aktivitas;
+                $shelter = $aktivitas?->shelter;
+
+                return [
+                    'id_activity_report' => $report->id_activity_report,
+                    'activity_id' => $report->id_aktivitas,
+                    'activity_date' => optional($aktivitas)->tanggal,
+                    'activity_type' => optional($aktivitas)->jenis_kegiatan,
+                    'shelter' => [
+                        'id' => $shelter->id_shelter ?? null,
+                        'name' => $shelter->nama_shelter ?? null,
+                    ],
+                    'auto_flag' => $report->auto_flag,
+                    'auto_flag_payload' => $report->auto_flag_payload,
+                    'review_status' => $report->review_status,
+                    'location' => [
+                        'latitude' => $report->latitude,
+                        'longitude' => $report->longitude,
+                        'accuracy' => $report->location_accuracy,
+                        'recorded_at' => optional($report->location_recorded_at)?->toDateTimeString(),
+                    ],
+                    'updated_at' => optional($report->updated_at)?->toDateTimeString(),
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data review otomatis berhasil diambil',
+                'data' => [
+                    'attendance' => $attendanceData,
+                    'activity_reports' => $reportData
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data review GPS: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Resolve company id from SSO context or fallback.
+     */
+    private function companyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
     }
 }

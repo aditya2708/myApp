@@ -11,17 +11,44 @@ use App\Models\Kelompok;
 use App\Models\AttendanceVerification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
+use App\Services\Attendance\AbsenUserFactory;
+use App\Services\Attendance\CompanyContextResolver;
+use App\Services\Attendance\GpsMetadataService;
+use App\Services\Attendance\StudentAttendanceProcessor;
+use App\Services\Attendance\TutorAttendanceProcessor;
 
 class AttendanceService
 {
-    protected $verificationService;
     protected $locationService;
-    
-    public function __construct(VerificationService $verificationService, LocationService $locationService)
-    {
-        $this->verificationService = $verificationService;
+    protected CompanyContextResolver $companyContextResolver;
+    protected AbsenUserFactory $absenUserFactory;
+    protected GpsMetadataService $gpsMetadataService;
+    protected StudentAttendanceProcessor $studentAttendanceProcessor;
+    protected TutorAttendanceProcessor $tutorAttendanceProcessor;
+
+    public function __construct(
+        LocationService $locationService,
+        CompanyContextResolver $companyContextResolver,
+        AbsenUserFactory $absenUserFactory,
+        GpsMetadataService $gpsMetadataService,
+        StudentAttendanceProcessor $studentAttendanceProcessor,
+        TutorAttendanceProcessor $tutorAttendanceProcessor,
+    ) {
         $this->locationService = $locationService;
+        $this->companyContextResolver = $companyContextResolver;
+        $this->absenUserFactory = $absenUserFactory;
+        $this->gpsMetadataService = $gpsMetadataService;
+        $this->studentAttendanceProcessor = $studentAttendanceProcessor;
+        $this->tutorAttendanceProcessor = $tutorAttendanceProcessor;
+    }
+
+    /**
+     * Resolve company_id from SSO context, admin shelter, anak, tutor, atau aktivitas.
+     */
+    protected function resolveCompanyId(?Anak $anak = null, ?Aktivitas $aktivitas = null, ?Tutor $tutor = null): ?int
+    {
+        return $this->companyContextResolver->resolve($anak, $aktivitas, $tutor);
     }
     
     protected function checkExistingAttendance($id_anak, $id_aktivitas)
@@ -39,255 +66,15 @@ class AttendanceService
         return $existingRecord ?: false;
     }
     
-    protected function determineAttendanceStatus($aktivitas, $arrivalTime, $manualStatus = null)
-    {
-        if ($manualStatus) {
-            switch ($manualStatus) {
-                case 'present':
-                    return Absen::TEXT_YA;
-                case 'absent':
-                    return Absen::TEXT_TIDAK;
-                case 'late':
-                    return Absen::TEXT_TERLAMBAT;
-            }
-        }
-        
-        $activityDate = Carbon::parse($aktivitas->tanggal)->startOfDay();
-        $currentDate = Carbon::now()->startOfDay();
-        
-        if ($activityDate->gt($currentDate)) {
-            throw new \Exception('Activity has not started yet. Please wait until the activity date.');
-        }
-        
-        if ($activityDate->lt($currentDate)) {
-            return Absen::TEXT_TIDAK;
-        }
-        
-        if (!$aktivitas->start_time) {
-            return Absen::TEXT_YA;
-        }
-        
-        // Check for early attendance (before allowed time)
-        if ($this->isTooEarly($aktivitas, $arrivalTime)) {
-            throw new \Exception('Too early to attend. Please wait until 15 minutes before activity start time.');
-        }
-        
-        $comparisonTime = $arrivalTime;
-        
-        if ($aktivitas->end_time && $aktivitas->isAbsent($comparisonTime)) {
-            return Absen::TEXT_TIDAK;
-        }
-        
-        if ($aktivitas->isLate($comparisonTime)) {
-            return Absen::TEXT_TERLAMBAT;
-        }
-        
-        return Absen::TEXT_YA;
-    }
-    
-    /**
-     * Check if attendance is too early (before allowed time window)
-     */
-    protected function isTooEarly($aktivitas, $arrivalTime)
-    {
-        if (!$aktivitas->start_time) {
-            return false;
-        }
-        
-        $activityDate = Carbon::parse($aktivitas->tanggal);
-        $arrivalDateTime = Carbon::parse($arrivalTime);
-        
-        // Handle both time-only (HH:MM:SS) and full datetime formats
-        if (str_contains($aktivitas->start_time, ' ')) {
-            // Full datetime format
-            $startTime = Carbon::parse($aktivitas->start_time);
-        } else {
-            // Time-only format
-            $startTime = Carbon::parse($activityDate->format('Y-m-d') . ' ' . $aktivitas->start_time);
-        }
-        
-        // Allow attendance 15 minutes before start_time
-        $earliestAllowedTime = $startTime->copy()->subMinutes(15);
-        
-        return $arrivalDateTime->lt($earliestAllowedTime);
-    }
     
     public function recordAttendanceByQr($id_anak, $id_aktivitas, $status = null, $token, $arrivalTime = null, $gpsData = null)
     {
-        DB::beginTransaction();
-        
-        try {
-            $existingRecord = $this->checkExistingAttendance($id_anak, $id_aktivitas);
-            
-            if ($existingRecord) {
-                DB::rollback();
-                return [
-                    'success' => false,
-                    'message' => 'Attendance record already exists for this student in this activity',
-                    'duplicate' => true,
-                    'absen' => $existingRecord
-                ];
-            }
-            
-            $anak = Anak::findOrFail($id_anak);
-            $aktivitas = Aktivitas::findOrFail($id_aktivitas);
-            
-            // GPS validation using shelter configuration
-            $shelter = $aktivitas->shelter;
-            $isBimbelActivity = $aktivitas->jenis_kegiatan === 'Bimbel';
-            $isGpsRequired = ($shelter && $shelter->require_gps) || ($isBimbelActivity && $shelter && $shelter->latitude && $shelter->longitude);
-            
-            if ($gpsData && $isGpsRequired) {
-                $gpsValidation = $this->validateGpsLocationFromShelter($shelter, $gpsData);
-                if (!$gpsValidation['valid']) {
-                    DB::rollback();
-                    return [
-                        'success' => false,
-                        'message' => $gpsValidation['reason'],
-                        'gps_validation' => $gpsValidation
-                    ];
-                }
-            }
-            $absenUser = AbsenUser::firstOrCreate(['id_anak' => $id_anak]);
-            
-            $now = Carbon::now();
-            $timeArrived = $arrivalTime ? Carbon::parse($arrivalTime) : $now;
-            
-            $attendanceStatus = $this->determineAttendanceStatus($aktivitas, $timeArrived, $status);
-            
-            // Prepare attendance data
-            $attendanceData = [
-                'absen' => $attendanceStatus,
-                'id_absen_user' => $absenUser->id_absen_user,
-                'id_aktivitas' => $id_aktivitas,
-                'is_read' => false,
-                'is_verified' => false,
-                'verification_status' => Absen::VERIFICATION_PENDING,
-                'time_arrived' => $timeArrived
-            ];
-            
-            // Add GPS data if provided
-            if ($gpsData) {
-                $attendanceData = array_merge($attendanceData, [
-                    'latitude' => $gpsData['latitude'] ?? null,
-                    'longitude' => $gpsData['longitude'] ?? null,
-                    'gps_accuracy' => $gpsData['gps_accuracy'] ?? null,
-                    'gps_recorded_at' => isset($gpsData['gps_recorded_at']) ? Carbon::parse($gpsData['gps_recorded_at']) : null,
-                    'distance_from_activity' => $gpsData['distance_from_activity'] ?? null,
-                    'gps_valid' => $gpsData['gps_valid'] ?? true,
-                    'location_name' => $gpsData['location_name'] ?? null,
-                    'gps_validation_notes' => $gpsData['gps_validation_notes'] ?? null,
-                ]);
-            }
-            
-            $absen = Absen::create($attendanceData);
-            
-            $verificationResult = $this->verificationService->verifyByQrCode(
-                $absen->id_absen,
-                $token,
-                'QR code verification via mobile app'
-            );
-            
-            if ($verificationResult['success']) {
-                $absen->is_verified = true;
-                $absen->verification_status = Absen::VERIFICATION_VERIFIED;
-                $absen->save();
-            }
-            
-            DB::commit();
-            
-            return [
-                'success' => true,
-                'absen' => $absen->refresh(),
-                'verification' => $verificationResult
-            ];
-            
-        } catch (\Exception $e) {
-            DB::rollback();
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
-        }
+        return $this->studentAttendanceProcessor->recordByQr($id_anak, $id_aktivitas, $status, $token, $arrivalTime, $gpsData);
     }
     
     public function recordAttendanceManually($id_anak, $id_aktivitas, $status = null, $notes = '', $arrivalTime = null, $gpsData = null)
     {
-        DB::beginTransaction();
-
-        try {
-            $existingRecord = $this->checkExistingAttendance($id_anak, $id_aktivitas);
-            
-            if ($existingRecord) {
-                DB::rollback();
-                return [
-                    'success' => false,
-                    'message' => 'Attendance record already exists for this student in this activity',
-                    'duplicate' => true,
-                    'absen' => $existingRecord
-                ];
-            }
-            
-            $anak = Anak::findOrFail($id_anak);
-            $aktivitas = Aktivitas::findOrFail($id_aktivitas);
-            $absenUser = AbsenUser::firstOrCreate(['id_anak' => $id_anak]);
-            
-            $now = Carbon::now();
-            $timeArrived = $arrivalTime ? Carbon::parse($arrivalTime) : $now;
-            
-            $attendanceStatus = $this->determineAttendanceStatus($aktivitas, $timeArrived, $status);
-            
-            // Prepare attendance data
-            $attendanceData = [
-                'absen' => $attendanceStatus,
-                'id_absen_user' => $absenUser->id_absen_user,
-                'id_aktivitas' => $id_aktivitas,
-                'is_read' => false,
-                'is_verified' => true,
-                'verification_status' => Absen::VERIFICATION_MANUAL,
-                'time_arrived' => $timeArrived
-            ];
-            
-            // Add GPS data if provided
-            if ($gpsData) {
-                $attendanceData = array_merge($attendanceData, [
-                    'latitude' => $gpsData['latitude'] ?? null,
-                    'longitude' => $gpsData['longitude'] ?? null,
-                    'gps_accuracy' => $gpsData['gps_accuracy'] ?? null,
-                    'gps_recorded_at' => isset($gpsData['gps_recorded_at']) ? Carbon::parse($gpsData['gps_recorded_at']) : null,
-                    'distance_from_activity' => $gpsData['distance_from_activity'] ?? null,
-                    'gps_valid' => $gpsData['gps_valid'] ?? true,
-                    'location_name' => $gpsData['location_name'] ?? null,
-                    'gps_validation_notes' => $gpsData['gps_validation_notes'] ?? null,
-                ]);
-            }
-            
-            $absen = Absen::create($attendanceData);
-            
-            $verification = AttendanceVerification::create([
-                'id_absen' => $absen->id_absen,
-                'verification_method' => AttendanceVerification::METHOD_MANUAL,
-                'is_verified' => true,
-                'verification_notes' => $notes ?: 'Manual verification by admin',
-                'verified_by' => Auth::user()->name ?? 'System',
-                'verified_at' => Carbon::now()
-            ]);
-            
-            DB::commit();
-            
-            return [
-                'success' => true,
-                'absen' => $absen->refresh(),
-                'verification' => $verification
-            ];
-            
-        } catch (\Exception $e) {
-            DB::rollback();
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
-        }
+        return $this->studentAttendanceProcessor->recordManually($id_anak, $id_aktivitas, $status, $notes, $arrivalTime, $gpsData);
     }
 
     public function generateAbsencesForCompletedActivity(Aktivitas $activity, bool $force = false)
@@ -353,9 +140,10 @@ class AttendanceService
                     continue;
                 }
 
-                $absenUser = AbsenUser::firstOrCreate(['id_anak' => $member->id_anak]);
+                $companyId = $this->resolveCompanyId($member, $activity);
+                $absenUser = $this->absenUserFactory->forAnak($member->id_anak, $companyId);
 
-                $absen = Absen::create([
+                $absenData = [
                     'id_absen_user' => $absenUser->id_absen_user,
                     'id_aktivitas' => $activity->id_aktivitas,
                     'absen' => Absen::TEXT_TIDAK,
@@ -363,7 +151,13 @@ class AttendanceService
                     'is_verified' => true,
                     'verification_status' => Absen::VERIFICATION_VERIFIED,
                     'time_arrived' => null,
-                ]);
+                ];
+
+                if ($companyId && Schema::hasColumn('absen', 'company_id')) {
+                    $absenData['company_id'] = $companyId;
+                }
+
+                $absen = Absen::create($absenData);
 
                 $createdIds[] = $absen->id_absen;
                 $createdCount++;
@@ -390,7 +184,7 @@ class AttendanceService
         return $summary;
     }
 
-    public function getAttendanceByActivity($id_aktivitas, $filters = [])
+    public function getAttendanceByActivity($id_aktivitas, $filters = [], ?int $companyId = null)
     {
         $query = Absen::where('id_aktivitas', $id_aktivitas)
                      ->with([
@@ -398,7 +192,10 @@ class AttendanceService
                          'absenUser.tutor',
                          'aktivitas',
                          'verifications'
-                     ]);
+                     ])
+                     ->when($companyId && Schema::hasColumn('absen', 'company_id'), function ($q) use ($companyId) {
+                         $q->where('company_id', $companyId);
+                     });
         
         if (isset($filters['is_verified'])) {
             $query->where('is_verified', $filters['is_verified']);
@@ -421,7 +218,7 @@ class AttendanceService
         return $query->get();
     }
     
-    public function getAttendanceByStudent($id_anak, $filters = [])
+    public function getAttendanceByStudent($id_anak, $filters = [], $companyId = null)
     {
         $absenUser = AbsenUser::where('id_anak', $id_anak)->first();
         
@@ -435,7 +232,10 @@ class AttendanceService
                          'absenUser.tutor',
                          'aktivitas',
                          'verifications'
-                     ]);
+                     ])
+                     ->when($companyId && Schema::hasColumn('absen', 'company_id'), function ($q) use ($companyId) {
+                         $q->where('company_id', $companyId);
+                     });
         
         if (isset($filters['is_verified'])) {
             $query->where('is_verified', $filters['is_verified']);
@@ -526,219 +326,15 @@ class AttendanceService
 
     public function recordTutorAttendanceByQr($id_tutor, $id_aktivitas, $status = null, $token, $arrivalTime = null, $gpsData = null)
     {
-        DB::beginTransaction();
-        
-        try {
-            $existingRecord = $this->checkExistingTutorAttendance($id_tutor, $id_aktivitas);
-            
-            if ($existingRecord) {
-                DB::rollback();
-                return [
-                    'success' => false,
-                    'message' => 'Attendance record already exists for this tutor in this activity',
-                    'duplicate' => true,
-                    'absen' => $existingRecord
-                ];
-            }
-            
-            $tutor = Tutor::findOrFail($id_tutor);
-            $aktivitas = Aktivitas::findOrFail($id_aktivitas);
-            
-            if ($aktivitas->id_tutor != $id_tutor) {
-                return [
-                    'success' => false,
-                    'message' => 'Tutor is not assigned to this activity'
-                ];
-            }
-            
-            // GPS validation using shelter configuration for tutors
-            $shelter = $aktivitas->shelter;
-            $isBimbelActivity = $aktivitas->jenis_kegiatan === 'Bimbel';
-            $isGpsRequired = ($shelter && $shelter->require_gps) || ($isBimbelActivity && $shelter && $shelter->latitude && $shelter->longitude);
-            
-            if ($gpsData && $isGpsRequired) {
-                $gpsValidation = $this->validateGpsLocationFromShelter($shelter, $gpsData);
-                if (!$gpsValidation['valid']) {
-                    DB::rollback();
-                    return [
-                        'success' => false,
-                        'message' => $gpsValidation['reason'],
-                        'gps_validation' => $gpsValidation
-                    ];
-                }
-            }
-            
-            $absenUser = AbsenUser::firstOrCreate(['id_tutor' => $id_tutor]);
-            
-            $now = Carbon::now();
-            $timeArrived = $arrivalTime ? Carbon::parse($arrivalTime) : $now;
-            
-            $attendanceStatus = $this->determineAttendanceStatus($aktivitas, $timeArrived, $status);
-            
-            // Prepare attendance data
-            $attendanceData = [
-                'absen' => $attendanceStatus,
-                'id_absen_user' => $absenUser->id_absen_user,
-                'id_aktivitas' => $id_aktivitas,
-                'is_read' => false,
-                'is_verified' => false,
-                'verification_status' => Absen::VERIFICATION_PENDING,
-                'time_arrived' => $timeArrived
-            ];
-            
-            // Add GPS data if provided
-            if ($gpsData) {
-                $attendanceData = array_merge($attendanceData, [
-                    'latitude' => $gpsData['latitude'] ?? null,
-                    'longitude' => $gpsData['longitude'] ?? null,
-                    'gps_accuracy' => $gpsData['gps_accuracy'] ?? null,
-                    'gps_recorded_at' => isset($gpsData['gps_recorded_at']) ? Carbon::parse($gpsData['gps_recorded_at']) : null,
-                    'distance_from_activity' => $gpsData['distance_from_activity'] ?? null,
-                    'gps_valid' => $gpsData['gps_valid'] ?? true,
-                    'location_name' => $gpsData['location_name'] ?? null,
-                    'gps_validation_notes' => $gpsData['gps_validation_notes'] ?? null,
-                ]);
-            }
-            
-            $absen = Absen::create($attendanceData);
-            
-            $verificationResult = $this->verificationService->verifyTutorByQrCode(
-                $absen->id_absen,
-                $token,
-                'QR code verification via mobile app'
-            );
-            
-            if ($verificationResult['success']) {
-                $absen->is_verified = true;
-                $absen->verification_status = Absen::VERIFICATION_VERIFIED;
-                $absen->save();
-            }
-            
-            DB::commit();
-            
-            return [
-                'success' => true,
-                'absen' => $absen->refresh(),
-                'verification' => $verificationResult
-            ];
-            
-        } catch (\Exception $e) {
-            DB::rollback();
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
-        }
+        return $this->tutorAttendanceProcessor->recordByQr($id_tutor, $id_aktivitas, $status, $token, $arrivalTime, $gpsData);
     }
 
     public function recordTutorAttendanceManually($id_tutor, $id_aktivitas, $status = null, $notes = '', $arrivalTime = null, $gpsData = null)
     {
-        DB::beginTransaction();
-        
-        try {
-            $existingRecord = $this->checkExistingTutorAttendance($id_tutor, $id_aktivitas);
-            
-            if ($existingRecord) {
-                DB::rollback();
-                return [
-                    'success' => false,
-                    'message' => 'Attendance record already exists for this tutor in this activity',
-                    'duplicate' => true,
-                    'absen' => $existingRecord
-                ];
-            }
-            
-            $tutor = Tutor::findOrFail($id_tutor);
-            $aktivitas = Aktivitas::findOrFail($id_aktivitas);
-            
-            if ($aktivitas->id_tutor != $id_tutor) {
-                return [
-                    'success' => false,
-                    'message' => 'Tutor is not assigned to this activity'
-                ];
-            }
-            
-            // GPS validation using shelter configuration for manual tutor attendance
-            $shelter = $aktivitas->shelter;
-            $isBimbelActivity = $aktivitas->jenis_kegiatan === 'Bimbel';
-            $isGpsRequired = ($shelter && $shelter->require_gps) || ($isBimbelActivity && $shelter && $shelter->latitude && $shelter->longitude);
-            
-            if ($gpsData && $isGpsRequired) {
-                $gpsValidation = $this->validateGpsLocationFromShelter($shelter, $gpsData);
-                if (!$gpsValidation['valid']) {
-                    DB::rollback();
-                    return [
-                        'success' => false,
-                        'message' => $gpsValidation['reason'],
-                        'gps_validation' => $gpsValidation
-                    ];
-                }
-            }
-            
-            $absenUser = AbsenUser::firstOrCreate(['id_tutor' => $id_tutor]);
-            
-            $now = Carbon::now();
-            $timeArrived = $arrivalTime ? Carbon::parse($arrivalTime) : $now;
-            
-            $attendanceStatus = $this->determineAttendanceStatus($aktivitas, $timeArrived, $status);
-            
-            // Prepare attendance data
-            $attendanceData = [
-                'absen' => $attendanceStatus,
-                'id_absen_user' => $absenUser->id_absen_user,
-                'id_aktivitas' => $id_aktivitas,
-                'is_read' => false,
-                'is_verified' => true,
-                'verification_status' => Absen::VERIFICATION_MANUAL,
-                'time_arrived' => $timeArrived
-            ];
-            
-            // Add GPS data if provided
-            if ($gpsData) {
-                $attendanceData = array_merge($attendanceData, [
-                    'latitude' => $gpsData['latitude'] ?? null,
-                    'longitude' => $gpsData['longitude'] ?? null,
-                    'gps_accuracy' => $gpsData['gps_accuracy'] ?? null,
-                    'gps_recorded_at' => isset($gpsData['gps_recorded_at']) ? Carbon::parse($gpsData['gps_recorded_at']) : null,
-                    'distance_from_activity' => $gpsData['distance_from_activity'] ?? null,
-                    'gps_valid' => $gpsData['gps_valid'] ?? true,
-                    'location_name' => $gpsData['location_name'] ?? null,
-                    'gps_validation_notes' => $gpsData['gps_validation_notes'] ?? null,
-                ]);
-            }
-            
-            $absen = Absen::create($attendanceData);
-            
-            $verification = AttendanceVerification::create([
-                'id_absen' => $absen->id_absen,
-                'verification_method' => AttendanceVerification::METHOD_MANUAL,
-                'is_verified' => true,
-                'verification_notes' => $notes ?: 'Manual tutor verification by admin',
-                'verified_by' => Auth::user()->name ?? 'System',
-                'verified_at' => Carbon::now(),
-                'metadata' => [
-                    'type' => 'tutor'
-                ]
-            ]);
-            
-            DB::commit();
-            
-            return [
-                'success' => true,
-                'absen' => $absen->refresh(),
-                'verification' => $verification
-            ];
-            
-        } catch (\Exception $e) {
-            DB::rollback();
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
-        }
+        return $this->tutorAttendanceProcessor->recordManually($id_tutor, $id_aktivitas, $status, $notes, $arrivalTime, $gpsData);
     }
 
-    public function getTutorAttendanceByActivity($id_aktivitas)
+    public function getTutorAttendanceByActivity($id_aktivitas, ?int $companyId = null)
     {
         $aktivitas = Aktivitas::findOrFail($id_aktivitas);
         
@@ -754,6 +350,7 @@ class AttendanceService
         
         return Absen::where('id_absen_user', $absenUser->id_absen_user)
                     ->where('id_aktivitas', $id_aktivitas)
+                    ->when($companyId && Schema::hasColumn('absen', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->with([
                         'absenUser.tutor',
                         'aktivitas',
@@ -762,7 +359,7 @@ class AttendanceService
                     ->first();
     }
 
-    public function getTutorAttendanceByTutor($id_tutor, $filters = [])
+    public function getTutorAttendanceByTutor($id_tutor, $filters = [], ?int $companyId = null)
     {
         $absenUser = AbsenUser::where('id_tutor', $id_tutor)->first();
         
@@ -776,6 +373,10 @@ class AttendanceService
                          'aktivitas',
                          'verifications'
                      ]);
+
+        if ($companyId && Schema::hasColumn('absen', 'company_id')) {
+            $query->where('company_id', $companyId);
+        }
         
         if (isset($filters['is_verified'])) {
             $query->where('is_verified', $filters['is_verified']);
@@ -796,14 +397,22 @@ class AttendanceService
         }
         
         if (isset($filters['date_from'])) {
-            $query->whereHas('aktivitas', function ($q) use ($filters) {
+            $query->whereHas('aktivitas', function ($q) use ($filters, $companyId) {
                 $q->where('tanggal', '>=', $filters['date_from']);
+
+                if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                    $q->where('aktivitas.company_id', $companyId);
+                }
             });
         }
         
         if (isset($filters['date_to'])) {
-            $query->whereHas('aktivitas', function ($q) use ($filters) {
+            $query->whereHas('aktivitas', function ($q) use ($filters, $companyId) {
                 $q->where('tanggal', '<=', $filters['date_to']);
+
+                if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                    $q->where('aktivitas.company_id', $companyId);
+                }
             });
         }
         
@@ -913,10 +522,16 @@ class AttendanceService
     protected function getOrCreateAbsenUser($targetId, $type)
     {
         if ($type === 'tutor') {
-            return AbsenUser::firstOrCreate(['id_tutor' => $targetId]);
+            $tutor = Tutor::find($targetId);
+            $companyId = $this->resolveCompanyId(null, null, $tutor);
+
+            return $this->absenUserFactory->forTutor($targetId, $companyId);
         }
-        
-        return AbsenUser::firstOrCreate(['id_anak' => $targetId]);
+
+        $anak = Anak::find($targetId);
+        $companyId = $this->resolveCompanyId($anak, null, null);
+
+        return $this->absenUserFactory->forAnak($targetId, $companyId);
     }
 
     protected function checkExistingAttendanceByType($targetId, $idAktivitas, $type)
@@ -933,76 +548,9 @@ class AttendanceService
      */
     protected function validateGpsLocationFromShelter($shelter, $gpsData)
     {
-        // Note: This method is called when GPS validation is required
-        // Caller should determine if GPS is required before calling this method
-        
-        // Check if shelter has GPS coordinates set
-        if (!$shelter->latitude || !$shelter->longitude) {
-            return [
-                'valid' => false,
-                'reason' => 'Shelter location not configured. Please contact administrator.',
-                'error_type' => 'missing_shelter_location'
-            ];
-        }
-        
-        // Validate GPS data format
-        if (!isset($gpsData['latitude']) || !isset($gpsData['longitude'])) {
-            return [
-                'valid' => false,
-                'reason' => 'Invalid GPS data format. Location coordinates required.',
-                'error_type' => 'invalid_gps_format'
-            ];
-        }
-        
-        // Check GPS accuracy if provided
-        if (isset($gpsData['accuracy'])) {
-            $requiredAccuracy = $shelter->gps_accuracy_required ?: 25;
-            if (!$this->locationService->isAccuracyAcceptable($gpsData['accuracy'], $requiredAccuracy)) {
-                return [
-                    'valid' => false,
-                    'reason' => "GPS accuracy ({$gpsData['accuracy']}m) is too low. Please try again with better signal.",
-                    'error_type' => 'low_accuracy',
-                    'required_accuracy' => $requiredAccuracy,
-                    'current_accuracy' => $gpsData['accuracy']
-                ];
-            }
-        }
-        
-        // Validate location within allowed radius
-        $attendanceLocation = [
-            'latitude' => $gpsData['latitude'],
-            'longitude' => $gpsData['longitude']
-        ];
-        
-        $shelterLocation = [
-            'latitude' => $shelter->latitude,
-            'longitude' => $shelter->longitude
-        ];
-        
-        $maxDistance = $shelter->max_distance_meters ?: 100; // Default 100m if not set
-        
-        $validation = $this->locationService->validateAttendanceLocation(
-            $attendanceLocation,
-            $shelterLocation,
-            $maxDistance
-        );
-        
-        if (!$validation['valid']) {
-            return [
-                'valid' => false,
-                'reason' => $validation['reason'],
-                'error_type' => 'location_out_of_range',
-                'distance' => $validation['distance'],
-                'max_distance' => $validation['max_distance']
-            ];
-        }
-        
-        return [
-            'valid' => true,
-            'distance' => $validation['distance'],
-            'max_distance' => $validation['max_distance']
-        ];
+        return $this->gpsMetadataService->validateGpsLocationFromShelter($shelter, $gpsData);
     }
+
 
     /**
      * Validate GPS location for attendance (legacy method for aktivitas-based GPS - kept for backward compatibility)
@@ -1205,10 +753,11 @@ class AttendanceService
         ];
     }
 
-    public function getTutorAttendanceSummaryForShelter(int $shelterId, array $filters = [])
+    public function getTutorAttendanceSummaryForShelter(int $shelterId, array $filters = [], ?int $companyId = null)
     {
         $baseActivityQuery = Aktivitas::query()
-            ->where('id_shelter', $shelterId);
+            ->where('id_shelter', $shelterId)
+            ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId));
 
         if (!empty($filters['date_from'])) {
             $baseActivityQuery->whereDate('tanggal', '>=', $filters['date_from']);
@@ -1252,11 +801,13 @@ class AttendanceService
                 $join->on('filtered_activities.id_aktivitas', '=', 'absen.id_aktivitas')
                     ->whereColumn('filtered_activities.id_tutor', 'absen_user.id_tutor');
             })
+            ->when($companyId && Schema::hasColumn('absen', 'company_id'), fn ($q) => $q->where('absen.company_id', $companyId))
             ->where('absen.is_verified', true)
             ->groupBy('absen_user.id_tutor');
 
         $tutors = Tutor::query()
             ->where('tutor.id_shelter', $shelterId)
+            ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('tutor.company_id', $companyId))
             ->leftJoinSub($activityStatsQuery, 'activity_stats', function ($join) {
                 $join->on('activity_stats.id_tutor', '=', 'tutor.id_tutor');
             })

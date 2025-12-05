@@ -6,18 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Wilbin\StoreWilbinRequest;
 use App\Http\Requests\Wilbin\UpdateWilbinRequest;
 use App\Http\Resources\WilbinResource;
+use App\Models\Kacab;
 use App\Models\Wilbin;
+use App\Support\AdminPusatScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Schema;
 
 class WilbinController extends Controller
 {
+    use AdminPusatScope;
+
     /**
      * Display a listing of the resource.
      */
     public function index(): AnonymousResourceCollection
     {
-        $wilbins = Wilbin::query()
+        $companyId = $this->companyId();
+
+        $wilbins = $this->applyCompanyScope(Wilbin::query(), $companyId, 'wilbin')
             ->with('kacab')
             ->latest('id_wilbin')
             ->paginate();
@@ -30,7 +37,21 @@ class WilbinController extends Controller
      */
     public function store(StoreWilbinRequest $request)
     {
-        $wilbin = Wilbin::create($request->validated());
+        $companyId = $this->companyId();
+        $data = $request->validated();
+
+        // Pastikan kacab terkait sesuai company
+        if ($companyId && Schema::hasColumn('kacab', 'company_id')) {
+            Kacab::where('id_kacab', $data['id_kacab'])
+                ->where('company_id', $companyId)
+                ->firstOrFail();
+        }
+
+        if ($companyId && Schema::hasColumn('wilbin', 'company_id')) {
+            $data['company_id'] = $companyId;
+        }
+
+        $wilbin = Wilbin::create($data);
 
         return (new WilbinResource($wilbin->load('kacab')))
             ->response()
@@ -42,6 +63,11 @@ class WilbinController extends Controller
      */
     public function show(Wilbin $wilbin): WilbinResource
     {
+        $companyId = $this->companyId();
+        $wilbin = $this->applyCompanyScope(Wilbin::whereKey($wilbin->getKey()), $companyId, 'wilbin')
+            ->with('kacab')
+            ->firstOrFail();
+
         $wilbin->loadMissing('kacab');
 
         return new WilbinResource($wilbin);
@@ -52,7 +78,17 @@ class WilbinController extends Controller
      */
     public function update(UpdateWilbinRequest $request, Wilbin $wilbin): WilbinResource
     {
-        $wilbin->fill($request->validated());
+        $companyId = $this->companyId();
+        $wilbin = $this->applyCompanyScope(Wilbin::whereKey($wilbin->getKey()), $companyId, 'wilbin')->firstOrFail();
+        $data = $request->validated();
+
+        if ($companyId && Schema::hasColumn('kacab', 'company_id')) {
+            Kacab::where('id_kacab', $data['id_kacab'])
+                ->where('company_id', $companyId)
+                ->firstOrFail();
+        }
+
+        $wilbin->fill($data);
         $wilbin->save();
 
         return new WilbinResource($wilbin->fresh()->loadMissing('kacab'));
@@ -63,6 +99,9 @@ class WilbinController extends Controller
      */
     public function destroy(Wilbin $wilbin): JsonResponse
     {
+        $companyId = $this->companyId();
+        $wilbin = $this->applyCompanyScope(Wilbin::whereKey($wilbin->getKey()), $companyId, 'wilbin')->firstOrFail();
+
         $wilbin->delete();
 
         return response()->json([

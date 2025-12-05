@@ -38,6 +38,7 @@ class Anak extends Model
         'id_anak_pend',
         'id_kelompok',
         'id_shelter',
+        'company_id',
         'id_donatur',
         'id_level_anak_binaan',
         'nik_anak',

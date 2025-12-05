@@ -1,8 +1,7 @@
 export const AUTH_ENDPOINTS = {
-  LOGIN: "/auth/login",
-  LOGOUT: "/auth/logout",
-  USER: "/auth/user",
-  CHANGE_PASSWORD: "/auth/change-password",
+  LOGIN: "/api/auth/login", // Management IdP
+  LOGOUT: "/api/auth/logout", // Management IdP (revoke)
+  USERINFO: "/api/userinfo",
 };
 
 export const ADMIN_PUSAT_ENDPOINTS = {
@@ -126,6 +125,7 @@ export const ADMIN_CABANG_ENDPOINTS = {
     DETAIL: "/admin-cabang/gps-approval/:id",
     APPROVE: "/admin-cabang/gps-approval/:id/approve",
     REJECT: "/admin-cabang/gps-approval/:id/reject",
+    NEEDS_REVIEW: "/admin-cabang/gps-approval/needs-review",
   },
   DASHBOARD: "/admin-cabang/dashboard",
   PROFILE: "/admin-cabang/profile",
@@ -135,35 +135,6 @@ export const ADMIN_CABANG_ENDPOINTS = {
     DETAIL: (id) => `/admin-cabang/survey-approval/${id}`,
     APPROVE: (id) => `/admin-cabang/survey-approval/${id}/approve`,
     REJECT: (id) => `/admin-cabang/survey-approval/${id}/reject`,
-  },
-  PENGAJUAN_DONATUR: {
-    CPB_CHILDREN: "/admin-cabang/pengajuan-donatur/cpb-children",
-    AVAILABLE_DONATUR: "/admin-cabang/pengajuan-donatur/available-donatur",
-    ASSIGN_DONATUR: "/admin-cabang/pengajuan-donatur/assign-donatur",
-    CHILD_DETAIL: (id) => `/admin-cabang/pengajuan-donatur/child-detail/${id}`,
-  },
-  USERS: {
-    LIST: "/admin-cabang/users",
-    CREATE: "/admin-cabang/create-user",
-    DETAIL: (id) => `/admin-cabang/users/${id}`,
-    UPDATE: (id) => `/admin-cabang/users/${id}`,
-    DROPDOWN: {
-      KACAB: "/admin-cabang/kacab",
-      WILBIN: (kacabId) => `/admin-cabang/kacab/${kacabId}/wilbin`,
-      SHELTER_BY_WILBIN: (wilbinId) =>
-        `/admin-cabang/wilbin/${wilbinId}/shelter`,
-    },
-  },
-  DONATUR: {
-    LIST: "/admin-cabang/donatur",
-    CREATE: "/admin-cabang/donatur",
-    DETAIL: (id) => `/admin-cabang/donatur/${id}`,
-    UPDATE: (id) => `/admin-cabang/donatur/${id}`,
-    DELETE: (id) => `/admin-cabang/donatur/${id}`,
-    FILTER_OPTIONS: "/admin-cabang/donatur-filter-options",
-    SHELTERS_BY_WILBIN: (wilbinId) =>
-      `/admin-cabang/donatur-shelters/${wilbinId}`,
-    STATS: "/admin-cabang/donatur-stats",
   },
   REPORTS: {
     SUMMARY: "/admin-cabang/laporan/summary",
@@ -466,9 +437,6 @@ export const DONATUR_ENDPOINTS = {
 };
 
 export const MANAGEMENT_ENDPOINTS = {
-  USERS: "/users",
-  USER_DETAIL: (id) => `/users/${id}`,
-
   KACAB: "/admin-pusat/kacab",
   KACAB_DETAIL: (id) => `/admin-pusat/kacab/${id}`,
 

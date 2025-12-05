@@ -1,369 +1,271 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Alert,
-  RefreshControl, ActivityIndicator
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
-import SearchBar from '../../../common/components/SearchBar';
-import EmptyState from '../../../common/components/EmptyState';
 import ErrorMessage from '../../../common/components/ErrorMessage';
-import LoadingSpinner from '../../../common/components/LoadingSpinner';
-import GpsApprovalCard from '../components/GpsApprovalCard';
-import ReasonInputModal from '../components/ReasonInputModal';
-import { adminCabangApi } from '../api/adminCabangApi';
+import EmptyState from '../../../common/components/EmptyState';
+import adminCabangApi from '../api/adminCabangApi';
 
-const GpsApprovalScreen = ({ navigation }) => {
-  const [gpsRequests, setGpsRequests] = useState([]);
+const formatDateTime = (value) => {
+  if (!value) return '-';
+  try {
+    const date = new Date(value);
+    return `${date.toLocaleDateString('id-ID')} ${date.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`;
+  } catch (error) {
+    return value;
+  }
+};
+
+const FlagBadge = ({ text, color = '#e67e22' }) => (
+  <View style={[styles.badge, { backgroundColor: color }]}>
+    <Text style={styles.badgeText}>{text}</Text>
+  </View>
+);
+
+const InfoRow = ({ label, value }) => (
+  <View style={styles.infoRow}>
+    <Text style={styles.infoLabel}>{label}</Text>
+    <Text style={styles.infoValue}>{value || '-'}</Text>
+  </View>
+);
+
+const FlagItem = ({ item, type }) => {
+  const flags = item?.auto_flag_payload || [];
+  const flagMessages = flags.length
+    ? flags.map((flag) => `• ${flag.message || flag.code || 'Perlu peninjauan'}`).join('\n')
+    : 'Catatan tidak tersedia';
+
+  const locationBlock = item?.gps
+    ? {
+        coordinate: item.gps.latitude && item.gps.longitude
+          ? `${item.gps.latitude}, ${item.gps.longitude}`
+          : 'Tidak tersedia',
+        accuracy: item.gps.accuracy ? `${Math.round(item.gps.accuracy)} m` : 'Tidak diketahui',
+        recorded_at: item.gps.recorded_at ? formatDateTime(item.gps.recorded_at) : '-',
+        distance: item.gps.distance
+          ? `${Math.round(item.gps.distance)} m`
+          : item.gps.distance_from_activity
+            ? `${Math.round(item.gps.distance_from_activity)} m`
+            : null,
+      }
+    : null;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardHeaderLeft}>
+          <Ionicons
+            name={type === 'attendance' ? 'people-circle' : 'document-text'}
+            size={22}
+            color={type === 'attendance' ? '#0984e3' : '#6c5ce7'}
+          />
+          <View>
+            <Text style={styles.cardTitle}>
+              {item?.member?.name || item?.shelter?.name || 'Tidak diketahui'}
+            </Text>
+            <Text style={styles.cardSubtitle}>
+              {type === 'attendance'
+                ? `Kegiatan: ${item.activity_type || '-'}`
+                : `Aktivitas: ${item.activity_type || '-'}`}
+            </Text>
+          </View>
+        </View>
+        <FlagBadge
+          text={type === 'attendance' ? 'Kehadiran' : 'Laporan Kegiatan'}
+          color={type === 'attendance' ? '#00a8ff' : '#9b59b6'}
+        />
+      </View>
+
+      {type === 'attendance' && (
+        <>
+          <InfoRow
+            label="Anggota"
+            value={
+              item?.member?.name
+                ? `${item.member.name} (${item.member?.type === 'tutor' ? 'Tutor' : 'Siswa'})`
+                : '-'
+            }
+          />
+          <InfoRow label="Status" value={item?.status || '-'} />
+        </>
+      )}
+
+      <InfoRow label="Shelter" value={item?.shelter?.name || '-'} />
+      <InfoRow label="Tanggal Aktivitas" value={formatDateTime(item?.activity_date)} />
+
+      {locationBlock && (
+        <View style={styles.locationContainer}>
+          <Text style={styles.locationHeading}>Detail Lokasi</Text>
+          <InfoRow label="Koordinat" value={locationBlock.coordinate} />
+          <InfoRow label="Akurasi" value={locationBlock.accuracy} />
+          {locationBlock.distance && <InfoRow label="Jarak" value={locationBlock.distance} />}
+          <InfoRow label="Dicatat" value={locationBlock.recorded_at} />
+        </View>
+      )}
+
+      <View style={styles.flagsContainer}>
+        <Text style={styles.flagHeading}>Auto Flag</Text>
+        <Text style={styles.flagText}>{flagMessages}</Text>
+      </View>
+
+      <TouchableOpacity
+        style={styles.reviewHint}
+        onPress={() => {
+          // future: navigate ke detail atau copy ID
+        }}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="information-circle-outline" size={16} color="#6c5ce7" />
+        <Text style={styles.reviewHintText}>
+          Tandai valid/invalid via dashboard web atau koordinasikan dengan admin shelter.
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const Section = ({ title, count, data, type }) => (
+  <View style={styles.section}>
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <FlagBadge text={`${count} data`} color="#34495e" />
+    </View>
+    {count === 0 ? (
+      <EmptyState
+        title="Tidak ada data"
+        description="Semua catatan aman. Tidak ada flag otomatis untuk diselesaikan."
+      />
+    ) : (
+      data.map((item) => (
+        <FlagItem
+          key={`${type}-${item.id_absen || item.id_activity_report || item.id}`}
+          item={item}
+          type={type}
+        />
+      ))
+    )}
+  </View>
+);
+
+const GpsApprovalScreen = () => {
+  const [data, setData] = useState({ attendance: [], activity_reports: [] });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [pagination, setPagination] = useState({
-    current_page: 1,
-    last_page: 1,
-    per_page: 10,
-    total: 0
-  });
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [rejectModalVisible, setRejectModalVisible] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [rejectLoading, setRejectLoading] = useState(false);
 
-  const statusOptions = [
-    { value: 'all', label: 'Semua Status', color: '#95a5a6' },
-    { value: 'pending', label: 'Menunggu Persetujuan', color: '#f39c12' },
-    { value: 'approved', label: 'Disetujui', color: '#27ae60' },
-    { value: 'rejected', label: 'Ditolak', color: '#e74c3c' }
-  ];
-
-  // Load GPS approval requests
-  const loadGpsRequests = useCallback(async (page = 1, isRefresh = false, overrides = {}) => {
-    const { statusOverride } = overrides;
-    const effectiveStatus = statusOverride ?? selectedStatus;
+  const fetchNeedsReview = useCallback(async (opts = { silent: false }) => {
+    if (!opts.silent) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
 
     try {
-      if (page === 1) {
-        isRefresh ? setRefreshing(true) : setLoading(true);
-        setError(null);
-      } else {
-        setLoadingMore(true);
-      }
-
-      const params = {
-        page,
-        per_page: pagination.per_page,
-        status: effectiveStatus,
-        search: searchQuery.trim() || undefined,
-        sort_by: 'gps_submitted_at',
-        sort_order: 'desc'
-      };
-
-      const response = await adminCabangApi.getGpsApprovalList(params);
-
-      if (response.data.success) {
-        const newData = response.data.data.data;
-        const paginationInfo = {
-          current_page: response.data.data.current_page,
-          last_page: response.data.data.last_page,
-          per_page: response.data.data.per_page,
-          total: response.data.data.total
-        };
-
-        if (page === 1) {
-          setGpsRequests(newData);
-        } else {
-          setGpsRequests(prev => [...prev, ...newData]);
-        }
-        
-        setPagination(paginationInfo);
-      } else {
-        throw new Error(response.data.message || 'Gagal memuat data');
-      }
+      const response = await adminCabangApi.getGpsNeedsReview();
+      const payload = response?.data?.data || { attendance: [], activity_reports: [] };
+      setData({
+        attendance: payload.attendance || [],
+        activity_reports: payload.activity_reports || [],
+      });
+      setError(null);
     } catch (err) {
-      console.error('Error loading GPS requests:', err);
-      setError(err.response?.data?.message || err.message || 'Gagal memuat data persetujuan GPS');
-      if (page === 1) setGpsRequests([]);
+      console.error('Failed to load GPS review data:', err);
+      setError(err?.response?.data?.message || err?.message || 'Gagal memuat data monitoring GPS');
+      setData({ attendance: [], activity_reports: [] });
     } finally {
       setLoading(false);
       setRefreshing(false);
-      setLoadingMore(false);
     }
-  }, [selectedStatus, searchQuery, pagination.per_page]);
+  }, []);
 
-  // Initial load and refresh on focus
   useFocusEffect(
     useCallback(() => {
-      loadGpsRequests(1);
-    }, [loadGpsRequests])
+      fetchNeedsReview();
+    }, [fetchNeedsReview])
   );
 
-  // Refresh data
-  const handleRefresh = (overrides) => {
-    loadGpsRequests(1, true, overrides);
-  };
+  const stats = useMemo(() => {
+    const attendanceCount = data.attendance.length;
+    const reportCount = data.activity_reports.length;
+    return {
+      attendanceCount,
+      reportCount,
+      total: attendanceCount + reportCount,
+    };
+  }, [data]);
 
-  // Load more data
-  const handleLoadMore = (overrides) => {
-    if (!loadingMore && pagination.current_page < pagination.last_page) {
-      loadGpsRequests(pagination.current_page + 1, false, overrides);
-    }
-  };
-
-  // Search handler
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-  };
-
-  // Search submit
-  useEffect(() => {
-    const delayedSearch = setTimeout(() => {
-      loadGpsRequests(1);
-    }, 500);
-
-    return () => clearTimeout(delayedSearch);
-  }, [searchQuery]);
-
-  // Status filter change
-  const handleStatusChange = (status) => {
-    setSelectedStatus(status);
-    loadGpsRequests(1, false, { statusOverride: status });
-  };
-
-  // Navigate to detail
-  const handleRequestPress = (request) => {
-    navigation.navigate('GpsApprovalDetailScreen', {
-      shelterId: request.id,
-      shelterName: request.nama_shelter
-    });
-  };
-
-  // Quick approve
-  const handleQuickApprove = async (request) => {
-    Alert.alert(
-      'Konfirmasi Persetujuan',
-      `Setujui perubahan GPS setting untuk ${request.nama_shelter}?`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Setujui',
-          style: 'default',
-          onPress: async () => {
-            try {
-              const response = await adminCabangApi.approveGpsRequest(request.id, {
-                approval_notes: 'Disetujui langsung dari daftar'
-              });
-
-              if (response.data.success) {
-                Alert.alert('Berhasil', 'GPS setting berhasil disetujui');
-                loadGpsRequests(1, true);
-              } else {
-                throw new Error(response.data.message);
-              }
-            } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || 'Gagal menyetujui GPS setting');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  // Quick reject
-  const handleQuickReject = (request) => {
-    setSelectedRequest(request);
-    setRejectModalVisible(true);
-  };
-
-  const handleCloseRejectModal = () => {
-    setRejectModalVisible(false);
-    setSelectedRequest(null);
-  };
-
-  const handleRejectSubmit = async (reason) => {
-    if (!selectedRequest) return;
-
-    const trimmedReason = reason.trim();
-
-    if (!trimmedReason) {
-      Alert.alert('Error', 'Alasan penolakan harus diisi');
-      return;
-    }
-
-    setRejectLoading(true);
-
-    try {
-      const response = await adminCabangApi.rejectGpsRequest(selectedRequest.id, {
-        rejection_reason: trimmedReason
-      });
-
-      if (response.data.success) {
-        Alert.alert('Berhasil', 'GPS setting berhasil ditolak');
-        handleCloseRejectModal();
-        loadGpsRequests(1, true);
-      } else {
-        throw new Error(response.data.message);
-      }
-    } catch (err) {
-      Alert.alert('Error', err.response?.data?.message || 'Gagal menolak GPS setting');
-    } finally {
-      setRejectLoading(false);
-    }
-  };
-
-  // Render status filter tabs
-  const renderStatusTabs = () => (
-    <View style={styles.statusTabs}>
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={statusOptions}
-        keyExtractor={(item) => item.value}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.statusTab,
-              selectedStatus === item.value && [styles.activeStatusTab, { borderBottomColor: item.color }]
-            ]}
-            onPress={() => handleStatusChange(item.value)}
-          >
-            <Text style={[
-              styles.statusTabText,
-              selectedStatus === item.value && [styles.activeStatusTabText, { color: item.color }]
-            ]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        )}
-        contentContainerStyle={styles.statusTabsContainer}
-      />
-    </View>
-  );
-
-  // Render request item
-  const renderRequestItem = ({ item }) => (
-    <GpsApprovalCard
-      request={item}
-      onPress={() => handleRequestPress(item)}
-      onQuickApprove={() => handleQuickApprove(item)}
-      onQuickReject={() => handleQuickReject(item)}
-    />
-  );
-
-  // Render footer
-  const renderFooter = () => {
-    if (!loadingMore) return null;
+  if (loading) {
     return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#3498db" />
-        <Text style={styles.footerLoaderText}>Memuat data...</Text>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#3498db" />
+        <Text style={styles.loadingText}>Memuat data monitoring GPS...</Text>
       </View>
     );
-  };
-
-  // Render empty state
-  const renderEmptyState = () => {
-    if (loading) return null;
-    
-    return (
-      <EmptyState
-        icon="document-text-outline"
-        title="Tidak ada permintaan GPS"
-        message={
-          searchQuery 
-            ? `Tidak ditemukan permintaan GPS untuk "${searchQuery}"`
-            : selectedStatus === 'all'
-            ? 'Belum ada shelter yang mengajukan perubahan GPS setting'
-            : `Tidak ada permintaan GPS dengan status "${statusOptions.find(s => s.value === selectedStatus)?.label}"`
-        }
-        actionText={searchQuery ? "Hapus Pencarian" : "Refresh"}
-        onActionPress={searchQuery ? () => setSearchQuery('') : handleRefresh}
-      />
-    );
-  };
-
-  if (loading && gpsRequests.length === 0) {
-    return <LoadingSpinner message="Memuat permintaan persetujuan GPS..." />;
   }
 
   return (
     <View style={styles.container}>
-      {error && (
-        <ErrorMessage 
-          message={error} 
-          onRetry={() => loadGpsRequests(1)} 
-        />
-      )}
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Persetujuan GPS Setting</Text>
-        <Text style={styles.subtitle}>
-          Kelola permintaan perubahan GPS setting dari shelter
-        </Text>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <SearchBar
-          placeholder="Cari nama shelter..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-          style={styles.searchBar}
-        />
-      </View>
-
-      {/* Status Filter Tabs */}
-      {renderStatusTabs()}
-
-      {/* Stats Summary */}
-      <View style={styles.statsContainer}>
-        <Text style={styles.statsText}>
-          Total: {pagination.total} permintaan
-        </Text>
-        <Text style={styles.statsText}>
-          Halaman {pagination.current_page} dari {pagination.last_page}
-        </Text>
-      </View>
-
-      {/* GPS Requests List */}
-      <FlatList
-        data={gpsRequests}
-        renderItem={renderRequestItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={['#3498db']}
-            tintColor="#3498db"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchNeedsReview({ silent: true })} />
         }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.1}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmptyState}
-      />
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Monitoring GPS & Aktivitas</Text>
+          <Text style={styles.subtitle}>
+            Pantau catatan kehadiran dan laporan kegiatan yang ditandai otomatis karena masalah lokasi.
+          </Text>
+        </View>
 
-      <ReasonInputModal
-        visible={rejectModalVisible}
-        title="Alasan Penolakan"
-        message={
-          selectedRequest
-            ? `Masukkan alasan penolakan untuk ${selectedRequest.nama_shelter}`
-            : ''
-        }
-        placeholder="Masukkan alasan penolakan"
-        confirmText="Tolak"
-        cancelText="Batal"
-        onCancel={handleCloseRejectModal}
-        onSubmit={handleRejectSubmit}
-        loading={rejectLoading}
-      />
+        {error && (
+          <ErrorMessage message={error} onRetry={() => fetchNeedsReview()} />
+        )}
+
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Total Flag</Text>
+            <Text style={styles.summaryValue}>{stats.total}</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Kehadiran</Text>
+            <Text style={styles.summaryValue}>{stats.attendanceCount}</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Laporan</Text>
+            <Text style={styles.summaryValue}>{stats.reportCount}</Text>
+          </View>
+        </View>
+
+        <Section
+          title="Flag Kehadiran"
+          count={data.attendance.length}
+          data={data.attendance}
+          type="attendance"
+        />
+
+        <Section
+          title="Flag Laporan Kegiatan"
+          count={data.activity_reports.length}
+          data={data.activity_reports}
+          type="report"
+        />
+      </ScrollView>
     </View>
   );
 };
@@ -371,87 +273,185 @@ const GpsApprovalScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f6fa',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f6fa',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#7f8c8d',
   },
   header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#2c3e50',
-    marginBottom: 4,
   },
   subtitle: {
+    marginTop: 4,
     fontSize: 14,
     color: '#7f8c8d',
     lineHeight: 20,
   },
-  searchContainer: {
+  summaryCard: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    borderRadius: 16,
+    paddingVertical: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
-  searchBar: {
-    marginBottom: 0,
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
   },
-  statusTabs: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
+  summaryLabel: {
+    fontSize: 12,
+    color: '#95a5a6',
+    marginBottom: 4,
+    textTransform: 'uppercase',
   },
-  statusTabsContainer: {
-    paddingHorizontal: 20,
+  summaryValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#2c3e50',
   },
-  statusTab: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginRight: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+  summaryDivider: {
+    width: 1,
+    backgroundColor: '#ecf0f1',
   },
-  activeStatusTab: {
-    borderBottomWidth: 2,
+  section: {
+    marginBottom: 28,
   },
-  statusTabText: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    fontWeight: '500',
-  },
-  activeStatusTabText: {
-    fontWeight: '600',
-  },
-  statsContainer: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  card: {
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  statsText: {
-    fontSize: 12,
-    color: '#7f8c8d',
-  },
-  listContainer: {
-    padding: 20,
-    paddingTop: 16,
-  },
-  footerLoader: {
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 20,
+    marginBottom: 12,
   },
-  footerLoaderText: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#7f8c8d',
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    color: '#95a5a6',
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#95a5a6',
+  },
+  infoValue: {
+    fontSize: 13,
+    color: '#2c3e50',
+    fontWeight: '500',
+    flexShrink: 1,
+    textAlign: 'right',
+    marginLeft: 12,
+  },
+  locationContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: '#f5f6fb',
+    borderRadius: 10,
+  },
+  locationHeading: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 6,
+  },
+  flagsContainer: {
+    marginTop: 12,
+    backgroundColor: '#fff5f5',
+    borderRadius: 10,
+    padding: 12,
+  },
+  flagHeading: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#c0392b',
+    marginBottom: 4,
+  },
+  flagText: {
+    fontSize: 13,
+    color: '#c0392b',
+    lineHeight: 18,
+  },
+  reviewHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    backgroundColor: '#f3e9ff',
+    padding: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  reviewHintText: {
+    fontSize: 12,
+    color: '#6c5ce7',
+    flex: 1,
   },
 });
 

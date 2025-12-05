@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\AdminShelter;
 use App\Http\Controllers\Controller;
 use App\Models\RaportFormal;
 use App\Models\Anak;
+use App\Support\SsoContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -12,9 +13,17 @@ use Illuminate\Support\Str;
 
 class AdminShelterRaportFormalController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
     public function index($anakId)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -24,9 +33,11 @@ class AdminShelterRaportFormalController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->findOrFail($anakId);
 
         $raportFormal = RaportFormal::where('id_anak', $anakId)
+                                   ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                                    ->with('anak')
                                    ->orderBy('tahun_ajaran', 'desc')
                                    ->orderBy('semester', 'desc')
@@ -42,6 +53,7 @@ class AdminShelterRaportFormalController extends Controller
     public function show($anakId, $id)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -51,9 +63,11 @@ class AdminShelterRaportFormalController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->findOrFail($anakId);
 
         $raportFormal = RaportFormal::where('id_anak', $anakId)
+                                   ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                                    ->with('anak')
                                    ->findOrFail($id);
 
@@ -67,6 +81,7 @@ class AdminShelterRaportFormalController extends Controller
     public function store(Request $request, $anakId)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -76,6 +91,7 @@ class AdminShelterRaportFormalController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->findOrFail($anakId);
 
         $validatedData = $request->validate([
@@ -119,6 +135,7 @@ class AdminShelterRaportFormalController extends Controller
     public function update(Request $request, $anakId, $id)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -128,9 +145,12 @@ class AdminShelterRaportFormalController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->findOrFail($anakId);
 
-        $raportFormal = RaportFormal::where('id_anak', $anakId)->findOrFail($id);
+        $raportFormal = RaportFormal::where('id_anak', $anakId)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->findOrFail($id);
 
         $validatedData = $request->validate([
             'nama_sekolah' => 'sometimes|string|max:255',
@@ -177,6 +197,7 @@ class AdminShelterRaportFormalController extends Controller
     public function destroy($anakId, $id)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -186,9 +207,12 @@ class AdminShelterRaportFormalController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->findOrFail($anakId);
 
-        $raportFormal = RaportFormal::where('id_anak', $anakId)->findOrFail($id);
+        $raportFormal = RaportFormal::where('id_anak', $anakId)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->findOrFail($id);
 
         if ($raportFormal->file_raport) {
             Storage::disk('public')->delete("RaportFormal/{$anakId}/{$raportFormal->file_raport}");

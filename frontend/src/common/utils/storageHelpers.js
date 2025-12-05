@@ -1,5 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_TOKEN_KEY, STORAGE_USER_KEY } from '../../constants/config';
+import {
+  STORAGE_REFRESH_TOKEN_KEY,
+  STORAGE_TOKEN_KEY,
+  STORAGE_USER_KEY,
+  STORAGE_CURRENT_ROLE_KEY
+} from '../../constants/config';
 
 /**
  * Store auth token in AsyncStorage
@@ -39,6 +44,35 @@ export const removeToken = async () => {
     return true;
   } catch (error) {
     console.error('Error removing token:', error);
+    return false;
+  }
+};
+
+export const storeRefreshToken = async (token) => {
+  try {
+    await AsyncStorage.setItem(STORAGE_REFRESH_TOKEN_KEY, token);
+    return true;
+  } catch (error) {
+    console.error('Error storing refresh token:', error);
+    return false;
+  }
+};
+
+export const getRefreshToken = async () => {
+  try {
+    return await AsyncStorage.getItem(STORAGE_REFRESH_TOKEN_KEY);
+  } catch (error) {
+    console.error('Error getting refresh token:', error);
+    return null;
+  }
+};
+
+export const removeRefreshToken = async () => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_REFRESH_TOKEN_KEY);
+    return true;
+  } catch (error) {
+    console.error('Error removing refresh token:', error);
     return false;
   }
 };
@@ -93,7 +127,12 @@ export const removeUser = async () => {
  */
 export const clearAuthData = async () => {
   try {
-    await AsyncStorage.multiRemove([STORAGE_TOKEN_KEY, STORAGE_USER_KEY]);
+    await AsyncStorage.multiRemove([
+      STORAGE_TOKEN_KEY,
+      STORAGE_USER_KEY,
+      STORAGE_REFRESH_TOKEN_KEY,
+      STORAGE_CURRENT_ROLE_KEY
+    ]);
     return true;
   } catch (error) {
     console.error('Error clearing auth data:', error);
@@ -151,6 +190,46 @@ export const removeData = async (key) => {
     return true;
   } catch (error) {
     console.error(`Error removing ${key}:`, error);
+    return false;
+  }
+};
+
+export const storeCurrentRole = async (role) => {
+  try {
+    if (!role) {
+      await AsyncStorage.removeItem(STORAGE_CURRENT_ROLE_KEY);
+      return true;
+    }
+    const normalized = {
+      slug: role.slug,
+      name: role.name || role.slug,
+      scope_type: role.scope_type ?? null,
+      scope_id: role.scope_id ?? null,
+    };
+    await AsyncStorage.setItem(STORAGE_CURRENT_ROLE_KEY, JSON.stringify(normalized));
+    return true;
+  } catch (error) {
+    console.error('Error storing current role:', error);
+    return false;
+  }
+};
+
+export const getCurrentRole = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_CURRENT_ROLE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.error('Error getting current role:', error);
+    return null;
+  }
+};
+
+export const removeCurrentRole = async () => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_CURRENT_ROLE_KEY);
+    return true;
+  } catch (error) {
+    console.error('Error removing current role:', error);
     return false;
   }
 };

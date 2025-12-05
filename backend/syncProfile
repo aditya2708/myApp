@@ -1,0 +1,5 @@
+84:            $this->roleAssignment->syncProfile($user, $user->level, $profileData);
+86:            $relations = $this->roleAssignment->relationsForLevel($user->level);
+171:            $this->roleAssignment->ensureRequiredProfileData($user, $targetLevel, $profileData);
+173:            $this->roleAssignment->syncProfile($user, $targetLevel, $profileData);
+182:            $relations = $this->roleAssignment->relationsForLevel($user->level);

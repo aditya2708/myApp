@@ -122,7 +122,7 @@ class ShelterGpsController extends Controller
                 ], 422);
             }
 
-            // Prepare GPS data for approval
+            // Prepare GPS data for direct update
             $gpsData = [
                 'require_gps' => $request->require_gps,
                 'max_distance_meters' => $request->max_distance_meters ?: 100,
@@ -132,7 +132,6 @@ class ShelterGpsController extends Controller
                 'location_name' => $request->require_gps ? $request->location_name : null
             ];
 
-            // Store current GPS settings for history
             $currentGpsData = [
                 'require_gps' => $shelter->require_gps,
                 'latitude' => $shelter->latitude,
@@ -142,37 +141,39 @@ class ShelterGpsController extends Controller
                 'location_name' => $shelter->location_name
             ];
 
-            // Update change history
             $changeHistory = $shelter->gps_change_history ? json_decode($shelter->gps_change_history, true) : [];
             $changeHistory[] = [
                 'timestamp' => now()->toISOString(),
                 'admin_shelter_id' => $user->adminShelter->id,
                 'previous_data' => $currentGpsData,
                 'new_data' => $gpsData,
-                'action' => 'submitted_for_approval'
+                'action' => 'updated_directly'
             ];
 
-            // Update shelter with pending approval
             $shelter->update([
-                'gps_approval_status' => 'pending',
-                'gps_approval_data' => json_encode($gpsData),
+                'require_gps' => $gpsData['require_gps'],
+                'latitude' => $gpsData['latitude'],
+                'longitude' => $gpsData['longitude'],
+                'max_distance_meters' => $gpsData['max_distance_meters'],
+                'gps_accuracy_required' => $gpsData['gps_accuracy_required'],
+                'location_name' => $gpsData['location_name'],
+                'gps_approval_status' => 'auto_approved',
+                'gps_approval_data' => null,
                 'gps_submitted_at' => now(),
-                'gps_approved_at' => null,
+                'gps_approved_at' => now(),
                 'gps_approved_by' => null,
                 'gps_rejection_reason' => null,
                 'gps_change_history' => json_encode($changeHistory)
             ]);
 
-            // Get updated shelter data
             $shelter->refresh();
 
             return response()->json([
                 'success' => true,
-                'message' => 'GPS setting berhasil dikirim untuk persetujuan Admin Cabang',
+                'message' => 'GPS setting berhasil diperbarui tanpa perlu persetujuan admin cabang',
                 'data' => [
                     'gps_approval_status' => $shelter->gps_approval_status,
-                    'gps_submitted_at' => $shelter->gps_submitted_at,
-                    'pending_gps_data' => json_decode($shelter->gps_approval_data, true),
+                    'gps_updated_at' => $shelter->gps_approved_at,
                     'current_gps_data' => [
                         'require_gps' => $shelter->require_gps,
                         'latitude' => $shelter->latitude,
@@ -181,6 +182,7 @@ class ShelterGpsController extends Controller
                         'gps_accuracy_required' => $shelter->gps_accuracy_required,
                         'location_name' => $shelter->location_name
                     ],
+                    'change_history' => $changeHistory,
                     'shelter_name' => $shelter->nama_shelter
                 ]
             ]);

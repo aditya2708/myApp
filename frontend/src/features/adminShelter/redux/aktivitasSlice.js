@@ -302,7 +302,13 @@ export const createActivityReport = createAsyncThunk(
       const response = await activityReportApi.createReport(formData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Gagal membuat laporan');
+      const payload = error.response?.data;
+      const message = payload?.message || error.message || 'Gagal membuat laporan';
+      return rejectWithValue({
+        message,
+        errors: payload?.errors || null,
+        status: error.response?.status
+      });
     }
   }
 );

@@ -74,7 +74,6 @@ const AdminPusatDashboardScreen = () => {
     );
   const navigateToProfile = () => navigation.navigate('ProfileTab');
   const navigateToTutorHonorSettings = () => navigation.navigate('TutorHonorSettings');
-  const navigateToUserManagement = () => navigation.navigate('UserManagement');
   const navigateToDataWilayah = () => navigation.navigate('DataWilayah');
 
   // Show loading indicator
@@ -191,18 +190,6 @@ const AdminPusatDashboardScreen = () => {
             </View>
             <Text style={styles.quickAccessText}>Setting Honor</Text>
             <Text style={styles.quickAccessSubtext}>Atur honor tutor</Text>
-          </TouchableOpacity>
-
-          {/* NEW: Manajemen User */}
-          <TouchableOpacity
-            style={styles.quickAccessItem}
-            onPress={navigateToUserManagement}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: '#2ecc71' }]}>
-              <Ionicons name="people" size={24} color="#fff" />
-            </View>
-            <Text style={styles.quickAccessText}>Manajemen User</Text>
-            <Text style={styles.quickAccessSubtext}>Kelola user pusat/cabang/shelter</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

@@ -18,15 +18,20 @@ export const useGpsNavigation = () => {
       );
 
       if (gpsCheck.allowed) {
-        // GPS check passed, proceed with navigation
+        // GPS check passed or hanya peringatan jarak; tetap lanjut
+        if (gpsCheck.flagged) {
+          console.warn('GPS check flagged:', gpsCheck.reason);
+          setGpsError(gpsCheck);
+        }
         if (navigationCallback) {
           navigationCallback();
         }
-      } else {
-        // GPS check failed, show modal
-        setGpsError(gpsCheck);
-        showGpsRequiredModal(gpsCheck, navigationCallback, activityId, activityType, shelterGpsConfig);
+        return;
       }
+
+      // GPS check failed karena izin/perangkat, tampilkan modal
+      setGpsError(gpsCheck);
+      showGpsRequiredModal(gpsCheck, navigationCallback, activityId, activityType, shelterGpsConfig);
 
     } catch (error) {
       console.error('GPS navigation check error:', error.message);
@@ -66,7 +71,13 @@ export const useGpsNavigation = () => {
       gpsCheck.gpsStatus,
       onRetry,
       onCancel,
-      gpsCheck.locationValidation // Pass location validation data
+      gpsCheck.locationValidation,
+      () => {
+        setGpsError(null);
+        if (navigationCallback) {
+          navigationCallback();
+        }
+      }
     );
   }, [checkGpsAndNavigate]);
 

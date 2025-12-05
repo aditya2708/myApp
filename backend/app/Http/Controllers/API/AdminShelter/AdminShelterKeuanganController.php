@@ -5,26 +5,46 @@ namespace App\Http\Controllers\API\AdminShelter;
 use App\Http\Controllers\Controller;
 use App\Models\Keuangan;
 use App\Models\Anak;
+use App\Support\AdminShelterScope;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 
 class AdminShelterKeuanganController extends Controller
 {
+    use AdminShelterScope;
+
     /**
      * Get list of keuangan for shelter's children
      */
     public function index(Request $request)
     {
         try {
-            $user = auth()->user();
-            $adminShelter = $user->adminShelter;
+            $user = Auth::user();
+            $adminShelter = $user?->adminShelter;
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
+
+            if (!$adminShelter || !$shelterId) {
+                return response()->json([
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
             
-            $query = Keuangan::with(['anak' => function($query) {
-                $query->select('id_anak', 'full_name', 'nick_name', 'foto');
-            }])
-            ->whereHas('anak', function($query) use ($adminShelter) {
+            $query = $this->applyCompanyScope(
+                Keuangan::with(['anak' => function($query) use ($companyId) {
+                    $this->applyCompanyScope($query, $companyId, 'anak');
+                    $query->select('id_anak', 'full_name', 'nick_name', 'foto', 'company_id');
+                }]),
+                $companyId
+            )->whereHas('anak', function($query) use ($adminShelter, $companyId) {
                 $query->where('id_shelter', $adminShelter->id_shelter);
+
+                if ($companyId && Schema::hasColumn('anak', 'company_id')) {
+                    $query->where('company_id', $companyId);
+                }
             });
 
             // Filter by search
@@ -104,12 +124,14 @@ class AdminShelterKeuanganController extends Controller
                 ], 422);
             }
 
-            $user = auth()->user();
-            $adminShelter = $user->adminShelter;
+            $user = Auth::user();
+            $adminShelter = $user?->adminShelter;
+            $companyId = $this->companyId();
 
             // Verify that the child belongs to this shelter
             $anak = Anak::where('id_anak', $request->id_anak)
                         ->where('id_shelter', $adminShelter->id_shelter)
+                        ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                         ->first();
 
             if (!$anak) {
@@ -121,7 +143,13 @@ class AdminShelterKeuanganController extends Controller
             // Check if keuangan already exists for this child and semester
             $existingKeuangan = Keuangan::where('id_anak', $request->id_anak)
                                        ->where('semester', $request->semester)
-                                       ->where('tingkat_sekolah', $request->tingkat_sekolah)
+                                       ->where('tingkat_sekolah', $request->tingkat_sekolah);
+
+            if ($companyId && Schema::hasColumn('keuangan', 'company_id')) {
+                $existingKeuangan->where('company_id', $companyId);
+            }
+
+            $existingKeuangan = $existingKeuangan
                                        ->first();
 
             if ($existingKeuangan) {
@@ -140,6 +168,10 @@ class AdminShelterKeuanganController extends Controller
             }
 
             $keuangan = Keuangan::create($data);
+            if ($companyId && Schema::hasColumn('keuangan', 'company_id')) {
+                $keuangan->company_id = $companyId;
+                $keuangan->save();
+            }
             $keuangan->load('anak');
             
             // Add calculated totals
@@ -167,14 +199,23 @@ class AdminShelterKeuanganController extends Controller
     public function show($id)
     {
         try {
-            $user = auth()->user();
-            $adminShelter = $user->adminShelter;
+            $user = Auth::user();
+            $adminShelter = $user?->adminShelter;
+            $companyId = $this->companyId();
 
-            $keuangan = Keuangan::with(['anak' => function($query) {
-                $query->select('id_anak', 'full_name', 'nick_name', 'foto', 'id_donatur');
-            }])
-            ->whereHas('anak', function($query) use ($adminShelter) {
+            $keuangan = $this->applyCompanyScope(
+                Keuangan::with(['anak' => function($query) use ($companyId) {
+                    $this->applyCompanyScope($query, $companyId, 'anak');
+                    $query->select('id_anak', 'full_name', 'nick_name', 'foto', 'id_donatur', 'company_id');
+                }]),
+                $companyId
+            )
+            ->whereHas('anak', function($query) use ($adminShelter, $companyId) {
                 $query->where('id_shelter', $adminShelter->id_shelter);
+
+                if ($companyId && Schema::hasColumn('anak', 'company_id')) {
+                    $query->where('company_id', $companyId);
+                }
             })
             ->find($id);
 
@@ -233,17 +274,25 @@ class AdminShelterKeuanganController extends Controller
                 ], 422);
             }
 
-            $user = auth()->user();
-            $adminShelter = $user->adminShelter;
+        $user = Auth::user();
+        $adminShelter = $user?->adminShelter;
+        $companyId = $this->companyId();
 
-            $keuangan = Keuangan::whereHas('anak', function($query) use ($adminShelter) {
+        $keuangan = $this->applyCompanyScope(
+            Keuangan::whereHas('anak', function($query) use ($adminShelter, $companyId) {
                 $query->where('id_shelter', $adminShelter->id_shelter);
-            })->find($id);
 
-            if (!$keuangan) {
-                return response()->json([
-                    'message' => 'Keuangan record not found'
-                ], 404);
+                if ($companyId && Schema::hasColumn('anak', 'company_id')) {
+                    $query->where('company_id', $companyId);
+                }
+            }),
+            $companyId
+        )->find($id);
+
+        if (!$keuangan) {
+            return response()->json([
+                'message' => 'Keuangan record not found'
+            ], 404);
             }
 
             // Convert empty strings to null for numeric fields
@@ -256,6 +305,10 @@ class AdminShelterKeuanganController extends Controller
             }
 
             $keuangan->update($data);
+            if ($companyId && Schema::hasColumn('keuangan', 'company_id')) {
+                $keuangan->company_id = $companyId;
+                $keuangan->save();
+            }
             $keuangan->load('anak');
             
             // Add calculated totals
@@ -283,12 +336,20 @@ class AdminShelterKeuanganController extends Controller
     public function destroy($id)
     {
         try {
-            $user = auth()->user();
-            $adminShelter = $user->adminShelter;
+            $user = Auth::user();
+            $adminShelter = $user?->adminShelter;
+            $companyId = $this->companyId();
 
-            $keuangan = Keuangan::whereHas('anak', function($query) use ($adminShelter) {
-                $query->where('id_shelter', $adminShelter->id_shelter);
-            })->find($id);
+            $keuangan = $this->applyCompanyScope(
+                Keuangan::whereHas('anak', function($query) use ($adminShelter, $companyId) {
+                    $query->where('id_shelter', $adminShelter->id_shelter);
+
+                    if ($companyId && Schema::hasColumn('anak', 'company_id')) {
+                        $query->where('company_id', $companyId);
+                    }
+                }),
+                $companyId
+            )->find($id);
 
             if (!$keuangan) {
                 return response()->json([
@@ -316,12 +377,14 @@ class AdminShelterKeuanganController extends Controller
     public function getByChild($childId)
     {
         try {
-            $user = auth()->user();
-            $adminShelter = $user->adminShelter;
+            $user = Auth::user();
+            $adminShelter = $user?->adminShelter;
+            $companyId = $this->companyId();
 
             // Verify child belongs to this shelter
             $anak = Anak::where('id_anak', $childId)
                         ->where('id_shelter', $adminShelter->id_shelter)
+                        ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                         ->first();
 
             if (!$anak) {
@@ -330,7 +393,11 @@ class AdminShelterKeuanganController extends Controller
                 ], 404);
             }
 
-            $keuangan = Keuangan::where('id_anak', $childId)
+            $keuangan = $this->applyCompanyScope(
+                Keuangan::where('id_anak', $childId),
+                $companyId
+            )
+                               ->when($companyId && Schema::hasColumn('keuangan', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                                ->orderBy('created_at', 'desc')
                                ->get();
 
@@ -362,12 +429,21 @@ class AdminShelterKeuanganController extends Controller
     public function getStatistics()
     {
         try {
-            $user = auth()->user();
-            $adminShelter = $user->adminShelter;
+            $user = Auth::user();
+            $adminShelter = $user?->adminShelter;
+            $companyId = $this->companyId();
 
-            $stats = Keuangan::whereHas('anak', function($query) use ($adminShelter) {
+            $stats = $this->applyCompanyScope(
+                Keuangan::whereHas('anak', function($query) use ($adminShelter, $companyId) {
                 $query->where('id_shelter', $adminShelter->id_shelter);
-            })
+
+                if ($companyId && Schema::hasColumn('anak', 'company_id')) {
+                    $query->where('company_id', $companyId);
+                }
+            }),
+                $companyId
+            )
+            ->when($companyId && Schema::hasColumn('keuangan', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
             ->selectRaw('
                 COUNT(*) as total_records,
                 SUM(COALESCE(bimbel, 0) + COALESCE(eskul_dan_keagamaan, 0) + COALESCE(laporan, 0) + COALESCE(uang_tunai, 0)) as total_kebutuhan,
@@ -376,9 +452,16 @@ class AdminShelterKeuanganController extends Controller
             ')
             ->first();
 
-            $semesterStats = Keuangan::whereHas('anak', function($query) use ($adminShelter) {
+            $semesterStats = $this->applyCompanyScope(
+                Keuangan::whereHas('anak', function($query) use ($adminShelter, $companyId) {
                 $query->where('id_shelter', $adminShelter->id_shelter);
-            })
+                    if ($companyId && Schema::hasColumn('anak', 'company_id')) {
+                        $query->where('company_id', $companyId);
+                    }
+                }),
+                $companyId
+            )
+            ->when($companyId && Schema::hasColumn('keuangan', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
             ->selectRaw('semester, COUNT(*) as count')
             ->groupBy('semester')
             ->orderBy('semester')

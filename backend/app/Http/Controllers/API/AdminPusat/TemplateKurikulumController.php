@@ -7,33 +7,42 @@ use App\Models\TemplateMateri;
 use App\Models\MataPelajaran;
 use App\Models\Kelas;
 use App\Models\TemplateAdoption;
+use App\Support\AdminPusatScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class TemplateKurikulumController extends Controller
 {
+    use AdminPusatScope;
+
     /**
      * List template dengan filters & pagination
      */
     public function index(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $mataPelajaranId = $request->query('mata_pelajaran');
             $kelasId = $request->query('kelas');
             $search = $request->query('search');
             $status = $request->query('status'); // active, inactive, all
             $kategori = $request->query('kategori');
 
-            $query = TemplateMateri::with(['mataPelajaran', 'kelas.jenjang', 'createdBy'])
+            $query = $this->applyCompanyScope(TemplateMateri::with(['mataPelajaran', 'kelas.jenjang', 'createdBy']), $companyId, 'template_materi')
                 ->withCount([
-                    'templateAdoptions as total_distributions',
-                    'templateAdoptions as pending_adoptions' => function($q) {
+                    'templateAdoptions as total_distributions' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
+                    },
+                    'templateAdoptions as pending_adoptions' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'pending');
                     },
-                    'templateAdoptions as adopted_count' => function($q) {
+                    'templateAdoptions as adopted_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'adopted');
                     }
                 ])
@@ -87,6 +96,7 @@ class TemplateKurikulumController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $validator = Validator::make($request->all(), [
                 'nama_template' => 'required|string|max:255',
                 'deskripsi' => 'nullable|string|max:1000',
@@ -111,9 +121,12 @@ class TemplateKurikulumController extends Controller
             // Get next urutan if not provided
             $urutan = $request->urutan;
             if (!$urutan) {
-                $maxUrutan = TemplateMateri::where('id_mata_pelajaran', $request->id_mata_pelajaran)
-                    ->where('id_kelas', $request->id_kelas)
-                    ->max('urutan');
+                $maxUrutan = $this->applyCompanyScope(
+                    TemplateMateri::where('id_mata_pelajaran', $request->id_mata_pelajaran)
+                        ->where('id_kelas', $request->id_kelas),
+                    $companyId,
+                    'template_materi'
+                )->max('urutan');
                 $urutan = ($maxUrutan ?? 0) + 1;
             }
 
@@ -123,12 +136,13 @@ class TemplateKurikulumController extends Controller
             $filePath = $file->storeAs('templates', $fileName, 'public');
 
             // Get admin pusat ID from authenticated user
-            $adminPusatId = auth()->user()->adminPusat->id_admin_pusat ?? 1; // Fallback for development
+            $adminPusatId = $request->user()?->adminPusat->id_admin_pusat ?? 1; // Fallback for development
 
             $template = TemplateMateri::create([
                 'id_mata_pelajaran' => $request->id_mata_pelajaran,
                 'id_kelas' => $request->id_kelas,
                 'created_by' => $adminPusatId,
+                'company_id' => $companyId && Schema::hasColumn('template_materi', 'company_id') ? $companyId : null,
                 'nama_template' => $request->nama_template,
                 'deskripsi' => $request->deskripsi,
                 'kategori' => $request->kategori,
@@ -177,24 +191,31 @@ class TemplateKurikulumController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $template = TemplateMateri::with([
+            $companyId = $this->companyId();
+            $template = $this->applyCompanyScope(TemplateMateri::with([
                 'mataPelajaran', 
                 'kelas.jenjang', 
                 'createdBy',
                 'templateAdoptions.kacab'
-            ])
+            ]), $companyId, 'template_materi')
             ->withCount([
-                'templateAdoptions as total_distributions',
-                'templateAdoptions as pending_adoptions' => function($q) {
+                'templateAdoptions as total_distributions' => function($q) use ($companyId) {
+                    $this->applyCompanyScope($q, $companyId, 'template_adoptions');
+                },
+                'templateAdoptions as pending_adoptions' => function($q) use ($companyId) {
+                    $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                     $q->where('status', 'pending');
                 },
-                'templateAdoptions as adopted_count' => function($q) {
+                'templateAdoptions as adopted_count' => function($q) use ($companyId) {
+                    $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                     $q->where('status', 'adopted');
                 },
-                'templateAdoptions as customized_count' => function($q) {
+                'templateAdoptions as customized_count' => function($q) use ($companyId) {
+                    $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                     $q->where('status', 'customized');
                 },
-                'templateAdoptions as skipped_count' => function($q) {
+                'templateAdoptions as skipped_count' => function($q) use ($companyId) {
+                    $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                     $q->where('status', 'skipped');
                 }
             ])
@@ -238,7 +259,8 @@ class TemplateKurikulumController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            $template = TemplateMateri::find($id);
+            $companyId = $this->companyId();
+            $template = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->find($id);
 
             if (!$template) {
                 return response()->json([
@@ -323,7 +345,8 @@ class TemplateKurikulumController extends Controller
     public function destroy($id): JsonResponse
     {
         try {
-            $template = TemplateMateri::find($id);
+            $companyId = $this->companyId();
+            $template = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->find($id);
 
             if (!$template) {
                 return response()->json([
@@ -335,6 +358,9 @@ class TemplateKurikulumController extends Controller
 
             // Check if template has pending or adopted distributions
             $activeDistributions = $template->templateAdoptions()
+                ->when($companyId && Schema::hasColumn('template_adoptions', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('template_adoptions.company_id', $companyId);
+                })
                 ->whereIn('status', ['pending', 'adopted'])
                 ->count();
 
@@ -379,7 +405,8 @@ class TemplateKurikulumController extends Controller
     public function activate($id): JsonResponse
     {
         try {
-            $template = TemplateMateri::find($id);
+            $companyId = $this->companyId();
+            $template = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->find($id);
             
             if (!$template) {
                 return response()->json([
@@ -419,7 +446,8 @@ class TemplateKurikulumController extends Controller
     public function deactivate($id): JsonResponse
     {
         try {
-            $template = TemplateMateri::find($id);
+            $companyId = $this->companyId();
+            $template = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->find($id);
             
             if (!$template) {
                 return response()->json([
@@ -459,7 +487,8 @@ class TemplateKurikulumController extends Controller
     public function duplicate($id): JsonResponse
     {
         try {
-            $sourceTemplate = TemplateMateri::find($id);
+            $companyId = $this->companyId();
+            $sourceTemplate = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->find($id);
 
             if (!$sourceTemplate) {
                 return response()->json([
@@ -480,16 +509,20 @@ class TemplateKurikulumController extends Controller
             }
 
             // Get next urutan
-            $maxUrutan = TemplateMateri::where('id_mata_pelajaran', $sourceTemplate->id_mata_pelajaran)
-                ->where('id_kelas', $sourceTemplate->id_kelas)
-                ->max('urutan');
+            $maxUrutan = $this->applyCompanyScope(
+                TemplateMateri::where('id_mata_pelajaran', $sourceTemplate->id_mata_pelajaran)
+                    ->where('id_kelas', $sourceTemplate->id_kelas),
+                $companyId,
+                'template_materi'
+            )->max('urutan');
 
-            $adminPusatId = auth()->user()->adminPusat->id_admin_pusat ?? 1;
+            $adminPusatId = $request->user()?->adminPusat->id_admin_pusat ?? 1;
 
             $newTemplate = TemplateMateri::create([
                 'id_mata_pelajaran' => $sourceTemplate->id_mata_pelajaran,
                 'id_kelas' => $sourceTemplate->id_kelas,
                 'created_by' => $adminPusatId,
+                'company_id' => $companyId && Schema::hasColumn('template_materi', 'company_id') ? $companyId : null,
                 'nama_template' => 'Copy of ' . $sourceTemplate->nama_template,
                 'deskripsi' => $sourceTemplate->deskripsi,
                 'kategori' => $sourceTemplate->kategori,

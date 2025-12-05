@@ -24,7 +24,8 @@ class Kelas extends Model
         'is_active',
         'is_global',
         'target_jenjang',
-        'kelas_gabungan'
+        'kelas_gabungan',
+        'company_id'
     ];
 
     protected $casts = [

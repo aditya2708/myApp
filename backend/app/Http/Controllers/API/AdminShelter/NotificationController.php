@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\AdminShelter;
 
 use App\Http\Controllers\Controller;
+use App\Support\SsoContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
@@ -14,12 +15,24 @@ class NotificationController extends Controller
         $this->middleware(['auth:sanctum', 'role:admin_shelter']);
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ?SsoContext $context = null): JsonResponse
     {
+        $companyId = $context?->company()?->id;
+
         $notifications = $request->user()
             ->notifications()
             ->latest()
             ->get()
+            ->filter(function (DatabaseNotification $notification) use ($companyId) {
+                if (!$companyId) {
+                    return true;
+                }
+
+                $notifCompanyId = data_get($notification->data, 'company_id');
+
+                return $notifCompanyId === null || (int) $notifCompanyId === (int) $companyId;
+            })
+            ->values()
             ->map(function (DatabaseNotification $notification) {
                 return [
                     'id' => $notification->id,
@@ -35,13 +48,21 @@ class NotificationController extends Controller
         ]);
     }
 
-    public function markAsRead(Request $request, DatabaseNotification $notification): JsonResponse
+    public function markAsRead(Request $request, DatabaseNotification $notification, ?SsoContext $context = null): JsonResponse
     {
         $user = $request->user();
+        $companyId = $context?->company()?->id;
 
         if ($notification->notifiable_id !== $user->getKey() ||
             $notification->notifiable_type !== $user->getMorphClass()) {
             abort(403, 'Unauthorized');
+        }
+
+        if ($companyId) {
+            $notifCompanyId = data_get($notification->data, 'company_id');
+            if ($notifCompanyId !== null && (int) $notifCompanyId !== (int) $companyId) {
+                abort(403, 'Notification does not belong to current company');
+            }
         }
 
         if ($notification->read_at === null) {

@@ -14,22 +14,29 @@ use App\Http\Resources\Kelompok\KelompokCollection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Support\AdminShelterScope;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class AdminShelterKelompokController extends Controller
 {
+   use AdminShelterScope;
    public function index(Request $request)
   {
       $adminShelter = Auth::user()->adminShelter;
+      $companyId = $this->companyId();
+      $shelterId = $this->shelterId();
 
-      if (!$adminShelter || !$adminShelter->shelter) {
+      if (!$adminShelter || !$adminShelter->shelter || !$shelterId) {
           return response()->json([
               'success' => false,
               'message' => 'Shelter tidak ditemukan'
           ], 403);
       }
 
-      $query = Kelompok::with(['shelter']);
-      $query->where('id_shelter', $adminShelter->shelter->id_shelter);
+      $query = Kelompok::with(['shelter'])
+        ->where('id_shelter', $shelterId)
+        ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId));
 
       if ($request->has('search')) {
           $query->where('nama_kelompok', 'like', '%' . $request->search . '%');
@@ -72,9 +79,20 @@ class AdminShelterKelompokController extends Controller
 
  public function show($id)
 {
+    $companyId = $this->companyId();
+    $shelterId = $this->shelterId();
     $kelompok = Kelompok::with(['shelter', 'anak.anakPendidikan'])
+        ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+        ->where('id_shelter', $shelterId)
         ->withCount('anak')
-        ->findOrFail($id);
+        ->find($id);
+
+    if (!$kelompok) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Kelompok tidak ditemukan'
+        ], 404);
+    }
 
     // Load kelas gabungan details if available
     if (is_array($kelompok->kelas_gabungan) && !empty($kelompok->kelas_gabungan)) {
@@ -127,12 +145,22 @@ class AdminShelterKelompokController extends Controller
    public function store(Request $request)
    {
        $adminShelter = Auth::user()->adminShelter;
+       $companyId = $this->companyId();
+       $shelterId = $this->shelterId();
+       $hasCompanyColumn = Schema::hasColumn('kelompok', 'company_id');
 
-       if (!$adminShelter || !$adminShelter->shelter) {
+       if (!$adminShelter || !$adminShelter->shelter || !$shelterId) {
            return response()->json([
                'success' => false,
                'message' => 'Shelter tidak ditemukan'
            ], 403);
+       }
+
+       $namaKelompokRule = Rule::unique('kelompok', 'nama_kelompok')
+           ->where('id_shelter', $shelterId);
+
+       if ($companyId && $hasCompanyColumn) {
+           $namaKelompokRule->where('company_id', $companyId);
        }
 
        $validatedData = $request->validate([
@@ -141,7 +169,7 @@ class AdminShelterKelompokController extends Controller
                'required', 
                'string', 
                'max:255', 
-               'unique:kelompok,nama_kelompok,NULL,id_kelompok,id_shelter,' . $adminShelter->shelter->id_shelter
+               $namaKelompokRule
            ],
            'jumlah_anggota' => 'nullable|integer|min:0',
            'kelas_gabungan' => 'required|array|min:1',
@@ -150,7 +178,10 @@ class AdminShelterKelompokController extends Controller
            'anak_ids.*' => 'exists:anak,id_anak'
        ]);
 
-       $validatedData['id_shelter'] = $adminShelter->shelter->id_shelter;
+       $validatedData['id_shelter'] = $shelterId;
+       if ($companyId && $hasCompanyColumn) {
+           $validatedData['company_id'] = $companyId;
+       }
 
        DB::beginTransaction();
        
@@ -164,7 +195,8 @@ class AdminShelterKelompokController extends Controller
 
                foreach ($validatedData['anak_ids'] as $anakId) {
                    $anak = Anak::where('id_anak', $anakId)
-                       ->where('id_shelter', $adminShelter->shelter->id_shelter)
+                       ->where('id_shelter', $shelterId)
+                       ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                        ->whereNull('id_kelompok')
                        ->where('status_validasi', 'aktif')
                        ->first();
@@ -208,21 +240,35 @@ class AdminShelterKelompokController extends Controller
    public function update(Request $request, $id)
    {
        $adminShelter = Auth::user()->adminShelter;
+       $companyId = $this->companyId();
+       $shelterId = $this->shelterId();
+       $hasCompanyColumn = Schema::hasColumn('kelompok', 'company_id');
 
-       if (!$adminShelter || !$adminShelter->shelter) {
+       if (!$adminShelter || !$adminShelter->shelter || !$shelterId) {
            return response()->json([
                'success' => false,
                'message' => 'Shelter tidak ditemukan'
            ], 403);
        }
 
-       $kelompok = Kelompok::findOrFail($id);
+       $kelompok = Kelompok::where('id_kelompok', $id)
+           ->where('id_shelter', $shelterId)
+           ->when($companyId && $hasCompanyColumn, fn ($q) => $q->where('company_id', $companyId))
+           ->first();
 
-       if ($kelompok->id_shelter !== $adminShelter->shelter->id_shelter) {
+       if (!$kelompok) {
            return response()->json([
                'success' => false,
-               'message' => 'Anda tidak memiliki izin untuk mengubah kelompok ini'
-           ], 403);
+               'message' => 'Kelompok tidak ditemukan atau tidak dalam scope Anda'
+           ], 404);
+       }
+
+       $namaKelompokRule = Rule::unique('kelompok', 'nama_kelompok')
+           ->ignore($id, 'id_kelompok')
+           ->where('id_shelter', $shelterId);
+
+       if ($companyId && $hasCompanyColumn) {
+           $namaKelompokRule->where('company_id', $companyId);
        }
 
        $validatedData = $request->validate([
@@ -233,7 +279,7 @@ class AdminShelterKelompokController extends Controller
                'sometimes', 
                'string', 
                'max:255', 
-               'unique:kelompok,nama_kelompok,' . $id . ',id_kelompok,id_shelter,' . $adminShelter->shelter->id_shelter
+               $namaKelompokRule
            ],
            'jumlah_anggota' => 'nullable|integer|min:0'
        ]);
@@ -264,21 +310,26 @@ class AdminShelterKelompokController extends Controller
    public function destroy($id)
    {
        $adminShelter = Auth::user()->adminShelter;
+       $companyId = $this->companyId();
+       $shelterId = $this->shelterId();
 
-       if (!$adminShelter || !$adminShelter->shelter) {
+       if (!$adminShelter || !$adminShelter->shelter || !$shelterId) {
            return response()->json([
                'success' => false,
                'message' => 'Shelter tidak ditemukan'
            ], 403);
        }
 
-       $kelompok = Kelompok::findOrFail($id);
+       $kelompok = Kelompok::where('id_kelompok', $id)
+           ->where('id_shelter', $shelterId)
+           ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+           ->first();
 
-       if ($kelompok->id_shelter !== $adminShelter->shelter->id_shelter) {
+       if (!$kelompok) {
            return response()->json([
                'success' => false,
-               'message' => 'Anda tidak memiliki izin untuk menghapus kelompok ini'
-           ], 403);
+               'message' => 'Kelompok tidak ditemukan atau tidak dalam scope Anda'
+           ], 404);
        }
 
        if ($kelompok->anak()->count() > 0) {
@@ -445,18 +496,19 @@ class AdminShelterKelompokController extends Controller
    {
        try {
            $adminShelter = Auth::user()->adminShelter;
+           $companyId = $this->companyId();
+           $shelterId = $this->shelterId();
 
-           if (!$adminShelter || !$adminShelter->shelter) {
+           if (!$adminShelter || !$adminShelter->shelter || !$shelterId) {
                return response()->json([
                    'success' => false,
                    'message' => 'Shelter tidak ditemukan'
                ], 403);
            }
 
-           $shelterId = $adminShelter->shelter->id_shelter;
-           
            $kelompok = Kelompok::where('id_kelompok', $kelompokId)
                ->where('id_shelter', $shelterId)
+               ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                // Removed levelAnakBinaan relationship
                ->first();
 
@@ -470,6 +522,7 @@ class AdminShelterKelompokController extends Controller
            // Get anak that are not in any kelompok and have status aktif
            $availableAnak = Anak::whereNull('id_kelompok')
                ->where('id_shelter', $shelterId)
+               ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                ->where('status_validasi', 'aktif')
                ->with(['anakPendidikan'])
                ->get();
@@ -508,28 +561,29 @@ class AdminShelterKelompokController extends Controller
     * Add multiple anak to kelompok (Enhanced for Phase 3)
     */
    public function addAnak(Request $request, $kelompokId)
-   {
-       try {
-           $validatedData = $request->validate([
-               'anak_ids' => 'required|array|min:1',
-               'anak_ids.*' => 'exists:anak,id_anak'
-           ]);
+    {
+        try {
+            $validatedData = $request->validate([
+                'anak_ids' => 'required|array|min:1',
+                'anak_ids.*' => 'exists:anak,id_anak'
+            ]);
 
-           $adminShelter = Auth::user()->adminShelter;
+            $adminShelter = Auth::user()->adminShelter;
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
 
-           if (!$adminShelter || !$adminShelter->shelter) {
-               return response()->json([
-                   'success' => false,
-                   'message' => 'Shelter tidak ditemukan'
-               ], 403);
-           }
+            if (!$adminShelter || !$adminShelter->shelter || !$shelterId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Shelter tidak ditemukan'
+                ], 403);
+            }
 
-           $shelterId = $adminShelter->shelter->id_shelter;
-           
-           $kelompok = Kelompok::where('id_kelompok', $kelompokId)
-               ->where('id_shelter', $shelterId)
-               // Removed levelAnakBinaan relationship
-               ->first();
+            $kelompok = Kelompok::where('id_kelompok', $kelompokId)
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                // Removed levelAnakBinaan relationship
+                ->first();
 
            if (!$kelompok) {
                return response()->json([
@@ -544,11 +598,13 @@ class AdminShelterKelompokController extends Controller
            $errors = [];
 
            foreach ($validatedData['anak_ids'] as $anakId) {
-               try {
-                   $anak = Anak::with('anakPendidikan')->findOrFail($anakId);
+                try {
+                    $anak = Anak::with('anakPendidikan')
+                        ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                        ->findOrFail($anakId);
 
-                   // Validate anak belongs to same shelter
-                   if ($anak->id_shelter !== $shelterId) {
+                    // Validate anak belongs to same shelter
+                    if ($anak->id_shelter !== $shelterId) {
                        $errors[] = "Anak ID $anakId tidak berada di shelter yang sama";
                        continue;
                    }
@@ -618,35 +674,37 @@ class AdminShelterKelompokController extends Controller
    /**
     * Remove anak from kelompok (Enhanced version)
     */
-   public function removeAnak($kelompokId, $anakId)
-   {
-       try {
-           $adminShelter = Auth::user()->adminShelter;
+    public function removeAnak($kelompokId, $anakId)
+    {
+        try {
+            $adminShelter = Auth::user()->adminShelter;
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
 
-           if (!$adminShelter || !$adminShelter->shelter) {
-               return response()->json([
-                   'success' => false,
-                   'message' => 'Shelter tidak ditemukan'
-               ], 403);
-           }
+            if (!$adminShelter || !$adminShelter->shelter || !$shelterId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Shelter tidak ditemukan'
+                ], 403);
+            }
 
-           $shelterId = $adminShelter->shelter->id_shelter;
-           
-           $kelompok = Kelompok::where('id_kelompok', $kelompokId)
-               ->where('id_shelter', $shelterId)
-               ->first();
+            $kelompok = Kelompok::where('id_kelompok', $kelompokId)
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
 
-           if (!$kelompok) {
-               return response()->json([
-                   'success' => false,
+            if (!$kelompok) {
+                return response()->json([
+                    'success' => false,
                    'message' => 'Kelompok tidak ditemukan'
                ], 404);
            }
 
-           $anak = Anak::where('id_anak', $anakId)
-               ->where('id_kelompok', $kelompokId)
-               ->where('id_shelter', $shelterId)
-               ->first();
+            $anak = Anak::where('id_anak', $anakId)
+                ->where('id_kelompok', $kelompokId)
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
 
            if (!$anak) {
                return response()->json([

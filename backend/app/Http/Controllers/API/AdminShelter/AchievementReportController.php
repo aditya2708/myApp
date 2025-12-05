@@ -4,13 +4,17 @@ namespace App\Http\Controllers\API\AdminShelter;
 
 use App\Http\Controllers\Controller;
 use App\Models\Penilaian;
+use App\Support\AdminShelterScope;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class AchievementReportController extends Controller
 {
+    use AdminShelterScope;
+
     /**
      * List achievement reports for the authenticated admin shelter.
      */
@@ -25,6 +29,7 @@ class AchievementReportController extends Controller
             ], 403);
         }
 
+        $companyId = $this->companyId();
         $validator = Validator::make($request->all(), [
             'start_date' => 'nullable|string',
             'end_date' => 'nullable|string',
@@ -84,6 +89,7 @@ class AchievementReportController extends Controller
         $shelterId = $user->adminShelter->shelter->id_shelter;
 
         $query = Penilaian::query()
+            ->when($companyId && Schema::hasColumn('penilaian', 'company_id'), fn ($q) => $q->where('penilaian.company_id', $companyId))
             ->with([
                 'anak:id_anak,full_name,id_kelompok',
                 'anak.kelompok:id_kelompok,nama_kelompok,id_shelter',
@@ -95,8 +101,12 @@ class AchievementReportController extends Controller
                 'materi.mataPelajaran:id_mata_pelajaran,nama_mata_pelajaran',
                 'jenisPenilaian:id_jenis_penilaian,nama_jenis'
             ])
-            ->whereHas('aktivitas', function ($aktivitasQuery) use ($shelterId) {
+            ->whereHas('aktivitas', function ($aktivitasQuery) use ($shelterId, $companyId) {
                 $aktivitasQuery->where('id_shelter', $shelterId);
+
+                if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                    $aktivitasQuery->where('aktivitas.company_id', $companyId);
+                }
             });
 
         if ($startDate) {

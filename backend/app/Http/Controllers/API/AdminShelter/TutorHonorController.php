@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class TutorHonorController extends Controller
 {
@@ -20,6 +22,35 @@ class TutorHonorController extends Controller
     public function __construct(TutorHonorService $tutorHonorService)
     {
         $this->tutorHonorService = $tutorHonorService;
+    }
+
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
+    protected function enforceTutorScope($id_tutor)
+    {
+        $user = Auth::user();
+        $companyId = $this->companyId();
+
+        return Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
+            ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+            ->findOrFail($id_tutor);
+    }
+
+    protected function scopeCompany($query)
+    {
+        $companyId = $this->companyId();
+        $table = $query->getModel()->getTable();
+
+        if ($companyId && Schema::hasColumn($table, 'company_id')) {
+            $query->where($table . '.company_id', $companyId);
+        }
+
+        return $query;
     }
 
     public function getTutorHonor($id_tutor, Request $request)
@@ -41,8 +72,8 @@ class TutorHonorController extends Controller
             'page' => 'nullable|integer|min:1'
         ]);
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($id_tutor);
+        $tutor = $this->enforceTutorScope($id_tutor);
+        $companyId = $this->companyId();
 
         try {
             $year = $request->input('year', Carbon::now()->year);
@@ -94,8 +125,7 @@ class TutorHonorController extends Controller
             ], 422);
         }
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($id_tutor);
+        $tutor = $this->enforceTutorScope($id_tutor);
 
         try {
             $honorDetail = $this->tutorHonorService->getTutorHonorDetail($id_tutor, $month, $year);
@@ -163,8 +193,7 @@ class TutorHonorController extends Controller
             'force_recalculate' => 'nullable|boolean'
         ]);
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($id_tutor);
+        $tutor = $this->enforceTutorScope($id_tutor);
 
         $month = $request->month;
         $year = $request->year;
@@ -242,6 +271,13 @@ class TutorHonorController extends Controller
                           ->whereHas('tutor', function($query) use ($user) {
                               $query->where('id_shelter', $user->adminShelter->shelter->id_shelter);
                           })
+                          ->when($this->companyId(), function ($query) {
+                              $companyId = $this->companyId();
+                              $query->whereHas('tutor', fn ($q) => $q->where('company_id', $companyId));
+                              if (Schema::hasColumn('tutor_honor', 'company_id')) {
+                                  $query->where('tutor_honor.company_id', $companyId);
+                              }
+                          })
                           ->findOrFail($id_honor);
 
         if ($honor->status !== 'draft') {
@@ -282,6 +318,13 @@ class TutorHonorController extends Controller
         $honor = TutorHonor::with('tutor')
                           ->whereHas('tutor', function($query) use ($user) {
                               $query->where('id_shelter', $user->adminShelter->shelter->id_shelter);
+                          })
+                          ->when($this->companyId(), function ($query) {
+                              $companyId = $this->companyId();
+                              $query->whereHas('tutor', fn ($q) => $q->where('company_id', $companyId));
+                              if (Schema::hasColumn('tutor_honor', 'company_id')) {
+                                  $query->where('tutor_honor.company_id', $companyId);
+                              }
                           })
                           ->findOrFail($id_honor);
 
@@ -326,6 +369,7 @@ class TutorHonorController extends Controller
             'status' => ['nullable', Rule::in(['draft', 'approved', 'paid'])],
             'tutor_id' => 'nullable|exists:tutor,id_tutor'
         ]);
+        $companyId = $this->companyId();
 
         try {
             $year = $request->input('year', Carbon::now()->year);
@@ -336,6 +380,14 @@ class TutorHonorController extends Controller
             $query = TutorHonor::whereHas('tutor', function($q) use ($user) {
                 $q->where('id_shelter', $user->adminShelter->shelter->id_shelter);
             })->where('tahun', $year);
+
+            if ($companyId) {
+                $query->whereHas('tutor', fn ($q) => $q->where('company_id', $companyId));
+
+                if (Schema::hasColumn('tutor_honor', 'company_id')) {
+                    $query->where('tutor_honor.company_id', $companyId);
+                }
+            }
 
             if ($month) {
                 $query->where('bulan', $month);
@@ -403,6 +455,7 @@ class TutorHonorController extends Controller
                 'message' => 'Unauthorized access'
             ], 403);
         }
+        $companyId = $this->companyId();
 
         $request->validate([
             'start_date' => 'nullable|date|before_or_equal:today',
@@ -419,8 +472,7 @@ class TutorHonorController extends Controller
             'max_activities' => 'nullable|integer|min:0|gte:min_activities'
         ]);
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($id_tutor);
+        $tutor = $this->enforceTutorScope($id_tutor);
 
         try {
             $filters = $request->only([
@@ -429,7 +481,7 @@ class TutorHonorController extends Controller
                 'min_activities', 'max_activities'
             ]);
 
-            $honorHistory = $this->tutorHonorService->getHonorByPeriod($id_tutor, $filters);
+            $honorHistory = $this->tutorHonorService->getHonorByPeriod($id_tutor, $filters, $companyId);
 
             // Add formatted amounts to items
             $formattedItems = $honorHistory->getCollection()->map(function ($item) {
@@ -469,6 +521,7 @@ class TutorHonorController extends Controller
                 'message' => 'Unauthorized access'
             ], 403);
         }
+        $companyId = $this->companyId();
 
         $request->validate([
             'start_date' => 'nullable|date|before_or_equal:today',
@@ -477,12 +530,11 @@ class TutorHonorController extends Controller
             'year' => 'nullable|integer|min:2020|max:' . (date('Y') + 1)
         ]);
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($id_tutor);
+        $tutor = $this->enforceTutorScope($id_tutor);
 
         try {
             $filters = $request->only(['start_date', 'end_date', 'status', 'year']);
-            $statistics = $this->tutorHonorService->generatePeriodStatistics($id_tutor, $filters);
+            $statistics = $this->tutorHonorService->generatePeriodStatistics($id_tutor, $filters, $companyId);
 
             return response()->json([
                 'success' => true,
@@ -508,8 +560,7 @@ class TutorHonorController extends Controller
             ], 403);
         }
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($id_tutor);
+        $tutor = $this->enforceTutorScope($id_tutor);
 
         try {
             $yearRange = $this->tutorHonorService->getYearRange($id_tutor);
@@ -536,9 +587,16 @@ class TutorHonorController extends Controller
                 'message' => 'Unauthorized access'
             ], 403);
         }
+        $companyId = $this->companyId();
 
         try {
-            $activeSetting = TutorHonorSettings::getActiveSetting();
+            $settingQuery = TutorHonorSettings::query()->where('is_active', true)->latest();
+
+            if ($companyId && Schema::hasColumn('tutor_honor_settings', 'company_id')) {
+                $settingQuery->where('company_id', $companyId);
+            }
+
+            $activeSetting = $settingQuery->first();
 
             if (!$activeSetting) {
                 return response()->json([
@@ -569,6 +627,7 @@ class TutorHonorController extends Controller
                 'message' => 'Unauthorized access'
             ], 403);
         }
+        $companyId = $this->companyId();
 
         $request->validate([
             'cpb_count' => 'nullable|integer|min:0',
@@ -578,7 +637,13 @@ class TutorHonorController extends Controller
         ]);
 
         try {
-            $setting = TutorHonorSettings::getActiveSetting();
+            $settingQuery = TutorHonorSettings::query()->where('is_active', true)->latest();
+
+            if ($companyId && Schema::hasColumn('tutor_honor_settings', 'company_id')) {
+                $settingQuery->where('company_id', $companyId);
+            }
+
+            $setting = $settingQuery->first();
 
             if (!$setting) {
                 return response()->json([

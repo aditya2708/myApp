@@ -18,6 +18,7 @@ class Keluarga extends Model
         'id_kacab',
         'id_wilbin',
         'id_shelter',
+        'company_id',
         'no_kk',
         'kepala_keluarga',
         'status_ortu',

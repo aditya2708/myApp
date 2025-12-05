@@ -8,10 +8,12 @@ use App\Models\Anak;
 use App\Models\Aktivitas;
 use App\Models\Semester;
 use App\Models\JenisPenilaian;
+use App\Support\SsoContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class PenilaianController extends Controller
 {
@@ -174,6 +176,45 @@ class PenilaianController extends Controller
                     ], 422);
                 }
                 $data['id_semester'] = $activeSemester->id_semester;
+            }
+
+            $hasCompanyColumn = Schema::hasColumn('penilaian', 'company_id');
+            if ($hasCompanyColumn) {
+                $companyId = app()->bound(SsoContext::class)
+                    ? app(SsoContext::class)->company()?->id
+                    : (auth()->user()?->adminShelter->company_id ?? null);
+
+                $resolvedCompanyId = $companyId
+                    ?? ($aktivitas->company_id ?? $aktivitas->shelter->company_id ?? null);
+
+                if ($companyId && $aktivitas->company_id && (int) $aktivitas->company_id !== (int) $companyId) {
+                    Log::warning('Company mismatch saat membuat penilaian', [
+                        'user_id' => auth()->id(),
+                        'context_company_id' => $companyId,
+                        'activity_company_id' => $aktivitas->company_id,
+                        'id_aktivitas' => $aktivitas->id_aktivitas,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Aktivitas berada pada perusahaan berbeda'
+                    ], 403);
+                }
+
+                if (!$resolvedCompanyId) {
+                    Log::error('Gagal menentukan company_id penilaian', [
+                        'user_id' => auth()->id(),
+                        'id_aktivitas' => $aktivitas->id_aktivitas,
+                        'id_anak' => $request->id_anak,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Perusahaan tidak dapat ditentukan untuk penilaian ini'
+                    ], 422);
+                }
+
+                $data['company_id'] = $resolvedCompanyId;
             }
     
             $penilaian = Penilaian::create($data);
@@ -385,9 +426,34 @@ class PenilaianController extends Controller
     public function getByAnakSemester($idAnak, $idSemester)
     {
         try {
+            $user = auth()->user();
+            $companyId = app()->bound(SsoContext::class)
+                ? app(SsoContext::class)->company()?->id
+                : ($user?->adminShelter->company_id ?? null);
+
+            if (!$user || !$user->adminShelter) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $anak = Anak::where('id_anak', $idAnak)
+                ->where('id_shelter', $user->adminShelter->id_shelter)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
+            if (!$anak) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Child not found'
+                ], 404);
+            }
+
             $penilaianCollection = Penilaian::with(['aktivitas', 'materi.mataPelajaran', 'jenisPenilaian'])
                 ->where('id_anak', $idAnak)
                 ->where('id_semester', $idSemester)
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->orderBy('tanggal_penilaian', 'desc')
                 ->get();
             

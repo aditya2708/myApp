@@ -1,14 +1,52 @@
 <?php
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\SsoProfileController;
+use App\Http\Controllers\API\SuperAdmin\SsoImportController;
+use App\Http\Controllers\API\SuperAdmin\UserManagementController;
+use App\Support\SsoContext;
 
 
 Route::post('/auth/login', [App\Http\Controllers\API\AuthController::class, 'login']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('sso.auth')->group(function () {
+    Route::get('/me', SsoProfileController::class);
+    Route::get('/sso/debug', function (SsoContext $sso) {
+        return response()->json([
+            'sub' => $sso->sub(),
+            'email' => $sso->email(),
+            'current_company' => $sso->company() ? [
+                'id' => $sso->company()->id,
+                'slug' => $sso->company()->slug,
+                'name' => $sso->company()->name,
+            ] : null,
+            'current_company_role' => $sso->role(),
+            'companies_allowed' => $sso->raw()['companies_allowed'] ?? [],
+        ]);
+    });
+
+    Route::prefix('sso')->group(function () {
+        Route::get('/me', SsoProfileController::class);
+    });
+
     Route::post('/auth/logout', [App\Http\Controllers\API\AuthController::class, 'logout']);
     Route::get('/auth/user', [App\Http\Controllers\API\AuthController::class, 'user']);
     Route::post('/auth/change-password', [App\Http\Controllers\API\AuthController::class, 'changePassword']);
+
+    Route::middleware('role:super_admin')
+        ->prefix('admin-super')
+        ->group(function () {
+            Route::get('users', [UserManagementController::class, 'index']);
+            Route::get('users/{user}', [UserManagementController::class, 'show']);
+            Route::put('users/{user}', [UserManagementController::class, 'update']);
+            Route::get('sso-users', [SsoImportController::class, 'index']);
+            Route::post('sso-users/import', [SsoImportController::class, 'store']);
+            Route::prefix('dropdowns')->group(function () {
+                Route::get('kacab', [UserManagementController::class, 'listKacab']);
+                Route::get('kacab/{kacab}/wilbin', [UserManagementController::class, 'listWilbinByKacab']);
+                Route::get('wilbin/{wilbin}/shelter', [UserManagementController::class, 'listShelterByWilbin']);
+            });
+        });
 
     Route::middleware('role:admin_pusat')->group(function () {
         Route::apiResource('kacab', App\Http\Controllers\API\KacabController::class);
@@ -16,19 +54,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('admin-pusat')->as('admin-pusat.')->group(function () {
             // Dashboard (tetap di AdminPusatController)
             Route::get('dashboard', [App\Http\Controllers\API\AdminPusatController::class, 'dashboard']);
-
-            // User Management + Dropdown (dipindah ke AdminPusatUserController)
-            Route::get('users', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'index']);
-            Route::get('users/{id}', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'show']);
-            Route::post('create-user', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'store']);
-            Route::put('users/{id}', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'update']);
-
-            // Dropdown berjenjang
-            Route::prefix('dropdowns')->group(function () {
-                Route::get('kacab', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listKacab']);
-                Route::get('kacab/{id}/wilbin', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listWilbinByKacab']);
-                Route::get('wilbin/{id}/shelter', [App\Http\Controllers\API\AdminPusat\AdminPusatUserController::class, 'listShelterByWilbin']);
-            });
 
             Route::apiResource('kacab', App\Http\Controllers\API\AdminPusat\KacabController::class);
             Route::apiResource('wilbin', App\Http\Controllers\API\AdminPusat\WilbinController::class);
@@ -91,18 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [App\Http\Controllers\API\AdminCabangController::class, 'getProfile']);
     Route::post('/profile', [App\Http\Controllers\API\AdminCabangController::class, 'updateProfile']);
 
-    // User Management + Dropdown
-    Route::get('users', [App\Http\Controllers\API\AdminCabang\AdminCabangUserController::class, 'index']);
-    Route::get('users/{id}', [App\Http\Controllers\API\AdminCabang\AdminCabangUserController::class, 'show']);
-    Route::post('create-user', [App\Http\Controllers\API\AdminCabang\AdminCabangUserController::class, 'store']);
-    Route::put('users/{id}', [App\Http\Controllers\API\AdminCabang\AdminCabangUserController::class, 'update']);
-
-    // Dropdown berjenjang
-    Route::get('kacab', [App\Http\Controllers\API\AdminCabang\AdminCabangUserController::class, 'listKacab']);
-    Route::get('kacab/{id}/wilbin', [App\Http\Controllers\API\AdminCabang\AdminCabangUserController::class, 'listWilbinByKacab']);
-    Route::get('wilbin/{id}/shelter', [App\Http\Controllers\API\AdminCabang\AdminCabangUserController::class, 'listShelterByWilbin']);
         // GPS Approval Management
         Route::prefix('gps-approval')->group(function () {
+            Route::get('/needs-review', [App\Http\Controllers\API\AdminCabang\GpsApprovalController::class, 'getNeedsReviewItems']);
             Route::get('/', [App\Http\Controllers\API\AdminCabang\GpsApprovalController::class, 'getGpsApprovalList']);
             Route::get('/{shelterId}', [App\Http\Controllers\API\AdminCabang\GpsApprovalController::class, 'getGpsApprovalDetail']);
             Route::post('/{shelterId}/approve', [App\Http\Controllers\API\AdminCabang\GpsApprovalController::class, 'approveGpsRequest']);
@@ -119,9 +135,7 @@ Route::middleware('auth:sanctum')->group(function () {
         });
         
         // Donatur CRUD
-        Route::apiResource('donatur', App\Http\Controllers\API\AdminCabang\AdminCabangDonaturController::class);
-        Route::get('/donatur-stats', [App\Http\Controllers\API\AdminCabang\AdminCabangDonaturController::class, 'getStats']);
-        Route::get('/donatur-dropdown', [App\Http\Controllers\API\AdminCabang\AdminCabangDonaturController::class, 'getDropdownData']);
+        
 
         // Kurikulum main endpoints
         Route::get('/kurikulum', [App\Http\Controllers\API\AdminCabang\KurikulumController::class, 'index']);
@@ -209,7 +223,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     });
 
- Route::middleware('role:admin_shelter')->prefix('admin-shelter')->group(function () {
+ Route::middleware(['role:admin_shelter', 'ensure.admin.shelter'])->prefix('admin-shelter')->group(function () {
     Route::get('/dashboard', [App\Http\Controllers\API\AdminShelterController::class, 'dashboard']);
     Route::get('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'getProfile']);
     Route::post('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'updateProfile']);
@@ -294,6 +308,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/keluarga-dropdown', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'getDropdownData']);
         Route::get('/keluarga-wilbin/{id_kacab}', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'getWilbinByKacab']);
         Route::get('/keluarga-shelter/{id_wilbin}', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'getShelterByWilbin']);
+        Route::get('/pengajuan-anak', [App\Http\Controllers\API\AdminShelter\AdminShelterPengajuanAnakController::class, 'index']);
         Route::get('/pengajuan-anak/priority-families', [App\Http\Controllers\API\AdminShelter\AdminShelterPengajuanAnakController::class, 'getPriorityFamilies']);
         Route::get('/pengajuan-anak/search-keluarga', [App\Http\Controllers\API\AdminShelter\AdminShelterPengajuanAnakController::class, 'searchKeluarga']);
         Route::post('/pengajuan-anak/validate-kk', [App\Http\Controllers\API\AdminShelter\AdminShelterPengajuanAnakController::class, 'validateKK']);
@@ -376,6 +391,7 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Attendance Management
         Route::prefix('attendance')->group(function () {
+            Route::get('/today', [App\Http\Controllers\API\AttendanceController::class, 'getTodaySummary']);
             // New unified endpoints
             Route::post('/record', [App\Http\Controllers\API\AttendanceController::class, 'recordByQr']);
             Route::post('/record-manual', [App\Http\Controllers\API\AttendanceController::class, 'recordManually']);

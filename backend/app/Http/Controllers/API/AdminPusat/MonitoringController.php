@@ -7,6 +7,7 @@ use App\Models\TemplateMateri;
 use App\Models\TemplateAdoption;
 use App\Models\Kacab;
 use App\Models\Materi;
+use App\Support\AdminPusatScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -14,20 +15,27 @@ use Carbon\Carbon;
 
 class MonitoringController extends Controller
 {
+    use AdminPusatScope;
+
     /**
      * Get dashboard overview statistics
      */
     public function getDashboardStats(): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             // Basic counts
-            $totalTemplates = TemplateMateri::count();
-            $activeTemplates = TemplateMateri::where('is_active', true)->count();
-            $totalDistributions = TemplateAdoption::count();
-            $totalCabang = Kacab::where('status', 'active')->count();
+            $totalTemplates = $this->applyCompanyScope(TemplateMateri::query(), $companyId, 'template_materi')->count();
+            $activeTemplates = $this->applyCompanyScope(TemplateMateri::where('is_active', true), $companyId, 'template_materi')->count();
+            $totalDistributions = $this->applyCompanyScope(TemplateAdoption::query(), $companyId, 'template_adoptions')->count();
+            $totalCabang = $this->applyCompanyScope(Kacab::where('status', 'active'), $companyId, 'kacab')->count();
 
             // Adoption statistics
-            $adoptionStats = TemplateAdoption::select('status', DB::raw('count(*) as count'))
+            $adoptionStats = $this->applyCompanyScope(
+                TemplateAdoption::select('status', DB::raw('count(*) as count')),
+                $companyId,
+                'template_adoptions'
+            )
                 ->groupBy('status')
                 ->pluck('count', 'status')
                 ->toArray();
@@ -44,20 +52,26 @@ class MonitoringController extends Controller
                 : 0;
 
             // Recent activity (last 30 days)
-            $recentDistributions = TemplateAdoption::where('created_at', '>=', Carbon::now()->subDays(30))
-                ->count();
+            $recentDistributions = $this->applyCompanyScope(
+                TemplateAdoption::where('created_at', '>=', Carbon::now()->subDays(30)),
+                $companyId,
+                'template_adoptions'
+            )->count();
 
-            $recentAdoptions = TemplateAdoption::whereIn('status', ['adopted', 'customized'])
-                ->where('adopted_at', '>=', Carbon::now()->subDays(30))
-                ->count();
+            $recentAdoptions = $this->applyCompanyScope(
+                TemplateAdoption::whereIn('status', ['adopted', 'customized'])
+                    ->where('adopted_at', '>=', Carbon::now()->subDays(30)),
+                $companyId,
+                'template_adoptions'
+            )->count();
 
             // Most active cabang (by adoption rate)
-            $topCabang = Kacab::withCount([
+            $topCabang = $this->applyCompanyScope(Kacab::withCount([
                 'templateAdoptions as total_received',
                 'templateAdoptions as adopted_count' => function($q) {
                     $q->whereIn('status', ['adopted', 'customized']);
                 }
-            ])
+            ]), $companyId, 'kacab')
             ->having('total_received', '>', 0)
             ->get()
             ->map(function($cabang) {
@@ -69,12 +83,12 @@ class MonitoringController extends Controller
             ->values();
 
             // Most distributed templates
-            $topTemplates = TemplateMateri::withCount([
+            $topTemplates = $this->applyCompanyScope(TemplateMateri::withCount([
                 'templateAdoptions as distribution_count',
                 'templateAdoptions as adoption_count' => function($q) {
                     $q->whereIn('status', ['adopted', 'customized']);
                 }
-            ])
+            ]), $companyId, 'template_materi')
             ->having('distribution_count', '>', 0)
             ->orderByDesc('distribution_count')
             ->take(5)
@@ -132,23 +146,30 @@ class MonitoringController extends Controller
     public function getCabangAdoptionRates(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $search = $request->query('search');
             $sortBy = $request->query('sort_by', 'adoption_rate'); // adoption_rate, nama_kacab, total_received
             $sortOrder = $request->query('sort_order', 'desc');
 
-            $query = Kacab::where('status', 'active')
+            $query = $this->applyCompanyScope(Kacab::where('status', 'active'), $companyId, 'kacab')
                 ->withCount([
-                    'templateAdoptions as total_received',
-                    'templateAdoptions as pending_count' => function($q) {
+                    'templateAdoptions as total_received' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
+                    },
+                    'templateAdoptions as pending_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'pending');
                     },
-                    'templateAdoptions as adopted_count' => function($q) {
+                    'templateAdoptions as adopted_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'adopted');
                     },
-                    'templateAdoptions as customized_count' => function($q) {
+                    'templateAdoptions as customized_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'customized');
                     },
-                    'templateAdoptions as skipped_count' => function($q) {
+                    'templateAdoptions as skipped_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'skipped');
                     }
                 ]);
@@ -239,23 +260,30 @@ class MonitoringController extends Controller
     public function getTemplatePerformance(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $sortBy = $request->query('sort_by', 'adoption_rate'); // adoption_rate, distribution_count, nama_template
             $sortOrder = $request->query('sort_order', 'desc');
             $limit = $request->query('limit', 20);
 
-            $templates = TemplateMateri::with(['mataPelajaran', 'kelas.jenjang'])
+            $templates = $this->applyCompanyScope(TemplateMateri::with(['mataPelajaran', 'kelas.jenjang']), $companyId, 'template_materi')
                 ->withCount([
-                    'templateAdoptions as distribution_count',
-                    'templateAdoptions as pending_count' => function($q) {
+                    'templateAdoptions as distribution_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
+                    },
+                    'templateAdoptions as pending_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'pending');
                     },
-                    'templateAdoptions as adopted_count' => function($q) {
+                    'templateAdoptions as adopted_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'adopted');
                     },
-                    'templateAdoptions as customized_count' => function($q) {
+                    'templateAdoptions as customized_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'customized');
                     },
-                    'templateAdoptions as skipped_count' => function($q) {
+                    'templateAdoptions as skipped_count' => function($q) use ($companyId) {
+                        $this->applyCompanyScope($q, $companyId, 'template_adoptions');
                         $q->where('status', 'skipped');
                     }
                 ])
@@ -304,7 +332,13 @@ class MonitoringController extends Controller
             $templates = $templates->take($limit)->values();
 
             // Performance summary
-            $allTemplates = TemplateMateri::withCount('templateAdoptions as distribution_count')->get();
+            $allTemplates = $this->applyCompanyScope(
+                TemplateMateri::withCount(['templateAdoptions as distribution_count' => function($q) use ($companyId) {
+                    $this->applyCompanyScope($q, $companyId, 'template_adoptions');
+                }]),
+                $companyId,
+                'template_materi'
+            )->get();
             $performanceSummary = [
                 'total_templates' => $allTemplates->count(),
                 'distributed_templates' => $allTemplates->where('distribution_count', '>', 0)->count(),
@@ -341,6 +375,7 @@ class MonitoringController extends Controller
     public function getAdoptionTrends(Request $request): JsonResponse
     {
         try {
+            $companyId = $this->companyId();
             $period = $request->query('period', 'monthly'); // daily, weekly, monthly
             $months = (int) $request->query('months', 6); // Number of months back
             $templateId = $request->query('template_id');
@@ -348,7 +383,7 @@ class MonitoringController extends Controller
 
             $startDate = Carbon::now()->subMonths($months)->startOfMonth();
             
-            $query = TemplateAdoption::where('created_at', '>=', $startDate);
+            $query = $this->applyCompanyScope(TemplateAdoption::where('created_at', '>=', $startDate), $companyId, 'template_adoptions');
 
             if ($templateId) {
                 $query->where('id_template_materi', $templateId);
@@ -368,8 +403,12 @@ class MonitoringController extends Controller
             ->get();
 
             // Get adoption trends
-            $adoptions = TemplateAdoption::whereIn('status', ['adopted', 'customized'])
-                ->where('adopted_at', '>=', $startDate)
+            $adoptions = $this->applyCompanyScope(
+                TemplateAdoption::whereIn('status', ['adopted', 'customized'])
+                    ->where('adopted_at', '>=', $startDate),
+                $companyId,
+                'template_adoptions'
+            )
                 ->when($templateId, function($q) use ($templateId) {
                     return $q->where('id_template_materi', $templateId);
                 })
@@ -461,7 +500,8 @@ class MonitoringController extends Controller
     public function getCabangDetails($kacabId): JsonResponse
     {
         try {
-            $kacab = Kacab::find($kacabId);
+            $companyId = $this->companyId();
+            $kacab = $this->applyCompanyScope(Kacab::query(), $companyId, 'kacab')->find($kacabId);
 
             if (!$kacab) {
                 return response()->json([
@@ -472,7 +512,11 @@ class MonitoringController extends Controller
             }
 
             // Get adoption statistics
-            $adoptionStats = TemplateAdoption::where('id_kacab', $kacabId)
+            $adoptionStats = $this->applyCompanyScope(
+                TemplateAdoption::where('id_kacab', $kacabId),
+                $companyId,
+                'template_adoptions'
+            )
                 ->select('status', DB::raw('count(*) as count'))
                 ->groupBy('status')
                 ->pluck('count', 'status')
@@ -483,14 +527,22 @@ class MonitoringController extends Controller
             $adoptionRate = $totalReceived > 0 ? round(($adopted / $totalReceived) * 100, 2) : 0;
 
             // Get recent adoption history
-            $recentActivity = TemplateAdoption::where('id_kacab', $kacabId)
+            $recentActivity = $this->applyCompanyScope(
+                TemplateAdoption::where('id_kacab', $kacabId),
+                $companyId,
+                'template_adoptions'
+            )
                 ->with(['templateMateri'])
                 ->orderBy('updated_at', 'desc')
                 ->take(10)
                 ->get();
 
             // Get templates by category
-            $templatesByCategory = TemplateAdoption::where('id_kacab', $kacabId)
+            $templatesByCategory = $this->applyCompanyScope(
+                TemplateAdoption::where('id_kacab', $kacabId),
+                $companyId,
+                'template_adoptions'
+            )
                 ->with(['templateMateri'])
                 ->get()
                 ->groupBy('templateMateri.kategori')
@@ -507,7 +559,11 @@ class MonitoringController extends Controller
                 });
 
             // Monthly adoption trend for this cabang
-            $monthlyTrend = TemplateAdoption::where('id_kacab', $kacabId)
+            $monthlyTrend = $this->applyCompanyScope(
+                TemplateAdoption::where('id_kacab', $kacabId),
+                $companyId,
+                'template_adoptions'
+            )
                 ->where('created_at', '>=', Carbon::now()->subMonths(6))
                 ->select(
                     DB::raw("DATE_FORMAT(created_at, '%Y-%m') as month"),
@@ -558,7 +614,8 @@ class MonitoringController extends Controller
     public function getTemplateUsageStats($templateId): JsonResponse
     {
         try {
-            $template = TemplateMateri::with(['mataPelajaran', 'kelas.jenjang'])
+            $companyId = $this->companyId();
+            $template = $this->applyCompanyScope(TemplateMateri::with(['mataPelajaran', 'kelas.jenjang']), $companyId, 'template_materi')
                 ->find($templateId);
 
             if (!$template) {
@@ -570,7 +627,11 @@ class MonitoringController extends Controller
             }
 
             // Get distribution and adoption stats
-            $adoptions = TemplateAdoption::where('id_template_materi', $templateId)
+            $adoptions = $this->applyCompanyScope(
+                TemplateAdoption::where('id_template_materi', $templateId),
+                $companyId,
+                'template_adoptions'
+            )
                 ->with(['kacab'])
                 ->get();
 
@@ -599,7 +660,11 @@ class MonitoringController extends Controller
             })->values();
 
             // Usage in actual materials (if adopted and implemented)
-            $materialUsage = Materi::where('template_source_id', $templateId)
+            $materialUsage = $this->applyCompanyScope(
+                Materi::where('template_source_id', $templateId),
+                $companyId,
+                'materi'
+            )
                 ->with(['kacab'])
                 ->count();
 
@@ -651,7 +716,7 @@ class MonitoringController extends Controller
                     'generated_at' => now()->toDateTimeString(),
                     'period_from' => $dateFrom,
                     'period_to' => $dateTo,
-                    'generated_by' => auth()->user()->name ?? 'System'
+                    'generated_by' => $request->user()?->name ?? 'System'
                 ],
                 'summary' => $this->getDashboardStats()->getData()->data,
                 'cabang_performance' => $this->getCabangAdoptionRates($request)->getData()->data,

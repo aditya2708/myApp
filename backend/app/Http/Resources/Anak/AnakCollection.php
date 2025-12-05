@@ -35,6 +35,7 @@ class AnakCollection extends JsonResource
             'tinggal_bersama' => $this->tinggal_bersama,
             'status_validasi' => $this->status_validasi,
             'status_cpb' => $this->status_cpb,
+            'jenis_anak_binaan' => $this->mapStatusCpbToJenisAnakBinaan($this->status_cpb),
             'status_keluarga' => $this->status_keluarga,
             'keterangan_keluarga' => $this->keterangan_keluarga,
             'hafalan' => $this->hafalan,
@@ -83,5 +84,16 @@ class AnakCollection extends JsonResource
                 return $this->keluarga->status_ortu ?? null;
             }),
         ];
+    }
+
+    private function mapStatusCpbToJenisAnakBinaan(?string $statusCpb): ?string
+    {
+        return match ($statusCpb) {
+            'BCPB' => 'BCPB',
+            'NPB' => 'NPB',
+            'CPB' => 'CPB',
+            'PB' => 'PB',
+            default => null,
+        };
     }
 }

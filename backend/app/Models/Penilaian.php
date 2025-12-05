@@ -14,6 +14,7 @@ class Penilaian extends Model
     protected $fillable = [
         'id_anak',
         'id_aktivitas',  // ✅ tambahkan ini
+        'company_id',
         'id_materi',
         'materi_text',
         'mata_pelajaran_manual',

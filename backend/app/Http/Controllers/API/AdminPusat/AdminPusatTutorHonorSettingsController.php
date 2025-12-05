@@ -5,13 +5,17 @@ namespace App\Http\Controllers\API\AdminPusat;
 use App\Http\Controllers\Controller;
 use App\Models\TutorHonorSettings;
 use App\Helpers\CurrencyHelper;
+use App\Support\AdminPusatScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AdminPusatTutorHonorSettingsController extends Controller
 {
+    use AdminPusatScope;
+
     /**
      * Get all tutor honor settings with pagination
      */
@@ -23,7 +27,9 @@ class AdminPusatTutorHonorSettingsController extends Controller
             'is_active' => 'nullable|boolean'
         ]);
 
-        $query = TutorHonorSettings::with(['creator:id_users,email', 'updater:id_users,email'])
+        $companyId = $this->companyId();
+
+        $query = $this->applyCompanyScope(TutorHonorSettings::with(['creator:id_users,email', 'updater:id_users,email']), $companyId, 'tutor_honor_settings')
                                   ->orderBy('created_at', 'desc');
 
         if ($request->has('is_active')) {
@@ -56,7 +62,10 @@ class AdminPusatTutorHonorSettingsController extends Controller
      */
     public function getActiveSetting()
     {
-        $activeSetting = TutorHonorSettings::getActiveSetting();
+        $companyId = $this->companyId();
+        $activeSetting = $this->applyCompanyScope(TutorHonorSettings::query(), $companyId, 'tutor_honor_settings')
+            ->where('is_active', true)
+            ->first();
 
         if (!$activeSetting) {
             return response()->json([
@@ -83,11 +92,15 @@ class AdminPusatTutorHonorSettingsController extends Controller
         DB::beginTransaction();
         
         try {
+            $companyId = $this->companyId();
             $data = [
                 'payment_system' => $request->payment_system,
                 'is_active' => $request->boolean('is_active', true),
                 'created_by' => Auth::id()
             ];
+            if ($companyId && Schema::hasColumn('tutor_honor_settings', 'company_id')) {
+                $data['company_id'] = $companyId;
+            }
 
             // Add rates based on payment system
             switch ($request->payment_system) {

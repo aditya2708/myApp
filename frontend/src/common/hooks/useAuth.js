@@ -9,13 +9,16 @@ import {
   selectAuthError,
   selectAuthFieldErrors,
   selectIsInitializing,
+  selectAvailableRoles,
+  selectCurrentRole,
   resetAuthError
 } from '../../features/auth/redux/authSlice';
 import { 
   loginUser, 
   logoutUser, 
   fetchCurrentUser, 
-  initializeAuth 
+  initializeAuth,
+  setActiveRole
 } from '../../features/auth/redux/authThunks';
 
 /**
@@ -34,6 +37,8 @@ export const useAuth = () => {
   const error = useSelector(selectAuthError);
   const fieldErrors = useSelector(selectAuthFieldErrors);
   const initializing = useSelector(selectIsInitializing);
+  const roles = useSelector(selectAvailableRoles);
+  const currentRole = useSelector(selectCurrentRole);
 
   // Initialize auth on first render
   const initialize = useCallback(() => {
@@ -52,11 +57,14 @@ export const useAuth = () => {
   // Logout function
   const logout = useCallback(async () => {
     try {
-      return await dispatch(logoutUser());
+      const result = await dispatch(logoutUser());
+      return result ?? { success: true };
     } catch (error) {
       console.error('Logout error:', error);
-      // Even if API fails, we clear the local state
-      return true;
+      return {
+        success: false,
+        message: error?.message || 'Gagal logout. Silakan coba lagi.',
+      };
     }
   }, [dispatch]);
 
@@ -67,6 +75,10 @@ export const useAuth = () => {
     }
     return Promise.resolve();
   }, [dispatch, isAuthenticated]);
+
+  const selectRole = useCallback(async (role) => {
+    return dispatch(setActiveRole(role));
+  }, [dispatch]);
 
   // Clear any auth errors
   const clearError = useCallback(() => {
@@ -83,11 +95,14 @@ export const useAuth = () => {
     error,
     fieldErrors,
     initializing,
+    roles,
+    currentRole,
     
     // Auth actions
     login,
     logout,
     refreshUser,
+    selectRole,
     clearError,
     initialize
   };

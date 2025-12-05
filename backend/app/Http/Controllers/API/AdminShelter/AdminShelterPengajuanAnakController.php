@@ -10,9 +10,84 @@ use App\Models\Anak;
 use App\Models\AnakPendidikan;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use App\Support\SsoContext;
+use Illuminate\Support\Facades\Schema;
 
 class AdminShelterPengajuanAnakController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
+    /**
+     * List pengajuan anak (scoped by company & shelter).
+     */
+    public function index(Request $request)
+    {
+        $user = Auth::user();
+        $companyId = $this->companyId();
+        $hasCompanyColumn = Schema::hasColumn('anak', 'company_id');
+
+        if (!$user || !$user->adminShelter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
+        $perPage = min($request->integer('per_page', 10), 50);
+
+        $query = Anak::query()
+            ->where('id_shelter', $user->adminShelter->id_shelter)
+            ->when($companyId && $hasCompanyColumn, fn ($q) => $q->where('company_id', $companyId))
+            ->with([
+                'keluarga:id_keluarga,no_kk,kepala_keluarga',
+                'anakPendidikan:id_anak_pend,id_keluarga,jenjang,kelas,nama_sekolah'
+            ])
+            ->select(array_filter([
+                'id_anak',
+                'id_keluarga',
+                'id_anak_pend',
+                'id_shelter',
+                'full_name',
+                'nick_name',
+                'status_validasi',
+                'status_cpb',
+                'created_at',
+                $hasCompanyColumn ? 'company_id' : null,
+            ]))
+            ->orderByDesc('created_at');
+
+        if ($search = trim((string) $request->get('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('nick_name', 'like', "%{$search}%")
+                    ->orWhere('nik_anak', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status = $request->get('status')) {
+            $query->where('status_validasi', $status);
+        }
+
+        $pengajuan = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $pengajuan->items(),
+            'pagination' => [
+                'total' => $pengajuan->total(),
+                'per_page' => $pengajuan->perPage(),
+                'current_page' => $pengajuan->currentPage(),
+                'last_page' => $pengajuan->lastPage(),
+            ],
+        ]);
+    }
+
     /**
      * Get priority families (families without children) in the same shelter
      */
@@ -164,8 +239,12 @@ class AdminShelterPengajuanAnakController extends Controller
         }
         
         try {
+            $companyId = $this->companyId();
+            $hasAnakCompany = Schema::hasColumn('anak', 'company_id');
+            $hasAnakPendCompany = Schema::hasColumn('anak_pend', 'company_id');
+
             // Simpan data pendidikan anak
-            $pendidikan = AnakPendidikan::create([
+            $pendidikanPayload = [
                 'id_keluarga' => $keluarga->id_keluarga,
                 'jenjang' => $request->jenjang,
                 'kelas' => $request->kelas,
@@ -175,10 +254,16 @@ class AdminShelterPengajuanAnakController extends Controller
                 'semester' => $request->semester,
                 'nama_pt' => $request->nama_pt,
                 'alamat_pt' => $request->alamat_pt,
-            ]);
+            ];
+
+            if ($companyId && $hasAnakPendCompany) {
+                $pendidikanPayload['company_id'] = $companyId;
+            }
+
+            $pendidikan = AnakPendidikan::create($pendidikanPayload);
             
             // Simpan data anak
-            $anak = Anak::create([
+            $anakPayload = [
                 'id_keluarga' => $keluarga->id_keluarga,
                 'id_anak_pend' => $pendidikan->id_anak_pend,
                 'id_kelompok' => $keluarga->id_kelompok ?? null,
@@ -201,7 +286,13 @@ class AdminShelterPengajuanAnakController extends Controller
                 'transportasi' => $request->transportasi,
                 'status_validasi' => 'aktif',
                 'status_cpb' => 'BCPB',
-            ]);
+            ];
+
+            if ($companyId && $hasAnakCompany) {
+                $anakPayload['company_id'] = $companyId;
+            }
+
+            $anak = Anak::create($anakPayload);
             
             // Upload foto jika ada
             if ($request->hasFile('foto')) {

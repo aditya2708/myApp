@@ -16,6 +16,7 @@ use App\Services\AttendanceService;
 use App\Services\VerificationService;
 use App\Services\QrTokenService;
 use App\Http\Resources\AttendanceResource;
+use App\Support\SsoContext;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
@@ -40,7 +41,26 @@ class AttendanceController extends Controller
     public function recordByQr(AttendanceRequest $request)
     {
         try {
-            $aktivitas = Aktivitas::findOrFail($request->id_aktivitas);
+            $adminShelter = $this->adminShelter();
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
+
+            if (!$adminShelter || !$shelterId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $aktivitas = $this->scopedActivity((int) $request->id_aktivitas);
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your shelter scope'
+                ], 404);
+            }
+
             $attendanceCheck = $aktivitas->canRecordAttendance();
             
             if (!$attendanceCheck['allowed']) {
@@ -52,10 +72,40 @@ class AttendanceController extends Controller
             
             $type = $request->type ?? 'student';
             $targetId = $request->target_id ?? $request->id_anak ?? $request->id_tutor;
+            $student = null;
+            $tutor = null;
+
+            if ($type === 'student') {
+                $student = Anak::where('id_anak', $targetId)
+                    ->where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                    ->first();
+
+                if (!$student) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Child not found in your shelter'
+                    ], 404);
+                }
+            } else {
+                $tutorId = $targetId ?: $aktivitas->id_tutor;
+                $tutor = Tutor::where('id_tutor', $tutorId)
+                    ->where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                    ->first();
+
+                if (!$tutor) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Tutor not found in your shelter'
+                    ], 404);
+                }
+                $targetId = $tutor->id_tutor;
+            }
             
             if ($type === 'student') {
                 $result = $this->attendanceService->recordAttendanceByQr(
-                    $targetId,
+                    $student->id_anak,
                     $request->id_aktivitas,
                     $request->status,
                     $request->token,
@@ -64,9 +114,8 @@ class AttendanceController extends Controller
                 );
             } else {
                 // For tutor QR, get tutor ID from activity's assigned tutor
-                $tutorId = $targetId ?: $aktivitas->id_tutor;
                 $result = $this->attendanceService->recordTutorAttendanceByQr(
-                    $tutorId,
+                    $targetId,
                     $request->id_aktivitas,
                     $request->status,
                     $request->token,
@@ -106,7 +155,8 @@ class AttendanceController extends Controller
                 'success' => true,
                 'message' => $message,
                 'data' => new AttendanceResource($result['absen']),
-                'verification' => $result['verification']
+                'verification' => $result['verification'],
+                'flags' => $result['flags'] ?? []
             ]);
             
         } catch (\Exception $e) {
@@ -126,7 +176,26 @@ class AttendanceController extends Controller
     public function recordManually(AttendanceRequest $request)
     {
         try {
-            $aktivitas = Aktivitas::findOrFail($request->id_aktivitas);
+            $adminShelter = $this->adminShelter();
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
+
+            if (!$adminShelter || !$shelterId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $aktivitas = $this->scopedActivity((int) $request->id_aktivitas);
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your shelter scope'
+                ], 404);
+            }
+
             $attendanceCheck = $aktivitas->canRecordAttendance();
             
             if (!$attendanceCheck['allowed']) {
@@ -138,10 +207,40 @@ class AttendanceController extends Controller
             
             $type = $request->type ?? 'student';
             $targetId = $request->target_id ?? $request->id_anak ?? $request->id_tutor;
+            $student = null;
+            $tutor = null;
+
+            if ($type === 'student') {
+                $student = Anak::where('id_anak', $targetId)
+                    ->where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                    ->first();
+
+                if (!$student) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Child not found in your shelter'
+                    ], 404);
+                }
+            } else {
+                $tutorId = $targetId ?: $aktivitas->id_tutor;
+                $tutor = Tutor::where('id_tutor', $tutorId)
+                    ->where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                    ->first();
+
+                if (!$tutor) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Tutor not found in your shelter'
+                    ], 404);
+                }
+                $targetId = $tutor->id_tutor;
+            }
             
             if ($type === 'student') {
                 $result = $this->attendanceService->recordAttendanceManually(
-                    $targetId,
+                    $student->id_anak,
                     $request->id_aktivitas,
                     $request->status,
                     $request->notes,
@@ -150,9 +249,8 @@ class AttendanceController extends Controller
                 );
             } else {
                 // For tutor manual, get tutor ID from target_id or activity's assigned tutor
-                $tutorId = $targetId ?: $aktivitas->id_tutor;
                 $result = $this->attendanceService->recordTutorAttendanceManually(
-                    $tutorId,
+                    $targetId,
                     $request->id_aktivitas,
                     $request->status,
                     $request->notes,
@@ -192,7 +290,8 @@ class AttendanceController extends Controller
                 'success' => true,
                 'message' => $message,
                 'data' => new AttendanceResource($result['absen']),
-                'verification' => $result['verification']
+                'verification' => $result['verification'],
+                'flags' => $result['flags'] ?? []
             ]);
             
         } catch (\Exception $e) {
@@ -208,22 +307,108 @@ class AttendanceController extends Controller
         $request->merge(['type' => 'student', 'target_id' => $request->id_anak]);
         return $this->recordManually($request);
     }
+
+    /**
+     * Quick summary for today's attendance on a specific activity.
+     */
+    public function getTodaySummary(Request $request)
+    {
+        $validated = $request->validate([
+            'id_aktivitas' => 'required|exists:aktivitas,id_aktivitas',
+        ]);
+
+        $companyId = $this->companyId();
+        $aktivitas = $this->scopedActivity((int) $validated['id_aktivitas']);
+
+        if (!$aktivitas) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Activity not found in your shelter scope',
+            ], 404);
+        }
+
+        $records = Absen::where('id_aktivitas', $aktivitas->id_aktivitas)
+            ->when($companyId && Schema::hasColumn('absen', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+            ->with(['absenUser.anak', 'absenUser.tutor'])
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $summary = [
+            'total' => $records->count(),
+            'present' => $records->where('absen', Absen::TEXT_YA)->count(),
+            'late' => $records->where('absen', Absen::TEXT_TERLAMBAT)->count(),
+            'absent' => $records->where('absen', Absen::TEXT_TIDAK)->count(),
+            'needs_review' => $records->where('review_status', Absen::REVIEW_STATUS_NEEDS_REVIEW)->count(),
+        ];
+
+        $flagged = $records->where('review_status', Absen::REVIEW_STATUS_NEEDS_REVIEW)
+            ->take((int) min($request->get('flag_limit', 5), 20))
+            ->map(function (Absen $record) {
+                $absenUser = $record->absenUser;
+                $memberType = $absenUser && $absenUser->id_anak ? 'student' : 'tutor';
+                $memberName = null;
+
+                if ($absenUser && $absenUser->anak) {
+                    $memberName = $absenUser->anak->full_name
+                        ?? $absenUser->anak->nama_lengkap
+                        ?? $absenUser->anak->nama_panggilan;
+                } elseif ($absenUser && $absenUser->tutor) {
+                    $memberName = $absenUser->tutor->nama;
+                }
+
+                return [
+                    'id_absen' => $record->id_absen,
+                    'member' => [
+                        'type' => $memberType,
+                        'name' => $memberName,
+                    ],
+                    'status' => $record->absen,
+                    'auto_flag' => $record->auto_flag,
+                    'auto_flag_payload' => $record->auto_flag_payload,
+                    'gps' => [
+                        'latitude' => $record->latitude,
+                        'longitude' => $record->longitude,
+                        'accuracy' => $record->gps_accuracy,
+                        'recorded_at' => optional($record->gps_recorded_at)?->toDateTimeString(),
+                    ],
+                    'updated_at' => optional($record->updated_at)?->toDateTimeString(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'summary' => $summary,
+                'flags' => $flagged,
+            ],
+        ]);
+    }
     
     public function getByActivity($id_aktivitas, Request $request)
     {
         $filters = $request->only(['is_verified', 'verification_status', 'status', 'type']);
         $type = $request->get('type', 'all');
+        $companyId = $this->companyId();
+        $aktivitas = $this->scopedActivity((int) $id_aktivitas);
+
+        if (!$aktivitas) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Activity not found in your shelter scope',
+            ], 404);
+        }
 
         try {
             if ($type === 'tutor') {
-                $attendanceRecord = $this->attendanceService->getTutorAttendanceByActivity($id_aktivitas);
+                $attendanceRecord = $this->attendanceService->getTutorAttendanceByActivity($aktivitas->id_aktivitas, $companyId);
                 $data = $attendanceRecord ? [new AttendanceResource($attendanceRecord)] : [];
             } elseif ($type === 'student') {
-                $attendanceRecords = $this->attendanceService->getAttendanceByActivity($id_aktivitas, $filters);
+                $attendanceRecords = $this->attendanceService->getAttendanceByActivity($aktivitas->id_aktivitas, $filters, $companyId);
                 $data = AttendanceResource::collection($attendanceRecords);
             } else {
-                $studentRecords = $this->attendanceService->getAttendanceByActivity($id_aktivitas, $filters);
-                $tutorRecord = $this->attendanceService->getTutorAttendanceByActivity($id_aktivitas);
+                $studentRecords = $this->attendanceService->getAttendanceByActivity($aktivitas->id_aktivitas, $filters, $companyId);
+                $tutorRecord = $this->attendanceService->getTutorAttendanceByActivity($aktivitas->id_aktivitas, $companyId);
 
                 $data = [
                     'students' => AttendanceResource::collection($studentRecords),
@@ -246,7 +431,17 @@ class AttendanceController extends Controller
     public function getTutorAttendanceForActivity($id_aktivitas)
     {
         try {
-            $attendance = $this->attendanceService->getTutorAttendanceByActivity($id_aktivitas);
+            $aktivitas = $this->scopedActivity((int) $id_aktivitas);
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your shelter scope',
+                ], 404);
+            }
+
+            $companyId = $this->companyId();
+            $attendance = $this->attendanceService->getTutorAttendanceByActivity($aktivitas->id_aktivitas, $companyId);
 
             if ($attendance) {
                 $attendance->loadMissing(['absenUser.tutor']);
@@ -277,9 +472,30 @@ class AttendanceController extends Controller
     public function getByStudent($id_anak, AttendanceRequest $request)
     {
         $filters = $request->only(['is_verified', 'verification_status', 'status', 'date_from', 'date_to']);
+        $user = Auth::user();
+        $companyId = $this->companyId();
         
         try {
-            $attendanceRecords = $this->attendanceService->getAttendanceByStudent($id_anak, $filters);
+            if (!$user || !$user->adminShelter) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access',
+                ], 403);
+            }
+
+            $anak = Anak::where('id_anak', $id_anak)
+                ->where('id_shelter', $user->adminShelter->id_shelter)
+                ->when($companyId && Schema::hasColumn('anak', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
+            if (!$anak) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Child not found or not in your shelter',
+                ], 404);
+            }
+
+            $attendanceRecords = $this->attendanceService->getAttendanceByStudent($id_anak, $filters, $companyId);
             
             return response()->json([
                 'success' => true,
@@ -300,20 +516,35 @@ class AttendanceController extends Controller
     public function getActivityMembersWithAttendance($id_aktivitas, Request $request)
     {
         try {
-            $aktivitas = \App\Models\Aktivitas::findOrFail($id_aktivitas);
+            $companyId = $this->companyId();
+            $aktivitas = $this->scopedActivity((int) $id_aktivitas);
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your shelter scope'
+                ], 404);
+            }
 
             // Attempt to resolve the kelompok either by foreign key or by name/id_shelter
             $kelompok = null;
 
             if (!empty($aktivitas->id_kelompok)) {
-                $kelompok = Kelompok::with('anak')->find($aktivitas->id_kelompok);
+                $kelompok = Kelompok::with('anak')
+                    ->where('id_kelompok', $aktivitas->id_kelompok)
+                    ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                    ->first();
             }
 
             if (!$kelompok && !empty($aktivitas->nama_kelompok)) {
                 $kelompok = Kelompok::with('anak')
                     ->where('nama_kelompok', $aktivitas->nama_kelompok)
-                    ->when($aktivitas->id_shelter, function ($query) use ($aktivitas) {
+                    ->when($aktivitas->id_shelter, function ($query) use ($aktivitas, $companyId) {
                         $query->where('id_shelter', $aktivitas->id_shelter);
+
+                        if ($companyId && Schema::hasColumn('kelompok', 'company_id')) {
+                            $query->where('company_id', $companyId);
+                        }
                     })
                     ->first();
             }
@@ -348,6 +579,7 @@ class AttendanceController extends Controller
             // Get all attendance records for this activity
             $attendanceRecords = \App\Models\Absen::join('absen_user', 'absen.id_absen_user', '=', 'absen_user.id_absen_user')
                 ->where('absen.id_aktivitas', $id_aktivitas)
+                ->when($companyId && Schema::hasColumn('absen', 'company_id'), fn ($q) => $q->where('absen.company_id', $companyId))
                 ->whereNotNull('absen_user.id_anak')
                 ->select('absen.*', 'absen_user.id_anak')
                 ->get()
@@ -424,6 +656,15 @@ class AttendanceController extends Controller
     
     public function manualVerify($id_absen, AttendanceRequest $request)
     {
+        $absen = $this->scopedAbsen((int) $id_absen);
+
+        if (!$absen) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Attendance record not found in your scope'
+            ], 404);
+        }
+
         $result = $this->verificationService->verifyManually($id_absen, $request->notes);
         
         if (!$result['success']) {
@@ -442,6 +683,15 @@ class AttendanceController extends Controller
     
     public function rejectVerification($id_absen, AttendanceRequest $request)
     {
+        $absen = $this->scopedAbsen((int) $id_absen);
+
+        if (!$absen) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Attendance record not found in your scope'
+            ], 404);
+        }
+
         $result = $this->verificationService->rejectVerification($id_absen, $request->reason);
         
         if (!$result['success']) {
@@ -461,6 +711,15 @@ class AttendanceController extends Controller
     public function getVerificationHistory($id_absen)
     {
         try {
+            $absen = $this->scopedAbsen((int) $id_absen);
+
+            if (!$absen) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Attendance record not found in your scope'
+                ], 404);
+            }
+
             $verificationHistory = $this->verificationService->getVerificationHistory($id_absen);
             
             return response()->json([
@@ -485,12 +744,26 @@ class AttendanceController extends Controller
         ]);
 
         try {
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
+
+            $tutor = Tutor::where('id_tutor', $request->id_tutor)
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
+            if (!$tutor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tutor not found in your shelter'
+                ], 404);
+            }
+
             $validDays = $request->input('valid_days', 30);
             $expiryStrategy = $request->input('expiry_strategy', 'days');
             $validUntil = null;
 
             if ($expiryStrategy === 'semester') {
-                $tutor = Tutor::findOrFail($request->id_tutor);
                 $semester = $this->findActiveSemesterForEntity($tutor->id_shelter, $this->resolveKacabId($tutor));
 
                 if (!$semester) {
@@ -503,7 +776,7 @@ class AttendanceController extends Controller
                 $validUntil = Carbon::parse($semester->tanggal_selesai)->endOfDay();
             }
 
-            $token = $this->qrTokenService->generateTutorToken($request->id_tutor, $validDays, $validUntil);
+            $token = $this->qrTokenService->generateTutorToken($tutor->id_tutor, $validDays, $validUntil);
 
             return response()->json([
                 'success' => true,
@@ -532,6 +805,20 @@ class AttendanceController extends Controller
                 'message' => $result['message']
             ], 400);
         }
+
+        $companyId = $this->companyId();
+        $shelterId = $this->shelterId();
+        $tutor = $result['tutor'] ?? null;
+
+        if ($tutor) {
+            $companyMismatch = $companyId && Schema::hasColumn('tutor', 'company_id') && (int) ($tutor->company_id ?? 0) !== (int) $companyId;
+            if ((int) $tutor->id_shelter !== (int) $shelterId || $companyMismatch) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tutor token is not in your shelter scope'
+                ], 403);
+            }
+        }
         
         return response()->json([
             'success' => true,
@@ -558,7 +845,17 @@ class AttendanceController extends Controller
     public function getTutorAttendanceByActivity($id_aktivitas)
     {
         try {
-            $attendanceRecord = $this->attendanceService->getTutorAttendanceByActivity($id_aktivitas);
+            $aktivitas = $this->scopedActivity((int) $id_aktivitas);
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your shelter scope'
+                ], 404);
+            }
+
+            $companyId = $this->companyId();
+            $attendanceRecord = $this->attendanceService->getTutorAttendanceByActivity($aktivitas->id_aktivitas, $companyId);
             
             return response()->json([
                 'success' => true,
@@ -580,9 +877,31 @@ class AttendanceController extends Controller
             'status' => 'nullable|in:present,absent,late'
         ]);
 
+        $user = Auth::user();
+        $companyId = $this->companyId();
+
+        if (!$user || !$user->adminShelter || !$user->adminShelter->shelter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
+        $tutor = Tutor::where('id_tutor', $id_tutor)
+            ->where('id_shelter', $user->adminShelter->shelter->id_shelter)
+            ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+            ->first();
+
+        if (!$tutor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tutor not found or not in your company scope'
+            ], 404);
+        }
+
         try {
             $filters = $request->only(['date_from', 'date_to', 'status']);
-            $attendance = $this->attendanceService->getTutorAttendanceByTutor($id_tutor, $filters);
+            $attendance = $this->attendanceService->getTutorAttendanceByTutor($id_tutor, $filters, $companyId);
 
             return response()->json([
                 'success' => true,
@@ -614,13 +933,14 @@ class AttendanceController extends Controller
         }
 
         $shelterId = $user->adminShelter->shelter->id_shelter;
+        $companyId = $this->companyId();
 
         $filters = collect($validated)
             ->reject(fn($value) => $value === null || $value === '' || $value === 'all')
             ->all();
 
         try {
-            $summaryCollection = $this->attendanceService->getTutorAttendanceSummaryForShelter($shelterId, $filters);
+            $summaryCollection = $this->attendanceService->getTutorAttendanceSummaryForShelter($shelterId, $filters, $companyId);
 
             $categoryLabels = [
                 'high' => 'Baik',
@@ -704,7 +1024,16 @@ class AttendanceController extends Controller
     public function getGpsConfig($id_aktivitas)
     {
         try {
-            $config = $this->attendanceService->getGpsConfig($id_aktivitas);
+            $aktivitas = $this->scopedActivity((int) $id_aktivitas);
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your shelter scope'
+                ], 404);
+            }
+
+            $config = $this->attendanceService->getGpsConfig($aktivitas->id_aktivitas);
             
             if (!$config) {
                 return response()->json([
@@ -728,7 +1057,16 @@ class AttendanceController extends Controller
     public function checkGpsRequirement($id_aktivitas)
     {
         try {
-            $required = $this->attendanceService->isGpsRequired($id_aktivitas);
+            $aktivitas = $this->scopedActivity((int) $id_aktivitas);
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your shelter scope'
+                ], 404);
+            }
+
+            $required = $this->attendanceService->isGpsRequired($aktivitas->id_aktivitas);
 
             return response()->json([
                 'success' => true,
@@ -740,6 +1078,46 @@ class AttendanceController extends Controller
                 'message' => 'Failed to check GPS requirement: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    protected function adminShelter()
+    {
+        return request()->attributes->get('adminShelter') ?? Auth::user()?->adminShelter;
+    }
+
+    protected function shelterId(): ?int
+    {
+        return $this->adminShelter()?->shelter?->id_shelter;
+    }
+
+    protected function scopedActivity(int $id): ?Aktivitas
+    {
+        $companyId = $this->companyId();
+        $shelterId = $this->shelterId();
+
+        return Aktivitas::where('id_aktivitas', $id)
+            ->when($shelterId, fn ($q) => $q->where('id_shelter', $shelterId))
+            ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+            ->first();
+    }
+
+    protected function scopedAbsen(int $id_absen): ?Absen
+    {
+        $companyId = $this->companyId();
+        $shelterId = $this->shelterId();
+
+        return Absen::where('id_absen', $id_absen)
+            ->when($companyId && Schema::hasColumn('absen', 'company_id'), fn ($q) => $q->where('absen.company_id', $companyId))
+            ->whereHas('aktivitas', function ($query) use ($shelterId, $companyId) {
+                if ($shelterId) {
+                    $query->where('id_shelter', $shelterId);
+                }
+
+                if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                    $query->where('aktivitas.company_id', $companyId);
+                }
+            })
+            ->first();
     }
 
     protected function findActiveSemesterForEntity(?int $shelterId, ?int $kacabId)
@@ -774,6 +1152,13 @@ class AttendanceController extends Controller
         }
 
         return $query;
+    }
+
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
     }
 
     protected function resolveKacabId($entity): ?int

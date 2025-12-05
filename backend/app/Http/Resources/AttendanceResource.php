@@ -21,6 +21,19 @@ class AttendanceResource extends JsonResource
             'is_verified' => $this->is_verified,
             'verification_status' => $this->verification_status,
             'time_arrived' => optional($this->time_arrived)->format('Y-m-d H:i:s'),
+            'gps' => [
+                'latitude' => $this->latitude,
+                'longitude' => $this->longitude,
+                'accuracy' => $this->gps_accuracy,
+                'recorded_at' => optional($this->gps_recorded_at)?->format('Y-m-d H:i:s'),
+                'distance_from_activity' => $this->distance_from_activity,
+                'gps_valid' => $this->gps_valid,
+                'location_name' => $this->location_name,
+            ],
+            'auto_flag' => $this->auto_flag,
+            'auto_flag_payload' => $this->auto_flag_payload,
+            'review_status' => $this->review_status,
+            'review_notes' => $this->review_notes,
             'absen_user' => $this->whenLoaded('absenUser', function () {
                 $result = [
                     'id_absen_user' => $this->absenUser->id_absen_user ?? null,

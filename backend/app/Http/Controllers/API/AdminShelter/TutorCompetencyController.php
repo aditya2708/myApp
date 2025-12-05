@@ -9,9 +9,28 @@ use App\Models\Tutor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use App\Support\SsoContext;
+use Illuminate\Support\Facades\Schema;
 
 class TutorCompetencyController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
+    protected function enforceTutorScope($tutorId)
+    {
+        $user = Auth::user();
+        $companyId = $this->companyId();
+
+        return Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
+            ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+            ->findOrFail($tutorId);
+    }
+
     public function index($tutorId)
     {
         $user = Auth::user();
@@ -20,8 +39,7 @@ class TutorCompetencyController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($tutorId);
+        $tutor = $this->enforceTutorScope($tutorId);
 
         $competencies = TutorCompetency::where('id_tutor', $tutorId)
                                       ->with('jenisKompetensi')
@@ -42,8 +60,7 @@ class TutorCompetencyController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($tutorId);
+        $tutor = $this->enforceTutorScope($tutorId);
 
         $competency = TutorCompetency::where('id_tutor', $tutorId)
                                     ->with('jenisKompetensi')
@@ -63,8 +80,7 @@ class TutorCompetencyController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($tutorId);
+        $tutor = $this->enforceTutorScope($tutorId);
 
         $validatedData = $request->validate([
             'id_jenis_kompetensi' => 'required|exists:jenis_kompetensi,id_jenis_kompetensi',
@@ -103,8 +119,7 @@ class TutorCompetencyController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $tutor = Tutor::where('id_shelter', $user->adminShelter->shelter->id_shelter)
-                     ->findOrFail($tutorId);
+        $tutor = $this->enforceTutorScope($tutorId);
 
         $competency = TutorCompetency::where('id_tutor', $tutorId)->findOrFail($id);
 

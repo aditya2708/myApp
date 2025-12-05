@@ -23,9 +23,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
+use App\Support\AdminShelterScope;
+use Illuminate\Support\Facades\Schema;
 
 class AktivitasController extends Controller
 {
+    use AdminShelterScope;
+
     protected AttendanceService $attendanceService;
     protected array $kelompokRequiredActivities = ['Bimbel', 'Tahfidz'];
 
@@ -71,13 +75,15 @@ class AktivitasController extends Controller
 
             // Get shelter_id from the admin_shelter relationship
             $shelterId = $user->adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
             
             // Base query with related tutor & kegiatan (materi stored as string)
             $query = Aktivitas::where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->with(['tutor', 'kegiatan']);
             
             // Auto-update status for activities that might be completed
-            $this->updateActivitiesStatus($shelterId);
+            $this->updateActivitiesStatus($shelterId, $companyId);
             
             // Query params
             $search = $request->input('search');
@@ -230,15 +236,26 @@ class AktivitasController extends Controller
 
             // Get shelter_id from the admin_shelter relationship
             $shelterId = $user->adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
             
             // Validate tutor belongs to the same shelter if provided
             if ($request->id_tutor) {
-                $tutor = Tutor::find($request->id_tutor);
+                $tutor = Tutor::where('id_tutor', $request->id_tutor)
+                    ->where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                    ->first();
                 if (!$tutor || $tutor->id_shelter != $shelterId) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Invalid tutor selected. Tutor must belong to your shelter.'
                     ], 400);
+                }
+
+                if ($companyId && Schema::hasColumn('tutor', 'company_id') && (int) $tutor->company_id !== (int) $companyId) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Tutor is not in your company scope.'
+                    ], 403);
                 }
 
                 if (!$tutor->is_active) {
@@ -260,7 +277,7 @@ class AktivitasController extends Controller
             $request->merge(['jenis_kegiatan' => $kegiatan->nama_kegiatan]);
 
             // Check for activity conflicts (tutor and kelompok overlap)
-            $conflictValidation = $this->validateActivityConflicts($request, $shelterId);
+            $conflictValidation = $this->validateActivityConflicts($request, $shelterId, null, $companyId);
             if (!$conflictValidation['success']) {
                 return response()->json($conflictValidation, 400);
             }
@@ -285,6 +302,7 @@ class AktivitasController extends Controller
 
                 $kelompok = Kelompok::where('nama_kelompok', $request->nama_kelompok)
                     ->where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->first();
 
                 if (!$kelompok) {
@@ -316,7 +334,9 @@ class AktivitasController extends Controller
                     $aktivitas->materi_manual = null;
 
                     if ($request->id_materi) {
-                        $materi = Materi::with(['mataPelajaran', 'kelas'])->find($request->id_materi);
+                        $materi = Materi::with(['mataPelajaran', 'kelas'])
+                            ->when($companyId && Schema::hasColumn('materi', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                            ->find($request->id_materi);
                         if (!$materi) {
                             return response()->json([
                                 'success' => false,
@@ -364,6 +384,9 @@ class AktivitasController extends Controller
             
             // Set default status
             $aktivitas->status = 'draft';
+            if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                $aktivitas->company_id = $companyId;
+            }
             
             // Save the activity
             $aktivitas->save();
@@ -429,16 +452,27 @@ class AktivitasController extends Controller
 
             // Get shelter_id from the admin_shelter relationship
             $shelterId = $user->adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
             
             // Load relations BUT NOT 'materi' to avoid overriding string field
             $aktivitas = Aktivitas::with(['absen.absenUser.anak', 'absen.absenUser.tutor', 'tutor', 'kegiatan'])
-                ->findOrFail($id);
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->where('id_aktivitas', $id)
+                ->first();
+            
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your scope'
+                ], 404);
+            }
             
             // Auto-update status for this specific activity
             $aktivitas->updateStatusByTime();
             
             // Verify access - only allow access to activities from user's shelter
-            if ($aktivitas->id_shelter != $shelterId) {
+            $companyMismatch = $companyId && Schema::hasColumn('aktivitas', 'company_id') && (int) $aktivitas->company_id !== (int) $companyId;
+            if ($aktivitas->id_shelter != $shelterId || $companyMismatch) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized access to this activity'
@@ -503,11 +537,23 @@ class AktivitasController extends Controller
 
             // Get shelter_id from the admin_shelter relationship
             $shelterId = $user->adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
             
-            $aktivitas = Aktivitas::findOrFail($id);
+            $aktivitas = Aktivitas::where('id_aktivitas', $id)
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+            
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access to this activity'
+                ], 403);
+            }
             
             // Verify access - only allow access to activities from user's shelter
-            if ($aktivitas->id_shelter != $shelterId) {
+            $companyMismatch = $companyId && Schema::hasColumn('aktivitas', 'company_id') && (int) $aktivitas->company_id !== (int) $companyId;
+            if ($companyMismatch) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized access to this activity'
@@ -516,7 +562,10 @@ class AktivitasController extends Controller
             
             // Validate tutor belongs to the same shelter if provided
         if ($request->id_tutor) {
-            $tutor = Tutor::find($request->id_tutor);
+            $tutor = Tutor::where('id_tutor', $request->id_tutor)
+                ->where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('tutor', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
             if (!$tutor || $tutor->id_shelter != $shelterId) {
                 return response()->json([
                     'success' => false,
@@ -543,7 +592,7 @@ class AktivitasController extends Controller
             $request->merge(['jenis_kegiatan' => $kegiatan->nama_kegiatan]);
 
             // Check for activity conflicts (tutor and kelompok overlap) - exclude current activity
-            $conflictValidation = $this->validateActivityConflicts($request, $shelterId, $id);
+            $conflictValidation = $this->validateActivityConflicts($request, $shelterId, $id, $companyId);
             if (!$conflictValidation['success']) {
                 return response()->json($conflictValidation, 400);
             }
@@ -566,6 +615,7 @@ class AktivitasController extends Controller
 
                 $kelompok = Kelompok::where('nama_kelompok', $request->nama_kelompok)
                     ->where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('kelompok', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->first();
 
                 if (!$kelompok) {
@@ -597,7 +647,9 @@ class AktivitasController extends Controller
                     $aktivitas->materi_manual = null;
 
                     if ($request->id_materi) {
-                        $materi = Materi::with(['mataPelajaran', 'kelas'])->find($request->id_materi);
+                        $materi = Materi::with(['mataPelajaran', 'kelas'])
+                            ->when($companyId && Schema::hasColumn('materi', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                            ->find($request->id_materi);
                         if (!$materi) {
                             return response()->json([
                                 'success' => false,
@@ -644,6 +696,9 @@ class AktivitasController extends Controller
             $aktivitas->late_minutes_threshold = $request->late_minutes_threshold ?? $aktivitas->late_minutes_threshold ?? 15;
             
             // Don't update status in update method - it should be managed by the system
+            if ($companyId && Schema::hasColumn('aktivitas', 'company_id')) {
+                $aktivitas->company_id = $companyId;
+            }
             
             $aktivitas->save();
             
@@ -866,9 +921,11 @@ class AktivitasController extends Controller
             }
 
             $shelterId = $user->adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
             
             // Validate semester exists
-            $semester = Semester::find($semesterId);
+            $semester = Semester::when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->find($semesterId);
             if (!$semester) {
                 return response()->json([
                     'success' => false,
@@ -878,6 +935,7 @@ class AktivitasController extends Controller
 
             // Get activities within semester date range
             $query = Aktivitas::where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->whereBetween('tanggal', [$semester->tanggal_mulai, $semester->tanggal_selesai])
                 ->with(['tutor']);
 
@@ -898,9 +956,10 @@ class AktivitasController extends Controller
             $aktivitas = $query->orderBy('tanggal', 'desc')->orderBy('id_aktivitas', 'desc')->paginate($perPage);
 
             // Add kurikulum info
-            $aktivitas->getCollection()->transform(function ($activity) {
+            $aktivitas->getCollection()->transform(function ($activity) use ($companyId) {
                 if ($activity->id_materi) {
                     $materi = \App\Models\Materi::with(['mataPelajaran', 'kelas.jenjang'])
+                        ->when($companyId && Schema::hasColumn('materi', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                         ->find($activity->id_materi);
                     
                     if ($materi) {
@@ -953,9 +1012,11 @@ class AktivitasController extends Controller
             }
 
             $shelterId = $user->adminShelter->shelter->id_shelter;
+            $companyId = $this->companyId();
             
             // Validate materi exists and belongs to kacab
-            $materi = Materi::find($materiId);
+            $materi = Materi::when($companyId && Schema::hasColumn('materi', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->find($materiId);
             if (!$materi) {
                 return response()->json([
                     'success' => false,
@@ -965,6 +1026,7 @@ class AktivitasController extends Controller
 
             // Get activities using this materi
             $query = Aktivitas::where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->where('id_materi', $materiId)
                 ->with(['tutor']);
 
@@ -984,21 +1046,26 @@ class AktivitasController extends Controller
             // Usage statistics
             $stats = [
                 'total_usage' => Aktivitas::where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_materi', $materiId)
                     ->count(),
                 'unique_tutors' => Aktivitas::where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_materi', $materiId)
                     ->distinct('id_tutor')
                     ->count('id_tutor'),
                 'unique_kelompok' => Aktivitas::where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_materi', $materiId)
                     ->distinct('nama_kelompok')
                     ->count('nama_kelompok'),
                 'first_used' => Aktivitas::where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_materi', $materiId)
                     ->orderBy('tanggal', 'asc')
                     ->value('tanggal'),
                 'last_used' => Aktivitas::where('id_shelter', $shelterId)
+                    ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                     ->where('id_materi', $materiId)
                     ->orderBy('tanggal', 'desc')
                     ->value('tanggal')
@@ -1325,11 +1392,12 @@ class AktivitasController extends Controller
     /**
      * Auto-update activities status based on current time
      */
-    private function updateActivitiesStatus($shelterId)
+    private function updateActivitiesStatus($shelterId, ?int $companyId = null)
     {
         try {
             // Find activities that need status update
             $activitiesToUpdate = Aktivitas::where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->whereIn('status', ['draft', 'ongoing'])
                 ->whereNotNull('start_time')
                 ->get();
@@ -1345,7 +1413,7 @@ class AktivitasController extends Controller
     /**
      * Validate activity conflicts (tutor and kelompok overlap)
      */
-    private function validateActivityConflicts($request, $shelterId, $excludeId = null)
+    private function validateActivityConflicts($request, $shelterId, $excludeId = null, ?int $companyId = null)
     {
         try {
             // Skip validation if no time is provided
@@ -1360,6 +1428,7 @@ class AktivitasController extends Controller
 
             // Base query for existing activities on the same date
             $existingQuery = Aktivitas::where('id_shelter', $shelterId)
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->whereDate('tanggal', $tanggal)
                 ->whereNotNull('start_time')
                 ->whereNotNull('end_time')

@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class KurikulumController extends Controller
 {
@@ -31,12 +33,14 @@ class KurikulumController extends Controller
             }
 
             $kacabId = $user->adminCabang->id_kacab;
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
             $search = trim((string) $request->query('search', ''));
             $status = $request->query('status');
             $tahun = $request->query('tahun') ?? $request->query('tahun_berlaku');
             $limit = $request->query('limit');
 
-            $query = Kurikulum::byKacab($kacabId)
+            $query = Kurikulum::byKacab($kacabId, $companyId)
                 ->withCounts()
                 ->with(['jenjang']);
 
@@ -147,6 +151,7 @@ class KurikulumController extends Controller
             }
 
             $kacabId = $user->adminCabang->id_kacab;
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
 
             $validator = Validator::make($request->all(), [
                 'nama' => 'required|string|max:255',
@@ -168,6 +173,9 @@ class KurikulumController extends Controller
             $tahun = (int) $request->input('tahun');
 
             $duplicateExists = Kurikulum::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('kurikulum', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->where('nama_kurikulum', $nama)
                 ->where('tahun_berlaku', $tahun)
                 ->exists();
@@ -190,6 +198,7 @@ class KurikulumController extends Controller
                 'status' => $status,
                 'is_active' => $status === 'aktif',
                 'id_kacab' => $kacabId,
+                'company_id' => $companyId,
             ]);
 
             $kurikulum->refresh();
@@ -223,8 +232,9 @@ class KurikulumController extends Controller
             }
 
             $kacabId = $user->adminCabang->id_kacab;
+            $companyId = $this->companyId($user->adminCabang->company_id ?? null);
 
-            $kurikulum = Kurikulum::byKacab($kacabId)
+            $kurikulum = Kurikulum::byKacab($kacabId, $companyId)
                 ->with(['jenjang'])
                 ->withCount(['kurikulumMateri', 'semester', 'materi'])
                 ->find($kurikulumId);
@@ -294,22 +304,33 @@ class KurikulumController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
             
             $struktur = Jenjang::active()
                 ->withCount(['kelas', 'mataPelajaran'])
                 ->with([
-                    'kelas' => function($query) use ($kacabId) {
+                    'kelas' => function($query) use ($kacabId, $companyId) {
                         $query->where(function($q) use ($kacabId) {
                             $q->where('is_global', true)
                               ->orWhere('id_kacab', $kacabId);
                         })
+                        ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                            $q->where(function ($qq) use ($companyId) {
+                                $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                            });
+                        })
                         ->active()
                         ->orderByUrutan();
                     },
-                    'mataPelajaran' => function($query) use ($kacabId) {
+                    'mataPelajaran' => function($query) use ($kacabId, $companyId) {
                         $query->where(function($q) use ($kacabId) {
                             $q->where('is_global', true)
                               ->orWhere('id_kacab', $kacabId);
+                        })
+                        ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                            $q->where(function ($qq) use ($companyId) {
+                                $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                            });
                         })
                         ->active()
                         ->withCount('materi');
@@ -338,6 +359,7 @@ class KurikulumController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
             $jenjangId = $request->query('jenjang');
             $kelasId = $request->query('kelas');
 
@@ -356,6 +378,11 @@ class KurikulumController extends Controller
             $query = MataPelajaran::where(function($q) use ($kacabId) {
                 $q->where('is_global', true)
                   ->orWhere('id_kacab', $kacabId);
+            })
+            ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                $q->where(function ($qq) use ($companyId) {
+                    $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                });
             })
             ->active()
             ->withCount(['materi' => function($q) use ($kelasId) {
@@ -406,12 +433,18 @@ class KurikulumController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $data = [
                 'jenjang' => Jenjang::active()->orderByUrutan()->get(['id_jenjang', 'nama_jenjang', 'kode_jenjang']),
                 'kelas' => Kelas::where(function($q) use ($kacabId) {
                     $q->where('is_global', true)
                       ->orWhere('id_kacab', $kacabId);
+                })
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where(function ($qq) use ($companyId) {
+                        $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                    });
                 })
                 ->active()
                 ->with('jenjang')
@@ -420,6 +453,11 @@ class KurikulumController extends Controller
                 'mata_pelajaran' => MataPelajaran::where(function($q) use ($kacabId) {
                     $q->where('is_global', true)
                       ->orWhere('id_kacab', $kacabId);
+                })
+                ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                    $q->where(function ($qq) use ($companyId) {
+                        $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                    });
                 })
                 ->active()
                 ->with('jenjang')
@@ -448,11 +486,17 @@ class KurikulumController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $kelas = Kelas::where('id_jenjang', $jenjangId)
                 ->where(function($q) use ($kacabId) {
                     $q->where('is_global', true)
                       ->orWhere('id_kacab', $kacabId);
+                })
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where(function ($qq) use ($companyId) {
+                        $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                    });
                 })
                 ->active()
                 ->withCount('materi')
@@ -479,6 +523,7 @@ class KurikulumController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $stats = [
                 'total_jenjang' => Jenjang::active()->count(),
@@ -487,14 +532,30 @@ class KurikulumController extends Controller
                     $q->where('is_global', true)
                       ->orWhere('id_kacab', $kacabId)
                       ->orWhereNull('is_global'); // Include existing kelas that don't have is_global set yet
-                })->active()->count(),
+                })
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where(function ($qq) use ($companyId) {
+                        $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                    });
+                })
+                ->active()->count(),
                 'total_mata_pelajaran' => MataPelajaran::where(function($q) use ($kacabId) {
                     // Temporary fix: include all active mata pelajaran until migration is run
                     $q->where('is_global', true)
                       ->orWhere('id_kacab', $kacabId)
                       ->orWhereNull('is_global'); // Include existing mata pelajaran that don't have is_global set yet
-                })->active()->count(),
-                'total_materi' => Materi::where('id_kacab', $kacabId)->count(),
+                })
+                ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                    $q->where(function ($qq) use ($companyId) {
+                        $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                    });
+                })
+                ->active()->count(),
+                'total_materi' => Materi::where('id_kacab', $kacabId)
+                    ->when($companyId && Schema::hasColumn('materi', 'company_id'), function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId);
+                    })
+                    ->count(),
                 'kelas_custom' => Kelas::where(function($q) use ($kacabId) {
                     // Check both jenis_kelas = 'custom' and is_custom = 1
                     $q->where('jenis_kelas', 'custom')
@@ -505,9 +566,17 @@ class KurikulumController extends Controller
                     $q->where('id_kacab', $kacabId)
                       ->orWhereNull('id_kacab');
                 })
+                ->when($companyId && Schema::hasColumn('kelas', 'company_id'), function ($q) use ($companyId) {
+                    $q->where(function ($qq) use ($companyId) {
+                        $qq->whereNull('company_id')->orWhere('company_id', $companyId);
+                    });
+                })
                 ->active()
                 ->count(),
                 'mata_pelajaran_custom' => MataPelajaran::where('id_kacab', $kacabId)
+                    ->when($companyId && Schema::hasColumn('mata_pelajaran', 'company_id'), function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId);
+                    })
                     ->active()
                     ->count()
             ];
@@ -545,5 +614,17 @@ class KurikulumController extends Controller
         }
 
         return $code;
+    }
+
+    /**
+     * Ambil company id dari SSO context atau fallback.
+     */
+    private function companyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
     }
 }

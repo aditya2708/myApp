@@ -7,9 +7,13 @@ use App\Models\Semester;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
+use App\Support\AdminShelterScope;
+use Illuminate\Support\Facades\Schema;
 
 class SemesterController extends Controller
 {
+    use AdminShelterScope;
+
     /**
      * Get semester list for shelter (read-only from cabang data)
      */
@@ -18,11 +22,13 @@ class SemesterController extends Controller
         try {
             // Admin Shelter gets semesters from their cabang
             $kacabId = auth()->user()->adminShelter->id_kacab;
+            $companyId = $this->companyId();
             $search = $request->query('search');
             $status = $request->query('status');
             $tahunAjaran = $request->query('tahun_ajaran');
 
             $query = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->with(['kurikulum']);
 
             if ($search) {
@@ -97,8 +103,10 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminShelter->id_kacab;
+            $companyId = $this->companyId();
 
             $semester = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->with(['kurikulum'])
                 ->find($id);
 
@@ -147,11 +155,13 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminShelter->id_kacab;
+            $companyId = $this->companyId();
 
             // Check if status column exists
             $hasStatusColumn = \Schema::hasColumn('semester', 'status');
 
             $query = Semester::where('id_kacab', $kacabId)
+                ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
                 ->with(['kurikulum']);
 
             if ($hasStatusColumn) {
@@ -203,21 +213,24 @@ class SemesterController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminShelter->id_kacab;
+            $companyId = $this->companyId();
 
             // Check if status column exists in semester table
             $hasStatusColumn = \Schema::hasColumn('semester', 'status');
 
             if ($hasStatusColumn) {
                 $stats = [
-                    'total' => Semester::where('id_kacab', $kacabId)->count(),
-                    'active' => Semester::where('id_kacab', $kacabId)->where('status', 'active')->count(),
-                    'draft' => Semester::where('id_kacab', $kacabId)->where('status', 'draft')->count(),
-                    'completed' => Semester::where('id_kacab', $kacabId)->where('status', 'completed')->count(),
-                    'archived' => Semester::where('id_kacab', $kacabId)->where('status', 'archived')->count(),
+                    'total' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))->count(),
+                    'active' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))->where('status', 'active')->count(),
+                    'draft' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))->where('status', 'draft')->count(),
+                    'completed' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))->where('status', 'completed')->count(),
+                    'archived' => Semester::where('id_kacab', $kacabId)->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))->where('status', 'archived')->count(),
                 ];
             } else {
                 // Fallback for when status column doesn't exist yet
-                $total = Semester::where('id_kacab', $kacabId)->count();
+                $total = Semester::where('id_kacab', $kacabId)
+                    ->when($companyId && Schema::hasColumn('semester', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                    ->count();
                 $stats = [
                     'total' => $total,
                     'active' => 0, // Default when no status column

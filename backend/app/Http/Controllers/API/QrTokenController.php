@@ -13,9 +13,12 @@ use App\Services\AttendanceService;
 use App\Http\Resources\QrTokenResource;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
+use App\Support\AdminShelterScope;
 
 class QrTokenController extends Controller
 {
+    use AdminShelterScope;
+
     protected $qrTokenService;
     protected $attendanceService;
     
@@ -178,7 +181,22 @@ class QrTokenController extends Controller
     public function getActivityGpsConfig($id_aktivitas)
     {
         try {
-            $config = $this->attendanceService->getGpsConfig($id_aktivitas);
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
+
+            $aktivitas = Aktivitas::where('id_aktivitas', $id_aktivitas)
+                ->when($shelterId, fn ($q) => $q->where('id_shelter', $shelterId))
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your scope'
+                ], 404);
+            }
+
+            $config = $this->attendanceService->getGpsConfig($aktivitas->id_aktivitas);
             
             if (!$config) {
                 return response()->json([
@@ -217,7 +235,22 @@ class QrTokenController extends Controller
         
         // Include GPS config if activity is provided
         if ($request->has('id_aktivitas')) {
-            $gpsConfig = $this->attendanceService->getGpsConfig($request->id_aktivitas);
+            $companyId = $this->companyId();
+            $shelterId = $this->shelterId();
+
+            $aktivitas = Aktivitas::where('id_aktivitas', $request->id_aktivitas)
+                ->when($shelterId, fn ($q) => $q->where('id_shelter', $shelterId))
+                ->when($companyId && Schema::hasColumn('aktivitas', 'company_id'), fn ($q) => $q->where('company_id', $companyId))
+                ->first();
+
+            if (!$aktivitas) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Activity not found in your scope'
+                ], 404);
+            }
+
+            $gpsConfig = $this->attendanceService->getGpsConfig($aktivitas->id_aktivitas);
             if ($gpsConfig) {
                 $responseData['gps_config'] = $gpsConfig;
             }

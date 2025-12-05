@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\AdminCabang\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Services\AdminCabang\Reports\TutorAttendanceReportService;
+use App\Support\AdminCabangScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -11,6 +12,8 @@ use RuntimeException;
 
 class AdminCabangTutorReportController extends Controller
 {
+    use AdminCabangScope;
+
     public function index(Request $request, TutorAttendanceReportService $reportService): JsonResponse
     {
         $validated = $request->validate([
@@ -37,6 +40,19 @@ class AdminCabangTutorReportController extends Controller
                 'success' => false,
                 'message' => 'Admin cabang tidak ditemukan',
             ], 404);
+        }
+
+        $companyId = $this->companyId($adminCabang->company_id ?? null);
+
+        if ($companyId && $adminCabang->company_id && $adminCabang->company_id !== $companyId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Admin cabang tidak ditemukan untuk company ini',
+            ], 404);
+        }
+
+        if ($companyId && !$adminCabang->company_id) {
+            $adminCabang->company_id = $companyId;
         }
 
         $adminCabang->loadMissing('kacab');

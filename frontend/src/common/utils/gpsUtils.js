@@ -31,9 +31,10 @@ export const GPS_ACCURACY = {
  * Default GPS configuration for attendance
  */
 export const DEFAULT_GPS_CONFIG = {
-  accuracy: GPS_ACCURACY.HIGH,
-  timeout: 15000, // 15 seconds
-  maximumAge: 60000, // 1 minute
+  // Gunakan Balanced agar lebih kompatibel di perangkat sensitif baterai
+  accuracy: GPS_ACCURACY.BALANCED,
+  timeout: 20000, // 20 seconds
+  maximumAge: 120000, // 2 minutes
   distanceInterval: 1, // meters
   timeInterval: 1000 // 1 second
 };
@@ -95,8 +96,27 @@ export const requestLocationPermissions = async () => {
  */
 export const getCurrentLocation = async (config = DEFAULT_GPS_CONFIG) => {
   try {
-    // Check if location services are enabled
+    // Diagnostic: log provider & permission status
     const servicesEnabled = await isLocationServicesEnabled();
+    console.log('[GPS] Services enabled:', servicesEnabled);
+
+    const permissionProbe = await Location.getForegroundPermissionsAsync();
+    console.log('[GPS] Permission status:', permissionProbe);
+
+    try {
+      const providerStatus = await Location.getProviderStatusAsync();
+      console.log('[GPS] Provider status:', providerStatus);
+    } catch (providerErr) {
+      console.warn('[GPS] getProviderStatusAsync failed:', providerErr?.message || providerErr);
+    }
+
+    console.log('[GPS] Config used:', {
+      accuracy: config.accuracy,
+      timeout: config.timeout,
+      maximumAge: config.maximumAge,
+    });
+
+    // Check if location services are enabled
     if (!servicesEnabled) {
       throw new Error('Layanan lokasi dinonaktifkan. Aktifkan GPS melalui pengaturan perangkat Anda.');
     }
@@ -108,11 +128,90 @@ export const getCurrentLocation = async (config = DEFAULT_GPS_CONFIG) => {
     }
 
     // Get current position
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: config.accuracy,
-      timeout: config.timeout,
-      maximumAge: config.maximumAge
-    });
+    let location = null;
+    let source = 'live';
+
+    const tryGetPosition = async (options, label) => {
+      console.log('[GPS] Attempt', label, options);
+      return Location.getCurrentPositionAsync(options);
+    };
+
+    try {
+      // Attempt 1: use provided config (Balanced)
+      location = await tryGetPosition({
+        accuracy: config.accuracy,
+        timeout: config.timeout,
+        maximumAge: config.maximumAge
+      }, 'balanced');
+    } catch (liveErr) {
+      console.warn('Live GPS fetch failed (balanced), trying high accuracy:', liveErr?.message || liveErr);
+      try {
+        // Attempt 2: Highest accuracy, longer timeout
+        location = await tryGetPosition({
+          accuracy: GPS_ACCURACY.HIGHEST,
+          timeout: 30000,
+          maximumAge: config.maximumAge
+        }, 'highest');
+      } catch (highErr) {
+        console.warn('Live GPS fetch failed (highest), trying last known position:', highErr?.message || highErr);
+        try {
+          const lastKnown = await Location.getLastKnownPositionAsync({
+            maxAge: 300000, // 5 minutes
+            requiredAccuracy: 3000 // allow coarse
+          });
+          if (lastKnown && lastKnown.coords) {
+            location = lastKnown;
+            source = 'last_known';
+          } else {
+            throw highErr;
+          }
+        } catch (lkErr) {
+          console.warn('Last known position unavailable, trying short watchPosition:', lkErr?.message || lkErr);
+          // Attempt 3: force a watch to obtain first fix
+          const watchOptions = {
+            accuracy: GPS_ACCURACY.HIGHEST,
+            timeInterval: 1000,
+            distanceInterval: 0,
+            mayShowUserSettingsDialog: true
+          };
+          const watchPromise = new Promise((resolve, reject) => {
+            let subscription = null;
+            let timeoutId = null;
+
+            const clearAll = () => {
+              if (subscription) {
+                subscription.remove();
+                subscription = null;
+              }
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+              }
+            };
+
+            timeoutId = setTimeout(() => {
+              clearAll();
+              reject(new Error('watchPosition timeout'));
+            }, 15000); // 15s watch window
+
+            Location.watchPositionAsync(watchOptions, (loc) => {
+              if (loc?.coords) {
+                clearAll();
+                resolve(loc);
+              }
+            }).then(sub => {
+              subscription = sub;
+            }).catch(watchErr => {
+              clearAll();
+              reject(watchErr);
+            });
+          });
+
+          location = await watchPromise;
+          source = 'watch';
+        }
+      }
+    }
 
     // Format the response
     const locationData = {
@@ -124,6 +223,7 @@ export const getCurrentLocation = async (config = DEFAULT_GPS_CONFIG) => {
       heading: location.coords.heading,
       speed: location.coords.speed,
       timestamp: new Date(location.timestamp).toISOString(),
+      source,
       success: true
     };
 
@@ -304,7 +404,8 @@ export const prepareGpsDataForApi = (locationData, validationResult = null) => {
     latitude: locationData.latitude,
     longitude: locationData.longitude,
     gps_accuracy: locationData.accuracy,
-    gps_recorded_at: locationData.timestamp
+    gps_recorded_at: locationData.timestamp,
+    gps_source: locationData.source || 'live'
   };
 
   // Add validation data if provided

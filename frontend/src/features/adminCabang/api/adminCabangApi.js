@@ -22,6 +22,9 @@ export const adminCabangApi = {
   rejectGpsRequest: async (shelterId, data) => {
     return await api.post(ADMIN_CABANG_ENDPOINTS.GPS_APPROVAL.REJECT.replace(':id', shelterId), data);
   },
+  getGpsNeedsReview: async () => {
+    return await api.get(ADMIN_CABANG_ENDPOINTS.GPS_APPROVAL.NEEDS_REVIEW);
+  },
   // ==================== CORE ADMIN CABANG ====================
   
   /**

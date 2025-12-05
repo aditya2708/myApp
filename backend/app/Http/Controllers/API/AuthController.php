@@ -11,61 +11,16 @@ use App\Models\AdminShelter;
 use App\Models\Donatur;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Support\SsoContext;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required|string'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        // Find user by email
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Email atau kata sandi tidak sesuai'
-            ], 401);
-        }
-
-        // Load role-specific data
-        $userData = null;
-        switch ($user->level) {
-            case 'admin_pusat':
-                $userData = $user->adminPusat;
-                break;
-            case 'admin_cabang':
-                $userData = $user->adminCabang;
-                break;
-            case 'admin_shelter':
-                $userData = $user->adminShelter->load('shelter');
-                break;
-            case 'donatur':
-                $userData = $user->donatur;
-                break;
-        }
-
-        // Create token with abilities based on role
-        $token = $user->createToken('auth_token')->plainTextToken;
-
         return response()->json([
-            'message' => 'Login successful',
-            'user' => [
-                'id' => $user->id_users,
-                'email' => $user->email,
-                'level' => $user->level,
-                'profile' => $userData
-            ],
-            'token' => $token
-        ]);
+            'message' => 'Login telah dipusatkan di aplikasi Manajemen (SSO).',
+            'sso_login_url' => config('sso.management_base_url').'/admin/login',
+        ], 410);
     }
 
     
@@ -73,41 +28,43 @@ class AuthController extends Controller
     // The rest of the controller remains the same
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-        
         return response()->json([
-            'message' => 'Logged out successfully'
+            'message' => 'Logout dilakukan melalui IdP. Token tenant otomatis tidak dipakai lagi setelah dicabut di pusat.',
         ]);
     }
 
-    public function user(Request $request)
+    public function user(Request $request, SsoContext $context)
     {
         $user = $request->user();
 
-        // Load role-specific profile
-        $userData = null;
-        switch ($user->level) {
-            case 'admin_pusat':
-                $userData = $user->adminPusat;
-                break;
-            case 'admin_cabang':
-                $userData = $user->adminCabang;
-                break;
-            case 'admin_shelter':
-                $userData = $user->adminShelter->load('shelter');
-                break;
-            case 'donatur':
-                $userData = $user->donatur;
-                break;
-        }
-        
+        $user->load([
+            'adminPusat',
+            'adminCabang.kacab',
+            'adminShelter.kacab',
+            'adminShelter.wilbin.kacab',
+            'adminShelter.shelter.wilbin',
+            'adminShelter.shelter.kacab',
+            'donatur.kacab',
+            'donatur.wilbin.kacab',
+            'donatur.shelter.wilbin',
+            'donatur.shelter.kacab',
+            'donatur.bank',
+            'donatur.anak',
+        ]);
+
+        $profile = $this->resolveProfilePayload($user);
+
         return response()->json([
             'user' => [
                 'id' => $user->id_users,
+                'username' => $user->username,
                 'email' => $user->email,
                 'level' => $user->level,
-                'profile' => $userData
-            ]
+                'status' => $user->status,
+                'profile' => $profile,
+            ],
+            'profile' => $profile,
+            'sso' => $context->raw(),
         ]);
     }
 
@@ -150,5 +107,21 @@ class AuthController extends Controller
         $fileName = time() . '_' . $file->getClientOriginalName();
         $file->storeAs("public/{$folder}/{$userId}", $fileName);
         return $fileName;
+    }
+
+    protected function resolveProfilePayload(User $user): ?array
+    {
+        return match ($user->level) {
+            User::ROLE_SUPER_ADMIN => [
+                'display_name' => $user->username,
+                'email' => $user->email,
+                'scope' => User::ROLE_SUPER_ADMIN,
+            ],
+            User::ROLE_ADMIN_PUSAT => $user->adminPusat?->toArray(),
+            User::ROLE_ADMIN_CABANG => $user->adminCabang?->toArray(),
+            User::ROLE_ADMIN_SHELTER => $user->adminShelter?->toArray(),
+            User::ROLE_DONATUR => $user->donatur?->toArray(),
+            default => null,
+        };
     }
 }

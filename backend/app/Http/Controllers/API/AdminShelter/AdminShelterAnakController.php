@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\AdminShelter;
 use App\Http\Controllers\Controller;
 use App\Models\Anak;
 use App\Http\Resources\Anak\AnakCollection;
+use App\Support\SsoContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -12,9 +13,17 @@ use Illuminate\Support\Str;
 
 class AdminShelterAnakController extends Controller
 {
+    protected function companyId(): ?int
+    {
+        return app()->bound(SsoContext::class)
+            ? app(SsoContext::class)->company()?->id
+            : (Auth::user()?->adminShelter->company_id ?? null);
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -24,6 +33,7 @@ class AdminShelterAnakController extends Controller
         }
 
         $query = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                     ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                      ->withActiveFamily();
 
         if ($request->has('search')) {
@@ -71,21 +81,26 @@ class AdminShelterAnakController extends Controller
 
         $summary = [
             'total' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                          ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                           ->withActiveFamily()
                           ->count(),
             'anak_aktif' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                             ->withActiveFamily()
                             ->where('status_validasi', 'aktif')
                             ->count(),
             'anak_tidak_aktif' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                                 ->withActiveFamily()
                                 ->where('status_validasi', 'non-aktif')
                                 ->count(),
             'dengan_kelompok' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                                 ->withActiveFamily()
                                 ->whereNotNull('id_kelompok')
                                 ->count(),
             'tanpa_kelompok' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                                 ->withActiveFamily()
                                 ->whereNull('id_kelompok')
                                 ->count(),
@@ -110,6 +125,7 @@ class AdminShelterAnakController extends Controller
     public function show($id)
     {
         $user = Auth::user();
+        $companyId = $this->companyId();
         
         if (!$user->adminShelter) {
             return response()->json([
@@ -119,6 +135,7 @@ class AdminShelterAnakController extends Controller
         }
 
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->withActiveFamily()
                     ->with([
                         'keluarga', 
@@ -162,7 +179,7 @@ class AdminShelterAnakController extends Controller
             'tanggal_lahir' => 'nullable|date',
             'jenis_kelamin' => 'nullable|in:Laki-laki,Perempuan',
             'tinggal_bersama' => 'nullable|in:Ayah,Ibu,Ayah dan Ibu,Wali',
-            'jenis_anak_binaan' => 'nullable|in:BCPB,NPB',
+            'jenis_anak_binaan' => 'nullable|in:BCPB,NPB,CPB,PB',
             'hafalan' => 'nullable|in:Tahfidz,Non-Tahfidz',
             'status_validasi' => 'nullable|in:aktif,non-aktif,Ditolak,Ditangguhkan',
             'foto' => 'nullable|image|max:2048',
@@ -217,11 +234,14 @@ class AdminShelterAnakController extends Controller
         $anak->status_validasi = $validatedData['status_validasi'] ?? 'non-aktif';
 
         if (array_key_exists('jenis_anak_binaan', $validatedData)) {
-            $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BCPB'
-                ? Anak::STATUS_CPB_BCPB
-                : ($validatedData['jenis_anak_binaan'] === 'NPB'
-                    ? Anak::STATUS_CPB_NPB
-                    : null);
+            $statusMap = [
+                'BCPB' => Anak::STATUS_CPB_BCPB,
+                'NPB' => Anak::STATUS_CPB_NPB,
+                'CPB' => Anak::STATUS_CPB_CPB,
+                'PB' => Anak::STATUS_CPB_PB,
+            ];
+
+            $anak->status_cpb = $statusMap[$validatedData['jenis_anak_binaan']] ?? null;
         }
 
         $anak->save();
@@ -294,7 +314,7 @@ class AdminShelterAnakController extends Controller
             'tanggal_lahir' => 'sometimes|nullable|date',
             'jenis_kelamin' => 'sometimes|nullable|in:Laki-laki,Perempuan',
             'tinggal_bersama' => 'sometimes|nullable|in:Ayah,Ibu,Ayah dan Ibu,Wali',
-            'jenis_anak_binaan' => 'sometimes|nullable|in:BCPB,NPB',
+            'jenis_anak_binaan' => 'sometimes|nullable|in:BCPB,NPB,CPB,PB',
             'hafalan' => 'sometimes|nullable|in:Tahfidz,Non-Tahfidz',
             'status_validasi' => 'sometimes|nullable|in:aktif,non-aktif,Ditolak,Ditangguhkan',
             'foto' => 'nullable|image|max:2048',
@@ -346,11 +366,14 @@ class AdminShelterAnakController extends Controller
         }
 
         if (array_key_exists('jenis_anak_binaan', $validatedData)) {
-            $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BCPB'
-                ? Anak::STATUS_CPB_BCPB
-                : ($validatedData['jenis_anak_binaan'] === 'NPB'
-                    ? Anak::STATUS_CPB_NPB
-                    : null);
+            $statusMap = [
+                'BCPB' => Anak::STATUS_CPB_BCPB,
+                'NPB' => Anak::STATUS_CPB_NPB,
+                'CPB' => Anak::STATUS_CPB_CPB,
+                'PB' => Anak::STATUS_CPB_PB,
+            ];
+
+            $anak->status_cpb = $statusMap[$validatedData['jenis_anak_binaan']] ?? null;
         }
 
         if ($request->hasFile('foto')) {

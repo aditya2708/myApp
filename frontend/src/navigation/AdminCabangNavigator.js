@@ -8,18 +8,10 @@ import AdminCabangDashboardScreen from '../features/adminCabang/screens/AdminCab
 import AdminCabangProfileScreen from '../features/adminCabang/screens/AdminCabangProfileScreen';
 import SurveyStatusFilterScreen from '../features/adminCabang/screens/SurveyStatusFilterScreen';
 import SurveyApprovalDetailScreen from '../features/adminCabang/screens/SurveyApprovalDetailScreen';
-import AdminCabangPengajuanDonaturScreen from '../features/adminCabang/screens/AdminCabangPengajuanDonaturScreen';
-import DonaturSelectionScreen from '../features/adminCabang/screens/DonaturSelectionScreen';
-import ChildDetailScreen from '../features/adminCabang/screens/ChildDetailScreen';
-import AdminCabangDonaturListScreen from '../features/adminCabang/screens/AdminCabangDonaturListScreen';
-import AdminCabangDonaturFormScreen from '../features/adminCabang/screens/AdminCabangDonaturFormScreen';
-import AdminCabangDonaturDetailScreen from '../features/adminCabang/screens/AdminCabangDonaturDetailScreen';
-import DonaturFilterScreen from '../features/adminCabang/screens/DonaturFilterScreen';
+// Donatur & user management screens dihapus (fitur dialihkan ke IdP/Super Admin)
 import GpsApprovalScreen from '../features/adminCabang/screens/GpsApprovalScreen';
 import GpsApprovalDetailScreen from '../features/adminCabang/screens/GpsApprovalDetailScreen';
-import AdminCabangUserManagementScreen from '../features/adminCabang/screens/user/AdminCabangUserManagementScreen';
-import AdminCabangUserFormScreen from '../features/adminCabang/screens/user/AdminCabangUserFormScreen';
-import AdminCabangUserDetailScreen from '../features/adminCabang/screens/user/AdminCabangUserDetailScreen';
+// User management screens dihapus
 import AdminCabangReportHomeScreen from '../features/adminCabang/screens/reports/AdminCabangReportHomeScreen';
 import AdminCabangChildReportScreen from '../features/adminCabang/screens/reports/AdminCabangChildReportScreen';
 import AdminCabangChildReportDetailScreen from '../features/adminCabang/screens/reports/child/AdminCabangChildReportDetailScreen';
@@ -67,41 +59,6 @@ const DashboardStackNavigator = () => (
       options={{ headerTitle: 'Detail Persetujuan Survey' }}
     />
     <DashboardStack.Screen
-      name="PengajuanDonatur"
-      component={AdminCabangPengajuanDonaturScreen}
-      options={{ headerTitle: 'Pengajuan Donatur' }}
-    />
-    <DashboardStack.Screen
-      name="DonaturSelection"
-      component={DonaturSelectionScreen}
-      options={{ headerTitle: 'Pilih Donatur' }}
-    />
-    <DashboardStack.Screen
-      name="ChildDetail"
-      component={ChildDetailScreen}
-      options={{ headerTitle: 'Detail Anak' }}
-    />
-    <DashboardStack.Screen
-      name="DonaturList"
-      component={AdminCabangDonaturListScreen}
-      options={{ headerTitle: 'Daftar Donatur' }}
-    />
-    <DashboardStack.Screen
-      name="DonaturForm"
-      component={AdminCabangDonaturFormScreen}
-      options={{ headerTitle: 'Form Donatur' }}
-    />
-    <DashboardStack.Screen
-      name="DonaturDetail"
-      component={AdminCabangDonaturDetailScreen}
-      options={{ headerTitle: 'Detail Donatur' }}
-    />
-    <DashboardStack.Screen
-      name="DonaturFilter"
-      component={DonaturFilterScreen}
-      options={{ headerTitle: 'Filter Donatur' }}
-    />
-    <DashboardStack.Screen
       name="GpsApprovalScreen"
       component={GpsApprovalScreen}
       options={{ headerTitle: 'Persetujuan GPS' }}
@@ -110,21 +67,6 @@ const DashboardStackNavigator = () => (
       name="GpsApprovalDetailScreen"
       component={GpsApprovalDetailScreen}
       options={{ headerTitle: 'Detail Persetujuan GPS' }}
-    />
-    <DashboardStack.Screen
-      name="AdminCabangUserManagement"
-      component={AdminCabangUserManagementScreen}
-      options={{ headerTitle: 'Manajemen User Cabang' }}
-    />
-    <DashboardStack.Screen
-      name="AdminCabangUserForm"
-      component={AdminCabangUserFormScreen}
-      options={{ headerTitle: 'Form User Cabang' }}
-    />
-    <DashboardStack.Screen
-      name="AdminCabangUserDetail"
-      component={AdminCabangUserDetailScreen}
-      options={{ headerTitle: 'Detail User Cabang' }}
     />
   </DashboardStack.Navigator>
 );

@@ -16,6 +16,7 @@ class AnakPendidikan extends Model
 
     protected $fillable = [
         'id_keluarga',
+        'company_id',
         'jenjang',
         'kelas',
         'nama_sekolah',

@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Exception;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class TemplateAdoptionController extends Controller
 {
@@ -23,13 +25,14 @@ class TemplateAdoptionController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $query = TemplateAdoption::with([
                 'templateMateri.mataPelajaran',
                 'templateMateri.kelas.jenjang',
                 'templateMateri.createdBy'
             ])
-            ->byKacab($kacabId);
+            ->byKacab($kacabId, $companyId);
 
             // Filter by status
             $status = $request->get('status', 'pending');
@@ -104,6 +107,7 @@ class TemplateAdoptionController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $adoption = TemplateAdoption::with([
                 'templateMateri.mataPelajaran',
@@ -111,7 +115,7 @@ class TemplateAdoptionController extends Controller
                 'templateMateri.createdBy',
                 'materiHasil'
             ])
-            ->byKacab($kacabId)
+            ->byKacab($kacabId, $companyId)
             ->findOrFail($adoptionId);
 
             // Check if similar materi already exists
@@ -158,10 +162,11 @@ class TemplateAdoptionController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
             $userId = auth()->id();
 
             $adoption = TemplateAdoption::with('templateMateri')
-                ->byKacab($kacabId)
+                ->byKacab($kacabId, $companyId)
                 ->pending()
                 ->findOrFail($adoptionId);
 
@@ -192,6 +197,7 @@ class TemplateAdoptionController extends Controller
                 'id_mata_pelajaran' => $template->id_mata_pelajaran,
                 'id_kelas' => $template->id_kelas,
                 'id_kacab' => $kacabId,
+                'company_id' => $companyId,
                 'template_source_id' => $template->id_template_materi,
                 'nama_materi' => $template->nama_template,
                 'deskripsi' => $template->deskripsi,
@@ -256,10 +262,11 @@ class TemplateAdoptionController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
             $userId = auth()->id();
 
             $adoption = TemplateAdoption::with('templateMateri')
-                ->byKacab($kacabId)
+                ->byKacab($kacabId, $companyId)
                 ->pending()
                 ->findOrFail($adoptionId);
 
@@ -295,6 +302,7 @@ class TemplateAdoptionController extends Controller
                 'id_mata_pelajaran' => $template->id_mata_pelajaran,
                 'id_kelas' => $template->id_kelas,
                 'id_kacab' => $kacabId,
+                'company_id' => $companyId,
                 'template_source_id' => $template->id_template_materi,
                 'nama_materi' => $request->nama_materi,
                 'deskripsi' => $request->deskripsi,
@@ -369,10 +377,14 @@ class TemplateAdoptionController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
             $userId = auth()->id();
 
             $adoption = TemplateAdoption::byKacab($kacabId)
                 ->pending()
+                ->when($companyId && Schema::hasColumn('template_adoptions', 'company_id'), function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
                 ->findOrFail($adoptionId);
 
             $validator = Validator::make($request->all(), [
@@ -416,6 +428,7 @@ class TemplateAdoptionController extends Controller
     {
         try {
             $kacabId = auth()->user()->adminCabang->id_kacab;
+            $companyId = $this->companyId(auth()->user()->adminCabang->company_id ?? null);
 
             $query = TemplateAdoption::with([
                 'templateMateri.mataPelajaran',
@@ -423,7 +436,7 @@ class TemplateAdoptionController extends Controller
                 'materiHasil',
                 'adoptedBy'
             ])
-            ->byKacab($kacabId)
+            ->byKacab($kacabId, $companyId)
             ->whereIn('status', ['adopted', 'customized', 'skipped']);
 
             // Filter by status
@@ -470,5 +483,17 @@ class TemplateAdoptionController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Ambil company id dari SSO context atau fallback.
+     */
+    private function companyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
     }
 }

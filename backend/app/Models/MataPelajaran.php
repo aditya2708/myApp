@@ -22,7 +22,8 @@ class MataPelajaran extends Model
         'id_jenjang',
         'is_global',
         'target_jenjang',
-        'target_kelas'
+        'target_kelas',
+        'company_id'
     ];
 
     protected $casts = [
@@ -73,8 +74,9 @@ class MataPelajaran extends Model
         return $query->where('is_global', true);
     }
 
-    public function scopeByKacab($query, $kacabId)
+    public function scopeByKacab($query, $kacabId, ?int $companyId = null)
     {
-        return $query->where('id_kacab', $kacabId);
+        return $query->where('id_kacab', $kacabId)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId));
     }
 }

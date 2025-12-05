@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\Validator;
 
 class AdminShelterController extends Controller
 {
-    public function dashboard()
+    public function dashboard(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         $adminShelter = $user->adminShelter->load(['kacab', 'wilbin', 'shelter']);
         
         return response()->json([
@@ -20,9 +20,9 @@ class AdminShelterController extends Controller
         ]);
     }
 
-    public function getProfile()
+    public function getProfile(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         $adminShelter = $user->adminShelter->load(['kacab', 'wilbin', 'shelter']);
         
         return response()->json([
@@ -33,7 +33,7 @@ class AdminShelterController extends Controller
 
     public function updateProfile(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         $adminShelter = $user->adminShelter;
 
         $validator = Validator::make($request->all(), [

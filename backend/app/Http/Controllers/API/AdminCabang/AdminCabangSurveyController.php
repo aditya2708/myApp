@@ -8,6 +8,8 @@ use App\Models\Anak;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
+use App\Support\SsoContext;
 
 class AdminCabangSurveyController extends Controller
 {
@@ -20,12 +22,22 @@ class AdminCabangSurveyController extends Controller
         return $admin;
     }
 
+    private function companyId(?int $fallback = null): ?int
+    {
+        if (app()->bound(SsoContext::class) && app(SsoContext::class)->company()) {
+            return app(SsoContext::class)->company()->id;
+        }
+
+        return $fallback;
+    }
+
     public function index(Request $request)
     {
         $admin = $this->getAdminCabang();
+        $companyId = $this->companyId($admin->company_id ?? null);
         $status = $request->get('status', 'pending');
         
-        $query = Survey::byKacab($admin->id_kacab)->with([
+        $query = Survey::byKacab($admin->id_kacab, $companyId)->with([
             'keluarga' => fn($q) => $q->with([
                 'shelter.wilbin', 
                 'anak' => fn($anak) => $anak->select('id_anak', 'id_keluarga', 'full_name', 'nick_name', 'status_cpb', 'tanggal_lahir')
@@ -40,13 +52,25 @@ class AdminCabangSurveyController extends Controller
         };
 
         if ($request->shelter_id) {
-            $query->whereHas('keluarga', fn($q) => $q->where('id_shelter', $request->shelter_id));
+            $query->whereHas('keluarga', function ($q) use ($request, $companyId) {
+                $q->where('id_shelter', $request->shelter_id);
+
+                if ($companyId && Schema::hasColumn('keluarga', 'company_id')) {
+                    $q->where('company_id', $companyId);
+                }
+            });
         }
 
         if ($search = $request->search) {
-            $query->whereHas('keluarga', fn($q) => $q->where('kepala_keluarga', 'LIKE', "%{$search}%")
-                ->orWhere('no_kk', 'LIKE', "%{$search}%")
-                ->orWhereHas('anak', fn($anak) => $anak->where('full_name', 'LIKE', "%{$search}%")));
+            $query->whereHas('keluarga', function ($q) use ($search, $companyId) {
+                $q->where('kepala_keluarga', 'LIKE', "%{$search}%")
+                    ->orWhere('no_kk', 'LIKE', "%{$search}%")
+                    ->orWhereHas('anak', fn($anak) => $anak->where('full_name', 'LIKE', "%{$search}%"));
+
+                if ($companyId && Schema::hasColumn('keluarga', 'company_id')) {
+                    $q->where('company_id', $companyId);
+                }
+            });
         }
 
         return response()->json([
@@ -58,8 +82,9 @@ class AdminCabangSurveyController extends Controller
     public function show($id)
     {
         $admin = $this->getAdminCabang();
+        $companyId = $this->companyId($admin->company_id ?? null);
         
-        $survey = Survey::byKacab($admin->id_kacab)->with([
+        $survey = Survey::byKacab($admin->id_kacab, $companyId)->with([
             'keluarga' => fn($q) => $q->with([
                 'shelter.wilbin',
                 'kacab',
@@ -90,7 +115,8 @@ class AdminCabangSurveyController extends Controller
         }
 
         $admin = $this->getAdminCabang();
-        $survey = Survey::pending()->byKacab($admin->id_kacab)->find($id);
+        $companyId = $this->companyId($admin->company_id ?? null);
+        $survey = Survey::pending()->byKacab($admin->id_kacab, $companyId)->find($id);
 
         if (!$survey) {
             return response()->json(['message' => 'Survey not found or already processed'], 404);
@@ -105,6 +131,9 @@ class AdminCabangSurveyController extends Controller
             ]);
 
             Anak::where('id_keluarga', $survey->id_keluarga)
+                ->when($admin->company_id && Schema::hasColumn('anak', 'company_id'), function ($query) use ($admin) {
+                    $query->where('company_id', $admin->company_id);
+                })
                 ->where('status_cpb', 'BCPB')
                 ->update(['status_cpb' => 'CPB']);
 
@@ -128,7 +157,8 @@ class AdminCabangSurveyController extends Controller
         }
 
         $admin = $this->getAdminCabang();
-        $survey = Survey::pending()->byKacab($admin->id_kacab)->find($id);
+        $companyId = $this->companyId($admin->company_id ?? null);
+        $survey = Survey::pending()->byKacab($admin->id_kacab, $companyId)->find($id);
 
         if (!$survey) {
             return response()->json(['message' => 'Survey not found or already processed'], 404);
@@ -144,6 +174,9 @@ class AdminCabangSurveyController extends Controller
             ]);
 
             Anak::where('id_keluarga', $survey->id_keluarga)
+                ->when($admin->company_id && Schema::hasColumn('anak', 'company_id'), function ($query) use ($admin) {
+                    $query->where('company_id', $admin->company_id);
+                })
                 ->where('status_cpb', 'BCPB')
                 ->update(['status_cpb' => 'NPB']);
 
@@ -158,11 +191,12 @@ class AdminCabangSurveyController extends Controller
     public function getStats()
     {
         $admin = $this->getAdminCabang();
+        $companyId = $this->companyId($admin->company_id ?? null);
         
         $stats = [
-            'pending' => Survey::pending()->byKacab($admin->id_kacab)->count(),
-            'approved' => Survey::approved()->byKacab($admin->id_kacab)->count(),
-            'rejected' => Survey::rejected()->byKacab($admin->id_kacab)->count(),
+            'pending' => Survey::pending()->byKacab($admin->id_kacab, $companyId)->count(),
+            'approved' => Survey::approved()->byKacab($admin->id_kacab, $companyId)->count(),
+            'rejected' => Survey::rejected()->byKacab($admin->id_kacab, $companyId)->count(),
         ];
 
         return response()->json(['success' => true, 'data' => $stats]);

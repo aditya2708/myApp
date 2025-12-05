@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity
+  View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -31,7 +31,7 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
   const { profile, refreshUser } = useAuth();
   
   const [gpsConfig, setGpsConfig] = useState({
-    require_gps: true,
+    require_gps: false,
     latitude: '',
     longitude: '',
     max_distance_meters: 100,
@@ -53,9 +53,8 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
   useEffect(() => {
     if (profile?.shelter) {
       const requireGps = profile.shelter.require_gps;
-      const enforcedRequireGps = requireGps === false ? true : (requireGps ?? true);
       setGpsConfig({
-        require_gps: enforcedRequireGps,
+        require_gps: requireGps ?? false,
         latitude: profile.shelter.latitude?.toString() || '',
         longitude: profile.shelter.longitude?.toString() || '',
         max_distance_meters: profile.shelter.max_distance_meters || 100,
@@ -71,9 +70,8 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       if (response.data && response.data.data) {
         const data = response.data.data;
         const requireGps = data.require_gps;
-        const enforcedRequireGps = requireGps === false ? true : (requireGps ?? true);
         setGpsConfig({
-          require_gps: enforcedRequireGps,
+          require_gps: requireGps ?? false,
           latitude: data.latitude?.toString() || '',
           longitude: data.longitude?.toString() || '',
           max_distance_meters: data.max_distance_meters || 100,
@@ -94,9 +92,8 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       // Fallback to profile data if API fails
       if (profile?.shelter) {
         const requireGps = profile.shelter.require_gps;
-        const enforcedRequireGps = requireGps === false ? true : (requireGps ?? true);
         setGpsConfig({
-          require_gps: enforcedRequireGps,
+          require_gps: requireGps ?? false,
           latitude: profile.shelter.latitude?.toString() || '',
           longitude: profile.shelter.longitude?.toString() || '',
           max_distance_meters: profile.shelter.max_distance_meters || 100,
@@ -182,7 +179,7 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       setError(null);
       
       const updateData = {
-        require_gps: true,
+        require_gps: !!gpsConfig.require_gps,
         latitude: parseFloat(gpsConfig.latitude),
         longitude: parseFloat(gpsConfig.longitude),
         max_distance_meters: gpsConfig.max_distance_meters,
@@ -200,9 +197,8 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
       if (response.data && response.data.data) {
         const updatedData = response.data.data;
         const requireGps = updatedData.require_gps;
-        const enforcedRequireGps = requireGps === false ? true : requireGps ?? true;
         setGpsConfig({
-          require_gps: enforcedRequireGps,
+          require_gps: requireGps ?? false,
           latitude: updatedData.latitude?.toString() || '',
           longitude: updatedData.longitude?.toString() || '',
           max_distance_meters: updatedData.max_distance_meters || 100,
@@ -367,6 +363,12 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
               Siswa dan tutor harus berada di lokasi shelter untuk dapat melakukan absensi
             </Text>
           </View>
+          <Switch
+            value={gpsConfig.require_gps}
+            onValueChange={(value) => handleInputChange('require_gps', value)}
+            trackColor={{ false: '#dfe6e9', true: '#3498db' }}
+            thumbColor={gpsConfig.require_gps ? '#fff' : '#fff'}
+          />
         </View>
         
         {/* GPS Approval Status */}
@@ -453,7 +455,7 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
             title="Kirim untuk Persetujuan"
             onPress={handleSave}
             loading={loading}
-            disabled={loading || profile?.shelter?.gps_approval_status === 'pending'}
+            disabled={loading}
             fullWidth
           />
           
@@ -470,8 +472,8 @@ const ShelterGpsSettingScreen = ({ navigation }) => {
         <View style={styles.infoContainer}>
           <Ionicons name="information-circle" size={20} color="#3498db" />
           <Text style={styles.infoText}>
-            GPS setting yang Anda kirim akan direview oleh Admin Cabang sebelum diterapkan. 
-            Setting GPS saat ini akan tetap aktif sampai perubahan disetujui.
+            GPS setting langsung dipakai untuk validasi jarak. Admin Cabang tetap bisa meninjau, 
+            tetapi Anda tidak perlu menunggu persetujuan untuk memakainya.
           </Text>
         </View>
       </View>

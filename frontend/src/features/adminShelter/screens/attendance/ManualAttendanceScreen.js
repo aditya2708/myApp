@@ -6,7 +6,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { format, isFuture, isPast, startOfDay } from 'date-fns';
+import { format, differenceInCalendarDays, parseISO } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import NetInfo from '@react-native-community/netinfo';
 
@@ -22,11 +22,22 @@ import {
   selectDuplicateError, resetAttendanceError
 } from '../../redux/attendanceSlice';
 import OfflineSync from '../../utils/offlineSync';
+import LocationCaptureCard from '../../../../common/components/LocationCaptureCard';
+import { useLocationCapture } from '../../../../common/hooks/useLocationCapture';
 import {
   MANUAL_ATTENDANCE_ACTIVITY_SET,
   MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET,
 } from '../../constants/activityTypes';
 import { isActivityCompleted, blockIfCompleted } from '../../utils/activityStatusHelper';
+import MapPreview from '../../../../common/components/MapPreview';
+import {
+  selectIsQuickFlowActive,
+  selectQuickFlowActivityId,
+  selectQuickFlowStatus,
+  setQuickFlowActivity,
+  updateQuickFlowStep,
+  resetQuickFlow,
+} from '../../redux/quickFlowSlice';
 
 const STATUS_COLOR_MAP = {
   absent: '#e74c3c',
@@ -47,12 +58,16 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
   
   const { 
-    id_aktivitas, activityName, activityDate, kelompokId, kelompokIds, kelompokName, activityType, activityStatus 
+    id_aktivitas, activityName, activityDate, activityDateRaw, kelompokId, kelompokIds, kelompokName, activityType, activityStatus 
   } = route.params || {};
   
   const loading = useSelector(selectAttendanceLoading);
   const error = useSelector(selectAttendanceError);
   const duplicateError = useSelector(selectDuplicateError);
+  const quickFlowActive = useSelector(selectIsQuickFlowActive);
+  const quickFlowActivityId = useSelector(selectQuickFlowActivityId);
+  const quickFlowStatus = useSelector(selectQuickFlowStatus);
+  const isQuickFlow = (route?.params?.quickFlow || quickFlowActive) && (!quickFlowActivityId || quickFlowActivityId === id_aktivitas);
 
   const resolvedKelompokIds = useMemo(() => {
     const ids = [];
@@ -80,24 +95,15 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const footerPropsRef = useRef({});
   const ineligibleWarningShown = useRef(false);
 
-  const dateStatus = useMemo(() => {
-    if (!activityDate) {
-      return 'unknown';
-    }
-
-    const today = startOfDay(new Date());
-    const actDate = startOfDay(new Date(activityDate));
-
-    if (isFuture(actDate)) {
-      return 'future';
-    }
-
-    if (isPast(actDate)) {
-      return 'past';
-    }
-
-    return 'valid';
-  }, [activityDate]);
+  const {
+    data: locationPayload,
+    capturing: capturingLocation,
+    error: locationError,
+    isStale: isLocationStale,
+    lastCapturedAt: locationCapturedAt,
+    captureLocation,
+    ensureFreshLocation,
+  } = useLocationCapture({ ttl: 60 * 1000 });
 
   const activityDetailQuery = useQuery({
     queryKey: ['manualAttendanceActivityDetail', id_aktivitas],
@@ -117,6 +123,79 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   const activityDetails = activityDetailQuery.data || null;
   const loadingActivity = activityDetailQuery.isFetching;
 
+  const resolvedActivityDateRaw = useMemo(() => {
+    if (activityDetails?.tanggal) {
+      return activityDetails.tanggal;
+    }
+    if (activityDateRaw) {
+      return activityDateRaw;
+    }
+    return null;
+  }, [activityDetails?.tanggal, activityDateRaw]);
+
+  const parsedActivityDate = useMemo(() => {
+    if (!resolvedActivityDateRaw) {
+      return null;
+    }
+
+    const parsed = parseISO(resolvedActivityDateRaw);
+    if (!Number.isNaN(parsed?.getTime?.())) {
+      return parsed;
+    }
+
+    const fallback = new Date(resolvedActivityDateRaw);
+    return Number.isNaN(fallback?.getTime?.()) ? null : fallback;
+  }, [resolvedActivityDateRaw]);
+
+  const displayActivityDate = useMemo(() => {
+    if (activityDate) {
+      return activityDate;
+    }
+
+    if (parsedActivityDate) {
+      try {
+        return format(parsedActivityDate, 'EEEE, dd MMMM yyyy');
+      } catch (err) {
+        return parsedActivityDate.toDateString();
+      }
+    }
+
+    return 'Tanggal tidak ditentukan';
+  }, [activityDate, parsedActivityDate]);
+
+  const effectiveActivityStatus = useMemo(() => {
+    if (activityDetails?.status) {
+      return activityDetails.status;
+    }
+    return activityStatus || null;
+  }, [activityDetails?.status, activityStatus]);
+
+  const dateStatus = useMemo(() => {
+    if (!parsedActivityDate) {
+      return 'unknown';
+    }
+
+    const normalizedStatus = typeof effectiveActivityStatus === 'string'
+      ? effectiveActivityStatus.toLowerCase()
+      : '';
+
+    if (normalizedStatus === 'ongoing') {
+      return 'valid';
+    }
+
+    const dayDiff = differenceInCalendarDays(parsedActivityDate, new Date());
+
+    if (dayDiff > 0) {
+      return 'future';
+    }
+
+    if (dayDiff < 0) {
+      return 'past';
+    }
+
+    return 'valid';
+  }, [parsedActivityDate, effectiveActivityStatus]);
+
   const effectiveActivityType = useMemo(() => {
     if (activityDetails?.jenis_kegiatan) {
       return activityDetails.jenis_kegiatan;
@@ -135,6 +214,12 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
 
     return MANUAL_ATTENDANCE_ACTIVITY_LOWER_SET.has(effectiveActivityType.toLowerCase());
   }, [effectiveActivityType]);
+
+  useEffect(() => {
+    if (isManualEligible) {
+      captureLocation();
+    }
+  }, [captureLocation, isManualEligible]);
 
   const studentsQuery = useQuery({
     queryKey: [
@@ -263,6 +348,24 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     if (duplicateError) setShowDuplicate(true);
     return () => dispatch(resetAttendanceError());
   }, [duplicateError, dispatch]);
+
+  useEffect(() => {
+    if (!isQuickFlow || !id_aktivitas) {
+      return;
+    }
+
+    const status = activityStatus || activityDetails?.status || quickFlowStatus || '';
+    if (typeof status === 'string') {
+      const normalized = status.toLowerCase();
+      if (normalized === 'reported' || normalized === 'selesai' || normalized === 'complete' || normalized === 'done') {
+        dispatch(resetQuickFlow());
+        return;
+      }
+    }
+
+    dispatch(setQuickFlowActivity({ activityId: id_aktivitas, status }));
+    dispatch(updateQuickFlowStep('manualAttendance'));
+  }, [activityDetails?.status, activityStatus, dispatch, id_aktivitas, isQuickFlow, quickFlowStatus]);
   
   useEffect(() => {
     updateExpectedStatus();
@@ -291,6 +394,10 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
   // Check if activity is completed and block access
   useEffect(() => {
     const effectiveActivityStatus = activityStatus || activityDetails?.status;
+    // Izinkan absen manual jika status "reported" saja (laporan sudah dikirim) namun masih perlu absen
+    if (effectiveActivityStatus && effectiveActivityStatus.toLowerCase() === 'reported') {
+      return;
+    }
     if (blockIfCompleted(effectiveActivityStatus, navigation, 'absen manual')) {
       return;
     }
@@ -383,60 +490,38 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     );
   };
   
-  const handleSubmit = () => {
-    if (dateStatus === 'future') {
-      Alert.alert('Error', 'Aktivitas belum dimulai. Silakan tunggu sampai tanggal aktivitas.');
-      return;
-    }
-    
-    if (!selectedStudents.length) {
-      Alert.alert('Error', 'Silakan pilih minimal satu siswa');
-      return;
-    }
-
-    if (!notes) {
-      Alert.alert('Error', 'Silakan masukkan catatan verifikasi');
-      return;
-    }
-
-    const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
-    const attendancePayloads = selectedStudents.map(student => ({
-      id_anak: student.id_anak,
-      id_aktivitas,
-      status: null,
-      notes,
-      arrival_time: formattedTime
-    }));
-
-    if (dateStatus === 'past') {
-      Alert.alert(
-        'Aktivitas Lampau',
-        'Aktivitas ini sudah berlalu. Kehadiran akan ditandai sebagai tidak hadir. Lanjutkan?',
-        [
-          { text: 'Batal', style: 'cancel' },
-          { text: 'Lanjutkan', onPress: () => submitStudentAttendance(attendancePayloads) }
-        ]
-      );
-      return;
-    }
-
-    submitStudentAttendance(attendancePayloads);
-  };
-
-  const submitStudentAttendance = async (attendanceList) => {
+  const confirmProceedWithoutLocation = useCallback((reason) => new Promise((resolve) => {
+    Alert.alert(
+      'Lokasi belum tersedia',
+      `${reason || 'Tidak dapat mengambil lokasi saat ini.'}\nAnda dapat melanjutkan tanpa koordinat, tetapi catatan akan ditandai untuk review.`,
+      [
+        { text: 'Ambil Ulang', style: 'default', onPress: () => resolve(false) },
+        { text: 'Lanjutkan', onPress: () => resolve(true) },
+      ]
+    );
+  }), []);
+  
+  const submitStudentAttendance = useCallback(async (attendanceList, selectionSnapshot) => {
     if (!attendanceList || !attendanceList.length) {
       return;
     }
 
-    const currentSelection = [...selectedStudents];
+    const currentSelection = [...selectionSnapshot];
     const successIds = [];
     const duplicateIds = [];
     const errorDetails = [];
+    const flagNotices = [];
 
     for (const attendanceData of attendanceList) {
       try {
         if (isConnected) {
-          await dispatch(recordAttendanceManually(attendanceData)).unwrap();
+          const submitResult = await dispatch(recordAttendanceManually(attendanceData)).unwrap();
+          if (submitResult?.flags?.length) {
+            flagNotices.push({
+              id: attendanceData.id_anak,
+              flags: submitResult.flags,
+            });
+          }
         } else {
           await OfflineSync.processAttendance(attendanceData, 'manual');
         }
@@ -461,6 +546,8 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     const successCount = successIds.length;
     const duplicateCount = duplicateIds.length;
     const errorCount = errorDetails.length;
+    const shouldQuickFlowNavigate = isQuickFlow && !!id_aktivitas && successCount > 0;
+    const resolvedActivityStatus = activityDetails?.status || activityStatus || null;
 
     let summaryTitle = 'Ringkasan';
     let summaryMessage = '';
@@ -484,6 +571,19 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
       summaryMessage += `Gagal (${errorCount}): ${errorNames}.`;
     }
 
+    if (flagNotices.length > 0) {
+      if (summaryMessage) summaryMessage += '\n\n';
+      summaryMessage += 'Catatan lokasi otomatis:\n';
+      summaryMessage += flagNotices
+        .map(({ id, flags }) => {
+          const readableFlags = flags
+            .map((flag) => flag.message || flag.code || 'Perlu review')
+            .join('; ');
+          return `- ${getStudentName(id)}: ${readableFlags}`;
+        })
+        .join('\n');
+    }
+
     if (!summaryMessage) {
       summaryMessage = 'Tidak ada perubahan yang dicatat.';
     }
@@ -500,13 +600,98 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
           text: 'OK',
           onPress: () => {
             if (successCount > 0) {
-              navigation.goBack();
+              if (shouldQuickFlowNavigate) {
+                dispatch(setQuickFlowActivity(id_aktivitas));
+                dispatch(updateQuickFlowStep('activityReport'));
+                navigation.navigate('ActivityReport', {
+                  id_aktivitas,
+                  activityName,
+                  activityDate,
+                  activityStatus: resolvedActivityStatus,
+                  quickFlow: true,
+                });
+              } else {
+                navigation.goBack();
+              }
             }
           }
         }
       ]
     );
-  };
+  }, [activityDate, activityDetails?.status, activityName, activityStatus, dispatch, id_aktivitas, isConnected, isQuickFlow, navigation, setSelectedStudents, students]);
+
+  const handleSubmit = useCallback(async () => {
+    if (dateStatus === 'future') {
+      Alert.alert('Error', 'Aktivitas belum dimulai. Silakan tunggu sampai tanggal aktivitas.');
+      return;
+    }
+    
+    if (!selectedStudents.length) {
+      Alert.alert('Error', 'Silakan pilih minimal satu siswa');
+      return;
+    }
+
+    if (!notes) {
+      Alert.alert('Error', 'Silakan masukkan catatan verifikasi');
+      return;
+    }
+
+    let gpsDataForSubmission = locationPayload && !isLocationStale ? locationPayload : null;
+
+    if (!gpsDataForSubmission) {
+      const locationResult = await ensureFreshLocation();
+      if (locationResult.success) {
+        gpsDataForSubmission = locationResult.gpsData;
+      } else {
+        const proceed = await confirmProceedWithoutLocation(locationResult.error);
+        if (!proceed) {
+          return;
+        }
+      }
+    }
+
+    const formattedTime = format(arrivalTime, 'yyyy-MM-dd HH:mm:ss');
+    const attendancePayloads = selectedStudents.map(student => {
+      const payload = {
+        id_anak: student.id_anak,
+        id_aktivitas,
+        status: null,
+        notes,
+        arrival_time: formattedTime
+      };
+
+      if (gpsDataForSubmission) {
+        payload.gps_data = gpsDataForSubmission;
+      }
+
+      return payload;
+    });
+
+    if (dateStatus === 'past') {
+      Alert.alert(
+        'Aktivitas Lampau',
+        'Aktivitas ini sudah berlalu. Kehadiran akan ditandai sebagai tidak hadir. Lanjutkan?',
+        [
+          { text: 'Batal', style: 'cancel' },
+          { text: 'Lanjutkan', onPress: () => submitStudentAttendance(attendancePayloads, selectedStudents) }
+        ]
+      );
+      return;
+    }
+
+    submitStudentAttendance(attendancePayloads, selectedStudents);
+  }, [
+    arrivalTime,
+    dateStatus,
+    ensureFreshLocation,
+    confirmProceedWithoutLocation,
+    id_aktivitas,
+    isLocationStale,
+    locationPayload,
+    notes,
+    selectedStudents,
+    submitStudentAttendance,
+  ]);
   
   const closeDuplicateAlert = () => {
     setShowDuplicate(false);
@@ -571,8 +756,75 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
     []
   );
 
-  const Header = () => (
+  const renderHeader = useCallback(() => (
     <>
+      <View style={styles.activityInfo}>
+        <Text style={styles.activityName}>{activityName || 'Aktivitas'}</Text>
+        <Text style={styles.activityDate}>{displayActivityDate}</Text>
+        
+        {isManualEligible && kelompokName && (
+          <View style={styles.kelompokContainer}>
+            <Text style={styles.kelompokInfo}>Kelompok: {kelompokName}</Text>
+          </View>
+        )}
+      </View>
+      
+      {statusInfo.show && (
+        <View style={[styles.statusAlert, { backgroundColor: statusInfo.color }]}>
+          <Ionicons name={statusInfo.icon} size={18} color="#fff" />
+          <Text style={styles.statusText}>{statusInfo.text}</Text>
+        </View>
+      )}
+      
+      {!isConnected && (
+        <View style={styles.offlineIndicator}>
+          <Ionicons name="cloud-offline" size={18} color="#fff" />
+          <Text style={styles.offlineText}>Mode Offline - Data akan disinkronkan nanti</Text>
+        </View>
+      )}
+
+      <View style={styles.locationWrapper}>
+        <LocationCaptureCard
+          title="Lokasi Absensi"
+          description="Koordinat disimpan maksimal 60 detik. Ambil ulang jika berpindah tempat."
+          location={locationPayload}
+          isStale={isLocationStale}
+          capturing={capturingLocation}
+          error={locationError}
+          lastCapturedAt={locationCapturedAt}
+          onCapturePress={captureLocation}
+        />
+
+        <View style={styles.mapPreview}>
+          <MapPreview
+            location={locationPayload}
+            isStale={isLocationStale}
+            label="Lokasi Absensi"
+            height={200}
+          />
+        </View>
+      </View>
+      
+      {showDuplicate && (
+        <View style={styles.duplicateAlert}>
+          <Ionicons name="alert-circle" size={20} color="#fff" />
+          <Text style={styles.duplicateText}>
+            {duplicateError || 'Beberapa catatan kehadiran sudah ada untuk aktivitas ini'}
+          </Text>
+          <TouchableOpacity style={styles.duplicateClose} onPress={closeDuplicateAlert}>
+            <Ionicons name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {error && <ErrorMessage message={error} />}
+      {studentErrorMessage && (
+        <ErrorMessage
+          message={studentErrorMessage}
+          onRetry={() => studentsQuery.refetch()}
+        />
+      )}
+
       <Text style={styles.label}>
         {`Siswa${isManualEligible ? ` dari ${kelompokName || 'kelompok ini'}` : ''}`}
       </Text>
@@ -591,7 +843,31 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
         </View>
       )}
     </>
-  );
+  ), [
+    activityName,
+    displayActivityDate,
+    isManualEligible,
+    kelompokName,
+    statusInfo.color,
+    statusInfo.icon,
+    statusInfo.show,
+    statusInfo.text,
+    isConnected,
+    locationPayload,
+    isLocationStale,
+    capturingLocation,
+    locationError,
+    locationCapturedAt,
+    captureLocation,
+    showDuplicate,
+    duplicateError,
+    error,
+    studentErrorMessage,
+    studentsQuery,
+    closeDuplicateAlert,
+    isFormDisabled,
+    searchQuery,
+  ]);
   
   const isAnyLoading = loading || studentsQuery.isFetching || loadingActivity;
 
@@ -602,75 +878,35 @@ const ManualAttendanceScreen = ({ navigation, route }) => {
         style={styles.container}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 30}
       >
-        <View style={styles.activityInfo}>
-          <Text style={styles.activityName}>{activityName || 'Aktivitas'}</Text>
-          <Text style={styles.activityDate}>{activityDate || 'Tanggal tidak ditentukan'}</Text>
-          
-          {isManualEligible && kelompokName && (
-            <View style={styles.kelompokContainer}>
-              <Text style={styles.kelompokInfo}>Kelompok: {kelompokName}</Text>
-            </View>
-          )}
-        </View>
-        
-        {statusInfo.show && (
-          <View style={[styles.statusAlert, { backgroundColor: statusInfo.color }]}>
-            <Ionicons name={statusInfo.icon} size={18} color="#fff" />
-            <Text style={styles.statusText}>{statusInfo.text}</Text>
-          </View>
-        )}
-        
-        {!isConnected && (
-          <View style={styles.offlineIndicator}>
-            <Ionicons name="cloud-offline" size={18} color="#fff" />
-            <Text style={styles.offlineText}>Mode Offline - Data akan disinkronkan nanti</Text>
-          </View>
-        )}
-        
-        {showDuplicate && (
-          <View style={styles.duplicateAlert}>
-            <Ionicons name="alert-circle" size={20} color="#fff" />
-            <Text style={styles.duplicateText}>
-              {duplicateError || 'Beberapa catatan kehadiran sudah ada untuk aktivitas ini'}
-            </Text>
-            <TouchableOpacity style={styles.duplicateClose} onPress={closeDuplicateAlert}>
-              <Ionicons name="close" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        )}
-        
-        {error && <ErrorMessage message={error} />}
-        {studentErrorMessage && (
-          <ErrorMessage
-            message={studentErrorMessage}
-            onRetry={() => studentsQuery.refetch()}
-          />
-        )}
-        
         <View style={styles.formContainer}>
-          {isAnyLoading ? (
-            <ActivityIndicator size="large" color="#3498db" style={styles.loadingIndicator} />
-          ) : (
-            <FlatList
-              ref={flatListRef}
-              data={isFormDisabled ? [] : filteredStudents}
-              renderItem={renderStudentItem}
-              keyExtractor={(item) => item.id_anak.toString()}
-              ListHeaderComponent={Header}
-              ListFooterComponent={renderFooter}
-              ListEmptyComponent={!isFormDisabled ? <Text style={styles.emptyText}>Tidak ada siswa ditemukan</Text> : null}
-              contentContainerStyle={[styles.listContent, { paddingBottom: isFormDisabled ? 24 : 160 }]}
-              keyboardShouldPersistTaps="handled"
-              extraData={{
-                notes,
-                selectedStudents,
-                showTimePicker,
-                expectedStatus,
-                isFormDisabled,
-                loading
-              }}
-            />
-          )}
+          <FlatList
+            ref={flatListRef}
+            data={isFormDisabled ? [] : filteredStudents}
+            renderItem={renderStudentItem}
+            keyExtractor={(item) => item.id_anak.toString()}
+            ListHeaderComponent={renderHeader}
+            ListFooterComponent={renderFooter}
+            ListEmptyComponent={
+              isAnyLoading
+                ? <ActivityIndicator size="large" color="#3498db" style={styles.loadingIndicator} />
+                : !isFormDisabled
+                  ? <Text style={styles.emptyText}>Tidak ada siswa ditemukan</Text>
+                  : null
+            }
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: isFormDisabled ? 120 : 200 }
+            ]}
+            keyboardShouldPersistTaps="handled"
+            extraData={{
+              notes,
+              selectedStudents,
+              showTimePicker,
+              expectedStatus,
+              isFormDisabled,
+              loading
+            }}
+          />
         </View>
         
         {isAnyLoading && (
@@ -759,6 +995,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd',
     borderRadius: 8, padding: 12, fontSize: 16, minHeight: 100
   },
+  locationWrapper: { marginHorizontal: 16, marginBottom: 16 },
+  mapPreview: { marginTop: 12 },
   buttonSection: { marginTop: 8, marginBottom: 24, paddingHorizontal: 16 },
   submitButton: {
     backgroundColor: '#3498db', paddingVertical: 14, borderRadius: 8,

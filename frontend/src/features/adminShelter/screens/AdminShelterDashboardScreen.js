@@ -4,12 +4,12 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../../common/components/LoadingSpinner';
 import ErrorMessage from '../../../common/components/ErrorMessage';
-import DonationAdModal from '../../../common/components/DonationAdModal';
 import TodayActivitiesCard from '../components/TodayActivitiesCard';
 import { adminShelterApi } from '../api/adminShelterApi';
 import { useDispatch } from 'react-redux';
 import { fetchNotifications } from '../redux/notificationSlice';
 import { useDonationAd } from '../../../common/hooks/useDonationAd';
+import DonationAdModal from '../../../common/components/DonationAdModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,14 +27,13 @@ const AdminShelterDashboardScreen = () => {
     markActionTaken,
     refreshAd,
   } = useDonationAd();
-
   const menuItems = [
     { title: 'Keluarga', icon: 'home', color: '#1abc9c', onPress: () => navigation.navigate('Management', { screen: 'KeluargaManagement' }) },
     { title: 'Anak Binaan', icon: 'people', color: '#e74c3c', onPress: () => navigation.navigate('Management', { screen: 'AnakManagement' }) },
     { title: 'Tutor', icon: 'school', color: '#2ecc71', onPress: () => navigation.navigate('Management', { screen: 'TutorManagement' }) },
     { title: 'Keuangan', icon: 'wallet', color: '#f39c12', onPress: () => navigation.navigate('Management', { screen: 'KeuanganList' }) },
     { title: 'Kelola Kurikulum', icon: 'library', color: '#9b59b6', onPress: () => navigation.navigate('KurikulumHome') },
-    { title: 'Laporan Kegiatan', icon: 'bar-chart', color: '#e67e22', onPress: () => navigation.navigate('Management', { screen: 'LaporanKegiatanMain' }) }
+    { title: 'Laporan Kegiatan', icon: 'bar-chart', color: '#e67e22', onPress: () => navigation.navigate('Reports') }
   ];
 
   const fetchDashboardData = useCallback(async () => {

@@ -15,6 +15,7 @@ class Survey extends Model
 
     protected $fillable = [
         'id_keluarga',
+        'company_id',
         'pekerjaan_kepala_keluarga',
         'penghasilan',
         'pendidikan_kepala_keluarga',
@@ -96,10 +97,16 @@ class Survey extends Model
         return $query->where('hasil_survey', 'tidak layak');
     }
 
-    public function scopeByKacab($query, $kacabId)
+    public function scopeByKacab($query, $kacabId, ?int $companyId = null)
     {
         return $query->whereHas('keluarga', function ($q) use ($kacabId) {
             $q->where('id_kacab', $kacabId);
+        })
+        ->when($companyId, function ($query) use ($companyId) {
+            $query->where('company_id', $companyId);
+            $query->whereHas('keluarga', function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            });
         });
     }
 }

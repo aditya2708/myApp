@@ -17,6 +17,7 @@ class Ayah extends Model
         'id_keluarga',
         'nik_ayah',
         'nama_ayah',
+        'company_id',
         'agama',
         'tempat_lahir',
         'tanggal_lahir',
